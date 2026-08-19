@@ -104,3 +104,10 @@ InitTestScene*.unity*
 
 # Auto-generated cache in Assets folder
 /[Aa]ssets/[Ss]ceneDependencyCache*
+
+# Collect files module
+collect_files.bat
+collect_files.py
+collected_files.txt
+collected_files_groups.js
+collected_files_prefix.txt
