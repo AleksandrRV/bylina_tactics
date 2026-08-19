@@ -141,7 +141,22 @@ interface MapGenConfig {
 
 ---
 
-## 5. Состязательный набор (`pvp.json5`)
+## 5. Быстрый матч (`quick-match.json5`)
+
+```typescript
+interface QuickMatchConfig {
+  playerSlots: [string, string, string]; // ближний, дистанционный, поддержка
+  enemyPool: [string, string, string];   // три рядовых типа
+  difficulties: {
+    id: "easy" | "normal" | "hard";
+    enemyCount: number;                  // ≥ 1; единственный параметр трудности
+  }[];
+}
+```
+
+Состав противников набирается из `enemyPool` случайно до указанной численности; повторы типа допускаются. Поле строится по `MapGenConfig` заготовки `quick_match`.
+
+## 6. Состязательный набор (`pvp.json5`)
 
 ```typescript
 interface PvpConfig {
@@ -153,6 +168,6 @@ interface PvpConfig {
 
 ---
 
-## 6. Тексты
+## 7. Тексты
 
 Строки, видимые человеку, в файлы настоящего документа не помещаются. Соответствие `id` → текст хранится в словарях модуля локализации. Конфигурация ссылается только на идентификаторы.
