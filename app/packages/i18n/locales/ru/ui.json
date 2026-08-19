@@ -1,0 +1,35 @@
+{
+  "app": {
+    "title": "Былина",
+    "fullTitle": "Былина: Тьма Кощея",
+    "subtitle": "Тьма Кощея",
+    "version": "Версия {version}"
+  },
+  "boot": {
+    "loading": "Загрузка…"
+  },
+  "menu": {
+    "quickMatch": "Быстрый матч",
+    "campaign": "Новая былина",
+    "pvp": "Потешные бои",
+    "settings": "Настройки",
+    "install": "Установить игру",
+    "unavailableTitle": "Режим ещё не открыт",
+    "unavailableBody": "Этот режим будет доступен в версии {version}.",
+    "unavailableHint": "Сейчас можно проверить меню, настройки и смену языка."
+  },
+  "settings": {
+    "title": "Настройки",
+    "language": "Язык",
+    "languageHint": "Подписи меняются сразу. Выбор сохраняется на этом устройстве.",
+    "masterVolume": "Общая громкость",
+    "musicVolume": "Музыка",
+    "sfxVolume": "Действия",
+    "back": "Назад в меню"
+  },
+  "common": {
+    "ok": "Понятно",
+    "close": "Закрыть",
+    "notReady": "Недоступно"
+  }
+}

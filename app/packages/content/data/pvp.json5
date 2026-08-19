@@ -1,0 +1,5 @@
+{
+  pool: [],
+  nMin: 1,
+  objective: "choice",
+}

@@ -1,0 +1,7 @@
+{
+  "fallback": "ru",
+  "languages": [
+    { "code": "ru", "bcp47": "ru", "dir": "ltr", "nativeName": "Русский" },
+    { "code": "en", "bcp47": "en", "dir": "ltr", "nativeName": "English" }
+  ]
+}

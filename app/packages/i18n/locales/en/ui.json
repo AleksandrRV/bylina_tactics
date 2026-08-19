@@ -1,0 +1,35 @@
+{
+  "app": {
+    "title": "Bylina",
+    "fullTitle": "Bylina: Koschei's Darkness",
+    "subtitle": "Koschei's Darkness",
+    "version": "Version {version}"
+  },
+  "boot": {
+    "loading": "Loading…"
+  },
+  "menu": {
+    "quickMatch": "Quick Match",
+    "campaign": "New Tale",
+    "pvp": "Exhibition Battles",
+    "settings": "Settings",
+    "install": "Install game",
+    "unavailableTitle": "This mode is not available yet",
+    "unavailableBody": "This mode will open in version {version}.",
+    "unavailableHint": "You can already review the menu, settings, and language switch."
+  },
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "languageHint": "Labels update immediately. The choice is stored on this device.",
+    "masterVolume": "Master volume",
+    "musicVolume": "Music",
+    "sfxVolume": "Actions",
+    "back": "Back to menu"
+  },
+  "common": {
+    "ok": "OK",
+    "close": "Close",
+    "notReady": "Unavailable"
+  }
+}

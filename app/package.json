@@ -1,0 +1,22 @@
+{
+  "name": "bylina",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.34.5",
+  "scripts": {
+    "dev": "pnpm --filter @bylina/game-pwa dev",
+    "build": "pnpm --filter @bylina/game-pwa build",
+    "preview": "pnpm --filter @bylina/game-pwa preview --host 0.0.0.0",
+    "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "sharp"
+    ]
+  }
+}

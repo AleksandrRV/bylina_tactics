@@ -1,0 +1,6 @@
+{
+  "name": "@bylina/signaling-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Ретранслятор установления соединения. Поставка — с версии 0.17.0."
+}

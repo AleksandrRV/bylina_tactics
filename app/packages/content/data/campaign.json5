@@ -1,0 +1,10 @@
+{
+  // Пустая, но допустимая запись кампании. Содержание появится на этапе 3.
+  rosterCap: 8,
+  deployMin: 1,
+  deployMax: 5,
+  classUnlockLevel: 2,
+  woundHpRatio: 0.3,
+  darknessMax: 20,
+  needleMissionId: "needle",
+}

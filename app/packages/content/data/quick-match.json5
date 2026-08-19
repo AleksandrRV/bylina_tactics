@@ -1,0 +1,10 @@
+{
+  // Слоты и пул заданы идентификаторами. Записи юнитов появятся в 0.4.0–0.5.0.
+  playerSlots: ["bogatyr", "strelets", "znaharka"],
+  enemyPool: ["upyr", "leshy", "kikimora"],
+  difficulties: [
+    { id: "easy", enemyCount: 3 },
+    { id: "normal", enemyCount: 5 },
+    { id: "hard", enemyCount: 8 },
+  ],
+}
