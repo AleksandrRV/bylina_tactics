@@ -33,6 +33,14 @@ node -v
 npm -v
 ```
 
+При отказе «running scripts is disabled» выполнить **один раз** в PowerShell:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+Подтвердить `Y`. Это разрешает локальные сценарии текущего пользователя и не меняет политику машины.
+
 Ожидается строка вида `v20.x.x` и номер npm. Если команда не найдена — выйти из учётной записи и войти снова либо проверить `PATH`.
 
 ### 2.2. pnpm
@@ -51,18 +59,6 @@ pnpm -v
 npm install -g pnpm
 pnpm -v
 ```
-
-### 2.3. Политика выполнения сценариев
-
-При отказе «running scripts is disabled» выполнить **один раз** в PowerShell:
-
-```powershell
-Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
-```
-
-Подтвердить `Y`. Это разрешает локальные сценарии текущего пользователя и не меняет политику машины.
-
----
 
 ## 3. Получение проекта и установка зависимостей
 
