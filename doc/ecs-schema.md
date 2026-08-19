@@ -1,189 +1,160 @@
-# Схема компонентов ECS (bitECS Schema)
-## Проект: «Былина: Тьма Кощея»
-**Версия:** 1.0.0
+# Схема исполнительной среды
+## «Былина: Тьма Кощея», версия 1.1
 
-## 1. Золотые правила `bitECS` в нашем проекте
-1. **Никаких строк и объектов в Компонентах.** `bitECS` оперирует только числами. Строки (ID игроков, строковые названия классов) хранятся во внешних словарях (Lookup Maps), а в компоненте хранится целочисленный индекс.
-2. **Entity — это просто число (ID).** Богатырь — это число `42`. Укрытие — это число `15`. Суть сущности определяется тем, какие компоненты на нее "навешаны".
-3. **Флаги (Tags) — это пустые компоненты.** Если сущность мертва, мы не делаем `Health.isDead = 1`, мы добавляем на нее компонент-тег `Dead`. Это ускоряет работу систем.
+Предмет ведения: компоненты и архетипы bitECS, словари индексов, перечень систем как набор запросов к данным. Правила изменения значений изложены в документе «Игровая математика». Поля исходных записей — в документе «Схема конфигурации». Формат выгрузки — в документе «Контракты обмена».
 
 ---
 
-## 2. Словари (Lookup Maps)
-Так как мы не можем хранить строки в ECS, модуль ядра предоставляет глобальные словари:
-*   `ConfigMap`: Массив строк-идентификаторов из JSON5. (Например: `1 -> 'bogatyr'`, `2 -> 'leshy'`, `3 -> 'tree_large'`).
-*   `PlayerMap`: Массив строк (WebRTC ID). (Например: `0 -> null (Нейтрал)`, `1 -> 'host-uuid'`, `2 -> 'client-uuid'`).
+## 1. Обязательные правила среды
+
+1. Компонент содержит только числовые поля. Строковые идентификаторы хранятся во внешних словарях; в компоненте хранится целочисленный индекс.
+2. Сущность есть целочисленный идентификатор. Смысл сущности определяется набором навешанных компонентов.
+3. Логический признак без величины представляется пустым компонентом-меткой. Запрещается кодировать такие признаки полями вида «равно единице».
+4. Живая сущность имеет ровно один компонент положения и занимает ровно одну клетку. Компонент размера не вводится.
+5. Ярус поверхности, признак ямы и признак глухой стены принадлежат массиву клеток поля, а не исполнительной среде сущностей. В среде хранится только то, что перемещается, разрушается или носит состояния.
 
 ---
 
-## 3. Описание Компонентов (Components Schema)
+## 2. Словари
 
-Ниже представлены определения компонентов на TypeScript/bitECS.
+`ConfigMap`: целое без знака шириной 16 бит → идентификатор записи конфигурации.
 
-### 3.1. Идентификация и Принадлежность
+`PlayerMap`: 0 — нейтральная принадлежность (среда); положительные значения — участники и сторона, управляемая алгоритмом.
+
+Числовые характеристики при создании сущности копируются из записи конфигурации в компоненты. Дальнейшее изменение характеристик в бою выполняется системами, а не повторным чтением записи, за исключением справки по оружию и умениям: оружие и умения с сущности не копируются и читаются по идентификаторам записи.
+
+---
+
+## 3. Компоненты
+
+### 3.1. Отождествление
 
 ```typescript
-import { defineComponent, Types } from 'bitecs';
-
-// Ссылка на JSON-конфиг сущности (класс, тип укрытия)
 export const ConfigReference = defineComponent({
-  index: Types.ui16 // Индекс в глобальном массиве ConfigMap (до 65535 типов)
+  index: Types.ui16,
 });
 
-// Кто управляет юнитом
 export const Owner = defineComponent({
-  playerIndex: Types.ui8 // 0 = Нейтрал/Окружение, 1 = Игрок 1, 2 = Игрок 2, 3 = AI Нечисть
+  playerIndex: Types.ui8,
 });
 ```
 
-### 3.2. Пространственные данные (Сетка)
-У карты 3 уровня высоты, размер поля вряд ли превысит 256x256 клеток, поэтому `ui8` (от 0 до 255) идеально подходит.
+### 3.2. Положение
 
 ```typescript
 export const Position = defineComponent({
   x: Types.ui8,
   y: Types.ui8,
-  z: Types.ui8  // Уровень высоты: 0 (низина), 1 (земля), 2 (возвышенность)
+  z: Types.ui8, // ярус поверхности 0…2
 });
 
-// Направление взгляда (для флангирования)
 export const Orientation = defineComponent({
-  direction: Types.ui8 // 0: North, 1: East, 2: South, 3: West
+  direction: Types.ui8, // 0 север, 1 восток, 2 юг, 3 запад
 });
 ```
 
-### 3.3. Боевые параметры (Stats)
+Компонента флангового охвата не существует: охват вычисляется для пары сущностей в момент разрешения атаки.
+
+### 3.3. Боевые величины
 
 ```typescript
 export const Health = defineComponent({
-  current: Types.i16, // Может уйти в минус (overkill)
-  max: Types.i16
+  current: Types.i16,
+  max: Types.i16,
 });
 
 export const ActionPoints = defineComponent({
   current: Types.i8,
-  max: Types.i8 // Обычно 2
+  max: Types.i8,
 });
 
-// Базовые статы юнита (модифицируются экипировкой/баффами)
 export const CombatStats = defineComponent({
-  mobility: Types.ui8, // На сколько клеток может пройти за 1 ОД
-  aim: Types.i8,       // Базовая меткость (может быть отрицательной при дебаффах)
-  defense: Types.i8,   // Базовая защита (уклонение)
-  will: Types.ui8      // Воля (сопротивление панике/магии Волхва)
+  mobility: Types.ui8,
+  aim: Types.i8,
+  defense: Types.i8,
+  will: Types.ui8,
+  vision: Types.ui8,
 });
 ```
 
-### 3.4. Окружение и Укрытия (Environment)
+### 3.4. Среда как сущность
 
 ```typescript
 export const Cover = defineComponent({
-  type: Types.ui8, // 1 = Полуукрытие (Пень), 2 = Полное (Изба)
-  hp: Types.i8     // Прочность укрытия (если разрушаемое). При hp <= 0 type снижается на 1.
+  type: Types.ui8, // 2 — полное, 1 — неполное
 });
 
-// Тег препятствия (Блокирует перемещение)
 export const ObstacleTag = defineComponent();
-
-// Тег Ямы (Убивает при попадании на эту клетку)
-export const PitTag = defineComponent();
 ```
 
-### 3.5. Статусы и Эффекты (Status Tags)
-Теги не имеют данных, их присутствие на сущности означает наличие статуса.
+Яма и глухая стена в компоненты не входят.
+
+### 3.5. Метки состояний
 
 ```typescript
-export const DeadTag = defineComponent(); // Сущность мертва (игнорируется в боевке)
-export const OverwatchTag = defineComponent(); // Сущность в дозоре ("Стеречь")
-export const FlankedTag = defineComponent(); // Сущность открыта с фланга (пересчитывается каждый ход)
+export const DeadTag = defineComponent();
+export const OverwatchTag = defineComponent();
+export const FlyingTag = defineComponent();
+export const HiddenTag = defineComponent();
+export const PanickedTag = defineComponent();
+export const ImmobilizedTag = defineComponent();
 
-// Пример эффекта с таймером
 export const Poisoned = defineComponent({
   damagePerTurn: Types.ui8,
-  turnsLeft: Types.ui8
+  turnsLeft: Types.ui8,
+});
+
+export const TimedLife = defineComponent({
+  turnsLeft: Types.ui8,
+});
+
+export const PanicSource = defineComponent({
+  entityId: Types.ui32, // источник, от которого выполняется бегство
 });
 ```
 
 ---
 
-## 4. Архитипы (Entity Archetypes / Префабы)
+## 4. Архетипы
 
-В `bitECS` нет классов, но есть функции-фабрики (Assemblers), которые собирают сущность из компонентов. Вот из чего состоят ключевые объекты игры.
+**Боец стороны** (герой, рядовой противник, генерал, призванный зверь, иллюзия):  
+`Position`, `Orientation`, `ConfigReference`, `Owner`, `Health`, `ActionPoints`, `CombatStats`, `ObstacleTag`.  
+По записи конфигурации дополнительно: `FlyingTag`, `HiddenTag`, `TimedLife`.  
+Иллюзия получает `Health.max = 1` согласно записи.
 
-### Архитип: Герой (Богатырь / Стрелец)
-Состав компонентов:
-*   `Position`
-*   `Orientation`
-*   `ConfigReference` (указывает на 'bogatyr')
-*   `Owner` (указывает на Игрока)
-*   `Health` (current: 10, max: 10)
-*   `ActionPoints` (current: 2, max: 2)
-*   `CombatStats` (mobility: 6, aim: 65, defense: 0, will: 40)
-*   `ObstacleTag` (через юнита нельзя пройти насквозь)
+**Укрытие:**  
+`Position`, `ConfigReference`, `Cover`, `ObstacleTag`. Признак глухой стены на эту сущность не устанавливается.
 
-### Архитип: Укрытие (Вековой Дуб - Полное, разрушаемое)
-Состав компонентов:
-*   `Position`
-*   `ConfigReference` (указывает на 'tree_oak')
-*   `Cover` (type: 2, hp: 2)  *// hp: 2 означает, что первый удар превратит его в полу-укрытие (пень)*
-*   `ObstacleTag`
-
-### Архитип: Яма (Ловушка)
-Состав компонентов:
-*   `Position`
-*   `PitTag`
+**Поле боя** как сущность не создаётся.
 
 ---
 
-## 5. Как работают Системы (Systems Overview)
+## 5. Системы
 
-Системы (Systems) — это чистые функции в `core-tactics`, которые каждую итерацию (или при получении Команды) фильтруют сущности по их компонентам и изменяют данные.
+Система — чистая функция, отбирающая сущности запросом и изменяющая компоненты. Новое правило состояния оформляется новой меткой и новой системой, а не дополнительным полем в `CombatStats`.
 
-**Пример фильтрации (Query):**
-```typescript
-import { defineQuery } from 'bitecs';
+Порядок вызова в начале хода стороны задан документом «Игровая математика», раздел 16.
 
-// Найти всех живых юнитов, у которых есть здоровье и которые отравлены
-const poisonedQuery = defineQuery([Health, Poisoned, Not(DeadTag)]);
+| Система | Читает | Пишет |
+|---|---|---|
+| PoisonSystem | `Health`, `Poisoned`, отсутствие `DeadTag` | `Health`, `Poisoned`, `DeadTag` |
+| TimedLifeSystem | `TimedLife`, `Owner` | снятие сущности |
+| OverwatchResetSystem | `OverwatchTag`, `Owner` | снятие `OverwatchTag` |
+| ActionRefillSystem | `ActionPoints`, отсутствие `DeadTag` | `ActionPoints.current` |
+| PanicSystem | `PanickedTag`, `PanicSource`, `Position` | `Position`, `ActionPoints` |
+| CommandSystem | команда, соответствующие компоненты | по виду команды |
+| ThresholdSystem | `Health`, запись `fleeHp` | удаление сущности |
+| DeathSystem | `Health.current ≤ 0` | `DeadTag`, снятие `ObstacleTag` и боевых меток |
+| ObjectiveSystem | положение носителя, клетки `homeOwner` | событие завершения сражения |
 
-export function PoisonSystem(world) {
-  const entities = poisonedQuery(world);
-  for (let i = 0; i < entities.length; i++) {
-    const eid = entities[i];
-    
-    // Наносим урон
-    Health.current[eid] -= Poisoned.damagePerTurn[eid];
-    Poisoned.turnsLeft[eid] -= 1;
-    
-    // Генерируем событие для UI/Render
-    emitEvent({ type: 'STAT_CHANGED', entityId: eid, stat: 'HP' ... });
+Запрос перемещаемых юнитов: наличие `ActionPoints`, отсутствие `DeadTag`, `PanickedTag`, `ImmobilizedTag`, при `ActionPoints.current > 0`.
 
-    // Если умер от яда
-    if (Health.current[eid] <= 0) {
-      addComponent(world, DeadTag, eid);
-      emitEvent({ type: 'ENTITY_DIED', entityId: eid });
-    }
-    
-    // Снимаем яд, если время вышло
-    if (Poisoned.turnsLeft[eid] <= 0) {
-      removeComponent(world, Poisoned, eid);
-    }
-  }
-  return world;
-}
-```
+Запрос юнитов, способных действовать с места: тот же набор без исключения `ImmobilizedTag`.
 
 ---
 
-## 6. Сериализация состояния (Для сохранения и WebRTC)
+## 6. Выгрузка
 
-Главное преимущество использования SoA (TypedArrays) в `bitECS` — возможность выгрузить **все** данные об игре в виде бинарного массива за 0 миллисекунд.
+Функция выгрузки обходит сущности и массив клеток поля и формирует снимок, описанный в документе «Контракты обмена». Индексы словаря конфигурации заменяются строковыми идентификаторами.
 
-Однако, для JS-контекста и передачи по WebRTC через JSON-конверты, модуль Ядра предоставляет утилиту `SerializeWorld`:
-Она проходит по всем `entities` в мире и собирает их в плоский JSON объект (описанный в *Спецификации Контрактов -> SyncPayload*), переводя индексы `ConfigReference` обратно в строковые ключи для UI.
-
----
-## Итог для Core-программистов
-1. Если вам нужно добавить новую механику (например, "Оглушение"), **НЕ** добавляйте поле `isStunned` в `CombatStats`. Создайте новый пустой компонент `StunnedTag` и вешайте его на сущность.
-2. Логика проверки (кто может ходить) меняется на запрос: `defineQuery([ActionPoints, Not(DeadTag), Not(StunnedTag)])`. 
-3. Это гарантирует, что компоненты остаются легковесными, а системы не требуют переписывания при расширении игры.
+Полный снимок строится только у ведущего. Ведомому передаётся снимок после исключения сведений, не принадлежащих его стороне, по правилам документа «Контракты обмена».

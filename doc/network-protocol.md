@@ -1,228 +1,350 @@
-# Спецификация контрактов данных (API / Network Protocol)
-## Проект: «Былина: Тьма Кощея»
-**Версия:** 1.0.0
-**Формат обмена:** JSON (сериализация/десериализация строк). В будущем, для оптимизации WebRTC, возможен переход на бинарный формат (MessagePack), но структура останется идентичной.
+# Контракты обмена
+## «Былина: Тьма Кощея», версия 1.1
+
+Предмет ведения: форматы сообщений между интерфейсом, модулем сессии, исполнительной средой и каналом связи. Правила вычисления видимости, дальности и урона в настоящий документ не входят; ведущий применяет документ «Игровая математика» и передаёт только результаты.
+
+Кодирование: JSON. Допускается последующий переход на MessagePack при сохранении настоящей схемы полей.
 
 ---
 
-## 1. Базовые принципы (Паттерны)
+## 1. Принципы
 
-1.  **Commands (Команды) — это *намерения*.** Игрок (или UI) отправляет команду. Ядро (Хост) имеет право её отклонить (например, если игрок пытается сходить чужим юнитом или у него нет ОД).
-2.  **Events (События) — это *факты*.** Ядро вычисляет команду и рассылает события. Они не подлежат сомнению. Рендер и UI просто реагируют на них.
-3.  **Батчинг (Batching).** Одна команда может породить каскад событий. Пример: `CommandAttack` -> `[EventAttackFired, EventDamageTaken, EventCoverDestroyed, EventEntityDied]`. Массив событий должен проигрываться Рендером строго последовательно.
+1. Команда выражает намерение. Ведущий вправе отклонить её.
+2. Событие выражает совершившийся факт. Средство отображения и интерфейс не оспаривают события.
+3. Одна команда порождает упорядоченный набор событий. Набор воспроизводится строго в указанном порядке.
+4. Поля маршрута и цели, присланные ведомым, не являются источником истины. Ведущий выполняет полную проверку допустимости.
+5. Каждому получателю направляются только сведения, доступные его стороне согласно разделу о поле зрения документа «Игровая математика». Наблюдатель по умолчанию получает объединение сведений обеих сторон. Если в комнате сбора включён полный обзор наблюдателя, наблюдатель получает полный снимок. Признак скрытности исключает сущность из чужих сообщений до снятия признака.
+6. Живая сущность не имеет полей ширины и высоты области.
 
 ---
 
-## 2. Структура сетевого конверта (WebRTC Message Envelope)
-
-Любое сообщение, передаваемое через `module-network`, оборачивается в стандартизированный конверт.
+## 2. Конверт
 
 ```typescript
-// Общий конверт для всех сетевых пакетов
 interface NetworkMessage {
-  type: "COMMAND" | "EVENT_BATCH" | "SYNC_REQUEST" | "SYNC_PAYLOAD" | "PING";
-  senderId: string; // Идентификатор пира (WebRTC peer ID)
+  type:
+    | "COMMAND"
+    | "EVENT_BATCH"
+    | "SYNC_REQUEST"
+    | "SYNC_PAYLOAD"
+    | "QUERY"
+    | "QUERY_RESULT"
+    | "REJECT"
+    | "PING";
+  senderId: string;
   timestamp: number;
-  payload: any; // В зависимости от 'type'
+  payload: unknown;
 }
 ```
 
+Отклонение команды:
+
+```typescript
+interface RejectPayload {
+  commandType: string;
+  reason:
+    | "ILLEGAL"
+    | "OUT_OF_RANGE"
+    | "NO_LOS"
+    | "NO_AP"
+    | "NOT_YOUR_TURN"
+    | "OCCUPIED"
+    | "NOT_FOUND";
+}
+```
+
+Текст причины не должен раскрывать наличие скрытой сущности или содержимое ненаблюдаемой клетки. Для таких случаев применяется `ILLEGAL` либо `OUT_OF_RANGE` без уточнения.
+
 ---
 
-## 3. Команды (Inputs: UI ➔ Session ➔ Core)
+## 3. Команды
 
-UI формирует команду и передает её в Контроллер Сессии, который упаковывает её в сетевой конверт.
-
-### Базовый тип Команды
 ```typescript
 type CommandType = "MOVE" | "ATTACK" | "OVERWATCH" | "USE_SKILL" | "END_TURN";
 
 interface BaseCommand {
   type: CommandType;
-  actorId: number; // ECS ID сущности, которая совершает действие
+  actorId: number;
 }
-```
 
-### Спецификации конкретных команд (Payloads)
-
-**1. Перемещение (`MOVE`)**
-```typescript
 interface CommandMove extends BaseCommand {
   type: "MOVE";
-  path: { x: number, y: number, z: number }[]; // Запрашиваемый маршрут от A до B
+  to: { x: number; y: number; z: number };
+  path?: { x: number; y: number; z: number }[];
 }
-```
 
-**2. Атака оружием (`ATTACK`)**
-```typescript
 interface CommandAttack extends BaseCommand {
   type: "ATTACK";
-  targetId: number; // Кого бьем
-  weaponId: string; // Чем бьем (из конфига, напр. 'sword_kladenets')
+  targetId: number;
+  weaponId: string;
 }
-```
 
-**3. Использование навыка (`USE_SKILL`)**
-```typescript
 interface CommandUseSkill extends BaseCommand {
   type: "USE_SKILL";
-  skillId: string; // Напр. 'heal_water' или 'whistle_strike'
-  targetId?: number; // Опционально (если скилл таргетный)
-  targetPos?: { x: number, y: number, z: number }; // Опционально (если скилл по площади - AoE)
+  skillId: string;
+  targetId?: number;
+  targetPos?: { x: number; y: number; z: number };
 }
-```
 
-**4. Встать в дозор (`OVERWATCH`)**
-```typescript
 interface CommandOverwatch extends BaseCommand {
   type: "OVERWATCH";
-  // actorId тратит оставшиеся ОД и ждет хода противника
 }
-```
 
-**5. Завершение хода (`END_TURN`)**
-```typescript
 interface CommandEndTurn {
   type: "END_TURN";
-  playerId: string; // Кто передает ход
+  playerId: string;
 }
 ```
 
 ---
 
-## 4. События (Outputs: Core ➔ Event Bus ➔ UI / Render)
+## 4. Запросы предпросмотра
 
-Когда Хост обрабатывает команду, он рассылает `EVENT_BATCH` (массив событий).
+Запрос не изменяет состояние и не обращается к генератору случайных чисел. Ведущий отвечает только по клеткам и сущностям, уже наблюдаемым стороной запрашивающего. В противном случае возвращается `available: false` без указания причины.
 
-### Базовый тип События
 ```typescript
-type GameEventType = 
-  | "TURN_CHANGED" 
-  | "ENTITY_MOVED" 
-  | "COMBAT_RESOLVED" 
-  | "STAT_CHANGED" 
-  | "ENTITY_DIED" 
-  | "COVER_DESTROYED";
+type QueryType = "REACHABLE" | "HIT" | "VISIBLE";
 
-interface BaseEvent {
-  type: GameEventType;
+interface QueryReachable {
+  type: "REACHABLE";
+  actorId: number;
+}
+
+interface QueryReachableResult {
+  type: "REACHABLE";
+  cells: {
+    x: number;
+    y: number;
+    z: number;
+    mpCost: number;
+    apCost: 1 | 2;
+  }[];
+}
+
+interface QueryHit {
+  type: "HIT";
+  actorId: number;
+  targetId: number;
+  weaponId?: string;
+  skillId?: string;
+}
+
+interface QueryHitResult {
+  type: "HIT";
+  available: boolean;
+  chance?: number;
+  dmgMin?: number;
+  dmgMax?: number;
+  cover?: 0 | 1 | 2;
+  heightMod?: -1 | 0 | 1;
+  flanked?: boolean;
+}
+
+interface QueryVisible {
+  type: "VISIBLE";
+}
+
+interface QueryVisibleResult {
+  type: "VISIBLE";
+  visible: { x: number; y: number }[];
+  seen: { x: number; y: number }[];
 }
 ```
 
-### Спецификации конкретных событий
+---
 
-**1. Смена хода (`TURN_CHANGED`)**
+## 5. События
+
 ```typescript
-interface EventTurnChanged extends BaseEvent {
+type GameEventType =
+  | "TURN_CHANGED"
+  | "ENTITY_MOVED"
+  | "ENTITY_DISPLACED"
+  | "COMBAT_RESOLVED"
+  | "SKILL_RESOLVED"
+  | "STAT_CHANGED"
+  | "STATUS_CHANGED"
+  | "COVER_DESTROYED"
+  | "ENTITY_DIED"
+  | "ENTITY_REMOVED"
+  | "OVERWATCH_FIRED"
+  | "REVEALED"
+  | "OBJECTIVE_CHANGED"
+  | "MATCH_ENDED";
+```
+
+```typescript
+interface EventTurnChanged {
   type: "TURN_CHANGED";
-  activePlayerId: string; // Чей теперь ход
-  turnNumber: number; // Номер раунда
+  activePlayerId: string;
+  turnNumber: number;
 }
-```
 
-**2. Сущность переместилась (`ENTITY_MOVED`)**
-*Рендер использует массив `path` для анимации бега по клеткам.*
-```typescript
-interface EventEntityMoved extends BaseEvent {
+interface EventEntityMoved {
   type: "ENTITY_MOVED";
   entityId: number;
-  path: { x: number, y: number, z: number }[];
-  isDash: boolean; // Был ли это "Рывок" (бег на 2 ОД)
+  path: { x: number; y: number; z: number }[];
+  isDash: boolean;
+  apSpent: number;
 }
-```
 
-**3. Итоги атаки/способности (`COMBAT_RESOLVED`)**
-*Самое важное событие. Содержит всю математику для UI (цифры урона) и Рендера (эффекты попадания/промаха).*
-```typescript
-interface EventCombatResolved extends BaseEvent {
+interface EventEntityDisplaced {
+  type: "ENTITY_DISPLACED";
+  entityId: number;
+  from: { x: number; y: number; z: number };
+  to: { x: number; y: number; z: number };
+  cause: "KNOCKBACK" | "TELEPORT" | "FALL";
+}
+
+interface EventCombatResolved {
   type: "COMBAT_RESOLVED";
-  sourceId: number; // Кто атаковал
-  targetId: number; // Кого атаковали
+  sourceId: number;
+  targetId: number;
   actionType: "MELEE" | "RANGED" | "MAGIC";
-  result: "HIT" | "MISS" | "CRIT" | "DODGE";
-  damageDealt: number; // Фактический урон
-  isFlanked: boolean; // Был ли заход с фланга (для спец. UI надписи)
+  result: "HIT" | "MISS" | "CRIT";
+  damageDealt: number;
+  isFlanked: boolean;
+  heightMod: -1 | 0 | 1;
 }
-```
 
-**4. Изменение статов (`STAT_CHANGED`)**
-*Синхронизирует полоски ХП и ОД в React.*
-```typescript
-interface EventStatChanged extends BaseEvent {
+interface EventSkillResolved {
+  type: "SKILL_RESOLVED";
+  sourceId: number;
+  skillId: string;
+  targetId?: number;
+  targetPos?: { x: number; y: number; z: number };
+  success: boolean;
+}
+
+interface EventStatChanged {
   type: "STAT_CHANGED";
   entityId: number;
   stat: "HP" | "AP";
   newValue: number;
-  delta: number; // На сколько изменилось (напр. -5 для урона, +2 для хила)
+  delta: number;
 }
-```
 
-**5. Разрушение укрытия (`COVER_DESTROYED`)**
-```typescript
-interface EventCoverDestroyed extends BaseEvent {
+interface EventStatusChanged {
+  type: "STATUS_CHANGED";
+  entityId: number;
+  status: "POISON" | "PANIC" | "OVERWATCH" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+  applied: boolean;
+}
+
+interface EventCoverDestroyed {
   type: "COVER_DESTROYED";
-  gridPos: { x: number, y: number, z: number };
-  newStatus: "HALF" | "NONE"; // Было полное - стало половина. Было половина - исчезло.
+  gridPos: { x: number; y: number; z: number };
+  newStatus: "HALF" | "NONE";
 }
-```
 
-**6. Смерть сущности (`ENTITY_DIED`)**
-```typescript
-interface EventEntityDied extends BaseEvent {
+interface EventEntityDied {
   type: "ENTITY_DIED";
   entityId: number;
-  causeOfDeath: "DAMAGE" | "FALL_INTO_PIT"; // Если FALL_INTO_PIT, рендер скейлит спрайт вниз
+  causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON";
+}
+
+interface EventEntityRemoved {
+  type: "ENTITY_REMOVED";
+  entityId: number;
+  reason: "FLED" | "EXPIRED" | "EXTRACTED";
+}
+
+interface EventOverwatchFired {
+  type: "OVERWATCH_FIRED";
+  watcherId: number;
+  triggerId: number;
+  at: { x: number; y: number; z: number };
+}
+
+interface EventRevealed {
+  type: "REVEALED";
+  entityId: number;
+  snapshot: EntitySnapshot;
+}
+
+interface EventObjectiveChanged {
+  type: "OBJECTIVE_CHANGED";
+  carrierId: number | null;
+  pos: { x: number; y: number; z: number };
+}
+
+interface EventMatchEnded {
+  type: "MATCH_ENDED";
+  winnerPlayerId: string | null;
+  reason: "ELIMINATION" | "OBJECTIVE" | "SURRENDER" | "CAMPAIGN_RESULT";
 }
 ```
+
+Область действия передаётся как несколько событий `COMBAT_RESOLVED` в одном наборе, по одному на цель, в порядке возрастания идентификатора.
+
+Гибель в яме: сначала `ENTITY_DISPLACED` с причиной `FALL`, затем `ENTITY_DIED` с причиной `FALL_INTO_PIT`.
+
+Набор, адресованный ведомому, не включает события о сущностях и клетках, которые его сторона не наблюдает, за исключением случая, когда результат изменяет уже известную местность (разрушение ранее наблюдавшегося укрытия).
 
 ---
 
-## 5. Синхронизация состояния (State Snapshot)
+## 6. Снимок состояния
 
-Используется в трех случаях:
-1. При старте тактического боя (Хост генерирует карту и шлет Клиенту).
-2. При переподключении клиента (Reconnect).
-3. При загрузке сохраненной игры.
+Применяется при начале сражения, повторном подключении и записи сохранения. Ведомому направляется уже сокращённый снимок.
 
 ```typescript
 interface SyncPayload {
   matchMeta: {
     turnNumber: number;
     activePlayerId: string;
-    rngSeed: string; // Зерно детерминированного рандома
+    rngSeed: string;
   };
   grid: {
     width: number;
     height: number;
-    tiles: TileData[]; // Плоский массив клеток (высоты, ямы)
+    tiles: TileData[];
   };
-  entities: EntitySnapshot[]; // Все живые юниты, объекты, укрытия
+  entities: EntitySnapshot[];
+  visible: { x: number; y: number }[];
+  seen: { x: number; y: number }[];
+  objective?: {
+    kind: "APPLE";
+    pos: { x: number; y: number; z: number };
+    carrierId: number | null;
+  };
+}
+
+interface TileData {
+  x: number;
+  y: number;
+  z: number;
+  pit: boolean;
+  blockLOS: boolean;
+  extract?: boolean;
+  homeOwner?: number;
 }
 
 interface EntitySnapshot {
   id: number;
-  configId: string; // Ссылка на JSON-конфиг (напр. 'bogatyr', 'tree_large')
-  ownerId: string | null; // Принадлежность (Игрок 1, Игрок 2, AI или null для пенька)
-  pos: { x: number, y: number, z: number };
+  configId: string;
+  ownerId: string | null;
+  pos: { x: number; y: number; z: number };
+  dir: number;
   stats: {
     hp: number;
     maxHp: number;
     ap: number;
+    maxAp: number;
   };
-  coverStatus?: "FULL" | "HALF" | "NONE"; 
-  statusEffects: string[]; // Напр. ['poisoned', 'overwatch']
+  coverType?: 1 | 2;
+  tags: string[];
 }
 ```
 
+Клетки, которые сторона никогда не наблюдала, в массиве `tiles` у ведомого либо опускаются, либо передаются без признаков, кроме координат; выбранный способ должен быть единым в реализации и не раскрывать ямы и стены за пределами разведанной местности. Рекомендуется опускать неразведанные клетки.
+
 ---
 
-## 6. Пример жизненного цикла (Use-Case Flow)
+## 7. Пример последовательности
 
-Как это выглядит на практике, когда Богатырь бьет Упыря:
+Ведомый направляет:
 
-**Шаг 1:** React UI игрока-клиента вызывает экшен Zustand:
 ```json
-// UI -> Core (через Network)
 {
   "type": "COMMAND",
   "payload": {
@@ -234,42 +356,42 @@ interface EntitySnapshot {
 }
 ```
 
-**Шаг 2:** Ядро Хоста валидирует дистанцию, бросает кубики (Seeded RNG) и вычисляет урон. ОД Богатыря падают с 1 до 0. ХП Упыря падает с 10 до 2. 
+Ведущий проверяет допустимость, изменяет состояние и рассылает набор тем получателям, которые наблюдают хотя бы одну из сущностей 12 и 45:
 
-**Шаг 3:** Ядро Хоста генерирует `EVENT_BATCH` и рассылает всем (себе и Клиенту):
 ```json
-// Core -> Render & UI
 {
   "type": "EVENT_BATCH",
   "payload": [
     {
-      "type": "STAT_CHANGED", // Списываем ОД Богатырю
-      "entityId": 12, "stat": "AP", "newValue": 0, "delta": -1
+      "type": "STAT_CHANGED",
+      "entityId": 12,
+      "stat": "AP",
+      "newValue": 0,
+      "delta": -1
     },
     {
-      "type": "COMBAT_RESOLVED", // Результат удара
-      "sourceId": 12, "targetId": 45, "actionType": "MELEE", "result": "HIT", "damageDealt": 8, "isFlanked": false
+      "type": "COMBAT_RESOLVED",
+      "sourceId": 12,
+      "targetId": 45,
+      "actionType": "MELEE",
+      "result": "HIT",
+      "damageDealt": 8,
+      "isFlanked": false,
+      "heightMod": 0
     },
     {
-      "type": "STAT_CHANGED", // Списываем ХП Упырю
-      "entityId": 45, "stat": "HP", "newValue": 2, "delta": -8
+      "type": "STAT_CHANGED",
+      "entityId": 45,
+      "stat": "HP",
+      "newValue": 2,
+      "delta": -8
     }
   ]
 }
 ```
 
-**Шаг 4:** Рендер (PixiJS) Клиента получает батч и ставит анимации в очередь:
-1. Играет анимацию замаха палицей у спрайта 12.
-2. Проигрывает эффект удара, трясет экран (Camera Shake).
-3. Всплывает красный текст "-8" над спрайтом 45.
-*ОД и ХП в React UI (полоски над головами) обновляются мгновенно благодаря `STAT_CHANGED`.*
-
 ---
 
-## Итог для разработчиков
-Любая фича, изменяющая игровой мир, должна быть разбита на:
-1. Как её запросить? (Добавить в `CommandType`).
-2. Какие данные меняются? (Добавить в `SyncPayload`).
-3. Как сообщить о результате? (Добавить в `GameEventType`).
+## 8. Правило добавления возможности
 
-*Нарушение этого потока (например, прямая смена ХП врага по клику мыши в React-компоненте) строго запрещено архитектурой.*
+Любое изменение мира описывается тремя элементами: командой либо внутренним срабатыванием, отражением в снимке, событием для отображения. Прямое изменение запаса здоровья из компонента интерфейса запрещено.
