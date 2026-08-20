@@ -329,6 +329,34 @@
   margin-top: 10px;
 }
 
+.top-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hud-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-height: 36px;
+  min-width: 36px;
+  color: #9a9384;
+}
+
+.hud-icon-btn:hover,
+.hud-icon-btn:focus-visible {
+  color: #d5cfc0;
+}
+
+.hud-icon-btn.is-on {
+  color: #e0b34a;
+  border-color: #e0b34a;
+  background: #2a332c;
+}
+
 .debug-toggle {
   font-size: 0.82rem;
   letter-spacing: 0.04em;

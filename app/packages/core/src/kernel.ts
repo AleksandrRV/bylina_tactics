@@ -1,5 +1,6 @@
 import { previewAttack, resolveAttack, type HitPreview } from "./combat.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
+import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
 import { facingAfterStep, tileAt } from "./grid.js";
 import { apCostFor, findPath, listReachable } from "./pathfinding.js";
 import { createMulberry32, type Rng } from "./rng.js";
@@ -14,7 +15,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.5.0";
+export const CORE_VERSION = "0.6.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -28,6 +29,10 @@ export interface TacticsKernel {
   getReachable(actorId: number): ReachableCell[];
   getPath(actorId: number, to: CellPos): { path: CellPos[]; mpCost: number; apCost: 1 | 2 } | null;
   getHitPreview(actorId: number, targetId: number, weaponId?: string): HitPreview;
+  /** Клетки, наблюдаемые стороной прямо сейчас (ключи «x,y»). */
+  getVisibleCells(owner: number): Set<string>;
+  /** Клетки, которые сторона когда-либо наблюдала (ключи «x,y»). */
+  getExploredCells(owner: number): Set<string>;
   apply(command: Command): ApplyResult;
   subscribe(listener: () => void): () => void;
 }
@@ -62,7 +67,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const rng: Rng = createMulberry32(options.seed ?? 0x51a7);
   const listeners = new Set<() => void>();
 
+  const fog: FogState = createFogState(state, [PLAYER_OWNER, ENEMY_OWNER]);
+
   const emit = (): void => {
+    refreshFog(fog, state, [PLAYER_OWNER, ENEMY_OWNER]);
     for (const listener of listeners) listener();
   };
 
@@ -97,6 +105,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (!weapon) return { available: false, reason: "NOT_FOUND" };
       if (actor.owner !== state.activeOwner) return { available: false, reason: "ILLEGAL" };
       return previewAttack(state.grid, state.entities, actor, target, weapon);
+    },
+    getVisibleCells: (owner) => {
+      const entry = fog[owner];
+      return entry ? new Set(entry.visible) : new Set();
+    },
+    getExploredCells: (owner) => {
+      const entry = fog[owner];
+      return entry ? new Set(entry.explored) : new Set();
     },
     apply: (command) => {
       if (command.type === "END_TURN") {

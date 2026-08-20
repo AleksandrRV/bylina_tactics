@@ -33,6 +33,7 @@ export interface EntityState {
   maxHp: number;
   aim: number;
   defense: number;
+  vision: number;
   weaponId: string;
   obstacle: boolean;
   dead: boolean;

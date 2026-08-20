@@ -39,6 +39,19 @@ function unitNameKey(configId: string): string {
   return `unit.${configId}.name`;
 }
 
+/** Иконка-жук: общепринятый символ отладочного режима. */
+function DebugIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
+      <ellipse cx="12" cy="14" rx="5" ry="6" />
+      <path d="M12 8v12" />
+      <path d="M7 12H3M21 12h-4M7.5 17l-3 2.5M16.5 17l3 2.5M7.5 11l-3-2.5M16.5 11l3-2.5" />
+      <circle cx="12" cy="7" r="2.5" />
+    </svg>
+  );
+}
+
 export function BattleScreen() {
   useI18nTick();
   const t = useT();
@@ -101,6 +114,9 @@ export function BattleScreen() {
   );
 
   const snapshot = kernel.getSnapshot();
+
+  const visibleCells = useMemo(() => kernel.getVisibleCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const exploredCells = useMemo(() => kernel.getExploredCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
 
   useEffect(() => {
     const first = snapshot.entities.find(isOwn);
@@ -182,11 +198,6 @@ export function BattleScreen() {
     });
   };
 
-  /**
-   * Ход Нави идёт по одному действию: решение ИИ → применение → ожидание
-   * анимации. Камера и лог показывают, какой враг ходит, кого бьёт и когда
-   * дружинник теряет здоровье.
-   */
   const runEnemyPhase = async (): Promise<void> => {
     setEnemyPhase(true);
     try {
@@ -316,8 +327,10 @@ export function BattleScreen() {
       aimOk: Boolean(hit?.available),
       heightMod: hit?.heightMod ?? 0,
       debugMovement,
+      visibleCells,
+      exploredCells,
     });
-  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement]);
+  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -364,18 +377,36 @@ export function BattleScreen() {
   }, [paused, busy, snapshot, selectedId, aimId, hit, session]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
-  const enemies = snapshot.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0);
   const weaponName = selected?.weaponId ? t(`weapon.${selected.weaponId}.name`) : "";
   const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
+
+  // Показывать портреты врагов только если они в зоне видимости (или уже мертвы и были видны).
+  const knownEnemies = snapshot.entities.filter((entity) => {
+    if (entity.owner !== ENEMY_OWNER || entity.coverType !== 0) return false;
+    const key = cellKey(entity.x, entity.y);
+    return visibleCells.has(key) || (entity.dead && exploredCells.has(key));
+  });
 
   return (
     <div className="battle-screen">
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
         <header className="battle-top">
-          <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
-            {t("battle.pause")}
-          </button>
+          <div className="top-controls">
+            <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
+              {t("battle.pause")}
+            </button>
+            <button
+              type="button"
+              className={`hud-btn hud-icon-btn debug-toggle${debugMovement ? " is-on" : ""}`}
+              onClick={() => setDebugMovement((value) => !value)}
+              title={t(debugMovement ? "battle.debugMovementHint" : "battle.debugMovement")}
+              aria-pressed={debugMovement}
+              aria-label={t("battle.debugMovement")}
+            >
+              <DebugIcon />
+            </button>
+          </div>
           <div className="battle-objective">
             <p className="eyebrow">{t("menu.quickMatch")}</p>
             <p>{t("battle.objectiveQuick")}</p>
@@ -384,9 +415,9 @@ export function BattleScreen() {
               {" · "}
               {t(sideKey)}
             </p>
-            {enemies.length > 0 ? (
+            {knownEnemies.length > 0 ? (
               <div className="enemies-strip" aria-label={t("field.sideEnemy")}>
-                {enemies.map((entity) => {
+                {knownEnemies.map((entity) => {
                   const face = unitPortrait(entity.configId);
                   return face ? (
                     <img
@@ -494,15 +525,6 @@ export function BattleScreen() {
             >
               <kbd>1</kbd>
               {weaponName || t("battle.weapon")}
-            </button>
-            <button
-              type="button"
-              className={`hud-btn debug-toggle${debugMovement ? " is-on" : ""}`}
-              onClick={() => setDebugMovement((value) => !value)}
-              title={debugMovement ? t("battle.debugMovementHint") : undefined}
-              aria-pressed={debugMovement}
-            >
-              {t("battle.debugMovement")}
             </button>
           </div>
           <button

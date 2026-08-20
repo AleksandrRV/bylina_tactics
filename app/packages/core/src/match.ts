@@ -34,6 +34,7 @@ function spawn(
     maxHp: config.maxHealth,
     aim: config.aim,
     defense: config.defense,
+    vision: config.vision,
     weaponId,
     obstacle: true,
     dead: false,

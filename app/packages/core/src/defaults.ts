@@ -7,6 +7,7 @@ export interface SpawnUnitConfig {
   mobility: number;
   aim: number;
   defense: number;
+  vision: number;
   weapons: string[];
 }
 
@@ -102,6 +103,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 70,
     defense: 10,
+    vision: 12,
     weapons: ["sword"],
   },
   strelets: {
@@ -111,6 +113,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 85,
     defense: 0,
+    vision: 14,
     weapons: ["bow"],
   },
   znaharka: {
@@ -120,6 +123,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 75,
     defense: 0,
+    vision: 12,
     weapons: ["sling"],
   },
   upyr: {
@@ -129,6 +133,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 60,
     defense: 0,
+    vision: 10,
     weapons: ["claws"],
   },
   leshy: {
@@ -138,6 +143,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 78,
     defense: 5,
+    vision: 12,
     weapons: ["branch"],
   },
   kikimora: {
@@ -147,6 +153,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 68,
     defense: 0,
+    vision: 10,
     weapons: ["needle"],
   },
 };

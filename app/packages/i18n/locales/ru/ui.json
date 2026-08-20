@@ -56,7 +56,8 @@
     "empty": "Нет выбранного",
     "apLeft": "ОД",
     "debugMovement": "Очки движения",
-    "debugMovementHint": "Показана стоимость клеток в ОД"
+    "debugMovementHint": "Показана стоимость клеток в ОД",
+    "fogUnknown": "Не разведано"
   },
   "unit": {
     "bogatyr": { "name": "Богатырь" },

@@ -1,6 +1,4 @@
-export const CORE_VERSION = "0.5.0";
-
-export { createTacticsKernel } from "./kernel.js";
+export { CORE_VERSION, createTacticsKernel } from "./kernel.js";
 export type { KernelOptions, TacticsKernel } from "./kernel.js";
 export {
   createDebugMatch,
@@ -41,6 +39,13 @@ export type { AttackResolution, HitPreview } from "./combat.js";
 export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
 export { clampChance, createMulberry32 } from "./rng.js";
+export {
+  cellVisibility,
+  computeVisibleCells,
+  createFogState,
+  refreshFog,
+} from "./fog.js";
+export type { CellVisibility, FogOfOwner, FogState } from "./fog.js";
 export type {
   ApplyResult,
   CellPos,

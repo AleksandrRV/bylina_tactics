@@ -56,7 +56,8 @@
     "empty": "None selected",
     "apLeft": "AP",
     "debugMovement": "Movement cost",
-    "debugMovementHint": "Cell AP costs are shown"
+    "debugMovementHint": "Cell AP costs are shown",
+    "fogUnknown": "Unexplored"
   },
   "unit": {
     "bogatyr": { "name": "Bogatyr" },
