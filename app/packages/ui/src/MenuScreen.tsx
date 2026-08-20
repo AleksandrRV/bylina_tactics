@@ -27,12 +27,6 @@ export function MenuScreen() {
         <button type="button" className="btn btn-primary" onClick={() => session.openQuickMatch()}>
           <span>{t("menu.quickMatch")}</span>
         </button>
-        <button type="button" className="btn btn-primary" onClick={() => session.openBattle()}>
-          <span>{t("menu.training")}</span>
-        </button>
-        <button type="button" className="btn btn-primary" onClick={() => session.openField()}>
-          <span>{t("menu.debugField")}</span>
-        </button>
         {locked.map((item) => (
           <button key={item.mode} type="button" className="btn btn-primary" onClick={() => session.openMode(item.mode)}>
             <span>{t(item.key)}</span>

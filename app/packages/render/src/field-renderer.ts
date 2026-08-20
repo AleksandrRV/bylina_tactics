@@ -6,7 +6,7 @@ import {
   type ReachableCell,
   type Tile,
 } from "@bylina/core";
-import { Application, Container, Graphics, Rectangle, type FederatedPointerEvent } from "pixi.js";
+import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -21,6 +21,7 @@ export interface FieldView {
   path: CellPos[];
   aimOk: boolean;
   heightMod: -1 | 0 | 1;
+  debugMovement?: boolean;
 }
 
 export interface FieldRenderer {
@@ -557,11 +558,35 @@ export function createFieldRenderer(): FieldRenderer {
     return g;
   };
 
+  const drawDebugLabel = (tile: Tile): Text | null => {
+    if (!view?.debugMovement) return null;
+    const reachCell = view.reachable.find((cell) => cell.x === tile.x && cell.y === tile.y);
+    if (!reachCell) return null;
+    const z = visualLevel(tile);
+    const { fy } = faceOf(tile.x, tile.y, z);
+    const label = new Text({
+      text: String(reachCell.mpCost),
+      style: {
+        fontFamily: "monospace",
+        fontSize: 12,
+        fontWeight: "600",
+        fill: 0xf3ecdc,
+        stroke: { color: 0x0c120c, width: 3 },
+      },
+    });
+    label.anchor.set(1, 1);
+    label.position.set(PAD + tile.x * CELL_SIZE + CELL_SIZE - 4, fy + CELL_SIZE - 3);
+    label.zIndex = tile.y * 100 + z * 10 + 5;
+    return label;
+  };
+
   const paintStatic = (): void => {
     if (!view || destroyed || !mounted) return;
     ground.removeChildren().forEach((child) => child.destroy());
     for (const tile of view.snapshot.grid.tiles) {
       ground.addChild(drawTile(tile));
+      const label = drawDebugLabel(tile);
+      if (label) ground.addChild(label);
     }
     ground.sortableChildren = true;
   };

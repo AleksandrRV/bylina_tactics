@@ -13,22 +13,16 @@ export {
 } from "./debug-map.js";
 export {
   BOW,
+  BRANCH,
   CLAWS,
   DEFAULT_TRAINING_UNITS,
+  NEEDLE,
   SLING,
   SWORD,
-  TRAINING_BOGATYR_ID,
-  TRAINING_COVER_ID,
-  TRAINING_STRELETS_ID,
-  TRAINING_UPYR_A_ID,
-  TRAINING_UPYR_B_ID,
-  TRAINING_UPYR_C_ID,
-  TRAINING_ZNAHARKA_ID,
-  createTrainingMatch,
   defaultTrainingWeapons,
   weaponStatsFromRecord,
-} from "./training-map.js";
-export type { SpawnUnitConfig } from "./training-map.js";
+} from "./defaults.js";
+export type { SpawnUnitConfig } from "./defaults.js";
 export { QUICK_MATCH_MAP, enemySpawns, generateBattlefield, playerSpawns } from "./mapgen.js";
 export type { MapGenConfig, SpawnPoint } from "./mapgen.js";
 export { createQuickMatch } from "./match.js";

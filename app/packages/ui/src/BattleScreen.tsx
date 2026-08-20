@@ -3,7 +3,6 @@ import {
   PLAYER_OWNER,
   createQuickMatch,
   createTacticsKernel,
-  createTrainingMatch,
   defaultTrainingWeapons,
   matchOutcome,
   pickEnemyCommand,
@@ -44,7 +43,7 @@ export function BattleScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
-  const { paused, battleKind, difficulty, matchSeed } = useSessionState();
+  const { paused, difficulty, matchSeed } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -55,6 +54,8 @@ export function BattleScreen() {
     onCell: () => undefined,
     onHover: () => undefined,
   });
+
+  const [debugMovement, setDebugMovement] = useState(false);
 
   const weapons = useMemo(() => {
     const base: Record<string, WeaponStats> = defaultTrainingWeapons();
@@ -69,22 +70,19 @@ export function BattleScreen() {
       content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
       content.quickMatch.difficulties[0]?.enemyCount ??
       3;
-    const initial =
-      battleKind === "quick"
-        ? createQuickMatch({
-            units: content.units,
-            map: content.quickMatch.map,
-            enemyPool: content.quickMatch.enemyPool,
-            enemyCount: count,
-            seed: matchSeed || 1,
-          })
-        : createTrainingMatch({ units: content.units });
+    const initial = createQuickMatch({
+      units: content.units,
+      map: content.quickMatch.map,
+      enemyPool: content.quickMatch.enemyPool,
+      enemyCount: count,
+      seed: matchSeed || 1,
+    });
     return createTacticsKernel({
       initial,
       weapons,
-      seed: battleKind === "quick" ? matchSeed || 1 : 0x40a1,
+      seed: matchSeed || 1,
     });
-  }, [battleKind, content.quickMatch, content.units, difficulty, matchSeed, weapons]);
+  }, [content.quickMatch, content.units, difficulty, matchSeed, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -148,7 +146,6 @@ export function BattleScreen() {
   };
 
   const concludeIfNeeded = (): boolean => {
-    if (battleKind !== "quick") return false;
     const outcome = matchOutcome(kernel.getSnapshot());
     if (outcome === "ongoing") return false;
     session.finishMatch(outcome);
@@ -229,7 +226,7 @@ export function BattleScreen() {
     void (async () => {
       try {
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
-        if (battleKind === "quick" && kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
+        if (kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
         }
       } finally {
@@ -318,8 +315,9 @@ export function BattleScreen() {
       path: previewPath,
       aimOk: Boolean(hit?.available),
       heightMod: hit?.heightMod ?? 0,
+      debugMovement,
     });
-  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused]);
+  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -379,8 +377,8 @@ export function BattleScreen() {
             {t("battle.pause")}
           </button>
           <div className="battle-objective">
-            <p className="eyebrow">{battleKind === "quick" ? t("menu.quickMatch") : t("battle.title")}</p>
-            <p>{t(battleKind === "quick" ? "battle.objectiveQuick" : "battle.objective")}</p>
+            <p className="eyebrow">{t("menu.quickMatch")}</p>
+            <p>{t("battle.objectiveQuick")}</p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
               {" · "}
@@ -496,6 +494,15 @@ export function BattleScreen() {
             >
               <kbd>1</kbd>
               {weaponName || t("battle.weapon")}
+            </button>
+            <button
+              type="button"
+              className={`hud-btn debug-toggle${debugMovement ? " is-on" : ""}`}
+              onClick={() => setDebugMovement((value) => !value)}
+              title={debugMovement ? t("battle.debugMovementHint") : undefined}
+              aria-pressed={debugMovement}
+            >
+              {t("battle.debugMovement")}
             </button>
           </div>
           <button

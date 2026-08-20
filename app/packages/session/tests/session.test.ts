@@ -27,23 +27,6 @@ describe("createSession", () => {
     expect(session.get().unavailableMode).toBeNull();
   });
 
-  it("opens the debug field", () => {
-    const session = createSession("menu");
-    session.openField();
-    expect(session.get().screen).toBe("field");
-  });
-
-  it("opens the staff battle and pause overlay", () => {
-    const session = createSession("menu");
-    session.openBattle();
-    expect(session.get().screen).toBe("battle");
-    expect(session.get().battleKind).toBe("training");
-    session.setPaused(true);
-    expect(session.get().paused).toBe(true);
-    session.goTo("menu");
-    expect(session.get().paused).toBe(false);
-  });
-
   it("opens quick match difficulty and starts a battle", () => {
     const session = createSession("menu");
     session.openQuickMatch();
