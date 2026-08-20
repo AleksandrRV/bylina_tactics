@@ -13,11 +13,12 @@
     "campaign": "New Tale",
     "pvp": "Exhibition Battles",
     "debugField": "Grid trial",
+    "training": "Staff clash",
     "settings": "Settings",
     "install": "Install game",
     "unavailableTitle": "This mode is not available yet",
     "unavailableBody": "This mode will open in version {version}.",
-    "unavailableHint": "Settings, language, and the grid trial are available."
+    "unavailableHint": "Settings, the grid trial, and the staff clash are available."
   },
   "field": {
     "title": "Grid trial",
@@ -40,6 +41,29 @@
     "legendEnemy": "Enemy",
     "sidePlayer": "Host",
     "sideEnemy": "Nav"
+  },
+  "battle": {
+    "title": "Staff clash",
+    "objective": "Destroy the dummies",
+    "pause": "Pause",
+    "resume": "Resume",
+    "toMenu": "Return to menu",
+    "hp": "Health {current} / {max}",
+    "weapon": "Weapon",
+    "empty": "None selected",
+    "apLeft": "AP"
+  },
+  "unit": {
+    "bogatyr": { "name": "Bogatyr" },
+    "strelets": { "name": "Strelets" },
+    "znaharka": { "name": "Znaharka" },
+    "upyr": { "name": "Upyr" }
+  },
+  "weapon": {
+    "sword": { "name": "Sword" },
+    "bow": { "name": "Bow" },
+    "sling": { "name": "Sling" },
+    "claws": { "name": "Claws" }
   },
   "combat": {
     "preview": "Hit {chance}% · dmg {dmg} · cover {cover} · height {height} · {flank}. Tap again to fire.",

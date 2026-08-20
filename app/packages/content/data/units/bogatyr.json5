@@ -1,0 +1,15 @@
+{
+  id: "bogatyr",
+  classId: "bogatyr",
+  side: "druzhina",
+  maxHealth: 12,
+  maxAP: 2,
+  mobility: 5,
+  aim: 70,
+  defense: 10,
+  will: 40,
+  vision: 12,
+  weapons: ["sword"],
+  skills: [],
+  tags: [],
+}

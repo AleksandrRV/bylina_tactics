@@ -1,0 +1,15 @@
+{
+  id: "strelets",
+  classId: "strelets",
+  side: "druzhina",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 6,
+  aim: 85,
+  defense: 0,
+  will: 30,
+  vision: 14,
+  weapons: ["bow"],
+  skills: [],
+  tags: [],
+}

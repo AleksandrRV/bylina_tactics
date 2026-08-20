@@ -27,9 +27,18 @@ describe("parseContent", () => {
     const result = parseContent(readDataTree());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.units).toEqual([]);
-    expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual(["bow_debug", "sword_debug"]);
+    expect(result.data.units.map((unit) => unit.id).sort()).toEqual(["bogatyr", "strelets", "upyr", "znaharka"]);
+    expect(result.data.units.every((unit) => unit.skills.length === 0)).toBe(true);
+    expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual([
+      "bow",
+      "bow_debug",
+      "claws",
+      "sling",
+      "sword",
+      "sword_debug",
+    ]);
     expect(result.data.skills).toEqual([]);
+    expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");
   });

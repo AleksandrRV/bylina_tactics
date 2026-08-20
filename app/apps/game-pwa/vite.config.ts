@@ -1,13 +1,44 @@
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 
 const rootDir = path.dirname(fileURLToPath(import.meta.url));
+const appRoot = path.resolve(rootDir, "../..");
+const renderPkg = path.resolve(appRoot, "packages/render/package.json");
+const pwaPkg = path.resolve(rootDir, "package.json");
+
+function resolveFrom(pkgJson: string, spec: string): string | undefined {
+  try {
+    return createRequire(pkgJson).resolve(spec);
+  } catch {
+    return undefined;
+  }
+}
+
+/** Абсолютный вход pixi.js: не зависит от того, откуда Vite разбирает исходник пакета. */
+function resolvePixiEntry(): string | undefined {
+  return resolveFrom(pwaPkg, "pixi.js") ?? resolveFrom(renderPkg, "pixi.js");
+}
+
+function pixiResolvePlugin(): Plugin {
+  return {
+    name: "bylina-pixi-resolve",
+    enforce: "pre",
+    resolveId(id) {
+      if (id !== "pixi.js") return null;
+      return resolvePixiEntry() ?? null;
+    },
+  };
+}
+
+const pixiEntry = resolvePixiEntry();
 
 export default defineConfig({
   plugins: [
+    pixiResolvePlugin(),
     react(),
     VitePWA({
       registerType: "autoUpdate",
@@ -28,15 +59,21 @@ export default defineConfig({
       },
     }),
   ],
+  optimizeDeps: {
+    include: ["pixi.js"],
+  },
   resolve: {
+    dedupe: ["pixi.js"],
     alias: {
-      "@bylina/core": path.resolve(rootDir, "../../packages/core/src/index.ts"),
-      "@bylina/content": path.resolve(rootDir, "../../packages/content/src/index.ts"),
-      "@bylina/i18n": path.resolve(rootDir, "../../packages/i18n/src/index.ts"),
-      "@bylina/net": path.resolve(rootDir, "../../packages/net/src/index.ts"),
-      "@bylina/session": path.resolve(rootDir, "../../packages/session/src/index.ts"),
-      "@bylina/settings": path.resolve(rootDir, "../../packages/settings/src/index.ts"),
-      "@bylina/ui": path.resolve(rootDir, "../../packages/ui/src/index.ts"),
+      ...(pixiEntry ? { "pixi.js": pixiEntry } : {}),
+      "@bylina/core": path.resolve(appRoot, "packages/core/src/index.ts"),
+      "@bylina/content": path.resolve(appRoot, "packages/content/src/index.ts"),
+      "@bylina/i18n": path.resolve(appRoot, "packages/i18n/src/index.ts"),
+      "@bylina/net": path.resolve(appRoot, "packages/net/src/index.ts"),
+      "@bylina/session": path.resolve(appRoot, "packages/session/src/index.ts"),
+      "@bylina/settings": path.resolve(appRoot, "packages/settings/src/index.ts"),
+      "@bylina/render": path.resolve(appRoot, "packages/render/src/index.ts"),
+      "@bylina/ui": path.resolve(appRoot, "packages/ui/src/index.ts"),
     },
   },
   server: {
@@ -44,6 +81,9 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
     allowedHosts: true,
+    fs: {
+      allow: [appRoot],
+    },
   },
   preview: {
     host: "0.0.0.0",

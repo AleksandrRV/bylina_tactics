@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { createSession } from "../src/index.js";
+import { APP_VERSION, createSession } from "../src/index.js";
 
 describe("createSession", () => {
   it("starts on the boot screen", () => {
     expect(createSession().get().screen).toBe("boot");
+  });
+
+  it("reports version 0.4.0", () => {
+    expect(APP_VERSION).toBe("0.4.0");
   });
 
   it("moves between menu and settings", () => {
@@ -27,5 +31,16 @@ describe("createSession", () => {
     const session = createSession("menu");
     session.openField();
     expect(session.get().screen).toBe("field");
+  });
+
+  it("opens the staff battle and pause overlay", () => {
+    const session = createSession("menu");
+    session.openBattle();
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().paused).toBe(false);
+    session.setPaused(true);
+    expect(session.get().paused).toBe(true);
+    session.goTo("menu");
+    expect(session.get().paused).toBe(false);
   });
 });

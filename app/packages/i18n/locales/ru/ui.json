@@ -13,11 +13,12 @@
     "campaign": "Новая былина",
     "pvp": "Потешные бои",
     "debugField": "Испытание сетки",
+    "training": "Служебная стычка",
     "settings": "Настройки",
     "install": "Установить игру",
     "unavailableTitle": "Режим ещё не открыт",
     "unavailableBody": "Этот режим будет доступен в версии {version}.",
-    "unavailableHint": "Доступны настройки, смена языка и испытание сетки."
+    "unavailableHint": "Доступны настройки, испытание сетки и служебная стычка."
   },
   "field": {
     "title": "Испытание сетки",
@@ -40,6 +41,29 @@
     "legendEnemy": "Противник",
     "sidePlayer": "Дружина",
     "sideEnemy": "Навь"
+  },
+  "battle": {
+    "title": "Служебная стычка",
+    "objective": "Уничтожьте мишени",
+    "pause": "Пауза",
+    "resume": "Продолжить",
+    "toMenu": "Выйти в меню",
+    "hp": "Здоровье {current} / {max}",
+    "weapon": "Оружие",
+    "empty": "Нет выбранного",
+    "apLeft": "ОД"
+  },
+  "unit": {
+    "bogatyr": { "name": "Богатырь" },
+    "strelets": { "name": "Стрелец" },
+    "znaharka": { "name": "Знахарка" },
+    "upyr": { "name": "Упырь" }
+  },
+  "weapon": {
+    "sword": { "name": "Меч" },
+    "bow": { "name": "Лук" },
+    "sling": { "name": "Праща" },
+    "claws": { "name": "Когти" }
   },
   "combat": {
     "preview": "Шанс {chance}% · урон {dmg} · укрытие {cover} · высота {height} · {flank}. Повтор — выстрел.",

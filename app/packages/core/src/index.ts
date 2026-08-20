@@ -1,4 +1,4 @@
-export const CORE_VERSION = "0.3.0";
+export const CORE_VERSION = "0.4.0";
 
 export { createTacticsKernel } from "./kernel.js";
 export type { KernelOptions, TacticsKernel } from "./kernel.js";
@@ -11,6 +11,24 @@ export {
   ENEMY_OWNER,
   PLAYER_OWNER,
 } from "./debug-map.js";
+export {
+  BOW,
+  CLAWS,
+  DEFAULT_TRAINING_UNITS,
+  SLING,
+  SWORD,
+  TRAINING_BOGATYR_ID,
+  TRAINING_COVER_ID,
+  TRAINING_STRELETS_ID,
+  TRAINING_UPYR_A_ID,
+  TRAINING_UPYR_B_ID,
+  TRAINING_UPYR_C_ID,
+  TRAINING_ZNAHARKA_ID,
+  createTrainingMatch,
+  defaultTrainingWeapons,
+  weaponStatsFromRecord,
+} from "./training-map.js";
+export type { SpawnUnitConfig } from "./training-map.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
 export { canFinish, canTransit, edgeCost } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";

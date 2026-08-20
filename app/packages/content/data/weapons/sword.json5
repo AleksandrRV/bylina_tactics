@@ -1,0 +1,14 @@
+{
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 4,
+  maxDmg: 6,
+  crit: 10,
+  critBonus: 2,
+  envDmg: 0,
+}

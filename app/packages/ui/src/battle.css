@@ -1,0 +1,236 @@
+.battle-screen {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+  background: #101410;
+  color: #d5cfc0;
+  touch-action: none;
+}
+
+.battle-stage {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.battle-stage canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.battle-hud {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.battle-hud * {
+  pointer-events: auto;
+}
+
+.battle-top,
+.battle-bottom {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  padding: 8px;
+  background: linear-gradient(180deg, rgba(16, 20, 20, 0.92), rgba(16, 20, 20, 0.72));
+}
+
+.battle-bottom {
+  background: linear-gradient(0deg, rgba(16, 20, 20, 0.94), rgba(16, 20, 20, 0.7));
+  flex-wrap: wrap;
+}
+
+.battle-objective {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.battle-objective p,
+.battle-selected p {
+  margin: 0;
+}
+
+.battle-objective .eyebrow,
+.battle-selected .eyebrow {
+  margin-bottom: 2px;
+}
+
+.hud-btn {
+  appearance: none;
+  border: 1px solid #3a4550;
+  background: #1c2320;
+  color: #d5cfc0;
+  padding: 10px 12px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.hud-btn:hover,
+.hud-btn:focus-visible {
+  border-color: #e0b34a;
+  outline: none;
+}
+
+.hud-btn-primary {
+  background: linear-gradient(180deg, #222a32, #1a2026);
+  color: #f3ecdc;
+}
+
+.roster {
+  display: flex;
+  gap: 6px;
+  flex: 1 1 auto;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.roster-card {
+  appearance: none;
+  min-width: 92px;
+  min-height: 44px;
+  border: 1px solid #3a4550;
+  background: #161c18;
+  color: #d5cfc0;
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.roster-card.is-on {
+  border-color: #e0b34a;
+}
+
+.roster-card.is-dead {
+  opacity: 0.4;
+}
+
+.roster-card .name {
+  display: block;
+  font-size: 0.82rem;
+}
+
+.diamonds {
+  display: flex;
+  gap: 5px;
+  margin-top: 4px;
+}
+
+.diamond {
+  width: 10px;
+  height: 10px;
+  transform: rotate(45deg);
+  border: 2px solid #e0b34a;
+  background: transparent;
+}
+
+.diamond.is-on {
+  background: #e0b34a;
+}
+
+.battle-selected {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.hp-segs {
+  display: flex;
+  gap: 2px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.hp-segs i {
+  width: 8px;
+  height: 10px;
+  background: #3a2020;
+  display: block;
+}
+
+.hp-segs i.on {
+  background: #8b1e1e;
+}
+
+.skill-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.skill-slot {
+  min-width: 88px;
+}
+
+.skill-slot kbd {
+  display: block;
+  font-size: 0.68rem;
+  color: #9a9384;
+  margin-bottom: 2px;
+}
+
+.aim-card,
+.battle-log {
+  margin: 0 8px;
+  padding: 6px 10px;
+  font-size: 0.88rem;
+  font-variant-numeric: tabular-nums;
+  background: rgba(28, 35, 32, 0.92);
+  border: 1px solid #3a4550;
+  pointer-events: none;
+}
+
+.battle-log {
+  color: #e0b34a;
+}
+
+.battle-mid {
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+
+.pause-root {
+  position: absolute;
+  inset: 0;
+  background: rgba(8, 10, 12, 0.66);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  z-index: 30;
+  pointer-events: auto;
+}
+
+.pause-card {
+  width: min(100%, 360px);
+  background: #1c232a;
+  border: 1px solid #3a4550;
+  padding: 22px 20px 18px;
+}
+
+.pause-card h2 {
+  margin: 0 0 14px;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  color: #f3ecdc;
+}
+
+.pause-card .hud-btn {
+  width: 100%;
+  margin-top: 10px;
+}
+
+@media (min-width: 880px) {
+  .battle-top {
+    align-items: flex-start;
+  }
+
+  .roster-card {
+    min-width: 110px;
+  }
+}

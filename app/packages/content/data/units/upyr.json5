@@ -1,0 +1,15 @@
+{
+  id: "upyr",
+  classId: "upyr",
+  side: "nav",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 5,
+  aim: 60,
+  defense: 0,
+  will: 20,
+  vision: 10,
+  weapons: ["claws"],
+  skills: [],
+  tags: [],
+}

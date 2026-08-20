@@ -1,3 +1,4 @@
+import { BattleScreen } from "./BattleScreen.js";
 import { BootScreen } from "./BootScreen.js";
 import { FieldScreen } from "./FieldScreen.js";
 import { MenuScreen } from "./MenuScreen.js";
@@ -10,5 +11,6 @@ export function Shell() {
   if (screen === "boot") return <BootScreen />;
   if (screen === "settings") return <SettingsScreen />;
   if (screen === "field") return <FieldScreen />;
+  if (screen === "battle") return <BattleScreen />;
   return <MenuScreen />;
 }

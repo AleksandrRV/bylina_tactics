@@ -25,6 +25,9 @@ export function MenuScreen() {
       </header>
 
       <nav className="menu-nav" aria-label={t("app.fullTitle")}>
+        <button type="button" className="btn btn-primary" onClick={() => session.openBattle()}>
+          <span>{t("menu.training")}</span>
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => session.openField()}>
           <span>{t("menu.debugField")}</span>
         </button>

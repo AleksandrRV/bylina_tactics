@@ -86,7 +86,9 @@ export function App() {
   void content;
 
   return (
-    <ServicesProvider value={{ i18n, settings, session, tactics: kernel, version: APP_VERSION, install }}>
+    <ServicesProvider
+      value={{ i18n, settings, session, tactics: kernel, content: content.data, version: APP_VERSION, install }}
+    >
       <Shell />
     </ServicesProvider>
   );
