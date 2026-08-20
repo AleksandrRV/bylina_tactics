@@ -90,7 +90,8 @@ export type GameEvent =
   | { type: "OVERWATCH_SET"; entityId: number }
   | { type: "OVERWATCH_CLEARED"; entityId: number }
   | { type: "DEFEND_SET"; entityId: number }
-  | { type: "DEFEND_CLEARED"; entityId: number };
+  | { type: "DEFEND_CLEARED"; entityId: number }
+  | { type: "COVER_DAMAGED"; entityId: number; newCoverType: 0 | 1 | 2 };
 
 export type RejectReason =
   | "ILLEGAL"

@@ -6,8 +6,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.7.0", () => {
-    expect(APP_VERSION).toBe("0.7.0");
+  it("reports version 0.8.0", () => {
+    expect(APP_VERSION).toBe("0.8.0");
   });
 
   it("moves between menu and settings", () => {

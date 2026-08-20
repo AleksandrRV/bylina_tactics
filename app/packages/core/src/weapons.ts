@@ -12,6 +12,10 @@ export interface WeaponStats {
   critBonus: number;
   ignoreHalfCover?: boolean;
   closeRangePenalty?: { distHLessThan: number; penalty: number };
+  /** Разрушающая сила: применяется к укрытиям на линии выстрела (§12). */
+  envDmg?: number;
+  /** Круговая атака: поражает всех смежных противников (Взмах Богатыря). */
+  sweep?: boolean;
 }
 
 export const DEBUG_BOW: WeaponStats = {

@@ -17,7 +17,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.7.0";
+export const CORE_VERSION = "0.8.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -61,6 +61,50 @@ function nextOwner(state: MatchState, current: number): number {
   const index = order.indexOf(current);
   if (index === -1) return order[0] ?? current;
   return order[(index + 1) % order.length] ?? current;
+}
+
+function sgn(value: number): number {
+  if (value > 0) return 1;
+  if (value < 0) return -1;
+  return 0;
+}
+
+/** Найти укрытие на линии выстрела (§9.2) для разрушения (§12). */
+function findCoverOnFireLine(
+  attacker: EntityState,
+  target: EntityState,
+  entities: readonly EntityState[],
+): EntityState | null {
+  const sx = sgn(attacker.x - target.x);
+  const sy = sgn(attacker.y - target.y);
+  const candidates = entities.filter(
+    (e) =>
+      e.coverType > 0 &&
+      !e.dead &&
+      Math.abs(e.x - target.x) + Math.abs(e.y - target.y) === 1 &&
+      Math.abs(e.z - target.z) <= 1,
+  );
+  let best: EntityState | null = null;
+  for (const cover of candidates) {
+    const dx = cover.x - target.x;
+    const dy = cover.y - target.y;
+    const onLine =
+      (sx !== 0 && sy !== 0 && ((dx === sx && dy === 0) || (dx === 0 && dy === sy) || (dx === sx && dy === sy))) ||
+      (sx !== 0 && sy === 0 && dx === sx && (dy === 0 || dy === 1 || dy === -1)) ||
+      (sx === 0 && sy !== 0 && dy === sy && (dx === 0 || dx === 1 || dx === -1));
+    if (onLine && (!best || cover.coverType > best.coverType)) best = cover;
+  }
+  return best;
+}
+
+/** §12: ступень := ступень − 1. При 0 снять укрытие и препятствие. */
+function damageCover(cover: EntityState, events: GameEvent[]): void {
+  cover.coverType = Math.max(0, cover.coverType - 1) as 0 | 1 | 2;
+  if (cover.coverType === 0) {
+    cover.obstacle = false;
+    cover.dead = true;
+  }
+  events.push({ type: "COVER_DAMAGED", entityId: cover.id, newCoverType: cover.coverType });
 }
 
 /**
@@ -296,8 +340,73 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if (actor.owner !== state.activeOwner) return { ok: false, reason: "NOT_YOUR_TURN" };
         const weapon = weaponOf(actor, command.weaponId);
         if (!weapon) return { ok: false, reason: "NOT_FOUND" };
+
+        // Атака по укрытию (§10.4): без проверки попадания, разрушение §12.
+        if (target.coverType > 0) {
+          if ((weapon.envDmg ?? 0) < 1) return { ok: false, reason: "ILLEGAL" };
+          if (actor.ap < weapon.apCost) return { ok: false, reason: "NO_AP" };
+          const spent = weapon.endsTurn ? actor.ap : Math.min(actor.ap, weapon.apCost);
+          actor.ap -= spent;
+          const events: GameEvent[] = [
+            { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: actor.ap, delta: -spent },
+          ];
+          damageCover(target, events);
+          emit();
+          return { ok: true, events };
+        }
+
         const preview = previewAttack(state.grid, state.entities, actor, target, weapon);
         if (!preview.available) return { ok: false, reason: preview.reason ?? "ILLEGAL" };
+
+        // Круговой взмах (§: sweep) — поражает всех смежных противников.
+        if (weapon.sweep) {
+          const spent = weapon.endsTurn ? actor.ap : Math.min(actor.ap, weapon.apCost);
+          const savedAp = actor.ap;
+          actor.ap = weapon.apCost; // временно восстановить ОД для resolveAttack
+          const events: GameEvent[] = [
+            { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: savedAp - spent, delta: -spent },
+          ];
+          const adjacent = state.entities.filter(
+            (e) =>
+              !e.dead &&
+              e.coverType === 0 &&
+              e.owner !== actor.owner &&
+              Math.abs(e.x - actor.x) <= 1 &&
+              Math.abs(e.y - actor.y) <= 1 &&
+              Math.abs(e.z - actor.z) <= 1 &&
+              !(e.x === actor.x && e.y === actor.y),
+          );
+          for (const foe of adjacent) {
+            const res = resolveAttack(state.grid, state.entities, actor, foe, weapon, rng);
+            if (!res) continue;
+            events.push({
+              type: "COMBAT_RESOLVED",
+              sourceId: actor.id,
+              targetId: foe.id,
+              actionType: res.actionType,
+              result: res.result,
+              damageDealt: res.damage,
+              isFlanked: res.flanked,
+              heightMod: res.heightMod,
+            });
+            if (res.damage > 0) {
+              foe.hp -= res.damage;
+              events.push({ type: "STAT_CHANGED", entityId: foe.id, stat: "HP", newValue: foe.hp, delta: -res.damage });
+            }
+            if (foe.hp <= 0 && !foe.dead) {
+              foe.dead = true;
+              foe.obstacle = false;
+              foe.ap = 0;
+              foe.overwatch = false;
+              foe.defending = false;
+              events.push({ type: "ENTITY_DIED", entityId: foe.id, causeOfDeath: "DAMAGE" });
+            }
+          }
+          actor.ap = savedAp - spent;
+          emit();
+          return { ok: true, events };
+        }
+
         const resolved = resolveAttack(state.grid, state.entities, actor, target, weapon, rng);
         if (!resolved) return { ok: false, reason: "ILLEGAL" };
 
@@ -334,6 +443,15 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           target.defending = false;
           events.push({ type: "ENTITY_DIED", entityId: target.id, causeOfDeath: "DAMAGE" });
         }
+
+        // §12: разрушение укрытия на линии выстрела.
+        if ((weapon.envDmg ?? 0) >= 1) {
+          const coverOnLine = findCoverOnFireLine(actor, target, state.entities);
+          if (coverOnLine) {
+            damageCover(coverOnLine, events);
+          }
+        }
+
         emit();
         return { ok: true, events };
       }

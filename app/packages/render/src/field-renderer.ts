@@ -26,6 +26,8 @@ export interface FieldView {
   visibleCells?: Set<string>;
   /** Клетки, которые сторона когда-либо наблюдала (ключи «x,y»). */
   exploredCells?: Set<string>;
+  /** Клетка, до которой линия прицеливания сплошная (препятствие или макс. дальность). */
+  aimBreakCell?: CellPos | null;
 }
 
 export interface FieldRenderer {
@@ -326,6 +328,7 @@ export function createFieldRenderer(): FieldRenderer {
   let onActivate: ((x: number, y: number) => void) | null = null;
   let onHover: ((x: number, y: number) => void) | null = null;
   let userMoved = false;
+  let animFrame = 0;
 
   const display = new Map<number, DisplayState>();
   const lunges = new Map<number, { dx: number; dy: number }>();
@@ -557,30 +560,6 @@ export function createFieldRenderer(): FieldRenderer {
       }
     }
 
-    // Туман войны: затемнение для неразведанных и ранее виденных клеток.
-    if (view?.visibleCells) {
-      const key = `${tile.x},${tile.y}`;
-      const isVisible = view.visibleCells.has(key);
-      const isExplored = view.exploredCells?.has(key) ?? false;
-      if (!isVisible && !isExplored) {
-        // Неразведанная клетка: плотный тёмный оверлей.
-        g.rect(0, 0, C, C).fill({ color: 0x06080a, alpha: 0.88 });
-      } else if (!isVisible && isExplored) {
-        // Ранее виденная: затемнение + лёгкий туман.
-        g.rect(0, 0, C, C).fill({ color: 0x0c1218, alpha: 0.55 });
-        // Полупрозрачные пятна тумана (детерминированные по хешу клетки).
-        const fogSeed = tile.x * 7919 + tile.y * 6271;
-        for (let i = 0; i < 3; i += 1) {
-          const hash = ((fogSeed * (i + 1) * 2654435761) >>> 0) / 4294967296;
-          const hash2 = (((fogSeed + 31) * (i + 7) * 2246822519) >>> 0) / 4294967296;
-          const fx = hash * C;
-          const fy = hash2 * C;
-          const fr = 8 + hash * 14;
-          g.circle(fx, fy, fr).fill({ color: 0x8a9aaa, alpha: 0.06 + hash * 0.04 });
-        }
-      }
-    }
-
     g.position.set(PAD + tile.x * CELL_SIZE, fy);
     g.zIndex = tile.y * 100 + z * 10;
     return g;
@@ -784,16 +763,78 @@ export function createFieldRenderer(): FieldRenderer {
     g.clear();
     const now = performance.now();
 
-    // Линия прицеливания и стрелка перепада высоты.
+    // Туман войны: анимированный оверлей поверх рельефа.
+    if (view.visibleCells) {
+      const C = CELL_SIZE;
+      const slowT = now * 0.0003; // медленная анимация
+      for (const tile of view.snapshot.grid.tiles) {
+        const key = `${tile.x},${tile.y}`;
+        const isVisible = view.visibleCells.has(key);
+        const isExplored = view.exploredCells?.has(key) ?? false;
+        const z = visualLevel(tile);
+        const { fx, fy } = faceOf(tile.x, tile.y, z);
+
+        if (!isVisible && !isExplored) {
+          // Неразведанная клетка: полностью скрыта.
+          g.rect(fx, fy, C, C).fill({ color: 0x080a0c, alpha: 1.0 });
+        } else if (!isVisible && isExplored) {
+          // Ранее виденная: затемнение + анимированный туман.
+          g.rect(fx, fy, C, C).fill({ color: 0x0c1218, alpha: 0.6 });
+          const fogSeed = tile.x * 7919 + tile.y * 6271;
+          for (let i = 0; i < 3; i += 1) {
+            const h1 = ((fogSeed * (i + 1) * 2654435761) >>> 0) / 4294967296;
+            const h2 = (((fogSeed + 31) * (i + 7) * 2246822519) >>> 0) / 4294967296;
+            const phase = slowT + h1 * 6.28;
+            const drift = Math.sin(phase) * 4;
+            const driftY = Math.cos(phase * 0.7 + i) * 3;
+            const cx = fx + h1 * C + drift;
+            const cy = fy + h2 * C + driftY;
+            const fr = 10 + h1 * 16;
+            const alpha = 0.05 + 0.03 * Math.sin(phase * 1.3 + i * 2.1);
+            g.circle(cx, cy, fr).fill({ color: 0x8a9aaa, alpha });
+          }
+        }
+      }
+    }
+
+    // Линия прицеливания: сплошная до точки разрыва, затем пунктир.
     const selected = view.snapshot.entities.find((entity) => entity.id === view?.selectedId);
     const aimed = view.snapshot.entities.find((entity) => entity.id === view?.aimId);
     if (selected && aimed && !selected.dead && !aimed.dead) {
       const a = entityPixel(selected);
       const b = entityPixel(aimed);
       const color = view.aimOk ? 0xe8b64c : 0xc45c5c;
-      g.moveTo(a.cx, a.cy)
-        .lineTo(b.cx, b.cy)
-        .stroke({ width: 2, color, alpha: 0.85 });
+
+      if (view.aimBreakCell) {
+        const breakTile = view.snapshot.grid.tiles.find((t) => t.x === view!.aimBreakCell!.x && t.y === view!.aimBreakCell!.y);
+        const breakZ = visualLevel(breakTile ?? ({ pit: false, z: 0 } as Tile));
+        const bp = centerOf(view.aimBreakCell.x, view.aimBreakCell.y, breakZ);
+        // Сплошная часть до точки разрыва.
+        g.moveTo(a.cx, a.cy).lineTo(bp.cx, bp.cy).stroke({ width: 2, color, alpha: 0.85 });
+        // Пунктирная часть от разрыва до цели.
+        const dx = b.cx - bp.cx;
+        const dy = b.cy - bp.cy;
+        const len = Math.hypot(dx, dy);
+        const dashLen = 6;
+        const gapLen = 5;
+        const steps = Math.floor(len / (dashLen + gapLen));
+        const ux = dx / (len || 1);
+        const uy = dy / (len || 1);
+        let pos = 0;
+        for (let i = 0; i < steps; i += 1) {
+          const x0 = bp.cx + ux * pos;
+          const y0 = bp.cy + uy * pos;
+          pos += dashLen;
+          const x1 = bp.cx + ux * Math.min(pos, len);
+          const y1 = bp.cy + uy * Math.min(pos, len);
+          g.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 1.5, color, alpha: 0.4 });
+          pos += gapLen;
+          if (pos >= len) break;
+        }
+      } else {
+        g.moveTo(a.cx, a.cy).lineTo(b.cx, b.cy).stroke({ width: 2, color, alpha: 0.85 });
+      }
+
       if (view.heightMod !== 0) {
         const mx = (a.cx + b.cx) / 2;
         const my = (a.cy + b.cy) / 2;
@@ -812,6 +853,14 @@ export function createFieldRenderer(): FieldRenderer {
       if (view.visibleCells && entity.owner !== 1 && entity.coverType === 0) {
         const key = `${entity.x},${entity.y}`;
         if (!view.visibleCells.has(key)) continue;
+      }
+      // Скрывать укрытия вне зоны видимости.
+      if (view.visibleCells && entity.coverType > 0) {
+        const key = `${entity.x},${entity.y}`;
+        if (!view.visibleCells.has(key)) {
+          const explored = view.exploredCells?.has(key) ?? false;
+          if (!explored) continue;
+        }
       }
       const shown = display.get(entity.id);
       const dead = shown?.dead ?? entity.dead;
@@ -1138,6 +1187,14 @@ export function createFieldRenderer(): FieldRenderer {
     event.preventDefault();
   };
 
+  const animLoop = (): void => {
+    if (destroyed) return;
+    if (!playing && view?.visibleCells) {
+      paintFx();
+    }
+    animFrame = requestAnimationFrame(animLoop);
+  };
+
   return {
     async mount(element) {
       if (destroyed) return;
@@ -1175,6 +1232,7 @@ export function createFieldRenderer(): FieldRenderer {
       fit();
       paintStatic();
       paintFx();
+      animFrame = requestAnimationFrame(animLoop);
     },
     update(next) {
       view = next;
@@ -1211,6 +1269,7 @@ export function createFieldRenderer(): FieldRenderer {
     },
     destroy() {
       destroyed = true;
+      cancelAnimationFrame(animFrame);
       jobs.length = 0;
       if (mounted) {
         world.off("pointerdown", onDown);
