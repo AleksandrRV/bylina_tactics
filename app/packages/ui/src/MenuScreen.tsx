@@ -9,8 +9,7 @@ export function MenuScreen() {
   const { session, version, install } = useServices();
   const { unavailableMode } = useSessionState();
 
-  const modes: { mode: GameMode; key: "menu.quickMatch" | "menu.campaign" | "menu.pvp" }[] = [
-    { mode: "quickMatch", key: "menu.quickMatch" },
+  const locked: { mode: GameMode; key: "menu.campaign" | "menu.pvp" }[] = [
     { mode: "campaign", key: "menu.campaign" },
     { mode: "pvp", key: "menu.pvp" },
   ];
@@ -25,19 +24,17 @@ export function MenuScreen() {
       </header>
 
       <nav className="menu-nav" aria-label={t("app.fullTitle")}>
+        <button type="button" className="btn btn-primary" onClick={() => session.openQuickMatch()}>
+          <span>{t("menu.quickMatch")}</span>
+        </button>
         <button type="button" className="btn btn-primary" onClick={() => session.openBattle()}>
           <span>{t("menu.training")}</span>
         </button>
         <button type="button" className="btn btn-primary" onClick={() => session.openField()}>
           <span>{t("menu.debugField")}</span>
         </button>
-        {modes.map((item) => (
-          <button
-            key={item.mode}
-            type="button"
-            className="btn btn-primary"
-            onClick={() => session.openMode(item.mode)}
-          >
+        {locked.map((item) => (
+          <button key={item.mode} type="button" className="btn btn-primary" onClick={() => session.openMode(item.mode)}>
             <span>{t(item.key)}</span>
             <span className="btn-note">{t("common.notReady")}</span>
           </button>

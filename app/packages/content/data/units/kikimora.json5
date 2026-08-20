@@ -1,0 +1,15 @@
+{
+  id: "kikimora",
+  classId: "kikimora",
+  side: "nav",
+  maxHealth: 7,
+  maxAP: 2,
+  mobility: 6,
+  aim: 68,
+  defense: 0,
+  will: 25,
+  vision: 10,
+  weapons: ["needle"],
+  skills: [],
+  tags: [],
+}

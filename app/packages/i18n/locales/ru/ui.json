@@ -18,7 +18,26 @@
     "install": "Установить игру",
     "unavailableTitle": "Режим ещё не открыт",
     "unavailableBody": "Этот режим будет доступен в версии {version}.",
-    "unavailableHint": "Доступны настройки, испытание сетки и служебная стычка."
+    "unavailableHint": "Доступны быстрый матч, служебная стычка, испытание сетки и настройки."
+  },
+  "difficulty": {
+    "title": "Трудность",
+    "hint": "Меняется только число противников.",
+    "easy": "Лёгкий",
+    "easyNote": "Трое",
+    "normal": "Обычный",
+    "normalNote": "Пятеро",
+    "hard": "Тяжёлый",
+    "hardNote": "Восемь",
+    "back": "В меню"
+  },
+  "result": {
+    "victory": "Победа",
+    "defeat": "Поражение",
+    "victoryHint": "Все противники уничтожены.",
+    "defeatHint": "Дружина пала.",
+    "again": "Ещё партия",
+    "toMenu": "В меню"
   },
   "field": {
     "title": "Испытание сетки",
@@ -45,6 +64,7 @@
   "battle": {
     "title": "Служебная стычка",
     "objective": "Уничтожьте мишени",
+    "objectiveQuick": "Уничтожьте всех противников",
     "pause": "Пауза",
     "resume": "Продолжить",
     "toMenu": "Выйти в меню",
@@ -57,13 +77,17 @@
     "bogatyr": { "name": "Богатырь" },
     "strelets": { "name": "Стрелец" },
     "znaharka": { "name": "Знахарка" },
-    "upyr": { "name": "Упырь" }
+    "upyr": { "name": "Упырь" },
+    "leshy": { "name": "Леший" },
+    "kikimora": { "name": "Кикимора" }
   },
   "weapon": {
     "sword": { "name": "Меч" },
     "bow": { "name": "Лук" },
     "sling": { "name": "Праща" },
-    "claws": { "name": "Когти" }
+    "claws": { "name": "Когти" },
+    "branch": { "name": "Ветвь" },
+    "needle": { "name": "Игла" }
   },
   "combat": {
     "preview": "Шанс {chance}% · урон {dmg} · укрытие {cover} · высота {height} · {flank}. Повтор — выстрел.",

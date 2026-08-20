@@ -1,0 +1,84 @@
+import { describe, expect, it } from "vitest";
+import {
+  ENEMY_OWNER,
+  PLAYER_OWNER,
+  QUICK_MATCH_MAP,
+  createQuickMatch,
+  createTacticsKernel,
+  defaultTrainingWeapons,
+  livingOf,
+  matchOutcome,
+  pickEnemyCommand,
+  runEnemyTurn,
+} from "../src/index.js";
+
+describe("createQuickMatch", () => {
+  it("places three player roles and the requested enemy count", () => {
+    const easy = createQuickMatch({ enemyCount: 3, seed: 11 });
+    const hard = createQuickMatch({ enemyCount: 8, seed: 11 });
+    expect(livingOf(easy, PLAYER_OWNER)).toHaveLength(3);
+    expect(livingOf(easy, ENEMY_OWNER)).toHaveLength(3);
+    expect(livingOf(hard, ENEMY_OWNER)).toHaveLength(8);
+    expect(easy.entities.filter((entity) => entity.coverType === 0 && !entity.dead).every((entity) => entity.maxAp > 0)).toBe(
+      true,
+    );
+  });
+
+  it("draws enemy types from the pool and may repeat", () => {
+    const match = createQuickMatch({ enemyCount: 8, seed: 99 });
+    const types = new Set(livingOf(match, ENEMY_OWNER).map((entity) => entity.configId));
+    for (const type of types) {
+      expect(["upyr", "leshy", "kikimora"]).toContain(type);
+    }
+  });
+
+  it("keeps spawn cells free of pits and walls", () => {
+    const match = createQuickMatch({ enemyCount: 5, seed: 7, map: QUICK_MATCH_MAP });
+    for (const unit of match.entities.filter((entity) => entity.coverType === 0)) {
+      const tile = match.grid.tiles.find((item) => item.x === unit.x && item.y === unit.y);
+      expect(tile?.pit).toBe(false);
+      expect(tile?.blockLOS).toBe(false);
+    }
+  });
+});
+
+describe("matchOutcome", () => {
+  it("reports victory when nav is gone and defeat when the host is gone", () => {
+    const match = createQuickMatch({ enemyCount: 3, seed: 1 });
+    expect(matchOutcome(match)).toBe("ongoing");
+    for (const entity of match.entities) {
+      if (entity.owner === ENEMY_OWNER && entity.coverType === 0) {
+        entity.dead = true;
+        entity.hp = 0;
+        entity.obstacle = false;
+      }
+    }
+    expect(matchOutcome(match)).toBe("victory");
+    const lost = createQuickMatch({ enemyCount: 3, seed: 1 });
+    for (const entity of lost.entities) {
+      if (entity.owner === PLAYER_OWNER && entity.coverType === 0) {
+        entity.dead = true;
+        entity.hp = 0;
+        entity.obstacle = false;
+      }
+    }
+    expect(matchOutcome(lost)).toBe("defeat");
+  });
+});
+
+describe("enemy AI", () => {
+  it("forms MOVE or ATTACK while it is nav's turn", () => {
+    const kernel = createTacticsKernel({
+      initial: createQuickMatch({ enemyCount: 3, seed: 21 }),
+      weapons: defaultTrainingWeapons(),
+      seed: 21,
+    });
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    expect(kernel.getSnapshot().activeOwner).toBe(ENEMY_OWNER);
+    const command = pickEnemyCommand(kernel);
+    expect(command === null || command.type === "MOVE" || command.type === "ATTACK").toBe(true);
+    const events = runEnemyTurn(kernel);
+    expect(events.length).toBeGreaterThan(0);
+    expect(kernel.getSnapshot().activeOwner).toBe(PLAYER_OWNER);
+  });
+});

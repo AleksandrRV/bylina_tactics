@@ -1,0 +1,14 @@
+{
+  id: "branch",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 7,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 4,
+  crit: 10,
+  critBonus: 1,
+  envDmg: 0,
+}

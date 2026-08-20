@@ -1,4 +1,4 @@
-export const CORE_VERSION = "0.4.0";
+export const CORE_VERSION = "0.5.0";
 
 export { createTacticsKernel } from "./kernel.js";
 export type { KernelOptions, TacticsKernel } from "./kernel.js";

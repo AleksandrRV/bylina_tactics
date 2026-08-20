@@ -1,0 +1,14 @@
+{
+  id: "needle",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 4,
+  crit: 10,
+  critBonus: 1,
+  envDmg: 0,
+}

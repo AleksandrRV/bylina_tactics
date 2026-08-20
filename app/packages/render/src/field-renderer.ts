@@ -50,6 +50,8 @@ function tokenColor(entity: EntityState): number {
   if (entity.owner === 2) return 0x8bc34a;
   if (entity.configId === "bogatyr") return 0xc45c3a;
   if (entity.configId === "znaharka") return 0x5bb3a0;
+  if (entity.configId === "leshy") return 0x6d9a3a;
+  if (entity.configId === "kikimora") return 0x9ccc65;
   return 0xe0b34a;
 }
 

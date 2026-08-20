@@ -1,8 +1,12 @@
 import {
+  ENEMY_OWNER,
   PLAYER_OWNER,
+  createQuickMatch,
   createTacticsKernel,
   createTrainingMatch,
   defaultTrainingWeapons,
+  matchOutcome,
+  runEnemyTurn,
   weaponStatsFromRecord,
   type CellPos,
   type EntityState,
@@ -33,7 +37,7 @@ export function BattleScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
-  const { paused } = useSessionState();
+  const { paused, battleKind, difficulty, matchSeed } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -53,15 +57,27 @@ export function BattleScreen() {
     return base;
   }, [content.weapons]);
 
-  const kernel = useMemo(
-    () =>
-      createTacticsKernel({
-        initial: createTrainingMatch({ units: content.units }),
-        weapons,
-        seed: 0x40a1,
-      }),
-    [content.units, weapons],
-  );
+  const kernel = useMemo(() => {
+    const count =
+      content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
+      content.quickMatch.difficulties[0]?.enemyCount ??
+      3;
+    const initial =
+      battleKind === "quick"
+        ? createQuickMatch({
+            units: content.units,
+            map: content.quickMatch.map,
+            enemyPool: content.quickMatch.enemyPool,
+            enemyCount: count,
+            seed: matchSeed || 1,
+          })
+        : createTrainingMatch({ units: content.units });
+    return createTacticsKernel({
+      initial,
+      weapons,
+      seed: battleKind === "quick" ? matchSeed || 1 : 0x40a1,
+    });
+  }, [battleKind, content.quickMatch, content.units, difficulty, matchSeed, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -123,32 +139,60 @@ export function BattleScreen() {
     if (events.some((event) => event.type === "ENTITY_DIED")) setLog(t("combat.died"));
   };
 
+  const concludeIfNeeded = (): boolean => {
+    if (battleKind !== "quick") return false;
+    const outcome = matchOutcome(kernel.getSnapshot());
+    if (outcome === "ongoing") return false;
+    session.finishMatch(outcome);
+    return true;
+  };
+
+  const playThen = (events: GameEvent[], after?: () => void): void => {
+    setBusy(true);
+    void (rendererRef.current?.play(events) ?? Promise.resolve()).finally(() => {
+      setBusy(false);
+      after?.();
+    });
+  };
+
   const tryMove = (to: CellPos): void => {
     if (selectedId === null || paused || busy) return;
+    if (snapshot.activeOwner !== PLAYER_OWNER) return;
     const result = kernel.apply({ type: "MOVE", actorId: selectedId, to });
     if (!result.ok) return;
     setPreview(null);
     setAimId(null);
-    setBusy(true);
-    void rendererRef.current
-      ?.play(result.events)
-      .finally(() => setBusy(false));
+    playThen(result.events);
   };
 
   const tryAttack = (targetId: number): void => {
     if (selectedId === null || paused || busy) return;
+    if (snapshot.activeOwner !== PLAYER_OWNER) return;
     const result = kernel.apply({ type: "ATTACK", actorId: selectedId, targetId });
     if (!result.ok) return;
     announce(result.events);
     setAimId(null);
-    setBusy(true);
-    void rendererRef.current
-      ?.play(result.events)
-      .finally(() => setBusy(false));
+    playThen(result.events, () => {
+      concludeIfNeeded();
+    });
+  };
+
+  const endTurn = (): void => {
+    if (paused || busy) return;
+    if (snapshot.activeOwner !== PLAYER_OWNER) return;
+    const result = kernel.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
+    if (!result.ok) return;
+    const follow: GameEvent[] = [...result.events];
+    if (battleKind === "quick" && kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
+      follow.push(...runEnemyTurn(kernel));
+    }
+    playThen(follow, () => {
+      concludeIfNeeded();
+    });
   };
 
   const onCell = (x: number, y: number): void => {
-    if (paused || busy) return;
+    if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
     const occupant = snapshot.entities.find(
       (entity) => !entity.dead && entity.x === x && entity.y === y && entity.coverType === 0,
     );
@@ -367,7 +411,7 @@ export function BattleScreen() {
             <button
               type="button"
               className="hud-btn skill-slot"
-              disabled={!selected || selected.ap <= 0 || busy}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
               onClick={() => {
                 if (aimId !== null && hit?.available) tryAttack(aimId);
               }}
@@ -379,8 +423,8 @@ export function BattleScreen() {
           <button
             type="button"
             className="hud-btn hud-btn-primary"
-            disabled={busy}
-            onClick={() => kernel.apply({ type: "END_TURN", playerId: String(snapshot.activeOwner) })}
+            disabled={busy || snapshot.activeOwner !== PLAYER_OWNER}
+            onClick={() => endTurn()}
           >
             {t("field.endTurn")}
           </button>

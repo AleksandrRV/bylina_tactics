@@ -6,8 +6,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.4.0", () => {
-    expect(APP_VERSION).toBe("0.4.0");
+  it("reports version 0.5.0", () => {
+    expect(APP_VERSION).toBe("0.5.0");
   });
 
   it("moves between menu and settings", () => {
@@ -20,9 +20,9 @@ describe("createSession", () => {
 
   it("records an unavailable mode without leaving the menu", () => {
     const session = createSession("menu");
-    session.openMode("quickMatch");
+    session.openMode("campaign");
     expect(session.get().screen).toBe("menu");
-    expect(session.get().unavailableMode).toBe("quickMatch");
+    expect(session.get().unavailableMode).toBe("campaign");
     session.dismissUnavailable();
     expect(session.get().unavailableMode).toBeNull();
   });
@@ -37,10 +37,25 @@ describe("createSession", () => {
     const session = createSession("menu");
     session.openBattle();
     expect(session.get().screen).toBe("battle");
-    expect(session.get().paused).toBe(false);
+    expect(session.get().battleKind).toBe("training");
     session.setPaused(true);
     expect(session.get().paused).toBe(true);
     session.goTo("menu");
     expect(session.get().paused).toBe(false);
+  });
+
+  it("opens quick match difficulty and starts a battle", () => {
+    const session = createSession("menu");
+    session.openQuickMatch();
+    expect(session.get().screen).toBe("difficulty");
+    session.selectDifficulty("hard");
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("quick");
+    expect(session.get().difficulty).toBe("hard");
+    session.finishMatch("victory");
+    expect(session.get().screen).toBe("result");
+    expect(session.get().outcome).toBe("victory");
+    session.playAgain();
+    expect(session.get().screen).toBe("difficulty");
   });
 });

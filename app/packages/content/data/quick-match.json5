@@ -1,5 +1,5 @@
 {
-  // Слоты стороны игрока совпадают с записями 0.4.0. Пул противников полностью задействуется в 0.5.0.
+  // Состав противников набирается из пула случайно. Численность — единственный параметр трудности.
   playerSlots: ["bogatyr", "strelets", "znaharka"],
   enemyPool: ["upyr", "leshy", "kikimora"],
   difficulties: [
@@ -7,4 +7,11 @@
     { id: "normal", enemyCount: 5 },
     { id: "hard", enemyCount: 8 },
   ],
+  map: {
+    width: 12,
+    height: 10,
+    pitChance: 0.05,
+    coverDensity: 0.07,
+    heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+  },
 }
