@@ -124,6 +124,7 @@ export const quickMatchConfigSchema = z.object({
       }),
     )
     .min(1),
+  map: mapGenConfigSchema,
 });
 
 export const pvpConfigSchema = z.object({
@@ -136,5 +137,6 @@ export type UnitConfig = z.infer<typeof unitConfigSchema>;
 export type WeaponConfig = z.infer<typeof weaponConfigSchema>;
 export type SkillConfig = z.infer<typeof skillConfigSchema>;
 export type CampaignConfig = z.infer<typeof campaignConfigSchema>;
+export type MapGenConfig = z.infer<typeof mapGenConfigSchema>;
 export type QuickMatchConfig = z.infer<typeof quickMatchConfigSchema>;
 export type PvpConfig = z.infer<typeof pvpConfigSchema>;

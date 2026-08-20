@@ -1,0 +1,15 @@
+{
+  id: "leshy",
+  classId: "leshy",
+  side: "nav",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 5,
+  aim: 78,
+  defense: 5,
+  will: 35,
+  vision: 12,
+  weapons: ["branch"],
+  skills: [],
+  tags: [],
+}

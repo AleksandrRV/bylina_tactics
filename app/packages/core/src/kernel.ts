@@ -14,7 +14,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.4.0";
+export const CORE_VERSION = "0.5.0";
 
 export interface KernelOptions {
   initial?: MatchState;

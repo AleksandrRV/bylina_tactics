@@ -107,9 +107,9 @@ describe("edges and occupancy", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.4.0 and does not touch the document object", () => {
+  it("reports 0.5.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.4.0");
+    expect(kernel.version).toBe("0.5.0");
     expect(typeof globalThis.document).toBe("undefined");
   });
 

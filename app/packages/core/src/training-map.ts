@@ -69,6 +69,34 @@ export const CLAWS: WeaponStats = {
   critBonus: 1,
 };
 
+export const BRANCH: WeaponStats = {
+  id: "branch",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 7,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 4,
+  crit: 10,
+  critBonus: 1,
+};
+
+export const NEEDLE: WeaponStats = {
+  id: "needle",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 4,
+  crit: 10,
+  critBonus: 1,
+};
+
 export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
   bogatyr: {
     id: "bogatyr",
@@ -106,6 +134,24 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     defense: 0,
     weapons: ["claws"],
   },
+  leshy: {
+    id: "leshy",
+    maxHealth: 8,
+    maxAP: 2,
+    mobility: 5,
+    aim: 78,
+    defense: 5,
+    weapons: ["branch"],
+  },
+  kikimora: {
+    id: "kikimora",
+    maxHealth: 7,
+    maxAP: 2,
+    mobility: 6,
+    aim: 68,
+    defense: 0,
+    weapons: ["needle"],
+  },
 };
 
 export function defaultTrainingWeapons(): Record<string, WeaponStats> {
@@ -114,6 +160,8 @@ export function defaultTrainingWeapons(): Record<string, WeaponStats> {
     [BOW.id]: BOW,
     [SLING.id]: SLING,
     [CLAWS.id]: CLAWS,
+    [BRANCH.id]: BRANCH,
+    [NEEDLE.id]: NEEDLE,
   };
 }
 

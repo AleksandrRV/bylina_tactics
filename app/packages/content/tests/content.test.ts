@@ -27,12 +27,21 @@ describe("parseContent", () => {
     const result = parseContent(readDataTree());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.units.map((unit) => unit.id).sort()).toEqual(["bogatyr", "strelets", "upyr", "znaharka"]);
+    expect(result.data.units.map((unit) => unit.id).sort()).toEqual([
+      "bogatyr",
+      "kikimora",
+      "leshy",
+      "strelets",
+      "upyr",
+      "znaharka",
+    ]);
     expect(result.data.units.every((unit) => unit.skills.length === 0)).toBe(true);
     expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual([
       "bow",
       "bow_debug",
+      "branch",
       "claws",
+      "needle",
       "sling",
       "sword",
       "sword_debug",

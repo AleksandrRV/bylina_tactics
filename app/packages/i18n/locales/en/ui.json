@@ -18,7 +18,26 @@
     "install": "Install game",
     "unavailableTitle": "This mode is not available yet",
     "unavailableBody": "This mode will open in version {version}.",
-    "unavailableHint": "Settings, the grid trial, and the staff clash are available."
+    "unavailableHint": "Quick Match, the staff clash, the grid trial, and settings are available."
+  },
+  "difficulty": {
+    "title": "Difficulty",
+    "hint": "Only the number of enemies changes.",
+    "easy": "Easy",
+    "easyNote": "Three",
+    "normal": "Normal",
+    "normalNote": "Five",
+    "hard": "Hard",
+    "hardNote": "Eight",
+    "back": "Menu"
+  },
+  "result": {
+    "victory": "Victory",
+    "defeat": "Defeat",
+    "victoryHint": "All enemies are destroyed.",
+    "defeatHint": "The host has fallen.",
+    "again": "Play again",
+    "toMenu": "Menu"
   },
   "field": {
     "title": "Grid trial",
@@ -45,6 +64,7 @@
   "battle": {
     "title": "Staff clash",
     "objective": "Destroy the dummies",
+    "objectiveQuick": "Destroy all enemies",
     "pause": "Pause",
     "resume": "Resume",
     "toMenu": "Return to menu",
@@ -57,13 +77,17 @@
     "bogatyr": { "name": "Bogatyr" },
     "strelets": { "name": "Strelets" },
     "znaharka": { "name": "Znaharka" },
-    "upyr": { "name": "Upyr" }
+    "upyr": { "name": "Upyr" },
+    "leshy": { "name": "Leshy" },
+    "kikimora": { "name": "Kikimora" }
   },
   "weapon": {
     "sword": { "name": "Sword" },
     "bow": { "name": "Bow" },
     "sling": { "name": "Sling" },
-    "claws": { "name": "Claws" }
+    "claws": { "name": "Claws" },
+    "branch": { "name": "Branch" },
+    "needle": { "name": "Needle" }
   },
   "combat": {
     "preview": "Hit {chance}% · dmg {dmg} · cover {cover} · height {height} · {flank}. Tap again to fire.",
