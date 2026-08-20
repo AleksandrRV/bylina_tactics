@@ -79,6 +79,8 @@ export function createDebugMatch(): MatchState {
       dead: false,
       flying: false,
       coverType: 0,
+      overwatch: false,
+      defending: false,
     }),
     unit({
       id: 2,
@@ -101,6 +103,8 @@ export function createDebugMatch(): MatchState {
       dead: false,
       flying: false,
       coverType: 0,
+      overwatch: false,
+      defending: false,
     }),
     unit({
       id: 3,
@@ -123,6 +127,8 @@ export function createDebugMatch(): MatchState {
       dead: false,
       flying: false,
       coverType: 2,
+      overwatch: false,
+      defending: false,
     }),
     unit({
       id: 4,
@@ -145,6 +151,8 @@ export function createDebugMatch(): MatchState {
       dead: false,
       flying: false,
       coverType: 0,
+      overwatch: false,
+      defending: false,
     }),
   );
 

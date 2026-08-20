@@ -57,7 +57,11 @@
     "apLeft": "AP",
     "debugMovement": "Movement cost",
     "debugMovementHint": "Cell AP costs are shown",
-    "fogUnknown": "Unexplored"
+    "fogUnknown": "Unexplored",
+    "overwatch": "Overwatch",
+    "overwatchHint": "Enter overwatch: reaction shot at enemies entering the sector. Ends this unit's turn.",
+    "defend": "Defend",
+    "defendHint": "Defensive stance: +25 dodge, −2 incoming damage. Ends this unit's turn."
   },
   "unit": {
     "bogatyr": { "name": "Bogatyr" },

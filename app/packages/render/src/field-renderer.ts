@@ -566,8 +566,18 @@ export function createFieldRenderer(): FieldRenderer {
         // Неразведанная клетка: плотный тёмный оверлей.
         g.rect(0, 0, C, C).fill({ color: 0x06080a, alpha: 0.88 });
       } else if (!isVisible && isExplored) {
-        // Ранее виденная: лёгкое затемнение, рельеф виден.
-        g.rect(0, 0, C, C).fill({ color: 0x0c1218, alpha: 0.42 });
+        // Ранее виденная: затемнение + лёгкий туман.
+        g.rect(0, 0, C, C).fill({ color: 0x0c1218, alpha: 0.55 });
+        // Полупрозрачные пятна тумана (детерминированные по хешу клетки).
+        const fogSeed = tile.x * 7919 + tile.y * 6271;
+        for (let i = 0; i < 3; i += 1) {
+          const hash = ((fogSeed * (i + 1) * 2654435761) >>> 0) / 4294967296;
+          const hash2 = (((fogSeed + 31) * (i + 7) * 2246822519) >>> 0) / 4294967296;
+          const fx = hash * C;
+          const fy = hash2 * C;
+          const fr = 8 + hash * 14;
+          g.circle(fx, fy, fr).fill({ color: 0x8a9aaa, alpha: 0.06 + hash * 0.04 });
+        }
       }
     }
 
@@ -678,6 +688,26 @@ export function createFieldRenderer(): FieldRenderer {
       g.poly([px0, cy + 21.5, px0 + 2.9, cy + 24.4, px0, cy + 27.3, px0 - 2.9, cy + 24.4]).fill(
         i < pips ? 0xe8b64c : 0x3a382e,
       );
+    }
+
+    // Щит: защитная стойка.
+    if (entity.defending) {
+      const sx = cx + 16;
+      const sy = cy - 18;
+      g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
+      g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
+      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
+      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
+    }
+
+    // Дозор: глаз-индикатор.
+    if (entity.overwatch) {
+      const ox = cx - 16;
+      const oy = cy - 18;
+      g.circle(ox, oy, 5.5).fill({ color: 0xe8b64c, alpha: 0.9 });
+      g.circle(ox, oy, 5.5).stroke({ width: 1, color: 0x57431a });
+      g.circle(ox, oy, 2.2).fill(0x1c1a20);
+      g.circle(ox + 0.8, oy - 0.8, 0.7).fill(0xf3ecdc);
     }
   };
 

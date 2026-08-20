@@ -34,6 +34,8 @@ function walker(partial: Partial<EntityState> = {}): EntityState {
     dead: false,
     flying: false,
     coverType: 0,
+    overwatch: false,
+    defending: false,
     ...partial,
   };
 }
@@ -108,9 +110,9 @@ describe("edges and occupancy", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.6.0 and does not touch the document object", () => {
+  it("reports 0.7.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.6.0");
+    expect(kernel.version).toBe("0.7.0");
     expect(typeof globalThis.document).toBe("undefined");
   });
 

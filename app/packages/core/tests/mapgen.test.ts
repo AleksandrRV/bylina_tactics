@@ -35,6 +35,8 @@ describe("generateBattlefield", () => {
         dead: false,
         flying: false,
         coverType: 0 as const,
+        overwatch: false,
+        defending: false,
       };
       for (const to of enemies) {
         expect(findPath(grid, covers, walker, to.x, to.y)).not.toBeNull();

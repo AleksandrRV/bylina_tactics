@@ -40,6 +40,8 @@ function spawn(
     dead: false,
     flying: false,
     coverType: 0,
+    overwatch: false,
+    defending: false,
   };
 }
 

@@ -60,6 +60,8 @@ function probe(x: number, y: number, z: number): EntityState {
     dead: false,
     flying: false,
     coverType: 0,
+    overwatch: false,
+    defending: false,
   };
 }
 
@@ -199,6 +201,8 @@ export function generateBattlefield(
         dead: false,
         flying: false,
         coverType: rng.nextInt(1, 2) as 1 | 2,
+        overwatch: false,
+        defending: false,
       });
     }
 

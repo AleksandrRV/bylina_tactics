@@ -84,6 +84,13 @@ export function pickEnemyCommand(kernel: TacticsKernel): Command | null {
     const move = bestMove(kernel, actor, foes);
     if (move) return move;
   }
+  // Если ни один враг не может атаковать или двигаться — ставим в защитную стойку
+  // тех, у кого ещё остались ОД (§16: неизрасходованные ОД сгорают).
+  for (const actor of enemies) {
+    if (actor.ap > 0 && !actor.defending) {
+      return { type: "DEFEND", actorId: actor.id };
+    }
+  }
   return null;
 }
 

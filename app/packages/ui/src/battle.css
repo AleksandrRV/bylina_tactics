@@ -277,6 +277,12 @@
   margin-bottom: 2px;
 }
 
+.skill-slot.is-active {
+  border-color: #e0b34a;
+  color: #f3ecdc;
+  background: #2a332c;
+}
+
 .aim-card,
 .battle-log {
   margin: 0 8px;
