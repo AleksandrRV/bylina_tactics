@@ -29,6 +29,13 @@ export {
   weaponStatsFromRecord,
 } from "./training-map.js";
 export type { SpawnUnitConfig } from "./training-map.js";
+export { QUICK_MATCH_MAP, enemySpawns, generateBattlefield, playerSpawns } from "./mapgen.js";
+export type { MapGenConfig, SpawnPoint } from "./mapgen.js";
+export { createQuickMatch } from "./match.js";
+export type { QuickMatchOptions } from "./match.js";
+export { isCombatant, livingOf, matchOutcome } from "./outcome.js";
+export type { MatchOutcome } from "./outcome.js";
+export { pickEnemyCommand, runEnemyTurn } from "./ai.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
 export { canFinish, canTransit, edgeCost } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";

@@ -65,6 +65,7 @@
     "title": "Staff clash",
     "objective": "Destroy the dummies",
     "objectiveQuick": "Destroy all enemies",
+    "enemyTurn": "The Nav advances",
     "pause": "Pause",
     "resume": "Resume",
     "toMenu": "Return to menu",

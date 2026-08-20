@@ -6,7 +6,7 @@ import {
   createTrainingMatch,
   defaultTrainingWeapons,
   matchOutcome,
-  runEnemyTurn,
+  pickEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
   type EntityState,
@@ -19,10 +19,17 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
+import { unitPortrait } from "./portraits.js";
 import "./battle.css";
 
 function cellKey(x: number, y: number): string {
   return `${x},${y}`;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
 }
 
 function isOwn(entity: EntityState): boolean {
@@ -85,6 +92,7 @@ export function BattleScreen() {
   const [preview, setPreview] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [enemyPhase, setEnemyPhase] = useState(false);
 
   useEffect(
     () =>
@@ -177,18 +185,58 @@ export function BattleScreen() {
     });
   };
 
+  /**
+   * Ход Нави идёт по одному действию: решение ИИ → применение → ожидание
+   * анимации. Камера и лог показывают, какой враг ходит, кого бьёт и когда
+   * дружинник теряет здоровье.
+   */
+  const runEnemyPhase = async (): Promise<void> => {
+    setEnemyPhase(true);
+    try {
+      await sleep(430);
+      for (let guard = 0; guard < 96; guard += 1) {
+        const snap = kernel.getSnapshot();
+        if (snap.activeOwner !== ENEMY_OWNER) break;
+        if (matchOutcome(snap) !== "ongoing") break;
+        const command = pickEnemyCommand(kernel);
+        const applied = command
+          ? kernel.apply(command)
+          : kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+        if (!applied.ok) {
+          kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+          break;
+        }
+        await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
+        announce(applied.events);
+        if (!command) break;
+        if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
+        await sleep(190);
+      }
+    } finally {
+      setEnemyPhase(false);
+    }
+  };
+
   const endTurn = (): void => {
     if (paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
     const result = kernel.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
     if (!result.ok) return;
-    const follow: GameEvent[] = [...result.events];
-    if (battleKind === "quick" && kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
-      follow.push(...runEnemyTurn(kernel));
-    }
-    playThen(follow, () => {
-      concludeIfNeeded();
-    });
+    setPreview(null);
+    setAimId(null);
+    setLog(null);
+    setBusy(true);
+    void (async () => {
+      try {
+        await (rendererRef.current?.play(result.events) ?? Promise.resolve());
+        if (battleKind === "quick" && kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
+          await runEnemyPhase();
+        }
+      } finally {
+        setBusy(false);
+        concludeIfNeeded();
+      }
+    })();
   };
 
   const onCell = (x: number, y: number): void => {
@@ -318,7 +366,9 @@ export function BattleScreen() {
   }, [paused, busy, snapshot, selectedId, aimId, hit, session]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
+  const enemies = snapshot.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0);
   const weaponName = selected?.weaponId ? t(`weapon.${selected.weaponId}.name`) : "";
+  const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
 
   return (
     <div className="battle-screen">
@@ -329,34 +379,57 @@ export function BattleScreen() {
             {t("battle.pause")}
           </button>
           <div className="battle-objective">
-            <p className="eyebrow">{t("battle.title")}</p>
-            <p>{t("battle.objective")}</p>
+            <p className="eyebrow">{battleKind === "quick" ? t("menu.quickMatch") : t("battle.title")}</p>
+            <p>{t(battleKind === "quick" ? "battle.objectiveQuick" : "battle.objective")}</p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
               {" · "}
-              {t("field.sidePlayer")}
+              {t(sideKey)}
             </p>
+            {enemies.length > 0 ? (
+              <div className="enemies-strip" aria-label={t("field.sideEnemy")}>
+                {enemies.map((entity) => {
+                  const face = unitPortrait(entity.configId);
+                  return face ? (
+                    <img
+                      key={entity.id}
+                      className={`enemy-face${entity.dead ? " is-dead" : ""}`}
+                      src={face}
+                      alt={t(unitNameKey(entity.configId))}
+                      title={t(unitNameKey(entity.configId))}
+                      draggable={false}
+                    />
+                  ) : null;
+                })}
+              </div>
+            ) : null}
           </div>
           <div className="roster" aria-label={t("field.sidePlayer")}>
-            {roster.map((entity) => (
-              <button
-                key={entity.id}
-                type="button"
-                className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
-                onClick={() => {
-                  if (entity.dead) return;
-                  setSelectedId(entity.id);
-                  setAimId(null);
-                }}
-              >
-                <span className="name">{t(unitNameKey(entity.configId))}</span>
-                <span className="diamonds" aria-label={t("field.ap", { current: entity.ap, max: entity.maxAp })}>
-                  {Array.from({ length: entity.maxAp }, (_, index) => (
-                    <i key={index} className={index < entity.ap ? "diamond is-on" : "diamond"} />
-                  ))}
-                </span>
-              </button>
-            ))}
+            {roster.map((entity) => {
+              const face = unitPortrait(entity.configId);
+              return (
+                <button
+                  key={entity.id}
+                  type="button"
+                  className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
+                  onClick={() => {
+                    if (entity.dead) return;
+                    setSelectedId(entity.id);
+                    setAimId(null);
+                  }}
+                >
+                  {face ? <img className="roster-face" src={face} alt="" draggable={false} /> : null}
+                  <span className="roster-meta">
+                    <span className="name">{t(unitNameKey(entity.configId))}</span>
+                    <span className="diamonds" aria-label={t("field.ap", { current: entity.ap, max: entity.maxAp })}>
+                      {Array.from({ length: entity.maxAp }, (_, index) => (
+                        <i key={index} className={index < entity.ap ? "diamond is-on" : "diamond"} />
+                      ))}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </header>
 
@@ -389,20 +462,25 @@ export function BattleScreen() {
         <footer className="battle-bottom">
           <div className="battle-selected">
             {selected ? (
-              <>
-                <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
-                <p>{t("battle.hp", { current: selected.hp, max: selected.maxHp })}</p>
-                <div className="hp-segs" aria-hidden="true">
-                  {Array.from({ length: selected.maxHp }, (_, index) => (
-                    <i key={index} className={index < selected.hp ? "on" : ""} />
-                  ))}
+              <div className="sel-row">
+                {unitPortrait(selected.configId) ? (
+                  <img className="sel-face" src={unitPortrait(selected.configId)} alt="" draggable={false} />
+                ) : null}
+                <div className="sel-info">
+                  <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
+                  <p>{t("battle.hp", { current: selected.hp, max: selected.maxHp })}</p>
+                  <div className="hp-segs" aria-hidden="true">
+                    {Array.from({ length: selected.maxHp }, (_, index) => (
+                      <i key={index} className={index < selected.hp ? "on" : ""} />
+                    ))}
+                  </div>
+                  <div className="diamonds" aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}>
+                    {Array.from({ length: selected.maxAp }, (_, index) => (
+                      <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
+                    ))}
+                  </div>
                 </div>
-                <div className="diamonds" aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}>
-                  {Array.from({ length: selected.maxAp }, (_, index) => (
-                    <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
-                  ))}
-                </div>
-              </>
+              </div>
             ) : (
               <p>{t("battle.empty")}</p>
             )}
@@ -430,6 +508,12 @@ export function BattleScreen() {
           </button>
         </footer>
       </div>
+
+      {enemyPhase ? (
+        <div className="phase-banner" role="status">
+          {t("battle.enemyTurn")}
+        </div>
+      ) : null}
 
       {paused ? (
         <div className="pause-root" role="presentation">

@@ -42,7 +42,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png"],
+      includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png", "portraits/*.jpg"],
       manifest: {
         name: "Былина: Тьма Кощея",
         short_name: "Былина",
