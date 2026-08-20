@@ -1,4 +1,12 @@
-import { DEBUG_PLAYER_ID, type CellPos, type EntityState, type ReachableCell, type Tile } from "@bylina/core";
+import {
+  DEBUG_PLAYER_ID,
+  type CellPos,
+  type EntityState,
+  type GameEvent,
+  type HitPreview,
+  type ReachableCell,
+  type Tile,
+} from "@bylina/core";
 import { useEffect, useMemo, useState } from "react";
 import { useServices, useT } from "./context.js";
 import { useI18nTick } from "./hooks.js";
@@ -10,7 +18,7 @@ function cellKey(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function Token({ kind }: { kind: "player" | "ally" | "cover" }) {
+function Token({ kind }: { kind: "player" | "ally" | "enemy" | "cover" }) {
   if (kind === "cover") {
     return (
       <svg className="token" viewBox="0 0 24 24" aria-hidden="true">
@@ -20,8 +28,8 @@ function Token({ kind }: { kind: "player" | "ally" | "cover" }) {
       </svg>
     );
   }
-  const fill = kind === "player" ? "#e0b34a" : "#9aa7b2";
-  const ring = kind === "player" ? "#f3ecdc" : "#5c6670";
+  const fill = kind === "player" ? "#e0b34a" : kind === "enemy" ? "#8bc34a" : "#9aa7b2";
+  const ring = kind === "player" ? "#f3ecdc" : kind === "enemy" ? "#1b3a14" : "#5c6670";
   return (
     <svg className="token" viewBox="0 0 24 24" aria-hidden="true">
       <circle cx="12" cy="12" r="8" fill={fill} stroke={ring} strokeWidth="2" />
@@ -29,14 +37,16 @@ function Token({ kind }: { kind: "player" | "ally" | "cover" }) {
   );
 }
 
-function occupantKind(entity: EntityState): "player" | "ally" | "cover" | null {
+function occupantKind(entity: EntityState): "player" | "ally" | "enemy" | "cover" | null {
   if (entity.coverType > 0) return "cover";
+  if (entity.dead) return null;
   if (entity.id === DEBUG_PLAYER_ID) return "player";
-  if (entity.obstacle && !entity.dead) return "ally";
+  if (entity.owner === 2) return "enemy";
+  if (entity.obstacle) return "ally";
   return null;
 }
 
-function tileLookup(tiles: Tile[], width: number, x: number, y: number): Tile | undefined {
+function tileLookup(tiles: Tile[], _width: number, x: number, y: number): Tile | undefined {
   return tiles.find((tile) => tile.x === x && tile.y === y);
 }
 
@@ -45,18 +55,36 @@ export function FieldScreen() {
   const t = useT();
   const { session, tactics } = useServices();
   const [, setTick] = useState(0);
+  const [log, setLog] = useState<string | null>(null);
 
-  useEffect(() => tactics.subscribe(() => setTick((value) => value + 1)), [tactics]);
+  useEffect(
+    () =>
+      tactics.subscribe(() => {
+        setTick((value) => value + 1);
+      }),
+    [tactics],
+  );
 
   const snapshot = tactics.getSnapshot();
-  const player = snapshot.entities.find((entity) => entity.id === DEBUG_PLAYER_ID);
   const [selectedId, setSelectedId] = useState<number | null>(DEBUG_PLAYER_ID);
+  const [aimId, setAimId] = useState<number | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
+
+  useEffect(() => {
+    const list = snapshot.entities.filter(
+      (entity) => !entity.dead && entity.coverType === 0 && entity.owner === snapshot.activeOwner && entity.maxAp > 0,
+    );
+    setSelectedId((current) => (current !== null && list.some((entity) => entity.id === current) ? current : (list[0]?.id ?? null)));
+    setAimId(null);
+  }, [snapshot.activeOwner, snapshot.turnNumber]);
+
+  const selected = snapshot.entities.find((entity) => entity.id === selectedId);
+  const aimed = snapshot.entities.find((entity) => entity.id === aimId);
 
   const reachable = useMemo(() => {
     if (selectedId === null) return [];
     return tactics.getReachable(selectedId);
-  }, [tactics, selectedId, snapshot.turnNumber, player?.x, player?.y, player?.ap]);
+  }, [tactics, selectedId, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -71,30 +99,70 @@ export function FieldScreen() {
     return new Set((path?.path ?? []).map((cell) => cellKey(cell.x, cell.y)));
   }, [preview, selectedId, tactics, snapshot.turnNumber]);
 
+  const hit: HitPreview | null = useMemo(() => {
+    if (selectedId === null || aimId === null) return null;
+    return tactics.getHitPreview(selectedId, aimId);
+  }, [tactics, selectedId, aimId, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+
+  const announce = (events: GameEvent[]): void => {
+    const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
+    if (combat && combat.type === "COMBAT_RESOLVED") {
+      if (combat.result === "MISS") setLog(t("combat.miss"));
+      else if (combat.result === "CRIT") setLog(t("combat.crit", { dmg: combat.damageDealt }));
+      else setLog(t("combat.hit", { dmg: combat.damageDealt }));
+    }
+    const death = events.find((event) => event.type === "ENTITY_DIED");
+    if (death) setLog(t("combat.died"));
+  };
+
   const tryMove = (to: CellPos): void => {
     if (selectedId === null) return;
     const result = tactics.apply({ type: "MOVE", actorId: selectedId, to });
-    if (result.ok) setPreview(null);
+    if (result.ok) {
+      setPreview(null);
+      setAimId(null);
+    }
+  };
+
+  const tryAttack = (targetId: number): void => {
+    if (selectedId === null) return;
+    const result = tactics.apply({ type: "ATTACK", actorId: selectedId, targetId });
+    if (result.ok) {
+      announce(result.events);
+      setAimId(null);
+    }
   };
 
   const onCell = (x: number, y: number, z: number): void => {
     const occupant = snapshot.entities.find(
       (entity) => !entity.dead && entity.x === x && entity.y === y && entity.coverType === 0,
     );
-    if (occupant && occupant.id === DEBUG_PLAYER_ID) {
+    if (occupant && occupant.owner === snapshot.activeOwner && occupant.maxAp > 0) {
       setSelectedId(occupant.id);
+      setAimId(null);
+      setPreview(null);
+      return;
+    }
+    if (occupant && selectedId !== null && occupant.owner !== snapshot.activeOwner) {
+      if (aimId === occupant.id && hit?.available) {
+        tryAttack(occupant.id);
+        return;
+      }
+      setAimId(occupant.id);
       setPreview(null);
       return;
     }
     const reach = byReach.get(cellKey(x, y));
     if (!reach) {
       setPreview(null);
+      setAimId(null);
       return;
     }
     const id = cellKey(x, y);
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     if (coarse && preview !== id) {
       setPreview(id);
+      setAimId(null);
       return;
     }
     tryMove({ x, y, z });
@@ -113,12 +181,14 @@ export function FieldScreen() {
           <p>
             {t("field.turn", { turn: snapshot.turnNumber })}
             {" · "}
-            {t("field.ap", { current: player?.ap ?? 0, max: player?.maxAp ?? 2 })}
+            {snapshot.activeOwner === 1 ? t("field.sidePlayer") : t("field.sideEnemy")}
+            {" · "}
+            {t("field.ap", { current: selected?.ap ?? 0, max: selected?.maxAp ?? 2 })}
           </p>
         </div>
         <div className="ap-pips" aria-hidden="true">
-          {Array.from({ length: player?.maxAp ?? 2 }, (_, index) => (
-            <span key={index} className={index < (player?.ap ?? 0) ? "pip pip-on" : "pip"} />
+          {Array.from({ length: selected?.maxAp ?? 2 }, (_, index) => (
+            <span key={index} className={index < (selected?.ap ?? 0) ? "pip pip-on" : "pip"} />
           ))}
         </div>
         <button
@@ -130,10 +200,31 @@ export function FieldScreen() {
         </button>
       </header>
 
+      {log ? (
+        <p className="combat-log" role="status">
+          {log}
+        </p>
+      ) : null}
+
+      {hit ? (
+        <p className="aim-panel">
+          {hit.available
+            ? t("combat.preview", {
+                chance: hit.chance ?? 0,
+                dmg: `${hit.dmgMin}-${hit.dmgMax}`,
+                cover: hit.cover === 2 ? t("combat.fullCover") : hit.cover === 1 ? t("combat.halfCover") : t("combat.noCover"),
+                height: hit.heightMod === 1 ? "+1" : hit.heightMod === -1 ? "−1" : "0",
+                flank: hit.flanked ? t("combat.flanked") : t("combat.notFlanked"),
+              })
+            : t(`combat.blocked.${hit.reason ?? "ILLEGAL"}`)}
+        </p>
+      ) : null}
+
       <div className="field-stage">
         <div
           className="field-board"
           style={{
+            position: "relative",
             display: "grid",
             gridTemplateColumns: `repeat(${snapshot.grid.width}, ${CELL}px)`,
             gridTemplateRows: `repeat(${snapshot.grid.height}, ${CELL}px)`,
@@ -142,6 +233,17 @@ export function FieldScreen() {
             paddingBottom: 20,
           }}
         >
+          {selected && aimed ? (
+            <svg className="aim-layer" width={snapshot.grid.width * CELL} height={snapshot.grid.height * CELL}>
+              <line
+                x1={(selected.x + 0.5) * CELL}
+                y1={(selected.y + 0.5) * CELL}
+                x2={(aimed.x + 0.5) * CELL}
+                y2={(aimed.y + 0.5) * CELL}
+                className={hit?.available ? "aim-ok" : "aim-bad"}
+              />
+            </svg>
+          ) : null}
           {snapshot.grid.tiles.map((tile) => {
             const id = cellKey(tile.x, tile.y);
             const reach = byReach.get(id);
@@ -169,6 +271,7 @@ export function FieldScreen() {
               reach ? `tile-reach-${reach.apCost}` : "",
               previewPath.has(id) ? "tile-path" : "",
               occupant && occupant.id === selectedId ? "tile-selected" : "",
+              occupant && occupant.id === aimId ? "tile-aimed" : "",
               dropSouth > 0 ? "has-riser" : "",
               !tile.pit && north && (north.pit ? 0 : north.z) < tile.z ? "cliff-n" : "",
               dropSouth > 0 ? "cliff-s" : "",
@@ -204,6 +307,11 @@ export function FieldScreen() {
                   {tile.pit ? <span className="tile-hole" /> : null}
                   {tile.blockLOS ? <span className="tile-block" /> : null}
                   {kind ? <Token kind={kind} /> : null}
+                  {occupant && occupant.coverType === 0 && !occupant.dead ? (
+                    <span className="hp-bar" aria-hidden="true">
+                      <span style={{ width: `${Math.max(0, (occupant.hp / occupant.maxHp) * 100)}%` }} />
+                    </span>
+                  ) : null}
                   {reach ? <span className="tile-mp">{reach.mpCost}</span> : null}
                 </span>
               </button>
@@ -236,6 +344,9 @@ export function FieldScreen() {
         </span>
         <span>
           <i className="lg lg-dash" /> {t("field.legendDash")}
+        </span>
+        <span>
+          <i className="lg lg-enemy" /> {t("field.legendEnemy")}
         </span>
       </footer>
     </div>

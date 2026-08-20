@@ -31,6 +31,9 @@ export interface EntityState {
   mobility: number;
   hp: number;
   maxHp: number;
+  aim: number;
+  defense: number;
+  weaponId: string;
   obstacle: boolean;
   dead: boolean;
   flying: boolean;
@@ -51,6 +54,7 @@ export interface ReachableCell extends CellPos {
 
 export type Command =
   | { type: "MOVE"; actorId: number; to: CellPos; path?: CellPos[] }
+  | { type: "ATTACK"; actorId: number; targetId: number; weaponId?: string }
   | { type: "END_TURN"; playerId: string };
 
 export type GameEvent =
@@ -62,9 +66,27 @@ export type GameEvent =
       isDash: boolean;
       apSpent: number;
     }
-  | { type: "STAT_CHANGED"; entityId: number; stat: "AP"; newValue: number; delta: number };
+  | { type: "STAT_CHANGED"; entityId: number; stat: "AP" | "HP"; newValue: number; delta: number }
+  | {
+      type: "COMBAT_RESOLVED";
+      sourceId: number;
+      targetId: number;
+      actionType: "MELEE" | "RANGED";
+      result: "HIT" | "MISS" | "CRIT";
+      damageDealt: number;
+      isFlanked: boolean;
+      heightMod: -1 | 0 | 1;
+    }
+  | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" };
 
-export type RejectReason = "ILLEGAL" | "NO_AP" | "NOT_YOUR_TURN" | "OCCUPIED" | "NOT_FOUND";
+export type RejectReason =
+  | "ILLEGAL"
+  | "NO_AP"
+  | "NOT_YOUR_TURN"
+  | "OCCUPIED"
+  | "NOT_FOUND"
+  | "NO_LOS"
+  | "OUT_OF_RANGE";
 
 export type ApplyResult =
   | { ok: true; events: GameEvent[] }

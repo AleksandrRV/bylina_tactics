@@ -1,0 +1,14 @@
+{
+  id: "sword_debug",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 3,
+  maxDmg: 5,
+  crit: 10,
+  critBonus: 2,
+  envDmg: 0,
+}

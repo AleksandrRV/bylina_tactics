@@ -26,6 +26,9 @@ function walker(partial: Partial<EntityState> = {}): EntityState {
     mobility: 6,
     hp: 10,
     maxHp: 10,
+    aim: 70,
+    defense: 0,
+    weaponId: "bow_debug",
     obstacle: true,
     dead: false,
     flying: false,
@@ -104,9 +107,9 @@ describe("edges and occupancy", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.2.0 and does not touch the document object", () => {
+  it("reports 0.3.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.2.0");
+    expect(kernel.version).toBe("0.3.0");
     expect(typeof globalThis.document).toBe("undefined");
   });
 
@@ -139,31 +142,36 @@ describe("createTacticsKernel", () => {
   it("rejects a move onto a pit or the ally", () => {
     const kernel = createTacticsKernel();
     expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 3, y: 3, z: 1 } }).ok).toBe(false);
-    expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 3, y: 6, z: 0 } }).ok).toBe(false);
+    expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 1, y: 6, z: 0 } }).ok).toBe(false);
   });
 
-  it("refills action points on end of turn", () => {
+  it("passes the turn to the other side and later refills the first", () => {
     const kernel = createTacticsKernel();
     const reachable = kernel.getReachable(1);
     const step = reachable[0];
     if (step) {
       kernel.apply({ type: "MOVE", actorId: 1, to: { x: step.x, y: step.y, z: step.z } });
     }
-    const result = kernel.apply({ type: "END_TURN", playerId: "1" });
-    expect(result.ok).toBe(true);
+    const afterMove = kernel.getSnapshot().entities.find((entity) => entity.id === 1);
+    expect(afterMove && afterMove.ap < 2).toBe(true);
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    expect(kernel.getSnapshot().activeOwner).toBe(2);
+    kernel.apply({ type: "END_TURN", playerId: "2" });
     const actor = kernel.getSnapshot().entities.find((entity) => entity.id === 1);
     expect(actor?.ap).toBe(2);
-    expect(kernel.getSnapshot().turnNumber).toBe(2);
+    expect(kernel.getSnapshot().activeOwner).toBe(1);
   });
 
   it("uses a dash when the path exceeds one mobility budget", () => {
     const grid = makeGrid(10, 1, 1);
     const self = walker({ x: 0, y: 0, mobility: 3, ap: 2 });
     const kernel = createTacticsKernel({
-      turnNumber: 1,
-      activeOwner: 1,
-      grid,
-      entities: [self],
+      initial: {
+        turnNumber: 1,
+        activeOwner: 1,
+        grid,
+        entities: [self],
+      },
     });
     const far = kernel.apply({ type: "MOVE", actorId: 1, to: { x: 5, y: 0, z: 1 } });
     expect(far.ok).toBe(true);

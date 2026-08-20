@@ -264,3 +264,63 @@
 .lg-dash {
   background: #e0b34a;
 }
+
+.lg-enemy {
+  background: #8bc34a;
+  border-radius: 50%;
+}
+
+.aim-layer {
+  position: absolute;
+  left: 0;
+  top: 20px;
+  pointer-events: none;
+  z-index: 80;
+  overflow: visible;
+}
+
+.aim-ok {
+  stroke: #e0b34a;
+  stroke-width: 2;
+  stroke-dasharray: 6 4;
+}
+
+.aim-bad {
+  stroke: #c45c5c;
+  stroke-width: 2;
+  stroke-dasharray: 4 5;
+}
+
+.tile-aimed .tile-face {
+  outline: 3px solid #8bc34a;
+  outline-offset: -3px;
+}
+
+.hp-bar {
+  position: absolute;
+  left: 6px;
+  right: 6px;
+  top: 3px;
+  height: 3px;
+  background: rgba(0, 0, 0, 0.45);
+  z-index: 3;
+}
+
+.hp-bar > span {
+  display: block;
+  height: 100%;
+  background: #c62828;
+}
+
+.combat-log,
+.aim-panel {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 0.9rem;
+  background: #1c2320;
+  border: 1px solid #3a4550;
+}
+
+.combat-log {
+  color: #e0b34a;
+}

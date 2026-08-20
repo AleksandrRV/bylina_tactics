@@ -36,7 +36,29 @@
     "legendDash": "Dash",
     "legendPit": "Pit",
     "legendWall": "Wall",
-    "legendCover": "Cover"
+    "legendCover": "Cover",
+    "legendEnemy": "Enemy",
+    "sidePlayer": "Host",
+    "sideEnemy": "Nav"
+  },
+  "combat": {
+    "preview": "Hit {chance}% · dmg {dmg} · cover {cover} · height {height} · {flank}. Tap again to fire.",
+    "fullCover": "full",
+    "halfCover": "half",
+    "noCover": "none",
+    "flanked": "flanked",
+    "notFlanked": "no flank",
+    "hit": "Hit: −{dmg}",
+    "crit": "Crit: −{dmg}",
+    "miss": "Miss",
+    "died": "Target down",
+    "blocked": {
+      "NO_LOS": "No line of sight",
+      "OUT_OF_RANGE": "Out of range",
+      "NO_AP": "No action points",
+      "ILLEGAL": "Not allowed",
+      "NOT_FOUND": "No target"
+    }
   },
   "settings": {
     "title": "Settings",

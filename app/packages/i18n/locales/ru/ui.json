@@ -36,7 +36,29 @@
     "legendDash": "Рывок",
     "legendPit": "Яма",
     "legendWall": "Стена",
-    "legendCover": "Укрытие"
+    "legendCover": "Укрытие",
+    "legendEnemy": "Противник",
+    "sidePlayer": "Дружина",
+    "sideEnemy": "Навь"
+  },
+  "combat": {
+    "preview": "Шанс {chance}% · урон {dmg} · укрытие {cover} · высота {height} · {flank}. Повтор — выстрел.",
+    "fullCover": "полное",
+    "halfCover": "полу",
+    "noCover": "нет",
+    "flanked": "фланг",
+    "notFlanked": "не фланг",
+    "hit": "Попадание: −{dmg}",
+    "crit": "Крит: −{dmg}",
+    "miss": "Промах",
+    "died": "Цель пала",
+    "blocked": {
+      "NO_LOS": "Нет линии наблюдения",
+      "OUT_OF_RANGE": "Вне дальности",
+      "NO_AP": "Нет очков действия",
+      "ILLEGAL": "Нельзя",
+      "NOT_FOUND": "Нет цели"
+    }
   },
   "settings": {
     "title": "Настройки",

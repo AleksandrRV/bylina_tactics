@@ -23,12 +23,12 @@ function readDataTree(): Record<string, string> {
 }
 
 describe("parseContent", () => {
-  it("accepts the empty valid records of 0.1.0", () => {
+  it("accepts the shipped records", () => {
     const result = parseContent(readDataTree());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.units).toEqual([]);
-    expect(result.data.weapons).toEqual([]);
+    expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual(["bow_debug", "sword_debug"]);
     expect(result.data.skills).toEqual([]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");

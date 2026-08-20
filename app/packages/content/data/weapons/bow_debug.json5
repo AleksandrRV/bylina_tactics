@@ -1,0 +1,14 @@
+{
+  id: "bow_debug",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 3,
+  maxDmg: 5,
+  crit: 15,
+  critBonus: 2,
+  envDmg: 0,
+}
