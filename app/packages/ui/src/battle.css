@@ -92,27 +92,77 @@
 
 .roster-card {
   appearance: none;
-  min-width: 92px;
-  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 108px;
+  min-height: 48px;
   border: 1px solid #3a4550;
   background: #161c18;
   color: #d5cfc0;
-  padding: 6px 8px;
+  padding: 5px 9px 5px 5px;
   text-align: left;
   cursor: pointer;
 }
 
 .roster-card.is-on {
   border-color: #e0b34a;
+  background: #1d231b;
 }
 
 .roster-card.is-dead {
-  opacity: 0.4;
+  opacity: 0.45;
+}
+
+.roster-face {
+  width: 38px;
+  height: 38px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid #4a5560;
+  flex: 0 0 auto;
+}
+
+.roster-card.is-on .roster-face {
+  border-color: #e0b34a;
+}
+
+.roster-card.is-dead .roster-face {
+  filter: grayscale(1) brightness(0.55);
+}
+
+.roster-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
 
 .roster-card .name {
   display: block;
   font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.enemies-strip {
+  display: flex;
+  gap: 4px;
+  margin-top: 7px;
+  flex-wrap: wrap;
+}
+
+.enemy-face {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #6d9a3a;
+  background: #131b10;
+}
+
+.enemy-face.is-dead {
+  filter: grayscale(1) brightness(0.5);
+  border-color: #3a4550;
 }
 
 .diamonds {
@@ -136,6 +186,60 @@
 .battle-selected {
   flex: 1 1 180px;
   min-width: 0;
+}
+
+.sel-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.sel-face {
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  object-fit: cover;
+  border: 1px solid #e0b34a;
+  flex: 0 0 auto;
+}
+
+.sel-info {
+  min-width: 0;
+}
+
+.sel-info p {
+  margin: 0;
+}
+
+.phase-banner {
+  position: absolute;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 26px;
+  background: linear-gradient(180deg, rgba(26, 36, 19, 0.96), rgba(15, 21, 10, 0.96));
+  border: 1px solid #8bc34a;
+  border-radius: 4px;
+  color: #cfe8a0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  font-size: 1.02rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  pointer-events: none;
+  z-index: 20;
+  animation: phase-banner-in 0.35s ease-out;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+}
+
+@keyframes phase-banner-in {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
 }
 
 .hp-segs {
