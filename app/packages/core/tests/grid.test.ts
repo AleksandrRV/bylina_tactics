@@ -28,6 +28,7 @@ function walker(partial: Partial<EntityState> = {}): EntityState {
     maxHp: 10,
     aim: 70,
     defense: 0,
+    vision: 12,
     weaponId: "bow_debug",
     obstacle: true,
     dead: false,
