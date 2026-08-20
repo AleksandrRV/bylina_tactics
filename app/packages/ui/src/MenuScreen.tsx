@@ -25,6 +25,9 @@ export function MenuScreen() {
       </header>
 
       <nav className="menu-nav" aria-label={t("app.fullTitle")}>
+        <button type="button" className="btn btn-primary" onClick={() => session.openField()}>
+          <span>{t("menu.debugField")}</span>
+        </button>
         {modes.map((item) => (
           <button
             key={item.mode}

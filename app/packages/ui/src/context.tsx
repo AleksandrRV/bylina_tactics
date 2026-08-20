@@ -1,4 +1,5 @@
 import { createContext, useContext } from "react";
+import type { TacticsKernel } from "@bylina/core";
 import type { I18nApi } from "@bylina/i18n";
 import type { SessionApi } from "@bylina/session";
 import type { SettingsApi } from "@bylina/settings";
@@ -13,6 +14,7 @@ export interface AppServices {
   i18n: I18nApi;
   settings: SettingsApi;
   session: SessionApi;
+  tactics: TacticsKernel;
   version: string;
   install: InstallController;
 }

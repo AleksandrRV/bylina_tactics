@@ -12,11 +12,31 @@
     "quickMatch": "Quick Match",
     "campaign": "New Tale",
     "pvp": "Exhibition Battles",
+    "debugField": "Grid trial",
     "settings": "Settings",
     "install": "Install game",
     "unavailableTitle": "This mode is not available yet",
     "unavailableBody": "This mode will open in version {version}.",
-    "unavailableHint": "You can already review the menu, settings, and language switch."
+    "unavailableHint": "Settings, language, and the grid trial are available."
+  },
+  "field": {
+    "title": "Grid trial",
+    "back": "Menu",
+    "endTurn": "End turn",
+    "turn": "Turn {turn}",
+    "ap": "AP {current} / {max}",
+    "height": "Tier {z}",
+    "pit": "Pit",
+    "wall": "Wall",
+    "cover": "Cover",
+    "legendLow": "Low",
+    "legendMid": "Ground",
+    "legendHigh": "High",
+    "legendWalk": "Walk",
+    "legendDash": "Dash",
+    "legendPit": "Pit",
+    "legendWall": "Wall",
+    "legendCover": "Cover"
   },
   "settings": {
     "title": "Settings",

@@ -1,0 +1,266 @@
+.field-screen {
+  box-sizing: border-box;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px 12px;
+  gap: 10px;
+  overflow: hidden;
+  background: #121614;
+}
+
+.field-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+.field-meta {
+  flex: 1 1 160px;
+}
+
+.field-meta p {
+  margin: 0;
+}
+
+.field-back,
+.field-end {
+  width: auto;
+  flex-shrink: 0;
+}
+
+.ap-pips {
+  display: flex;
+  gap: 6px;
+}
+
+.pip {
+  width: 14px;
+  height: 14px;
+  transform: rotate(45deg);
+  border: 2px solid #e0b34a;
+  background: transparent;
+}
+
+.pip-on {
+  background: #e0b34a;
+}
+
+.field-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background:
+    radial-gradient(ellipse at center, #1a221c 0%, #101410 72%);
+  border: 1px solid #2a332c;
+}
+
+.field-board {
+  display: grid;
+}
+
+.tile {
+  appearance: none;
+  -webkit-appearance: none;
+  box-sizing: border-box;
+  position: relative;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.tile.has-riser {
+  overflow: visible;
+}
+
+.tile-face {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.28);
+}
+
+.cliff-n .tile-face {
+  border-top: 3px solid #0b100c;
+}
+
+.cliff-s .tile-face {
+  border-bottom: 3px solid #0b100c;
+}
+
+.cliff-w .tile-face {
+  border-left: 3px solid #0b100c;
+}
+
+.cliff-e .tile-face {
+  border-right: 3px solid #0b100c;
+}
+
+.tile-riser {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 100%;
+  pointer-events: none;
+}
+
+.tile-z0 .tile-face {
+  background: #1c2c22;
+}
+
+.tile-z1 .tile-face {
+  background: #3a5a44;
+}
+
+.tile-z1 .tile-riser {
+  background: #24382c;
+}
+
+.tile-z2 .tile-face {
+  background: #6a8f6c;
+}
+
+.tile-z2 .tile-riser {
+  background: #3d5640;
+}
+
+.tile-pit .tile-face {
+  background: #141310;
+}
+
+.tile-hole {
+  width: 70%;
+  height: 70%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 38% 32%, #2c241c 0%, #070806 68%, #000 100%);
+  box-shadow: inset 0 0 0 2px #2a241c;
+}
+
+.tile-wall .tile-face {
+  background: #5a4c3e;
+}
+
+.tile-block {
+  width: 82%;
+  height: 82%;
+  background: repeating-linear-gradient(135deg, #7a6a56 0 5px, #534636 5px 10px);
+  border: 1px solid #cbb89a;
+}
+
+.tile-cover .tile-face {
+  background: #3d5c42;
+}
+
+.tile-mp {
+  position: absolute;
+  right: 3px;
+  bottom: 2px;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: #f3ecdc;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.token {
+  width: 58%;
+  height: 58%;
+  z-index: 2;
+  filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.5));
+}
+
+.tile-reach-1 .tile-face {
+  background-image: linear-gradient(rgba(56, 140, 220, 0.48), rgba(56, 140, 220, 0.48));
+  outline: 2px solid #8fd0ff;
+  outline-offset: -2px;
+}
+
+.tile-reach-2 .tile-face {
+  background-image: linear-gradient(rgba(224, 179, 74, 0.46), rgba(224, 179, 74, 0.46));
+  outline: 2px solid #f3d56a;
+  outline-offset: -2px;
+}
+
+.tile-path .tile-face {
+  outline: 2px solid #ffffff;
+  outline-offset: -2px;
+}
+
+.tile-selected .tile-face {
+  outline: 3px solid #e0b34a;
+  outline-offset: -3px;
+}
+
+.tile:hover .tile-face,
+.tile:focus-visible .tile-face {
+  filter: brightness(1.08);
+  outline-color: #e8d9a8;
+}
+
+.field-legend {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  font-size: 13px;
+  color: #9a9384;
+}
+
+.field-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.lg {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border: 1px solid #4a5850;
+  flex-shrink: 0;
+}
+
+.lg-z0 {
+  background: #1c2c22;
+}
+
+.lg-z1 {
+  background: #3a5a44;
+}
+
+.lg-z2 {
+  background: #6a8f6c;
+}
+
+.lg-pit {
+  background: #050604;
+  border-radius: 50%;
+}
+
+.lg-wall {
+  background: repeating-linear-gradient(135deg, #7a6a56 0 3px, #534636 3px 6px);
+}
+
+.lg-cover {
+  background: #8b6a3a;
+}
+
+.lg-walk {
+  background: #388cdc;
+}
+
+.lg-dash {
+  background: #e0b34a;
+}

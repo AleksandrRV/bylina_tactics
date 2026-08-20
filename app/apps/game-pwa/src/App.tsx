@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createTacticsKernel } from "@bylina/core";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
+import { createLocalTransport } from "@bylina/net";
 import { APP_VERSION, createSession } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
@@ -42,7 +43,21 @@ export function App() {
   );
 
   const session = useMemo(() => createSession("boot"), []);
+  const transport = useMemo(() => createLocalTransport(), []);
   const [, setLocaleTick] = useState(0);
+
+  useEffect(() => {
+    return transport.subscribe((message) => {
+      if (message.type !== "COMMAND") return;
+      const result = kernel.apply(message.payload as Parameters<typeof kernel.apply>[0]);
+      transport.send({
+        type: result.ok ? "EVENT_BATCH" : "REJECT",
+        senderId: "host",
+        timestamp: Date.now(),
+        payload: result,
+      });
+    });
+  }, [kernel, transport]);
 
   useEffect(() => {
     applyDocumentLocale(i18n);
@@ -68,11 +83,10 @@ export function App() {
     );
   }
 
-  void kernel;
   void content;
 
   return (
-    <ServicesProvider value={{ i18n, settings, session, version: APP_VERSION, install }}>
+    <ServicesProvider value={{ i18n, settings, session, tactics: kernel, version: APP_VERSION, install }}>
       <Shell />
     </ServicesProvider>
   );

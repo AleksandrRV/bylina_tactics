@@ -12,11 +12,31 @@
     "quickMatch": "Быстрый матч",
     "campaign": "Новая былина",
     "pvp": "Потешные бои",
+    "debugField": "Испытание сетки",
     "settings": "Настройки",
     "install": "Установить игру",
     "unavailableTitle": "Режим ещё не открыт",
     "unavailableBody": "Этот режим будет доступен в версии {version}.",
-    "unavailableHint": "Сейчас можно проверить меню, настройки и смену языка."
+    "unavailableHint": "Доступны настройки, смена языка и испытание сетки."
+  },
+  "field": {
+    "title": "Испытание сетки",
+    "back": "В меню",
+    "endTurn": "Завершить ход",
+    "turn": "Ход {turn}",
+    "ap": "ОД {current} / {max}",
+    "height": "Ярус {z}",
+    "pit": "Яма",
+    "wall": "Стена",
+    "cover": "Укрытие",
+    "legendLow": "Низ",
+    "legendMid": "Земля",
+    "legendHigh": "Верх",
+    "legendWalk": "Шаг",
+    "legendDash": "Рывок",
+    "legendPit": "Яма",
+    "legendWall": "Стена",
+    "legendCover": "Укрытие"
   },
   "settings": {
     "title": "Настройки",

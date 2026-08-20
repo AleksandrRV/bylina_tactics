@@ -19,6 +19,9 @@ importers:
       '@bylina/i18n':
         specifier: workspace:*
         version: link:../../packages/i18n
+      '@bylina/net':
+        specifier: workspace:*
+        version: link:../../packages/net
       '@bylina/session':
         specifier: workspace:*
         version: link:../../packages/session
@@ -101,6 +104,9 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(terser@5.50.0)
 
   packages/render:
     devDependencies:
@@ -140,6 +146,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@bylina/core':
+        specifier: workspace:*
+        version: link:../core
       '@bylina/i18n':
         specifier: workspace:*
         version: link:../i18n

@@ -1,6 +1,6 @@
-export const APP_VERSION = "0.1.0";
+export const APP_VERSION = "0.2.0";
 
-export type AppScreen = "boot" | "menu" | "settings";
+export type AppScreen = "boot" | "menu" | "settings" | "field";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
@@ -18,6 +18,7 @@ export interface SessionState {
 export interface SessionApi {
   get(): SessionState;
   goTo(screen: AppScreen): void;
+  openField(): void;
   openMode(mode: GameMode): void;
   dismissUnavailable(): void;
   subscribe(listener: (state: SessionState) => void): () => void;
@@ -36,6 +37,9 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
     get: () => state,
     goTo: (screen) => {
       emit({ screen, unavailableMode: null });
+    },
+    openField: () => {
+      emit({ screen: "field", unavailableMode: null });
     },
     openMode: (mode) => {
       emit({ screen: "menu", unavailableMode: mode });

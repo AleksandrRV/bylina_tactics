@@ -22,4 +22,10 @@ describe("createSession", () => {
     session.dismissUnavailable();
     expect(session.get().unavailableMode).toBeNull();
   });
+
+  it("opens the debug field", () => {
+    const session = createSession("menu");
+    session.openField();
+    expect(session.get().screen).toBe("field");
+  });
 });

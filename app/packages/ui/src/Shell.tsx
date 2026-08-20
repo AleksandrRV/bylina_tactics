@@ -1,4 +1,5 @@
 import { BootScreen } from "./BootScreen.js";
+import { FieldScreen } from "./FieldScreen.js";
 import { MenuScreen } from "./MenuScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { useSessionState } from "./hooks.js";
@@ -8,5 +9,6 @@ export function Shell() {
 
   if (screen === "boot") return <BootScreen />;
   if (screen === "settings") return <SettingsScreen />;
+  if (screen === "field") return <FieldScreen />;
   return <MenuScreen />;
 }

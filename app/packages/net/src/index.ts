@@ -1,2 +1,2 @@
-/** Заготовка канала связи. Реализация — с версии 0.14.0. */
-export const NET_STATUS = "deferred" as const;
+export { createLocalTransport } from "./local.js";
+export type { Envelope, EnvelopeType, Transport } from "./local.js";

@@ -33,6 +33,7 @@ export default defineConfig({
       "@bylina/core": path.resolve(rootDir, "../../packages/core/src/index.ts"),
       "@bylina/content": path.resolve(rootDir, "../../packages/content/src/index.ts"),
       "@bylina/i18n": path.resolve(rootDir, "../../packages/i18n/src/index.ts"),
+      "@bylina/net": path.resolve(rootDir, "../../packages/net/src/index.ts"),
       "@bylina/session": path.resolve(rootDir, "../../packages/session/src/index.ts"),
       "@bylina/settings": path.resolve(rootDir, "../../packages/settings/src/index.ts"),
       "@bylina/ui": path.resolve(rootDir, "../../packages/ui/src/index.ts"),
