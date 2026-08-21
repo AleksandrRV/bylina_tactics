@@ -10,6 +10,9 @@ importers:
 
   apps/game-pwa:
     dependencies:
+      '@bylina/campaign':
+        specifier: workspace:*
+        version: link:../../packages/campaign
       '@bylina/content':
         specifier: workspace:*
         version: link:../../packages/content
@@ -67,6 +70,19 @@ importers:
         version: 0.21.2(vite@5.4.21(@types/node@22.20.1)(terser@5.50.0))(workbox-build@7.4.1(@types/babel__core@7.20.5))(workbox-window@7.4.1)
 
   apps/signaling-server: {}
+
+  packages/campaign:
+    dependencies:
+      '@bylina/content':
+        specifier: workspace:*
+        version: link:../content
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(terser@5.50.0)
 
   packages/content:
     dependencies:
@@ -138,10 +154,16 @@ importers:
 
   packages/session:
     dependencies:
+      '@bylina/campaign':
+        specifier: workspace:*
+        version: link:../campaign
       '@bylina/core':
         specifier: workspace:*
         version: link:../core
     devDependencies:
+      '@bylina/content':
+        specifier: workspace:*
+        version: link:../content
       typescript:
         specifier: ^5.6.3
         version: 5.9.3

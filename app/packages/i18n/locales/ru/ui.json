@@ -82,7 +82,8 @@
     "cooldownHint": "Перезарядка: {turns} ход.",
     "noUsesHint": "Лимит применений в этом бою исчерпан.",
     "cooldownShort": "КД {turns}",
-    "usesShort": "×{uses}"
+    "usesShort": "×{uses}",
+    "toCampaignMap": "К карте корабля"
   },
   "unit": {
     "bogatyr": {
@@ -237,5 +238,47 @@
     "timed": "Срок · {turns}",
     "defending": "Стойка",
     "overwatch": "Дозор"
+  },
+  "campaign": {
+    "toMenu": "В меню",
+    "darkness": "Тьма",
+    "darknessLabel": "Счётчик Тьмы",
+    "darknessValue": "Тьма {current} / {max}",
+    "darknessGrowth": "Прирост Тьмы",
+    "darknessOnVictory": "успех +{value}",
+    "darknessOnDefeat": "поражение +{value}",
+    "resourcesLabel": "Запасы корабля",
+    "gold": "Золото",
+    "herbs": "Травы",
+    "artifacts": "Артефакты",
+    "mapLabel": "Карта Тридевятого царства",
+    "mission": "Миссия",
+    "type": {
+      "purge": "Зачистка"
+    },
+    "foes": "Противники",
+    "reward": "Награда",
+    "rewardEmpty": "—",
+    "done": "Пройдено",
+    "start": "В бой",
+    "pickMission": "Выберите точку на карте",
+    "tabsLabel": "Службы корабля",
+    "tabRoster": "Дружина",
+    "tabForge": "Кузня",
+    "tabChamber": "Горница",
+    "tabSoon": "Откроется в версии {version}",
+    "lostTitle": "Тьма заполнена",
+    "lostBody": "Счётчик Тьмы достиг {value}: ритуал вечной ночи завершён, кампания окончена.",
+    "marker": {
+      "open": "Миссия {mission}: доступна",
+      "locked": "Точка скрыта",
+      "done": "Миссия {mission}: пройдена"
+    },
+    "ship": "Летучий Корабль"
+  },
+  "missionResult": {
+    "title": "Итог миссии",
+    "darknessGained": "Тьма возросла на {value}",
+    "toMap": "К карте"
   }
 }

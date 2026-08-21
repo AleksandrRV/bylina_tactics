@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createCampaign } from "@bylina/campaign";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
@@ -50,6 +51,15 @@ export function App() {
       setLocaleTick((value) => value + 1);
     });
   }, [i18n, settings]);
+
+  const campaign = useMemo(
+    () => (content.ok ? createCampaign(content.data.campaign) : null),
+    [content],
+  );
+
+  useEffect(() => {
+    if (campaign) session.bindCampaign(campaign);
+  }, [session, campaign]);
 
   if (!content.ok) {
     return (

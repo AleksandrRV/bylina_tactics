@@ -136,6 +136,25 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       if (!unitIds.has(unitId)) issues.push({ file: "quick-match.json5", message: `unknown unit: ${unitId}` });
     }
   }
+  if (campaign.value) {
+    const missionIds = new Set<string>();
+    for (const mission of campaign.value.missions) {
+      if (missionIds.has(mission.id)) {
+        issues.push({ file: "campaign.json5", message: `duplicate mission id: ${mission.id}` });
+      }
+      missionIds.add(mission.id);
+      for (const entry of mission.enemies) {
+        if (!unitIds.has(entry.unitId)) {
+          issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown unit: ${entry.unitId}` });
+        }
+      }
+      for (const generalId of mission.generals ?? []) {
+        if (!unitIds.has(generalId)) {
+          issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown general: ${generalId}` });
+        }
+      }
+    }
+  }
   if (pvp.value) {
     for (const unitId of pvp.value.pool) {
       if (!unitIds.has(unitId)) issues.push({ file: "pvp.json5", message: `unknown unit: ${unitId}` });

@@ -9,11 +9,6 @@ export function MenuScreen() {
   const { session, version, install } = useServices();
   const { unavailableMode } = useSessionState();
 
-  const locked: { mode: GameMode; key: "menu.campaign" | "menu.pvp" }[] = [
-    { mode: "campaign", key: "menu.campaign" },
-    { mode: "pvp", key: "menu.pvp" },
-  ];
-
   return (
     <div className="screen menu-screen">
       <header className="menu-brand">
@@ -27,12 +22,13 @@ export function MenuScreen() {
         <button type="button" className="btn btn-primary" onClick={() => session.openQuickMatch()}>
           <span>{t("menu.quickMatch")}</span>
         </button>
-        {locked.map((item) => (
-          <button key={item.mode} type="button" className="btn btn-primary" onClick={() => session.openMode(item.mode)}>
-            <span>{t(item.key)}</span>
-            <span className="btn-note">{t("common.notReady")}</span>
-          </button>
-        ))}
+        <button type="button" className="btn btn-primary" onClick={() => session.openMode("campaign")}>
+          <span>{t("menu.campaign")}</span>
+        </button>
+        <button type="button" className="btn btn-primary" onClick={() => session.openMode("pvp")}>
+          <span>{t("menu.pvp")}</span>
+          <span className="btn-note">{t("common.notReady")}</span>
+        </button>
         <button type="button" className="btn btn-ghost" onClick={() => session.goTo("settings")}>
           {t("menu.settings")}
         </button>

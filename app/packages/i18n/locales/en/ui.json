@@ -82,7 +82,8 @@
     "cooldownHint": "Cooldown: {turns} turn(s).",
     "noUsesHint": "No uses remain in this battle.",
     "cooldownShort": "CD {turns}",
-    "usesShort": "×{uses}"
+    "usesShort": "×{uses}",
+    "toCampaignMap": "To the ship map"
   },
   "unit": {
     "bogatyr": {
@@ -237,5 +238,47 @@
     "timed": "Timed · {turns}",
     "defending": "Defending",
     "overwatch": "Overwatch"
+  },
+  "campaign": {
+    "toMenu": "Menu",
+    "darkness": "Darkness",
+    "darknessLabel": "Darkness counter",
+    "darknessValue": "Darkness {current} / {max}",
+    "darknessGrowth": "Darkness growth",
+    "darknessOnVictory": "success +{value}",
+    "darknessOnDefeat": "defeat +{value}",
+    "resourcesLabel": "Ship supplies",
+    "gold": "Gold",
+    "herbs": "Herbs",
+    "artifacts": "Artifacts",
+    "mapLabel": "Map of the Thrice-Ninth Kingdom",
+    "mission": "Mission",
+    "type": {
+      "purge": "Purge"
+    },
+    "foes": "Enemies",
+    "reward": "Reward",
+    "rewardEmpty": "—",
+    "done": "Completed",
+    "start": "To battle",
+    "pickMission": "Pick a point on the map",
+    "tabsLabel": "Ship services",
+    "tabRoster": "Druzhina",
+    "tabForge": "Forge",
+    "tabChamber": "Chamber",
+    "tabSoon": "Opens in version {version}",
+    "lostTitle": "Darkness is full",
+    "lostBody": "The darkness counter reached {value}: the rite of the eternal night is complete, the campaign is over.",
+    "marker": {
+      "open": "Mission {mission}: available",
+      "locked": "Point hidden",
+      "done": "Mission {mission}: completed"
+    },
+    "ship": "Flying Ship"
+  },
+  "missionResult": {
+    "title": "Mission result",
+    "darknessGained": "Darkness grew by {value}",
+    "toMap": "To the map"
   }
 }

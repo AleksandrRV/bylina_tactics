@@ -43,6 +43,7 @@
 └─ app/                  # исходный код и сборка
    ├─ packages/
    │  ├─ core/
+   │  ├─ campaign/
    │  ├─ net/
    │  ├─ signaling/
    │  ├─ render/

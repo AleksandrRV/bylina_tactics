@@ -1,5 +1,5 @@
 {
-  "name": "@bylina/session",
+  "name": "@bylina/campaign",
   "version": "0.10.0",
   "type": "module",
   "exports": {
@@ -10,12 +10,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@bylina/campaign": "workspace:*",
-    "@bylina/core": "workspace:*"
+    "@bylina/content": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
-    "vitest": "^2.1.8",
-    "@bylina/content": "workspace:*"
+    "vitest": "^2.1.8"
   }
 }

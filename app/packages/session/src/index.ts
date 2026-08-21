@@ -9,14 +9,23 @@ import type {
   SkillPreview,
   TacticsKernel,
 } from "@bylina/core";
+import type { CampaignApi, MissionOutcome } from "@bylina/campaign";
 
-export const APP_VERSION = "0.9.0";
+export const APP_VERSION = "0.10.0";
 
-export type AppScreen = "boot" | "menu" | "settings" | "battle" | "difficulty" | "result";
+export type AppScreen =
+  | "boot"
+  | "menu"
+  | "settings"
+  | "battle"
+  | "difficulty"
+  | "result"
+  | "campaign"
+  | "missionResult";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick";
+export type BattleKind = "quick" | "campaign";
 
 export type DifficultyId = "easy" | "normal" | "hard";
 
@@ -28,12 +37,19 @@ export const MODE_OPENS_IN: Record<GameMode, string> = {
   pvp: "0.14.0",
 };
 
+export interface CampaignFinishInfo {
+  darknessGained: number;
+  campaignLost: boolean;
+}
+
 export interface SessionState {
   screen: AppScreen;
   unavailableMode: GameMode | null;
   paused: boolean;
   battleKind: BattleKind | null;
   difficulty: DifficultyId | null;
+  /** Идентификатор активной миссии кампании. */
+  activeMissionId: string | null;
   matchSeed: number;
   outcome: MatchOutcome | null;
 }
@@ -48,6 +64,19 @@ export interface SessionApi {
   openMode(mode: GameMode): void;
   dismissUnavailable(): void;
   setPaused(paused: boolean): void;
+  /** Регистрирует единственный автомат кампании локальной партии. */
+  bindCampaign(campaign: CampaignApi): void;
+  /** Открыть карту корабля (ветка «Новая былина»). */
+  openCampaign(): void;
+  /** Начать доступную миссию и перейти в сражение. */
+  startCampaignMission(missionId: string): boolean;
+  /** Завершить активную миссию исходом: применить прирост Тьмы, открыть следующую точку. */
+  finishCampaignMission(outcome: MissionOutcome): CampaignFinishInfo | null;
+  /** Покинуть начатую миссию без последствий и вернуться на карту. */
+  leaveCampaignMission(): void;
+  /** Вернуться на карту корабля с экрана итога миссии. */
+  backToCampaign(): void;
+  getCampaign(): CampaignApi;
   /** Регистрирует единственное ведущее ядро текущего локального боя. */
   bindTacticsHost(host: TacticsKernel): void;
   /** Единственный путь изменения тактического состояния из интерфейса. */
@@ -69,6 +98,7 @@ const idle: Omit<SessionState, "screen"> = {
   paused: false,
   battleKind: null,
   difficulty: null,
+  activeMissionId: null,
   matchSeed: 0,
   outcome: null,
 };
@@ -76,10 +106,15 @@ const idle: Omit<SessionState, "screen"> = {
 export function createSession(initial: AppScreen = "boot"): SessionApi {
   let state: SessionState = { screen: initial, ...idle };
   let tacticsHost: TacticsKernel | null = null;
+  let campaign: CampaignApi | null = null;
   const listeners = new Set<(state: SessionState) => void>();
   const requireTacticsHost = (): TacticsKernel => {
     if (!tacticsHost) throw new Error("Tactics host is not bound");
     return tacticsHost;
+  };
+  const requireCampaign = (): CampaignApi => {
+    if (!campaign) throw new Error("Campaign automaton is not bound");
+    return campaign;
   };
 
   const emit = (next: SessionState): void => {
@@ -115,6 +150,10 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
         emit({ ...idle, screen: "difficulty" });
         return;
       }
+      if (mode === "campaign") {
+        emit({ ...idle, screen: "campaign" });
+        return;
+      }
       emit({ screen: "menu", ...idle, unavailableMode: mode });
     },
     dismissUnavailable: () => {
@@ -124,6 +163,40 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
       if (state.screen !== "battle") return;
       emit({ ...state, paused });
     },
+    bindCampaign: (automaton) => {
+      campaign = automaton;
+    },
+    openCampaign: () => {
+      emit({ ...idle, screen: "campaign" });
+    },
+    startCampaignMission: (missionId) => {
+      const ok = requireCampaign().startMission(missionId);
+      if (!ok) return false;
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "campaign",
+        activeMissionId: missionId,
+        matchSeed: Date.now() >>> 0,
+      });
+      return true;
+    },
+    finishCampaignMission: (outcome) => {
+      const active = state.activeMissionId;
+      if (state.battleKind !== "campaign" || active === null) return null;
+      const result = requireCampaign().finishMission(active, outcome);
+      if (!result) return null;
+      emit({ ...state, screen: "missionResult", paused: false, outcome });
+      return result;
+    },
+    leaveCampaignMission: () => {
+      requireCampaign().abandonMission();
+      emit({ ...idle, screen: "campaign" });
+    },
+    backToCampaign: () => {
+      emit({ ...idle, screen: "campaign" });
+    },
+    getCampaign: () => requireCampaign(),
     bindTacticsHost: (host) => {
       tacticsHost = host;
     },
