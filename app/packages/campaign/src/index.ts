@@ -272,6 +272,8 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         if (!participant.survived) {
           fighter.alive = false;
           fighter.hp = 0;
+          // Снаряжение погибшего возвращается в запасы корабля.
+          fighter.equippedItemId = null;
           fallen.push(fighter.name);
           continue;
         }

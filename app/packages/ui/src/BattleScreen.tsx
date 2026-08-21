@@ -44,6 +44,15 @@ function unitNameKey(configId: string): string {
   return `unit.${configId}.name`;
 }
 
+/** Иконка автопобеды: молния как знак мгновенного разрешения. */
+function AutoWinIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2Z" />
+    </svg>
+  );
+}
+
 /** Иконка-жук: общепринятый символ отладочного режима. */
 function DebugIcon() {
   return (
@@ -256,6 +265,18 @@ export function BattleScreen() {
       finishFromEvents(events);
       after?.();
     });
+  };
+
+  /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы. */
+  const debugAutoWin = (): void => {
+    if (paused || busy) return;
+    const result = session.debugAutoWinBattle();
+    if (!result.ok) return;
+    setPreview(null);
+    setAimId(null);
+    setSkillTargetPos(null);
+    setAction(null);
+    playThen(result.events);
   };
 
   const tryMove = (to: CellPos): void => {
@@ -602,6 +623,15 @@ export function BattleScreen() {
               aria-label={t("battle.debugMovement")}
             >
               <DebugIcon />
+            </button>
+            <button
+              type="button"
+              className="hud-btn hud-icon-btn debug-win"
+              onClick={() => debugAutoWin()}
+              title={t("battle.debugAutoWinHint")}
+              aria-label={t("battle.debugAutoWin")}
+            >
+              <AutoWinIcon />
             </button>
           </div>
           <div className="battle-objective">

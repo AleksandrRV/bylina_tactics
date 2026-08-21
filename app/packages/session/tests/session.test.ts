@@ -219,3 +219,22 @@ describe("createSession", () => {
     expect(session.startCampaignMission("clearing_2")).toBe(false);
   });
 });
+
+describe("createSession debug auto win", () => {
+  it("instantly wins the battle and reports the victory outcome", () => {
+    const session = createSession("menu");
+    session.openQuickMatch();
+    session.selectDifficulty("easy");
+    const host = createTacticsKernel();
+    session.bindTacticsHost(host);
+    const result = session.debugAutoWinBattle();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+    expect(session.getBattleOutcome()).toBe("victory");
+  });
+
+  it("rejects the debug command outside a battle", () => {
+    const session = createSession("menu");
+    expect(session.debugAutoWinBattle()).toEqual({ ok: false, reason: "ILLEGAL" });
+  });
+});

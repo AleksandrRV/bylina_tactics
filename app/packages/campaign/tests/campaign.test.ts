@@ -420,3 +420,28 @@ describe("createCampaign: хозяйство 0.12", () => {
     expect(automaton.getItems().map((item) => item.id)).toEqual(["mace_of_trail", "aim_charm"]);
   });
 });
+
+describe("createCampaign: снаряжение и гибель", () => {
+  it("returns a fallen fighter's equipment to the ship supply", () => {
+    const automaton = campaign();
+    const fighters = automaton.getState().fighters;
+    const ids = fighters.map((fighter) => fighter.id);
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.craftItem("aim_charm");
+    automaton.equipItem(fighters[0]!.id, "aim_charm");
+
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    automaton.finishMission("clearing_2", "defeat", [
+      { fighterId: fighters[0]!.id, survived: false, hp: 0 },
+      { fighterId: fighters[1]!.id, survived: true, hp: 8 },
+      { fighterId: fighters[2]!.id, survived: true, hp: 7 },
+    ]);
+    const fallen = automaton.getState().fighters.find((fighter) => fighter.id === fighters[0]!.id)!;
+    expect(fallen.alive).toBe(false);
+    expect(fallen.equippedItemId).toBeNull();
+    // Предмет снова доступен для надевания.
+    expect(automaton.equipItem(fighters[1]!.id, "aim_charm")).toBe(true);
+  });
+});

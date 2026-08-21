@@ -83,7 +83,9 @@
     "noUsesHint": "No uses remain in this battle.",
     "cooldownShort": "CD {turns}",
     "usesShort": "×{uses}",
-    "toCampaignMap": "To the ship map"
+    "toCampaignMap": "To the ship map",
+    "debugAutoWin": "Finish mission",
+    "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission."
   },
   "unit": {
     "bogatyr": {

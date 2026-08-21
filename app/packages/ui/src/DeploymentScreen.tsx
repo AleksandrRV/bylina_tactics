@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+// useMemo остаётся только для itemById; fighters вычисляются на каждый рендер.
 import type { ItemConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
@@ -78,11 +79,10 @@ export function DeploymentScreen() {
     [campaign],
   );
 
-  const fighters = useMemo(
-    () => campaign.getState().fighters.filter((fighter) => fighter.alive),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [campaign, activeMissionId],
-  );
+  // Список бойцов пересчитывается при каждом изменении состояния кампании:
+  // мемоизация по стабильным ссылкам (campaign, activeMissionId) замораживала
+  // снаряжение — после equipItem карточка не обновлялась.
+  const fighters = campaign.getState().fighters.filter((fighter) => fighter.alive);
 
   const inventory = campaign.getState().inventory;
   const items = campaign.getItems();

@@ -83,7 +83,9 @@
     "noUsesHint": "Лимит применений в этом бою исчерпан.",
     "cooldownShort": "КД {turns}",
     "usesShort": "×{uses}",
-    "toCampaignMap": "К карте корабля"
+    "toCampaignMap": "К карте корабля",
+    "debugAutoWin": "Завершить миссию",
+    "debugAutoWinHint": "Отладка: мгновенно уничтожить всех противников и завершить миссию победой."
   },
   "unit": {
     "bogatyr": {

@@ -46,6 +46,12 @@ export interface TacticsKernel {
   getVisibleCells(owner: number): Set<string>;
   getExploredCells(owner: number): Set<string>;
   apply(command: Command): ApplyResult;
+  /**
+   * Отладочная автопобеда (только для разработки и QA): мгновенно уничтожает
+   * всех противников и фиксирует победу текущей стороны. Не изменяет баланс
+   * и не раскрывает скрытых сведений; применяется как обычная победа.
+   */
+  debugAutoWin(): ApplyResult;
   subscribe(listener: () => void): () => void;
 }
 
@@ -1226,6 +1232,20 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if (triggerOverwatch(actor, events)) break;
       }
       actor.movementSpent = (actor.movementSpent ?? 0) + traversedMp;
+      appendOutcome(events);
+      emit();
+      return { ok: true, events };
+    },
+    debugAutoWin: () => {
+      if (ended) return { ok: false, reason: "ILLEGAL" };
+      const events: GameEvent[] = [];
+      for (const entity of state.entities) {
+        if (entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.dead) {
+          kill(entity, "DAMAGE", events);
+        }
+      }
+      // Победа фиксируется обычным механизмом исхода; Тьма/награды/уровни
+      // применяются как при любой другой победе.
       appendOutcome(events);
       emit();
       return { ok: true, events };
