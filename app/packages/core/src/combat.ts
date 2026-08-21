@@ -1,9 +1,9 @@
 import { evaluateCover } from "./cover.js";
 import { distH } from "./grid.js";
-import { hasLineOfSight } from "./los.js";
+import { evaluateObstacles } from "./los.js";
 import { heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 import { clampChance, type Rng } from "./rng.js";
-import type { EntityState, Grid } from "./types.js";
+import type { CellPos, EntityState, Grid } from "./types.js";
 import type { WeaponStats } from "./weapons.js";
 
 export interface HitPreview {
@@ -16,6 +16,10 @@ export interface HitPreview {
   heightMod?: -1 | 0 | 1;
   flanked?: boolean;
   actionType?: "MELEE" | "RANGED";
+  /** Клетка, до которой линия прицеливания сплошная (препятствие или макс. дальность). */
+  breakCell?: CellPos | null;
+  /** Суммарный штраф от промежуточных препятствий (§9.5). */
+  obstaclePenalty?: number;
 }
 
 export interface AttackResolution {
@@ -49,9 +53,20 @@ export function previewAttack(
     : inRangedReach(attacker.x, attacker.y, attacker.z, target.x, target.y, target.z, weapon.range);
   if (!inReach) return { available: false, reason: "OUT_OF_RANGE", heightMod };
 
-  const los = hasLineOfSight(grid, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
-  if (weapon.requiresLOS && !los) {
-    return { available: false, reason: "NO_LOS", heightMod };
+  // §7, §9.3: оценка промежуточных препятствий.
+  const obstacles = evaluateObstacles(
+    grid,
+    entities,
+    attacker.x,
+    attacker.y,
+    attacker.z,
+    target.x,
+    target.y,
+    target.z,
+  );
+
+  if (weapon.requiresLOS && obstacles.blocked) {
+    return { available: false, reason: "NO_LOS", heightMod, breakCell: obstacles.breakCell };
   }
 
   const cover = evaluateCover(attacker, target, entities, {
@@ -65,11 +80,32 @@ export function previewAttack(
     rangePenalty = weapon.closeRangePenalty.penalty;
   }
 
+  // §9.5: итоговый штраф P = max(укрытие_цели, промежуточные), ограничение 75.
+  const obstaclePenalty = melee ? obstacles.obstaclePenalty : Math.min(75, Math.max(cover.penalty, obstacles.obstaclePenalty));
+
+  // §10.1: формула попадания.
   const heightAim = heightMod === 1 ? 20 : heightMod === -1 ? -20 : 0;
   const defendBonus = target.defending ? 25 : 0;
   const chance = clampChance(
-    attacker.aim + weapon.aimMod + heightAim - target.defense - defendBonus - cover.penalty - rangePenalty,
+    attacker.aim + weapon.aimMod + heightAim
+    - target.defense - defendBonus - cover.adjacentDefenseBonus
+    - obstaclePenalty - rangePenalty,
   );
+
+  // Вычислить breakCell для визуализации.
+  let breakCell: CellPos | null = obstacles.breakCell;
+  if (!breakCell && !obstacles.blocked && !inReach) {
+    // Цель вне дальности: breakCell на максимальной дальности.
+    const range = weapon.range;
+    const dx = target.x - attacker.x;
+    const dy = target.y - attacker.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    breakCell = {
+      x: Math.round(attacker.x + (dx / d) * range),
+      y: Math.round(attacker.y + (dy / d) * range),
+      z: attacker.z,
+    };
+  }
 
   return {
     available: true,
@@ -80,6 +116,8 @@ export function previewAttack(
     heightMod,
     flanked: cover.flanked,
     actionType: melee ? "MELEE" : "RANGED",
+    breakCell,
+    obstaclePenalty,
   };
 }
 

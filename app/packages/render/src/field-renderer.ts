@@ -264,21 +264,65 @@ const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
 const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: 0x6d9a3a };
 
 /** Деревянная завала-укрытие: полубрус (1) или высокий сруб (2). */
-function drawCover(g: Graphics, cx: number, cy: number, coverType: 1 | 2): void {
-  g.ellipse(cx, cy + 11, 15, 4.5).fill({ color: 0x000000, alpha: 0.3 });
-  const logs = coverType === 2 ? 3 : 2;
-  for (let i = 0; i < logs; i += 1) {
-    const ly = cy + 6 - i * 6;
-    g.roundRect(cx - 13, ly - 4.4, 26, 8.8, 4.2).fill(0x8a6a42);
-    g.roundRect(cx - 13, ly - 4.4, 26, 8.8, 4.2).stroke({ width: 1, color: 0x3a2a18 });
-    g.circle(cx - 10.6, ly, 3.1).fill(0xb28a58);
-    g.circle(cx - 10.6, ly, 3.1).stroke({ width: 0.8, color: 0x3a2a18 });
-    g.circle(cx - 10.6, ly, 1.1).fill(0x6b4f2a);
+/** Смещение для граневых укрытий: N=0, E=1, S=2, W=3. */
+const EDGE_OFFSET: [number, number][] = [[0, -14], [14, 0], [0, 14], [-14, 0]];
+
+function drawCover(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  coverType: 1 | 2,
+  edge?: 0 | 1 | 2 | 3,
+): void {
+  // Граневое укрытие: сместить к грани клетки.
+  let ox = 0;
+  let oy = 0;
+  if (edge !== undefined) {
+    const [dx, dy] = EDGE_OFFSET[edge]!;
+    ox = dx;
+    oy = dy;
   }
-  g.moveTo(cx + 4, cy - 9)
-    .lineTo(cx + 11, cy - 14)
-    .stroke({ width: 2.2, color: 0x6b4f2a });
-  g.poly([cx + 11, cy - 14, cx + 9, cy - 11.6, cx + 12.4, cy - 11.4]).fill(0x3a2a18);
+  const px = cx + ox;
+  const py = cy + oy;
+
+  // Тень.
+  g.ellipse(px, py + 11, 15, 4.5).fill({ color: 0x000000, alpha: 0.3 });
+
+  if (coverType === 1) {
+    // Полуукрытие: низкий брус, светлее и компактнее.
+    const ly = py + 4;
+    g.roundRect(px - 11, ly - 3.5, 22, 7, 3.5).fill(0xa08050);
+    g.roundRect(px - 11, ly - 3.5, 22, 7, 3.5).stroke({ width: 0.8, color: 0x4a3a28 });
+    g.circle(px - 8, ly, 2.5).fill(0xc4a870);
+    g.circle(px - 8, ly, 2.5).stroke({ width: 0.6, color: 0x4a3a28 });
+    g.circle(px - 8, ly, 0.9).fill(0x6b4f2a);
+    // Верхняя доска.
+    g.roundRect(px - 9, ly - 6, 18, 3.5, 1.8).fill(0xb89060);
+    g.roundRect(px - 9, ly - 6, 18, 3.5, 1.8).stroke({ width: 0.6, color: 0x4a3a28 });
+  } else {
+    // Полное укрытие: три бревна, высокий сруб.
+    for (let i = 0; i < 3; i += 1) {
+      const ly = py + 6 - i * 6;
+      g.roundRect(px - 13, ly - 4.4, 26, 8.8, 4.2).fill(0x8a6a42);
+      g.roundRect(px - 13, ly - 4.4, 26, 8.8, 4.2).stroke({ width: 1, color: 0x3a2a18 });
+      g.circle(px - 10.6, ly, 3.1).fill(0xb28a58);
+      g.circle(px - 10.6, ly, 3.1).stroke({ width: 0.8, color: 0x3a2a18 });
+      g.circle(px - 10.6, ly, 1.1).fill(0x6b4f2a);
+    }
+    g.moveTo(px + 4, py - 9)
+      .lineTo(px + 11, py - 14)
+      .stroke({ width: 2.2, color: 0x6b4f2a });
+    g.poly([px + 11, py - 14, px + 9, py - 11.6, px + 12.4, py - 11.4]).fill(0x3a2a18);
+  }
+
+  // Метка грани: тонкая полоска-индикатор у граневых укрытий.
+  if (edge !== undefined) {
+    const markColor = coverType === 2 ? 0xe8b64c : 0x8fd0ff;
+    if (edge === 0) g.rect(px - 8, py - 18, 16, 2).fill({ color: markColor, alpha: 0.6 });
+    if (edge === 2) g.rect(px - 8, py + 16, 16, 2).fill({ color: markColor, alpha: 0.6 });
+    if (edge === 1) g.rect(px + 16, py - 8, 2, 16).fill({ color: markColor, alpha: 0.6 });
+    if (edge === 3) g.rect(px - 18, py - 8, 2, 16).fill({ color: markColor, alpha: 0.6 });
+  }
 }
 
 /** Могильная отметина павшего: камешки и череп. */
@@ -609,7 +653,7 @@ export function createFieldRenderer(): FieldRenderer {
     const fade = dieStart === undefined ? 1 : Math.max(0.25, 1 - ((performance.now() - dieStart) / 430) * 0.75);
 
     if (entity.coverType > 0) {
-      drawCover(g, cx, cy, entity.coverType as 1 | 2);
+      drawCover(g, cx, cy, entity.coverType as 1 | 2, entity.edge);
       return;
     }
 

@@ -318,31 +318,11 @@ export function BattleScreen() {
   }, []);
 
   const aimBreakCell = useMemo(() => {
-    if (!hit || hit.available || !selected || !aimed) return null;
-    const reason = hit.reason;
-    if (reason === "OUT_OF_RANGE") {
-      // Точка на максимальной дальности оружия по направлению к цели.
-      const weapon = selected.weaponId ? (kernel as any) : null;
-      const range = hit.actionType === "MELEE" ? 1 : 8; // fallback
-      const dx = aimed.x - selected.x;
-      const dy = aimed.y - selected.y;
-      const dist = Math.max(1, Math.hypot(dx, dy));
-      const bx = Math.round(selected.x + (dx / dist) * range);
-      const by = Math.round(selected.y + (dy / dist) * range);
-      return { x: Math.max(0, Math.min(snapshot.grid.width - 1, bx)), y: Math.max(0, Math.min(snapshot.grid.height - 1, by)), z: selected.z };
-    }
-    if (reason === "NO_LOS") {
-      // Точка перед первым блокирующим тайлом (приблизительно — середина линии).
-      const dx = aimed.x - selected.x;
-      const dy = aimed.y - selected.y;
-      const dist = Math.max(1, Math.hypot(dx, dy));
-      const halfDist = Math.floor(dist / 2);
-      const bx = Math.round(selected.x + (dx / dist) * halfDist);
-      const by = Math.round(selected.y + (dy / dist) * halfDist);
-      return { x: Math.max(0, Math.min(snapshot.grid.width - 1, bx)), y: Math.max(0, Math.min(snapshot.grid.height - 1, by)), z: selected.z };
-    }
+    if (!hit || !selected || !aimed) return null;
+    // breakCell теперь вычисляется ядром в previewAttack (§7, §9.3).
+    if (hit.breakCell) return hit.breakCell;
     return null;
-  }, [hit, selected, aimed, snapshot.grid]);
+  }, [hit, selected, aimed]);
 
   useEffect(() => {
     rendererRef.current?.update({
