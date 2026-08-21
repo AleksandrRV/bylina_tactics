@@ -90,6 +90,8 @@ export interface SessionApi {
   bindTacticsHost(host: TacticsKernel): void;
   /** Единственный путь изменения тактического состояния из интерфейса. */
   applyBattleCommand(command: Command): ApplyResult;
+  /** Отладочная автопобеда текущего боя (только для разработки и QA). */
+  debugAutoWinBattle(): ApplyResult;
   getBattleSnapshot(owner: number): MatchState;
   getBattleReachable(actorId: number): ReachableCell[];
   getBattlePath(actorId: number, to: CellPos): { path: CellPos[]; mpCost: number; apCost: 1 | 2 } | null;
@@ -224,6 +226,10 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
     applyBattleCommand: (command) => {
       if (!tacticsHost || state.screen !== "battle") return { ok: false, reason: "ILLEGAL" };
       return tacticsHost.apply(command);
+    },
+    debugAutoWinBattle: () => {
+      if (!tacticsHost || state.screen !== "battle") return { ok: false, reason: "ILLEGAL" };
+      return tacticsHost.debugAutoWin();
     },
     getBattleSnapshot: (owner) => requireTacticsHost().getSnapshotFor(owner),
     getBattleReachable: (actorId) => requireTacticsHost().getReachable(actorId),

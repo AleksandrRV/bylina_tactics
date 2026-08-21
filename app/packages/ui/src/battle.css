@@ -551,3 +551,16 @@
   text-transform: uppercase;
   vertical-align: middle;
 }
+
+/* Отладочная автопобеда: янтарная молния, отличная от жука-переключателя */
+.debug-win {
+  color: var(--amber, #e0b34a);
+  border-color: var(--amber-dim, #8a6a24);
+}
+
+.debug-win:hover,
+.debug-win:focus-visible {
+  border-color: var(--amber, #e0b34a);
+  color: #f3ecdc;
+  box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}

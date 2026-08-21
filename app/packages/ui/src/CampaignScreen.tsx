@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import type { MissionConfig } from "@bylina/content";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import type { ItemConfig, MissionConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
 import { useI18nTick } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -7,34 +7,32 @@ import { unitPortrait } from "./portraits.js";
 /** Классы дружины, доступные для обучения рекрута. */
 const CLASS_IDS: readonly string[] = ["bogatyr", "strelets", "znaharka", "volkhv"];
 
-type CampTab = "map" | "roster" | "chamber";
-
-/**
- * Отметки точек на карте царства. Выпуск 0.10.0 не хранит координаты в
- * конфигурации: положения вычисляются детерминированно из порядка точек.
- */
-const WAYPOINTS: readonly { x: number; y: number }[] = [
-  { x: 13, y: 64 },
-  { x: 31, y: 42 },
-  { x: 49, y: 62 },
-  { x: 65, y: 36 },
-  { x: 82, y: 55 },
-  { x: 70, y: 20 },
-];
+type CampTab = "map" | "roster" | "chamber" | "forge";
 
 /** Геометрические знаки-руны отметок: плоские формы вместо орнамента (ui-design §1). */
 const RUNES: readonly string[] = ["✦", "▲", "◆", "⬢", "✶", "✵"];
-
-function markerPosition(index: number): { x: number; y: number } {
-  return WAYPOINTS[index % WAYPOINTS.length] ?? { x: 50, y: 50 };
-}
 
 function unitName(unitId: string): string {
   return `unit.${unitId}.name`;
 }
 
-function roadPath(): string {
-  return WAYPOINTS.map((point) => `${point.x},${point.y}`).join(" ");
+function itemName(itemId: string): string {
+  return `item.${itemId}.name`;
+}
+
+function roadPath(missions: readonly MissionConfig[]): string {
+  return missions.map((mission) => `${mission.x},${mission.y}`).join(" ");
+}
+
+/** Строка эффекта предмета для карточки Кузни и снаряжения. */
+function itemEffectParts(item: ItemConfig, t: (key: string, vars?: Record<string, string | number>) => string): string[] {
+  const parts: string[] = [];
+  if (item.weaponId) parts.push(t(`weapon.${item.weaponId}.name`));
+  if (item.aimMod) parts.push(`${item.aimMod > 0 ? "+" : ""}${item.aimMod} ${t("item.aim")}`);
+  if (item.defenseMod) parts.push(`${item.defenseMod > 0 ? "+" : ""}${item.defenseMod} ${t("item.defense")}`);
+  if (item.mobilityMod) parts.push(`${item.mobilityMod > 0 ? "+" : ""}${item.mobilityMod} ${t("item.mobility")}`);
+  if (item.maxHpMod) parts.push(`${item.maxHpMod > 0 ? "+" : ""}${item.maxHpMod} ${t("item.maxHp")}`);
+  return parts;
 }
 
 /* ---------- Геометрические иконки (плоские, в стиле игры) ---------- */
@@ -136,6 +134,26 @@ function CrossIcon() {
   );
 }
 
+function RadarIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <circle cx="10" cy="10" r="8" strokeDasharray="4 2.6" />
+      <path d="M10 10 16 4" />
+      <circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function AnvilIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 14h12" />
+      <path d="M5 14v-3a5 5 0 0 1 10 0v3" />
+      <path d="M3 11h14M10 6V4.2M7 4.2h6" />
+    </svg>
+  );
+}
+
 function RecruitSilhouette() {
   return (
     <svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
@@ -164,9 +182,12 @@ export function CampaignScreen() {
   const campaign = session.getCampaign();
   const state = campaign.getState();
   const missions = campaign.getMissions();
+  const items = campaign.getItems();
   const [tab, setTab] = useState<CampTab>("map");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [trainingId, setTrainingId] = useState<number | null>(null);
+  const [scanKey, setScanKey] = useState<number>(0);
+  const [justOpened, setJustOpened] = useState<string[]>([]);
   const [, setTick] = useState(0);
 
   useEffect(
@@ -185,15 +206,34 @@ export function CampaignScreen() {
 
   const selected = selectedId ? byId.get(selectedId) : undefined;
   const selectedPoint = selectedId ? state.missions.find((point) => point.id === selectedId) : undefined;
-  const resources = { gold: 0, herbs: 0, artifacts: 0 };
   const isRecruitUnit = (unitId: string): boolean => unitId === content.campaign.recruitUnitId;
 
-  // Корабль стоит у передовой точки: первой открытой, иначе у последней пройденной.
-  const frontIndex = state.missions.findIndex((point) => point.status === "open");
-  const shipPosition = markerPosition(frontIndex >= 0 ? frontIndex : Math.max(0, state.missions.length - 1));
+  const resources = state.resources;
+  const scanCost = content.campaign.scan.cost;
+  const canScan =
+    resources.gold >= scanCost.gold
+    && resources.herbs >= scanCost.herbs
+    && resources.artifacts >= scanCost.artifacts;
+  const lockedCount = state.missions.filter((point) => point.status === "locked").length;
 
+  const shipPosition = state.shipPosition;
   const woundedFighters = state.fighters.filter((fighter) => fighter.alive && fighter.wounded);
   const training = trainingId !== null ? state.fighters.find((fighter) => fighter.id === trainingId) : undefined;
+
+  const doScan = (): void => {
+    const result = campaign.scan();
+    if (result && result.opened.length > 0) {
+      setScanKey((value) => value + 1);
+      setJustOpened(result.opened);
+      window.setTimeout(() => setJustOpened([]), 1400);
+    }
+  };
+
+  const itemById = useMemo(() => {
+    const map = new Map<string, ItemConfig>();
+    for (const item of items) map.set(item.id, item);
+    return map;
+  }, [items]);
 
   return (
     <div className="screen campaign-screen">
@@ -229,7 +269,35 @@ export function CampaignScreen() {
 
       {tab === "map" ? (
         <>
-          <div className="campaign-map" role="region" aria-label={t("campaign.mapLabel")}>
+          <div className="map-toolbar">
+            <p className="map-toolbar-note">
+              {lockedCount > 0
+                ? t("scan.hint", { radius: content.campaign.scan.radius })
+                : t("scan.allOpen")}
+            </p>
+            <button
+              type="button"
+              className={`scan-btn${canScan && lockedCount > 0 ? "" : " is-disabled"}`}
+              disabled={!canScan || lockedCount === 0}
+              onClick={doScan}
+              title={t("scan.cost", { gold: scanCost.gold, herbs: scanCost.herbs, artifacts: scanCost.artifacts })}
+            >
+              <RadarIcon />
+              {t("scan.action")}
+              <span className="scan-cost" aria-hidden="true">
+                {scanCost.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{scanCost.gold}</span> : null}
+                {scanCost.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{scanCost.herbs}</span> : null}
+                {scanCost.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{scanCost.artifacts}</span> : null}
+              </span>
+            </button>
+          </div>
+
+          <div
+            className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}`}
+            role="region"
+            aria-label={t("campaign.mapLabel")}
+            style={{ "--ship-x": `${shipPosition.x}%`, "--ship-y": `${shipPosition.y}%` } as CSSProperties}
+          >
             {/* Декоративный рельеф: река, горы, леса, дорога между точками */}
             <svg className="map-terrain" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path
@@ -255,7 +323,7 @@ export function CampaignScreen() {
               <path d="M20 80 26 92 14 92Z" fill="#1e2a22" />
               <path d="M27 76 33 87 21 87Z" fill="#223027" />
               <polyline
-                points={roadPath()}
+                points={roadPath(missions)}
                 fill="none"
                 stroke="rgba(224, 179, 74, 0.16)"
                 strokeWidth="0.5"
@@ -264,18 +332,20 @@ export function CampaignScreen() {
               />
             </svg>
             <div className="map-fog" aria-hidden="true" />
+            {/* Волна сканирования от корабля */}
+            {scanKey > 0 ? <div key={scanKey} className="scan-wave" aria-hidden="true" /> : null}
 
             {missions.map((mission, index) => {
               const point = state.missions.find((candidate) => candidate.id === mission.id);
-              const position = markerPosition(index);
               const status = point?.status ?? "locked";
               const rune = RUNES[index % RUNES.length] ?? "✦";
+              const isNewlyOpen = justOpened.includes(mission.id);
               return (
                 <button
                   key={mission.id}
                   type="button"
-                  className={`map-marker is-${status}${selectedId === mission.id ? " is-selected" : ""}`}
-                  style={{ left: `${position.x}%`, top: `${position.y}%` }}
+                  className={`map-marker is-${status}${selectedId === mission.id ? " is-selected" : ""}${isNewlyOpen ? " is-revealed" : ""}`}
+                  style={{ left: `${mission.x}%`, top: `${mission.y}%` }}
                   aria-label={t(`campaign.marker.${status}`, { mission: mission.id })}
                   disabled={status === "locked"}
                   onClick={() => {
@@ -332,7 +402,13 @@ export function CampaignScreen() {
                   </div>
                   <div className="fact-row">
                     <dt>{t("campaign.reward")}</dt>
-                    <dd className="muted">{t("campaign.rewardEmpty")}</dd>
+                    <dd>
+                      <span className="reward-chips" aria-label={t("campaign.reward")}>
+                        {selected.rewards.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{selected.rewards.gold}</span> : null}
+                        {selected.rewards.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{selected.rewards.herbs}</span> : null}
+                        {selected.rewards.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{selected.rewards.artifacts}</span> : null}
+                      </span>
+                    </dd>
                   </div>
                   <div className="fact-row">
                     <dt>{t("campaign.darknessGrowth")}</dt>
@@ -395,6 +471,7 @@ export function CampaignScreen() {
               const recruit = isRecruitUnit(fighter.unitId);
               const canTrain = fighter.alive && recruit && fighter.level >= content.campaign.classUnlockLevel;
               const penalty = content.campaign.woundPenalty;
+              const equipped = fighter.equippedItemId ? itemById.get(fighter.equippedItemId) : undefined;
               return (
                 <div
                   key={fighter.id}
@@ -427,6 +504,12 @@ export function CampaignScreen() {
                         ? t("battle.hp", { current: fighter.hp, max: fighter.maxHp })
                         : t("roster.fallenHp")}
                     </span>
+                    {equipped ? (
+                      <span className="equip-chip" title={itemEffectParts(equipped, t).join(", ")}>
+                        <AnvilIcon />
+                        {t(itemName(equipped.id))}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="fighter-level">
                     <LevelPips level={fighter.level} />
@@ -437,7 +520,7 @@ export function CampaignScreen() {
                       {t("roster.train")}
                     </button>
                   ) : null}
-                  {fighter.alive && !recruit && !fighter.wounded ? (
+                  {fighter.alive && !recruit && !fighter.wounded && !equipped ? (
                     <span className="fighter-ready" aria-hidden="true" title={t("roster.ready")}>
                       ✓
                     </span>
@@ -520,6 +603,59 @@ export function CampaignScreen() {
         </div>
       ) : null}
 
+      {tab === "forge" ? (
+        <div className="roster-panel forge-panel" aria-label={t("campaign.tabForge")}>
+          <div className="panel-head">
+            <h2>{t("campaign.tabForge")}</h2>
+            <p className="muted">
+              {t("forge.inventory", { current: state.inventory.length })}
+            </p>
+          </div>
+          <div className="forge-grid">
+            {items.map((item) => {
+              const crafted = state.inventory.includes(item.id);
+              const affordable =
+                resources.gold >= item.cost.gold
+                && resources.herbs >= item.cost.herbs
+                && resources.artifacts >= item.cost.artifacts;
+              const parts = itemEffectParts(item, t);
+              return (
+                <div key={item.id} className={`forge-card${crafted ? " is-crafted" : ""}`}>
+                  <span className="forge-icon" aria-hidden="true">
+                    {item.weaponId ? <SwordsIcon /> : <GemIcon />}
+                  </span>
+                  <span className="forge-name">{t(itemName(item.id))}</span>
+                  <span className="forge-effects">{parts.join(" · ")}</span>
+                  <span className="forge-cost" aria-label={t("forge.cost")}>
+                    {item.cost.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{item.cost.gold}</span> : null}
+                    {item.cost.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{item.cost.herbs}</span> : null}
+                    {item.cost.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{item.cost.artifacts}</span> : null}
+                  </span>
+                  {crafted ? (
+                    <span className="crafted-tag">{t("forge.crafted")}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="craft-btn"
+                      disabled={!affordable}
+                      onClick={() => campaign.craftItem(item.id)}
+                    >
+                      <AnvilIcon />
+                      {t("forge.craft")}
+                    </button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+          {state.inventory.length > 0 ? (
+            <p className="forge-note">
+              {t("forge.equipHint")}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <nav className="campaign-tabs" aria-label={t("campaign.tabsLabel")}>
         <button
           type="button"
@@ -546,10 +682,14 @@ export function CampaignScreen() {
           {t("campaign.tabChamber")}
           {woundedFighters.length > 0 ? <span className="tab-alert" aria-label={t("chamber.count", { current: woundedFighters.length })}>{woundedFighters.length}</span> : null}
         </button>
-        <button type="button" className="campaign-tab" disabled title={t("campaign.tabSoon", { version: "0.12.0" })}>
+        <button
+          type="button"
+          className={`campaign-tab${tab === "forge" ? " is-active" : ""}`}
+          onClick={() => setTab("forge")}
+        >
           <HammerIcon />
           {t("campaign.tabForge")}
-          <span className="tab-note">{t("campaign.tabNoteSoon", { version: "0.12.0" })}</span>
+          {state.inventory.length > 0 ? <span className="tab-alert forge-alert" aria-label={t("forge.inventory", { current: state.inventory.length })}>{state.inventory.length}</span> : null}
         </button>
       </nav>
 

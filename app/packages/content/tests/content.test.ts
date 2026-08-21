@@ -56,6 +56,14 @@ describe("parseContent", () => {
       "sword",
       "sword_debug",
     ]);
+    expect(result.data.items.map((item) => item.id).sort()).toEqual([
+      "aim_charm",
+      "guard_charm",
+      "mace_of_trail",
+      "pishchal_gun",
+      "swift_boots",
+      "vital_amulet",
+    ]);
     expect(result.data.skills.map((skill) => skill.id).sort()).toEqual([
       "aimed_eye",
       "breach",

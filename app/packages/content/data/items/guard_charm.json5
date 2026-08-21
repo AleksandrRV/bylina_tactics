@@ -1,0 +1,6 @@
+{
+  // Оберег защиты.
+  id: "guard_charm",
+  defenseMod: 10,
+  cost: { gold: 8, herbs: 3, artifacts: 0 },
+}

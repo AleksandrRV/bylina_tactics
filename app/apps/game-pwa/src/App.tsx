@@ -56,7 +56,7 @@ export function App() {
     if (!content.ok) return null;
     const unitStats: Record<string, { maxHealth: number }> = {};
     for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
-    return createCampaign(content.data.campaign, { unitStats });
+    return createCampaign(content.data.campaign, { unitStats, items: content.data.items });
   }, [content]);
 
   useEffect(() => {

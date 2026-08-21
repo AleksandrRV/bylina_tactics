@@ -101,3 +101,43 @@ describe("enemy AI", () => {
     expect(kernel.getSnapshot().activeOwner).toBe(PLAYER_OWNER);
   });
 });
+
+describe("debug auto win", () => {
+  it("instantly destroys all enemies and ends the match with a player victory", () => {
+    const kernel = createTacticsKernel({
+      initial: createQuickMatch({ enemyCount: 3, seed: 31 }),
+      weapons: defaultTrainingWeapons(),
+      seed: 31,
+    });
+    const result = kernel.debugAutoWin();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events.some((event) => event.type === "ENTITY_DIED")).toBe(true);
+    expect(result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+    const snapshot = kernel.getSnapshot();
+    expect(snapshot.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.dead)).toHaveLength(0);
+  });
+
+  it("rejects a second auto win after the match has ended", () => {
+    const kernel = createTacticsKernel({
+      initial: createQuickMatch({ enemyCount: 3, seed: 32 }),
+      weapons: defaultTrainingWeapons(),
+      seed: 32,
+    });
+    expect(kernel.debugAutoWin().ok).toBe(true);
+    expect(kernel.debugAutoWin()).toEqual({ ok: false, reason: "ILLEGAL" });
+  });
+
+  it("auto win does not depend on whose turn it is", () => {
+    const kernel = createTacticsKernel({
+      initial: createQuickMatch({ enemyCount: 3, seed: 33 }),
+      weapons: defaultTrainingWeapons(),
+      seed: 33,
+    });
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    expect(kernel.getSnapshot().activeOwner).toBe(ENEMY_OWNER);
+    const result = kernel.debugAutoWin();
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+  });
+});

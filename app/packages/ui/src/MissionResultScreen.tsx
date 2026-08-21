@@ -52,6 +52,36 @@ function ArrowUpIcon() {
   );
 }
 
+function CoinIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="8" cy="8" r="6.2" />
+      <circle cx="8" cy="8" r="2.6" />
+      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2" />
+    </svg>
+  );
+}
+
+function HerbIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+      <path d="M8 14V6" />
+      <path d="M8 7c-2.4 0-3.6-1.6-3.4-3.8 2.3-.2 3.7 1 3.4 3.8Z" />
+      <path d="M8 9.5c2.4 0 3.6-1.6 3.4-3.8-2.3-.2-3.7 1-3.4 3.8Z" />
+      <path d="M8 12c-1.9 0-2.8-1.2-2.6-2.9 1.7-.2 2.8.8 2.6 2.9Z" />
+    </svg>
+  );
+}
+
+function GemIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+      <path d="M6 2.5h4l3 3.5-5 7.5L3 6l3-3.5Z" />
+      <path d="M3 6h10M8 13.5 6.6 6M8 13.5 9.4 6" />
+    </svg>
+  );
+}
+
 export function MissionResultScreen() {
   useI18nTick();
   const t = useT();
@@ -116,6 +146,30 @@ export function MissionResultScreen() {
                 <p className="outcome-names">{last.newRecruit}</p>
               </div>
             </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {last && (last.rewards.gold > 0 || last.rewards.herbs > 0 || last.rewards.artifacts > 0) ? (
+        <div className="rewards-strip" aria-label={t("missionResult.rewards")}>
+          <span className="rewards-title">{t("missionResult.rewards")}</span>
+          {last.rewards.gold > 0 ? (
+            <span className="cost-chip gold reward-gain">
+              <CoinIcon />
+              +{last.rewards.gold}
+            </span>
+          ) : null}
+          {last.rewards.herbs > 0 ? (
+            <span className="cost-chip herbs reward-gain">
+              <HerbIcon />
+              +{last.rewards.herbs}
+            </span>
+          ) : null}
+          {last.rewards.artifacts > 0 ? (
+            <span className="cost-chip artifacts reward-gain">
+              <GemIcon />
+              +{last.rewards.artifacts}
+            </span>
           ) : null}
         </div>
       ) : null}

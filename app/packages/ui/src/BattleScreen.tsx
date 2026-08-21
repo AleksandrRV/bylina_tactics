@@ -13,6 +13,7 @@ import {
   type HitPreview,
   type MatchState,
   type ReachableCell,
+  type RosterMods,
   type SkillStats,
   type WeaponStats,
 } from "@bylina/core";
@@ -41,6 +42,15 @@ function isOwn(entity: EntityState): boolean {
 
 function unitNameKey(configId: string): string {
   return `unit.${configId}.name`;
+}
+
+/** Иконка автопобеды: молния как знак мгновенного разрешения. */
+function AutoWinIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2Z" />
+    </svg>
+  );
 }
 
 /** Иконка-жук: общепринятый символ отладочного режима. */
@@ -97,12 +107,22 @@ export function BattleScreen() {
       if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
       const penalty = content.campaign.woundPenalty;
       const fighters = session.getCampaign().getState().fighters;
+      const items = session.getCampaign().getItems();
       const playerSlots = deployment.map((fighterId) => {
         const fighter = fighters.find((candidate) => candidate.id === fighterId);
         if (!fighter || !fighter.alive) throw new Error(`Unknown fighter in deployment: ${fighterId}`);
-        const mods = fighter.wounded
+        const mods: RosterMods = fighter.wounded
           ? { aimMod: penalty.aim, defenseMod: penalty.defense, mobilityMod: penalty.mobility }
           : {};
+        // Снаряжение: оружие и модификаторы предмета добавляются к высадке.
+        const item = fighter.equippedItemId ? items.find((entry) => entry.id === fighter.equippedItemId) : undefined;
+        if (item) {
+          mods.aimMod = (mods.aimMod ?? 0) + (item.aimMod ?? 0);
+          mods.defenseMod = (mods.defenseMod ?? 0) + (item.defenseMod ?? 0);
+          mods.mobilityMod = (mods.mobilityMod ?? 0) + (item.mobilityMod ?? 0);
+          if (item.maxHpMod) mods.maxHpMod = (mods.maxHpMod ?? 0) + item.maxHpMod;
+          if (item.weaponId) mods.extraWeaponIds = [item.weaponId];
+        }
         return { unitId: fighter.unitId, hp: fighter.hp, ...mods };
       });
       initial = createMissionMatch({
@@ -245,6 +265,18 @@ export function BattleScreen() {
       finishFromEvents(events);
       after?.();
     });
+  };
+
+  /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы. */
+  const debugAutoWin = (): void => {
+    if (paused || busy) return;
+    const result = session.debugAutoWinBattle();
+    if (!result.ok) return;
+    setPreview(null);
+    setAimId(null);
+    setSkillTargetPos(null);
+    setAction(null);
+    playThen(result.events);
   };
 
   const tryMove = (to: CellPos): void => {
@@ -591,6 +623,15 @@ export function BattleScreen() {
               aria-label={t("battle.debugMovement")}
             >
               <DebugIcon />
+            </button>
+            <button
+              type="button"
+              className="hud-btn hud-icon-btn debug-win"
+              onClick={() => debugAutoWin()}
+              title={t("battle.debugAutoWinHint")}
+              aria-label={t("battle.debugAutoWin")}
+            >
+              <AutoWinIcon />
             </button>
           </div>
           <div className="battle-objective">

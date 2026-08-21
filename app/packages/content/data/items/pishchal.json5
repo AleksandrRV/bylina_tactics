@@ -1,0 +1,6 @@
+{
+  // Пищаль: дальнобойное оружие Стрельца.
+  id: "pishchal_gun",
+  weaponId: "pishchal",
+  cost: { gold: 20, herbs: 3, artifacts: 1 },
+}
