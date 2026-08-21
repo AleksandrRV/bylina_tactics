@@ -8,5 +8,6 @@
   resolution: "auto",
   envDmg: 0,
   filter: "enemies",
+  cooldownTurns: 3,
   effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
 }

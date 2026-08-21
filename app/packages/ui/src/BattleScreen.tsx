@@ -480,6 +480,12 @@ export function BattleScreen() {
         const index = Number(event.key) - 1;
         const chosen = selectableActions(selected)[index];
         if (!chosen) return;
+        if (chosen.type === "skill") {
+          const skill = skills[chosen.id];
+          const cooldown = selected.skillCooldowns?.[chosen.id] ?? 0;
+          const uses = selected.skillUses?.[chosen.id] ?? 0;
+          if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
+        }
         if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
           useSelfSkill(chosen.id);
         } else {
@@ -767,14 +773,19 @@ export function BattleScreen() {
               const skill = skills[skillId];
               const active = action?.type === "skill" && action.id === skillId;
               const shortcut = selected ? shortcutForAction(selected, "skill", skillId) : undefined;
+              const cooldown = selected?.skillCooldowns?.[skillId] ?? 0;
+              const uses = selected?.skillUses?.[skillId] ?? 0;
+              const usesLeft = skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses);
+              const exhausted = usesLeft === 0;
               return (
                 <button
                   key={`skill-${skillId}`}
                   type="button"
-                  className={`hud-btn skill-slot${active ? " is-active" : ""}`}
+                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}`}
                   aria-pressed={active}
-                  data-action-state={active ? "active" : "inactive"}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                  data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
+                  title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== PLAYER_OWNER}
                   onClick={() => {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
@@ -787,6 +798,8 @@ export function BattleScreen() {
                 >
                   {shortcut ? <kbd>{shortcut}</kbd> : null}
                   {t(`skill.${skillId}.name`)}
+                  {cooldown > 0 ? <span className="skill-resource cooldown">{t("battle.cooldownShort", { turns: cooldown })}</span> : null}
+                  {usesLeft !== undefined ? <span className="skill-resource uses">{t("battle.usesShort", { uses: usesLeft })}</span> : null}
                 </button>
               );
             })}

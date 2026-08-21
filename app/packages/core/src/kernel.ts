@@ -42,6 +42,7 @@ export interface TacticsKernel {
   getPath(actorId: number, to: CellPos): { path: CellPos[]; mpCost: number; apCost: 1 | 2 } | null;
   getHitPreview(actorId: number, targetId: number, weaponId?: string): HitPreview;
   getSkillPreview(actorId: number, skillId: string, targetId?: number, targetPos?: CellPos): SkillPreview;
+  getSkillDefinition(skillId: string): SkillStats | undefined;
   getVisibleCells(owner: number): Set<string>;
   getExploredCells(owner: number): Set<string>;
   apply(command: Command): ApplyResult;
@@ -61,6 +62,8 @@ function cloneState(state: MatchState): MatchState {
       ...entity,
       weaponIds: entity.weaponIds ? [...entity.weaponIds] : undefined,
       skillIds: entity.skillIds ? [...entity.skillIds] : undefined,
+      skillCooldowns: entity.skillCooldowns ? { ...entity.skillCooldowns } : undefined,
+      skillUses: entity.skillUses ? { ...entity.skillUses } : undefined,
       poison: entity.poison ? { ...entity.poison } : undefined,
       panic: entity.panic ? { ...entity.panic } : undefined,
     })),
@@ -365,6 +368,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         ...spawned,
         weaponIds: spawned.weaponIds ? [...spawned.weaponIds] : undefined,
         skillIds: spawned.skillIds ? [...spawned.skillIds] : undefined,
+        skillCooldowns: spawned.skillCooldowns ? { ...spawned.skillCooldowns } : undefined,
+        skillUses: spawned.skillUses ? { ...spawned.skillUses } : undefined,
       },
       cause,
     });
@@ -672,6 +677,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
     if (actor.dead || actor.panic || actor.owner !== state.activeOwner || (actor.decoy && skill.resolution === "attack")) return { available: false, reason: "ILLEGAL" };
     if (actor.ap < skill.apCost) return { available: false, reason: "NO_AP" };
+    if ((actor.skillCooldowns?.[skill.id] ?? 0) > 0) return { available: false, reason: "ON_COOLDOWN" };
+    if (skill.maxUsesPerBattle !== undefined && (actor.skillUses?.[skill.id] ?? 0) >= skill.maxUsesPerBattle) {
+      return { available: false, reason: "NO_USES" };
+    }
     if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
     if (target) {
@@ -867,6 +876,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (targetPos && !(fog[actor.owner]?.visible.has(`${targetPos.x},${targetPos.y}`) ?? true)) return { available: false };
       return skillPreview(actor, skill, target, targetPos);
     },
+    getSkillDefinition: (skillId) => skills[skillId],
     getVisibleCells: (owner) => new Set(fog[owner]?.visible ?? []),
     getExploredCells: (owner) => new Set(fog[owner]?.explored ?? []),
     apply: (command) => {
@@ -915,6 +925,26 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           if (entity.timedLife <= 0) {
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "TIMED", applied: false });
             removeEntity(entity, "EXPIRED", events);
+          }
+        }
+
+        // Cooldowns tick once at the beginning of the owning side's turn.
+        for (const entity of state.entities.filter((candidate) => candidate.owner === upcoming && !candidate.dead)) {
+          if (!entity.skillCooldowns) continue;
+          for (const [skillId, value] of Object.entries(entity.skillCooldowns)) {
+            if (value <= 0) continue;
+            const cooldown = Math.max(0, value - 1);
+            entity.skillCooldowns[skillId] = cooldown;
+            const skill = skills[skillId];
+            const uses = entity.skillUses?.[skillId] ?? 0;
+            events.push({
+              type: "SKILL_RESOURCE_CHANGED",
+              entityId: entity.id,
+              skillId,
+              cooldown,
+              uses,
+              usesLeft: skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses),
+            });
           }
         }
 
@@ -1082,6 +1112,20 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           targetId: target?.id,
           targetPos: preview.targetPos,
           success,
+        });
+        actor.skillUses ??= {};
+        actor.skillCooldowns ??= {};
+        actor.skillUses[skill.id] = (actor.skillUses[skill.id] ?? 0) + 1;
+        actor.skillCooldowns[skill.id] = skill.cooldownTurns ?? 0;
+        events.push({
+          type: "SKILL_RESOURCE_CHANGED",
+          entityId: actor.id,
+          skillId: skill.id,
+          cooldown: actor.skillCooldowns[skill.id] ?? 0,
+          uses: actor.skillUses[skill.id] ?? 0,
+          usesLeft: skill.maxUsesPerBattle === undefined
+            ? undefined
+            : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
         });
         spendAction(actor, skill.apCost, skill.endsTurn, events);
         appendOutcome(events);

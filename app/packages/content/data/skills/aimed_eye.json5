@@ -9,5 +9,6 @@
   envDmg: 0,
   ignoreHalfCover: true,
   filter: "enemies",
+  cooldownTurns: 2,
   effects: [{ type: "damage", minDmg: 3, maxDmg: 5, crit: 20, critBonus: 2 }],
 }

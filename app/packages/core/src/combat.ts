@@ -29,7 +29,7 @@ export interface HitBreakdown {
 
 export interface HitPreview {
   available: boolean;
-  reason?: "NO_LOS" | "OUT_OF_RANGE" | "NO_AP" | "ILLEGAL" | "NOT_FOUND";
+  reason?: "NO_LOS" | "OUT_OF_RANGE" | "NO_AP" | "ON_COOLDOWN" | "NO_USES" | "ILLEGAL" | "NOT_FOUND";
   chance?: number;
   dmgMin?: number;
   dmgMax?: number;

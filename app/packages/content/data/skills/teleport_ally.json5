@@ -8,5 +8,6 @@
   resolution: "auto",
   envDmg: 0,
   filter: "allies",
+  cooldownTurns: 5,
   effects: [{ type: "displace" }],
 }

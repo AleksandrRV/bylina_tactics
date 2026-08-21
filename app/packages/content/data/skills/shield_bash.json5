@@ -8,6 +8,7 @@
   resolution: "attack",
   envDmg: 0,
   filter: "enemies",
+  cooldownTurns: 1,
   effects: [
     { type: "damage", minDmg: 1, maxDmg: 2, crit: 0, critBonus: 0 },
     { type: "knockback" },

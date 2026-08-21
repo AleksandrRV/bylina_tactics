@@ -84,6 +84,22 @@ describe("parseContent", () => {
     expect(parseContent(files).ok).toBe(false);
   });
 
+  it("requires cooldowns for regular skills and one use for summons", () => {
+    const files = readDataTree();
+    const rootsKey = Object.keys(files).find((key) => key.endsWith("skills/roots.json5"));
+    expect(rootsKey).toBeDefined();
+    if (!rootsKey) return;
+    files[rootsKey] = files[rootsKey]!.replace(/\s*cooldownTurns:\s*2,/, "");
+    expect(parseContent(files).ok).toBe(false);
+
+    const summonFiles = readDataTree();
+    const summonKey = Object.keys(summonFiles).find((key) => key.endsWith("skills/summon_forest_beast.json5"));
+    expect(summonKey).toBeDefined();
+    if (!summonKey) return;
+    summonFiles[summonKey] = summonFiles[summonKey]!.replace("maxUsesPerBattle: 1", "maxUsesPerBattle: 2");
+    expect(parseContent(summonFiles).ok).toBe(false);
+  });
+
   it("rejects a broken campaign file", () => {
     const files = readDataTree();
     const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));

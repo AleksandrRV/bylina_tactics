@@ -78,7 +78,11 @@
     "debugMovement": "Movement cost",
     "defend": "Defensive stance",
     "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
-    "statuses": "Statuses"
+    "statuses": "Statuses",
+    "cooldownHint": "Cooldown: {turns} turn(s).",
+    "noUsesHint": "No uses remain in this battle.",
+    "cooldownShort": "CD {turns}",
+    "usesShort": "×{uses}"
   },
   "unit": {
     "bogatyr": {

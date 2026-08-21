@@ -89,6 +89,8 @@ export const skillConfigSchema = z.object({
   radius: z.number().int().min(0).optional(),
   willPower: z.number().optional(),
   filter: z.enum(["enemies", "allies", "all", "cover"]).optional(),
+  cooldownTurns: z.number().int().min(1).max(5).optional(),
+  maxUsesPerBattle: z.number().int().min(1).optional(),
   effects: z.array(skillEffectSchema).min(1),
 }).strict().superRefine((value, context) => {
   if (value.category === "self" && value.range !== 0) {
@@ -96,6 +98,13 @@ export const skillConfigSchema = z.object({
   }
   if (value.resolution === "will" && value.willPower === undefined) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["willPower"], message: "willPower is required for will resolution" });
+  }
+  const hasSpawn = value.effects.some((effect) => effect.type === "spawn");
+  if (hasSpawn && value.maxUsesPerBattle !== 1) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["maxUsesPerBattle"], message: "summoning skills must have maxUsesPerBattle = 1" });
+  }
+  if (!hasSpawn && value.cooldownTurns === undefined) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["cooldownTurns"], message: "non-summoning skills require cooldownTurns from 1 to 5" });
   }
   value.effects.forEach((effect, index) => {
     if (effect.type === "damage" && effect.maxDmg < effect.minDmg) {

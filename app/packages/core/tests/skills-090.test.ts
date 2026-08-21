@@ -28,41 +28,41 @@ function state(...entities: EntityState[]): MatchState {
 
 const HEAL: SkillStats = {
   id: "heal", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", effects: [{ type: "heal", amount: 4 }],
+  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 2, effects: [{ type: "heal", amount: 4 }],
 };
 const CLEANSE: SkillStats = {
   id: "cleanse", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", effects: [
+  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 3, effects: [
     { type: "removeStatus", status: "poison" }, { type: "removeStatus", status: "panic" }, { type: "removeStatus", status: "immobile" },
   ],
 };
 const POISON: SkillStats = {
   id: "poison_needles", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "enemies", effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
+  resolution: "auto", envDmg: 0, filter: "enemies", cooldownTurns: 3, effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
 };
 const ROOTS: SkillStats = {
   id: "roots", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "enemies", effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
+  resolution: "auto", envDmg: 0, filter: "enemies", cooldownTurns: 2, effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
 };
 const PANIC: SkillStats = {
   id: "panic", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "will", willPower: 100, envDmg: 0, filter: "enemies", effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
+  resolution: "will", willPower: 100, envDmg: 0, filter: "enemies", cooldownTurns: 4, effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
 };
 const SUMMON: SkillStats = {
   id: "summon_forest_beast", apCost: 1, endsTurn: true, range: 4, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", effects: [{ type: "spawn", unitId: "forest_beast" }],
+  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "forest_beast" }],
 };
 const TELEPORT: SkillStats = {
   id: "teleport_ally", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", effects: [{ type: "displace" }],
+  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 5, effects: [{ type: "displace" }],
 };
 const ILLUSION: SkillStats = {
   id: "create_illusion", apCost: 1, endsTurn: true, range: 5, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", effects: [{ type: "spawn", unitId: "illusion" }],
+  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "illusion" }],
 };
 const RAISE: SkillStats = {
   id: "raise_skeleton", apCost: 1, endsTurn: true, range: 5, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", effects: [{ type: "spawn", unitId: "upyr" }],
+  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "upyr" }],
 };
 
 const BEAST: SpawnUnitConfig = {
@@ -96,6 +96,16 @@ describe("0.9 automatic skills", () => {
     initial.activeOwner = 2;
     const game = kernel(initial, [ROOTS]);
     expect(pickEnemyCommand(game)).toEqual({ type: "USE_SKILL", actorId: 2, skillId: ROOTS.id, targetId: 1 });
+  });
+
+  it("never asks AI to reapply a status that is already active", () => {
+    const player = fighter({ id: 1, owner: 1, x: 2, immobileTurns: 1 });
+    const leshy = fighter({ id: 2, owner: 2, x: 5, configId: "leshy", skillIds: [ROOTS.id] });
+    const initial = state(player, leshy);
+    initial.activeOwner = 2;
+    const game = kernel(initial, [ROOTS]);
+    const command = pickEnemyCommand(game);
+    expect(command?.type).not.toBe("USE_SKILL");
   });
 
   it("heals up to max HP and removes all configured negative statuses", () => {
@@ -137,6 +147,34 @@ describe("0.9 automatic skills", () => {
     expect(game.apply({ type: "MOVE", actorId: 2, to: { x: 4, y: 2, z: 1 } }).ok).toBe(false);
     const ended = game.apply({ type: "END_TURN", playerId: "2" });
     expect(ended.ok && ended.events.some((event) => event.type === "STATUS_CHANGED" && event.status === "IMMOBILE" && !event.applied)).toBe(true);
+  });
+});
+
+describe("skill cooldowns and per-battle limits", () => {
+  it("blocks a cooling skill and ticks it once per owning turn", () => {
+    const healer = fighter({ id: 1, owner: 1, skillIds: [HEAL.id] });
+    const ally = fighter({ id: 2, owner: 1, x: 2, hp: 5 });
+    const enemy = fighter({ id: 3, owner: 2, x: 6 });
+    const game = kernel(state(healer, ally, enemy), [HEAL]);
+    expect(game.apply({ type: "USE_SKILL", actorId: 1, skillId: HEAL.id, targetId: 2 }).ok).toBe(true);
+    game.apply({ type: "END_TURN", playerId: "1" });
+    game.apply({ type: "END_TURN", playerId: "2" });
+    expect(game.getSkillPreview(1, HEAL.id, 2)).toMatchObject({ available: false, reason: "ON_COOLDOWN" });
+    expect(game.getSnapshot().entities.find((entity) => entity.id === 1)?.skillCooldowns?.[HEAL.id]).toBe(1);
+    game.apply({ type: "END_TURN", playerId: "1" });
+    game.apply({ type: "END_TURN", playerId: "2" });
+    expect(game.getSkillPreview(1, HEAL.id, 2).available).toBe(true);
+  });
+
+  it("allows each summoning skill only once per battle", () => {
+    const source = fighter({ id: 1, owner: 1, skillIds: [SUMMON.id] });
+    const enemy = fighter({ id: 2, owner: 2, x: 6 });
+    const game = kernel(state(source, enemy), [SUMMON], [BEAST]);
+    expect(game.apply({ type: "USE_SKILL", actorId: 1, skillId: SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } }).ok).toBe(true);
+    game.apply({ type: "END_TURN", playerId: "1" });
+    game.apply({ type: "END_TURN", playerId: "2" });
+    expect(game.getSkillPreview(1, SUMMON.id, undefined, { x: 3, y: 3, z: 1 })).toMatchObject({ available: false, reason: "NO_USES" });
+    expect(game.getSnapshot().entities.find((entity) => entity.id === 1)?.skillUses?.[SUMMON.id]).toBe(1);
   });
 });
 

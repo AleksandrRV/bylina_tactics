@@ -9,6 +9,7 @@
   envDmg: 1,
   affectsEnvironment: true,
   filter: "all",
+  cooldownTurns: 4,
   effects: [
     { type: "damage", minDmg: 4, maxDmg: 6, crit: 10, critBonus: 2 },
     { type: "destroyCover" },

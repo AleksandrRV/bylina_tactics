@@ -78,7 +78,11 @@
     "debugMovement": "Очки движения",
     "defend": "Защитная стойка",
     "defendHint": "Защитная стойка: −25 к шансу попадания и −2 к урону от атак. Завершает активацию.",
-    "statuses": "Состояния"
+    "statuses": "Состояния",
+    "cooldownHint": "Перезарядка: {turns} ход.",
+    "noUsesHint": "Лимит применений в этом бою исчерпан.",
+    "cooldownShort": "КД {turns}",
+    "usesShort": "×{uses}"
   },
   "unit": {
     "bogatyr": {

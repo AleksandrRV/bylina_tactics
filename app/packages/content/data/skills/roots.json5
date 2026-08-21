@@ -8,5 +8,6 @@
   resolution: "auto",
   envDmg: 0,
   filter: "enemies",
+  cooldownTurns: 2,
   effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
 }

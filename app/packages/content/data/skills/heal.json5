@@ -8,5 +8,6 @@
   resolution: "auto",
   envDmg: 0,
   filter: "allies",
+  cooldownTurns: 2,
   effects: [{ type: "heal", amount: 4 }],
 }

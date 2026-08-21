@@ -21,6 +21,8 @@
 
 `PlayerMap`: 0 — нейтральная принадлежность (среда); положительные значения — участники и сторона, управляемая алгоритмом.
 
+`SkillRuntimeMap`: пара `(entityId, skillConfigIndex)` → `{ cooldown: ui8, uses: ui8 }`. Таблица внешняя, поскольку число умений сущности задаётся конфигурацией и один компонент не может повторяться на сущности. Она входит в полный снимок ведущего и сокращённый снимок владельца.
+
 Числовые характеристики при создании сущности копируются из записи конфигурации в компоненты. Дальнейшее изменение характеристик в бою выполняется системами, а не повторным чтением записи, за исключением справки по оружию и умениям: оружие и умения с сущности не копируются и читаются по идентификаторам записи.
 
 ---
@@ -147,6 +149,7 @@ export const PanicSource = defineComponent({
 | TimedLifeSystem | `TimedLife`, `Owner` | снятие сущности |
 | OverwatchResetSystem | `OverwatchTag`, `Owner` | снятие `OverwatchTag` |
 | DefendingResetSystem | `DefendingTag`, `Owner` | снятие `DefendingTag` |
+| SkillCooldownSystem | `Owner`, `SkillRuntimeMap` | уменьшение ненулевых `cooldown` на 1 |
 | ActionRefillSystem | `ActionPoints`, `MovementTurn`, отсутствие `DeadTag` | `ActionPoints.current`, `MovementTurn.spent = 0` |
 | PanicSystem | `PanickedTag`, `PanicSource`, `Position` | `Position`, `ActionPoints` |
 | CommandSystem | команда, соответствующие компоненты | по виду команды |

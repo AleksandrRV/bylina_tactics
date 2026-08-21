@@ -9,5 +9,6 @@
   willPower: 75,
   envDmg: 0,
   filter: "enemies",
+  cooldownTurns: 4,
   effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
 }

@@ -85,6 +85,8 @@ interface SkillConfig {
   radius?: number;           // область; 0 или отсутствие — одна клетка
   willPower?: number;        // для resolution = "will"
   filter?: "enemies" | "allies" | "all" | "cover";
+  cooldownTurns?: number;    // 1…5 собственных ходов; обязательно для непризывных умений
+  maxUsesPerBattle?: number; // предел применений; для любого spawn обязан быть равен 1
   effects: SkillEffect[];
 }
 

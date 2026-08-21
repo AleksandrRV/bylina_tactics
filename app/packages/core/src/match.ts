@@ -38,6 +38,8 @@ export function spawnUnitState(id: number, config: SpawnUnitConfig, owner: numbe
     weaponId: weaponIds[0] ?? "",
     weaponIds,
     skillIds: [...(config.skills ?? [])],
+    skillCooldowns: {},
+    skillUses: {},
     obstacle: true,
     dead: false,
     flying: config.tags?.includes("flying") ?? false,

@@ -47,6 +47,8 @@ interface RejectPayload {
     | "OUT_OF_RANGE"
     | "NO_LOS"
     | "NO_AP"
+    | "ON_COOLDOWN"
+    | "NO_USES"
     | "NOT_YOUR_TURN"
     | "OCCUPIED"
     | "NOT_FOUND";
@@ -166,6 +168,7 @@ type GameEventType =
   | "ENTITY_DISPLACED"
   | "COMBAT_RESOLVED"
   | "SKILL_RESOLVED"
+  | "SKILL_RESOURCE_CHANGED"
   | "STAT_CHANGED"
   | "STATUS_CHANGED"
   | "ENTITY_SPAWNED"
@@ -219,6 +222,15 @@ interface EventSkillResolved {
   targetId?: number;
   targetPos?: { x: number; y: number; z: number };
   success: boolean;
+}
+
+interface EventSkillResourceChanged {
+  type: "SKILL_RESOURCE_CHANGED";
+  entityId: number;
+  skillId: string;
+  cooldown: number;
+  uses: number;
+  usesLeft?: number;
 }
 
 interface EventStatChanged {
@@ -358,6 +370,8 @@ interface EntitySnapshot {
     panicTurns?: number;
     immobileTurns?: number;
     timedLife?: number;
+    skillCooldowns?: Record<string, number>;
+    skillUses?: Record<string, number>;
   };
 }
 ```

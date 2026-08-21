@@ -46,6 +46,10 @@ export interface EntityState {
   weaponIds?: string[];
   /** Все доступные юниту активные умения. */
   skillIds?: string[];
+  /** Оставшаяся перезарядка по идентификатору умения. */
+  skillCooldowns?: Record<string, number>;
+  /** Число уже выполненных применений за текущий бой. */
+  skillUses?: Record<string, number>;
   obstacle: boolean;
   dead: boolean;
   flying: boolean;
@@ -121,6 +125,7 @@ export type GameEvent =
       heightMod: -1 | 0 | 1;
     }
   | { type: "SKILL_RESOLVED"; sourceId: number; skillId: string; targetId?: number; targetPos?: CellPos; success: boolean }
+  | { type: "SKILL_RESOURCE_CHANGED"; entityId: number; skillId: string; cooldown: number; uses: number; usesLeft?: number }
   | {
       type: "STATUS_CHANGED";
       entityId: number;
@@ -141,6 +146,8 @@ export type GameEvent =
 export type RejectReason =
   | "ILLEGAL"
   | "NO_AP"
+  | "ON_COOLDOWN"
+  | "NO_USES"
   | "NOT_YOUR_TURN"
   | "OCCUPIED"
   | "NOT_FOUND"

@@ -8,5 +8,6 @@
   resolution: "auto",
   envDmg: 0,
   filter: "all",
+  maxUsesPerBattle: 1,
   effects: [{ type: "spawn", unitId: "illusion" }],
 }

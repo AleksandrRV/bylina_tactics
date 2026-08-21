@@ -14,20 +14,39 @@ function nearest(from: { x: number; y: number }, candidates: readonly EntityStat
   return ranked[0];
 }
 
+function hasStatus(entity: EntityState, status: string): boolean {
+  if (status === "poison") return Boolean(entity.poison);
+  if (status === "panic") return Boolean(entity.panic);
+  if (status === "immobile") return Boolean(entity.immobileTurns);
+  if (status === "hidden") return Boolean(entity.hidden);
+  if (status === "flying") return Boolean(entity.flying);
+  if (status === "timed") return entity.timedLife !== undefined;
+  return false;
+}
+
+function repeatsAppliedStatus(kernel: TacticsKernel, skillId: string, target: EntityState): boolean {
+  const skill = kernel.getSkillDefinition(skillId);
+  return Boolean(skill?.effects.some((effect) => effect.type === "applyStatus" && hasStatus(target, effect.status)));
+}
+
 function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[], all: readonly EntityState[]): Command | null {
   for (const skillId of actor.skillIds ?? []) {
-    if (skillId === "poison_needles") {
-      const target = foes.find((foe) => !foe.poison && kernel.getSkillPreview(actor.id, skillId, foe.id).available);
-      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
-    } else if (skillId === "roots") {
-      const target = foes.find((foe) => !foe.immobileTurns && kernel.getSkillPreview(actor.id, skillId, foe.id).available);
-      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
-    } else if (skillId === "raise_skeleton") {
+    const skill = kernel.getSkillDefinition(skillId);
+    if (!skill) continue;
+    if (skill.effects.some((effect) => effect.type === "spawn")) {
+      if (skillId !== "raise_skeleton") continue;
       const corpse = all
         .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === "upyr")
         .sort((a, b) => a.id - b.id)
         .find((entity) => kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available);
       if (corpse) return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
+      continue;
+    }
+    if (skill.filter === "enemies") {
+      const target = foes.find((foe) =>
+        !repeatsAppliedStatus(kernel, skillId, foe) && kernel.getSkillPreview(actor.id, skillId, foe.id).available
+      );
+      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
     }
   }
   return null;
