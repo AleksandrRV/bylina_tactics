@@ -226,7 +226,9 @@ describe("0.9 will, panic, summons and displacement", () => {
     const corpse = fighter({ id: 4, owner: 1, configId: "upyr", x: 3, y: 2, dead: true, obstacle: false, hp: 0 });
     game = kernel(state(kikimora, corpse, enemy), [RAISE], [UPYR]);
     const raised = game.apply({ type: "USE_SKILL", actorId: 1, skillId: RAISE.id, targetPos: { x: 3, y: 2, z: 1 } });
-    expect(raised.ok && raised.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION")).toBe(true);
-    expect(game.getSnapshot().entities.filter((entity) => entity.configId === "upyr" && !entity.dead)).toHaveLength(1);
+    expect(raised.ok && raised.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1)).toBe(true);
+    const livingSkeletons = game.getSnapshot().entities.filter((entity) => entity.configId === "upyr" && !entity.dead);
+    expect(livingSkeletons).toHaveLength(1);
+    expect(livingSkeletons[0]?.hp).toBe(1);
   });
 });

@@ -361,6 +361,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     }
     const spawned = spawnUnitState(nextEntityId++, config, source.owner, pos.x, pos.y, tile.z, source.dir);
     spawned.countsForElimination = cause === "RESURRECTION";
+    if (cause === "RESURRECTION") spawned.hp = 1;
     state.entities.push(spawned);
     events.push({
       type: "ENTITY_SPAWNED",
