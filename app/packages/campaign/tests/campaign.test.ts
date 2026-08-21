@@ -64,6 +64,13 @@ function campaign(config: CampaignConfig = CONFIG) {
   return createCampaign(config, { unitStats: UNIT_STATS, items: ITEMS });
 }
 
+describe("createCampaign: deployment limits", () => {
+  it("reports deployMin and deployMax from the config", () => {
+    expect(campaign().getDeployLimits()).toEqual({ min: 1, max: 5 });
+    expect(campaign({ ...CONFIG, deployMin: 2, deployMax: 3 }).getDeployLimits()).toEqual({ min: 2, max: 3 });
+  });
+});
+
 describe("createCampaign: points and darkness", () => {
   it("opens only the first point and starts with zero darkness", () => {
     const state = campaign().getState();

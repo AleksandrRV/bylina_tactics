@@ -112,6 +112,8 @@ export interface CampaignApi {
   getMission(id: string): MissionConfig | undefined;
   /** Записи предметов Кузни. */
   getItems(): ItemConfig[];
+  /** Границы численности высадки из конфигурации кампании (`deployMin`, `deployMax`). */
+  getDeployLimits(): { min: number; max: number };
   /** Начать доступную миссию; возвращает false, если миссия недоступна. */
   startMission(id: string): boolean;
   /**
@@ -242,6 +244,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     getMissions: () => missions.map((mission) => ({ ...mission })),
     getMission: (id) => missions.find((mission) => mission.id === id),
     getItems: () => items.map((item) => ({ ...item, cost: { ...item.cost } })),
+    getDeployLimits: () => ({ min: config.deployMin, max: config.deployMax }),
     startMission: (id) => {
       if (state.phase !== "active" || state.activeMissionId !== null) return false;
       const point = findMission(id);

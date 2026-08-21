@@ -239,13 +239,16 @@ export function BattleScreen() {
     if (!ended || ended.type !== "MATCH_ENDED") return;
     const outcome = ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
     if (battleKind === "campaign") {
-      // Исходы бойцов высадки: сопоставление по порядку сущностей игрока.
+      // Исходы бойцов высадки: сопоставление по явной метке rosterIndex,
+      // а не по порядку идентификаторов. Метка не зависит от призывов,
+      // иллюзий и удалённых с поля сущностей (FLED/EXTRACTED).
       const final = session.getBattleSnapshot(PLAYER_OWNER);
-      const squad = final.entities
-        .filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0 && !entity.decoy)
-        .sort((a, b) => a.id - b.id);
       const participants = deployment.map((fighterId, index) => {
-        const entity = squad[index];
+        const entity = final.entities.find((candidate) =>
+          candidate.owner === PLAYER_OWNER &&
+          candidate.coverType === 0 &&
+          candidate.rosterIndex === index,
+        );
         return {
           fighterId,
           survived: Boolean(entity && !entity.dead),

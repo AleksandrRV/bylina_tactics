@@ -16,7 +16,16 @@ function pickUnit(units: SpawnUnitConfig[] | undefined, id: string): SpawnUnitCo
   return fallback;
 }
 
-export function spawnUnitState(id: number, config: SpawnUnitConfig, owner: number, x: number, y: number, z: number, dir: number): EntityState {
+export function spawnUnitState(
+  id: number,
+  config: SpawnUnitConfig,
+  owner: number,
+  x: number,
+  y: number,
+  z: number,
+  dir: number,
+  rosterIndex?: number,
+): EntityState {
   const weaponIds = [...config.weapons];
   return {
     id,
@@ -54,6 +63,7 @@ export function spawnUnitState(id: number, config: SpawnUnitConfig, owner: numbe
     overwatch: false,
     defending: false,
     movementSpent: 0,
+    rosterIndex,
   };
 }
 
@@ -132,7 +142,7 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
       throw new Error(`Deployment of ${roster.length} fighters exceeds ${players.length} player spawn cells`);
     }
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1);
+    const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1, index);
     if (entry.mods.aimMod) spawned.aim += entry.mods.aimMod;
     if (entry.mods.defenseMod) spawned.defense += entry.mods.defenseMod;
     if (entry.mods.mobilityMod) spawned.mobility = Math.max(1, spawned.mobility + entry.mods.mobilityMod);

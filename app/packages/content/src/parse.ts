@@ -153,8 +153,9 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     }
   }
   if (campaign.value) {
+    const campaignConfig = campaign.value;
     const missionIds = new Set<string>();
-    for (const mission of campaign.value.missions) {
+    for (const mission of campaignConfig.missions) {
       if (missionIds.has(mission.id)) {
         issues.push({ file: "campaign.json5", message: `duplicate mission id: ${mission.id}` });
       }
@@ -169,6 +170,33 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
           issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown general: ${generalId}` });
         }
       }
+    }
+    // Ссылки дружины: рекрут и стартовый состав обязаны существовать среди записей юнитов.
+    if (!unitIds.has(campaignConfig.recruitUnitId)) {
+      issues.push({ file: "campaign.json5", message: `unknown recruit unit: ${campaignConfig.recruitUnitId}` });
+    }
+    for (const unitId of campaignConfig.initialRoster) {
+      if (!unitIds.has(unitId)) {
+        issues.push({ file: "campaign.json5", message: `unknown initial roster unit: ${unitId}` });
+      }
+    }
+    // Согласованность финальной миссии: если в конфигурации есть миссия типа
+    // «needle», её идентификатор обязан совпадать с needleMissionId, и наоборот —
+    // точка, на которую ссылается needleMissionId, не может быть иного типа.
+    for (const mission of campaignConfig.missions) {
+      if (mission.type === "needle" && mission.id !== campaignConfig.needleMissionId) {
+        issues.push({
+          file: "campaign.json5",
+          message: `needle mission ${mission.id} does not match needleMissionId ${campaignConfig.needleMissionId}`,
+        });
+      }
+    }
+    const needlePoint = campaignConfig.missions.find((mission) => mission.id === campaignConfig.needleMissionId);
+    if (needlePoint && needlePoint.type !== "needle") {
+      issues.push({
+        file: "campaign.json5",
+        message: `needleMissionId refers to mission ${needlePoint.id} of type ${needlePoint.type}, expected "needle"`,
+      });
     }
   }
   if (pvp.value) {

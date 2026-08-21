@@ -200,7 +200,9 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
         const fighter = fighters.find((candidate) => candidate.id === fighterId);
         return Boolean(fighter?.alive);
       });
-      if (!alive || fighterIds.length < 1 || fighterIds.length > 5) return false;
+      // Границы численности высадки задаются конфигурацией кампании (content-schema §4).
+      const limits = requireCampaign().getDeployLimits();
+      if (!alive || fighterIds.length < limits.min || fighterIds.length > limits.max) return false;
       emit({ ...state, screen: "battle", deployment: [...fighterIds] });
       return true;
     },

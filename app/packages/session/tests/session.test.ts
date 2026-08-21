@@ -150,6 +150,25 @@ describe("createSession", () => {
     expect(session.confirmDeployment([999])).toBe(false);
   });
 
+  it("enforces deployMin and deployMax from the campaign config", () => {
+    const session = createSession("menu");
+    session.bindCampaign(campaign({ ...CAMPAIGN_CONFIG, deployMin: 2, deployMax: 2 }));
+    session.openCampaign();
+    session.startCampaignMission("clearing_1");
+    const fighters = session.getCampaign().getState().fighters;
+    const ids = fighters.map((fighter) => fighter.id);
+
+    // Меньше deployMin — отклоняется.
+    expect(session.confirmDeployment([ids[0]!])).toBe(false);
+    expect(session.get().screen).toBe("deployment");
+    // Больше deployMax — отклоняется.
+    expect(session.confirmDeployment(ids)).toBe(false);
+    // В границах конфигурации — принимается.
+    expect(session.confirmDeployment(ids.slice(0, 2))).toBe(true);
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().deployment).toEqual(ids.slice(0, 2));
+  });
+
   it("rejects starting a locked mission", () => {
     const session = createSession("menu");
     session.bindCampaign(campaign());

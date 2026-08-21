@@ -155,3 +155,35 @@ describe("createMissionMatch deployment size", () => {
     expect(new Set(cells).size).toBe(5);
   });
 });
+
+describe("createMissionMatch roster markers", () => {
+  it("tags deployed fighters with rosterIndex in deployment order", () => {
+    const match = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: ["bogatyr", "strelets", "znaharka"],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      seed: 46,
+    });
+    const players = livingOf(match, PLAYER_OWNER).sort((a, b) => a.id - b.id);
+    expect(players.map((entity) => entity.rosterIndex)).toEqual([0, 1, 2]);
+    const enemies = livingOf(match, ENEMY_OWNER);
+    expect(enemies.every((entity) => entity.rosterIndex === undefined)).toBe(true);
+  });
+
+  it("keeps rosterIndex stable when a fighter is removed from the field", () => {
+    const match = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: ["bogatyr", "strelets", "znaharka"],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      seed: 47,
+    });
+    // Имитация исхода FLED/EXTRACTED: первый боец удалён из состояния.
+    match.entities = match.entities.filter((entity) => entity.rosterIndex !== 0);
+    const remaining = match.entities
+      .filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0)
+      .sort((a, b) => a.id - b.id);
+    expect(remaining.map((entity) => entity.rosterIndex)).toEqual([1, 2]);
+  });
+});

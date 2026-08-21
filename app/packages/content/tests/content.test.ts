@@ -118,4 +118,44 @@ describe("parseContent", () => {
     const result = parseContent(files);
     expect(result.ok).toBe(false);
   });
+
+  it("rejects unknown recruit and initial roster units", () => {
+    const files = readDataTree();
+    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));
+    expect(campaignKey).toBeDefined();
+    if (!campaignKey) return;
+
+    const brokenRecruit = { ...files };
+    brokenRecruit[campaignKey!] = files[campaignKey]!.replace('recruitUnitId: "recruit"', 'recruitUnitId: "recruit_typo"');
+    const recruitResult = parseContent(brokenRecruit);
+    expect(recruitResult.ok).toBe(false);
+    expect(recruitResult.ok || recruitResult.issues.some((issue) => issue.message.includes("unknown recruit unit"))).toBe(true);
+
+    const brokenRoster = { ...files };
+    brokenRoster[campaignKey!] = files[campaignKey]!.replace('initialRoster: ["bogatyr", "strelets", "znaharka"]', 'initialRoster: ["bogatyr", "bogatyr_typo"]');
+    const rosterResult = parseContent(brokenRoster);
+    expect(rosterResult.ok).toBe(false);
+    expect(rosterResult.ok || rosterResult.issues.some((issue) => issue.message.includes("unknown initial roster unit"))).toBe(true);
+  });
+
+  it("rejects an inconsistent needle mission", () => {
+    const files = readDataTree();
+    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));
+    expect(campaignKey).toBeDefined();
+    if (!campaignKey) return;
+
+    // Миссия типа needle, но её id не совпадает с needleMissionId.
+    const wrongId = { ...files };
+    wrongId[campaignKey!] = files[campaignKey]!.replace('type: "purge",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 13,', 'type: "needle",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 13,');
+    const idResult = parseContent(wrongId);
+    expect(idResult.ok).toBe(false);
+    expect(idResult.ok || idResult.issues.some((issue) => issue.message.includes("does not match needleMissionId"))).toBe(true);
+
+    // needleMissionId ссылается на точку иного типа.
+    const wrongType = { ...files };
+    wrongType[campaignKey!] = files[campaignKey]!.replace('needleMissionId: "needle"', 'needleMissionId: "clearing_1"');
+    const typeResult = parseContent(wrongType);
+    expect(typeResult.ok).toBe(false);
+    expect(typeResult.ok || typeResult.issues.some((issue) => issue.message.includes("expected \"needle\""))).toBe(true);
+  });
 });
