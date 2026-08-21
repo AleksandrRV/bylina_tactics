@@ -303,7 +303,8 @@
     "equipEmpty": "No items in supply. Craft them in the Forge.",
     "equipPut": "Equip",
     "equipOn": "Equipped",
-    "equipTaken": "Worn by another"
+    "equipTaken": "Worn by another",
+    "unequip": "Unequip"
   },
   "roster": {
     "count": "Druzhina {current} of {max}",

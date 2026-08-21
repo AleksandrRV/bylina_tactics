@@ -224,6 +224,15 @@ export function DeploymentScreen() {
             <h2 id="equip-title">{t("deployment.equipFor", { name: equipTarget.name })}</h2>
             <p className="muted">{t("deployment.equipHint")}</p>
             <div className="equip-list">
+              {equipTarget.equippedItemId ? (
+                <button
+                  type="button"
+                  className="equip-unequip"
+                  onClick={() => campaign.equipItem(equipTarget.id, null)}
+                >
+                  {t("deployment.unequip")}
+                </button>
+              ) : null}
               {inventory.length === 0 ? (
                 <p className="muted equip-empty">{t("deployment.equipEmpty")}</p>
               ) : null}
