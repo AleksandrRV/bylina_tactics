@@ -29,7 +29,9 @@ describe("parseContent", () => {
     if (!result.ok) return;
     expect(result.data.units.map((unit) => unit.id).sort()).toEqual([
       "bogatyr",
+      "captive",
       "forest_beast",
+      "idol",
       "illusion",
       "kikimora",
       "leshy",
@@ -70,6 +72,7 @@ describe("parseContent", () => {
       "circular_sweep",
       "cleanse",
       "create_illusion",
+      "evacuate",
       "heal",
       "panic",
       "poison_needles",
@@ -79,6 +82,16 @@ describe("parseContent", () => {
       "summon_forest_beast",
       "teleport_ally",
     ]);
+    expect(result.data.skills.find((skill) => skill.id === "evacuate")?.extract).toBe(true);
+    expect(result.data.units.find((unit) => unit.id === "captive")?.skills).toContain("evacuate");
+    expect(result.data.campaign.missions.map((mission) => mission.type)).toEqual([
+      "purge", "purge", "purge", "purge", "purge", "destroy", "rescue", "recon",
+    ]);
+    const destroy = result.data.campaign.missions.find((mission) => mission.id === "destroy_idol_1");
+    expect(destroy?.objectiveUnitId).toBe("idol");
+    const rescue = result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1");
+    expect(rescue?.escorteeUnitId).toBe("captive");
+    expect(rescue?.map.extract).toBe(true);
     const spawnKinds = result.data.skills
       .flatMap((skill) => skill.effects.filter((effect) => effect.type === "spawn"))
       .map((effect) => (effect.type === "spawn" ? effect.spawnKind : undefined))
@@ -193,5 +206,67 @@ describe("parseContent", () => {
     const typeResult = parseContent(wrongType);
     expect(typeResult.ok).toBe(false);
     expect(typeResult.ok || typeResult.issues.some((issue) => issue.message.includes("expected \"needle\""))).toBe(true);
+  });
+});
+
+describe("parseContent mission objectives (0.13.0)", () => {
+  function missionFiles(type: string, extra: string, missionExtra = ""): Record<string, string> {
+    const files = readDataTree();
+    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"))!;
+    const campaign = files[campaignKey]!;
+    const newMission = `{
+      id: "objective_test",
+      type: "${type}",
+      ${missionExtra}
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      x: 10,
+      y: 10,
+      rewards: { gold: 1, herbs: 0, artifacts: 0 },
+      map: {
+        width: 12,
+        height: 10,
+        pitChance: 0.04,
+        coverDensity: 0.05,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.4,
+        halfCoverChance: 0.55,
+        heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+        ${extra}
+      },
+      enemies: [{ unitId: "upyr", count: 2 }],
+    },`;
+    // Вставляем миссию в массив missions перед закрывающей скобкой.
+    const idx = campaign.lastIndexOf("  ],");
+    const updated = campaign.slice(0, idx) + newMission + campaign.slice(idx);
+    files[campaignKey] = updated;
+    return files;
+  }
+
+  it("rejects destroy without objectiveUnitId", () => {
+    const result = parseContent(missionFiles("destroy", ""));
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("destroy missions require objectiveUnitId"))).toBe(true);
+  });
+
+  it("rejects rescue without escorteeUnitId", () => {
+    const result = parseContent(missionFiles("rescue", "extract: true,"));
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("rescue missions require escorteeUnitId"))).toBe(true);
+  });
+
+  it("rejects rescue and recon without an evacuation zone", () => {
+    const rescue = parseContent(missionFiles("rescue", ""));
+    expect(rescue.ok).toBe(false);
+    const recon = parseContent(missionFiles("recon", ""));
+    expect(recon.ok).toBe(false);
+    expect(recon.ok || recon.issues.some((issue) => issue.message.includes("recon missions require map.extract"))).toBe(true);
+  });
+
+  it("rejects destroy with an unknown objective unit", () => {
+    const files = missionFiles("destroy", "", 'objectiveUnitId: "idol_missing",');
+    const result = parseContent(files);
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown objective unit"))).toBe(true);
   });
 });

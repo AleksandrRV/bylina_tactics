@@ -63,7 +63,12 @@
   },
   "battle": {
     "title": "Staff clash",
-    "objective": "Destroy the dummies",
+    "objective": {
+      "purge": "Defeat all enemies",
+      "destroy": "Destroy the idol of Nav",
+      "rescue": "Lead the princess to the extraction zone",
+      "recon": "Reach the extraction zone and leave the field"
+    },
     "objectiveQuick": "Destroy all enemies",
     "enemyTurn": "The Nav advances",
     "pause": "Pause",
@@ -85,7 +90,8 @@
     "usesShort": "×{uses}",
     "toCampaignMap": "To the ship map",
     "debugAutoWin": "Finish mission",
-    "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission."
+    "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission.",
+    "saved": "Saved"
   },
   "unit": {
     "bogatyr": {
@@ -117,6 +123,12 @@
     },
     "recruit": {
       "name": "Recruit"
+    },
+    "idol": {
+      "name": "Idol of Nav"
+    },
+    "captive": {
+      "name": "Princess"
     }
   },
   "weapon": {
@@ -232,6 +244,9 @@
     },
     "teleport_ally": {
       "name": "Teleport ally"
+    },
+    "evacuate": {
+      "name": "Evacuate"
     }
   },
   "status": {
@@ -260,7 +275,10 @@
     "mapLabel": "Map of the Thrice-Ninth Kingdom",
     "mission": "Mission",
     "type": {
-      "purge": "Purge"
+      "purge": "Purge",
+      "destroy": "Destroy the idol",
+      "rescue": "Rescue",
+      "recon": "Reconnaissance"
     },
     "foes": "Enemies",
     "reward": "Reward",
@@ -284,7 +302,9 @@
     "kingdom": "The Thrice-Ninth Kingdom",
     "tabNoteSoon": "since {version}",
     "tabMap": "Map",
-    "lostRosterBody": "The druzhina has fallen: no fighter survived. The campaign is over."
+    "lostRosterBody": "The druzhina has fallen: no fighter survived. The campaign is over.",
+    "objective": "Objective",
+    "escortee": "Rescue"
   },
   "missionResult": {
     "rosterOutcomes": "Druzhina outcomes",

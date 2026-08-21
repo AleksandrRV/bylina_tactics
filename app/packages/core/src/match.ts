@@ -3,7 +3,7 @@ import { tileAt } from "./grid.js";
 import { createMulberry32 } from "./rng.js";
 import { enemySpawns, generateBattlefield, playerSpawns, QUICK_MATCH_MAP, type MapGenConfig } from "./mapgen.js";
 import { DEFAULT_TRAINING_UNITS, type SpawnUnitConfig } from "./defaults.js";
-import type { EntityState, MatchState } from "./types.js";
+import type { EntityState, Grid, MatchState, MissionObjective } from "./types.js";
 
 function pickUnit(units: SpawnUnitConfig[] | undefined, id: string): SpawnUnitConfig {
   if (units) {
@@ -100,7 +100,35 @@ export interface MissionMatchOptions {
   playerSlots: readonly (string | RosterSlot)[];
   /** Состав противников миссии: тип и число. */
   enemies: readonly { unitId: string; count: number }[];
+  /** Цель миссии: уничтожение объекта, спасение лица, разведка (0.13.0). */
+  objective?: MissionObjective;
   seed: number;
+}
+
+/** Ближайшая свободная клетка к точке (x0, y0): без ямы, стены, укрытия и сущности. */
+function freeCellNear(
+  grid: Grid,
+  covers: readonly EntityState[],
+  entities: readonly EntityState[],
+  x0: number,
+  y0: number,
+): { x: number; y: number } | null {
+  const limit = Math.max(grid.width, grid.height);
+  for (let r = 0; r < limit; r += 1) {
+    for (let dy = -r; dy <= r; dy += 1) {
+      for (let dx = -r; dx <= r; dx += 1) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const x = x0 + dx;
+        const y = y0 + dy;
+        const tile = tileAt(grid, x, y);
+        if (!tile || tile.pit || tile.blockLOS) continue;
+        if (covers.some((cover) => cover.x === x && cover.y === y)) continue;
+        if (entities.some((entity) => !entity.dead && entity.obstacle && entity.x === x && entity.y === y)) continue;
+        return { x, y };
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -133,6 +161,7 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     entities: [...generated.covers],
     rngSeed: String(options.seed >>> 0),
     rngState: String(rng.getState()),
+    objective: options.objective,
   };
 
   roster.forEach((entry, index) => {
@@ -171,6 +200,41 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
   });
+
+  // Разведка: сценарий даёт бойцам высадки действие эвакуации — любой из них
+  // может покинуть поле из зоны эвакуации (base-design §3.2, тип «Разведка»).
+  if (options.objective?.kind === "recon") {
+    for (const entity of state.entities) {
+      if (entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !(entity.skillIds ?? []).includes("evacuate")) {
+        entity.skillIds = [...(entity.skillIds ?? []), "evacuate"];
+      }
+    }
+  }
+
+  // Цель миссии: идол/строение для уничтожения у восточного края, сопровождаемый
+  // для спасения рядом с высадкой. Уникальные идентификаторы 1000/1001 не
+  // пересекаются с бойцами (1…5) и противниками (10+).
+  const objective = options.objective;
+  if (objective?.kind === "destroy") {
+    const config = pickUnit(options.units, objective.unitId);
+    const point = freeCellNear(generated.grid, generated.covers, state.entities, state.grid.width - 3, Math.floor(state.grid.height / 2));
+    if (!point) throw new Error(`No free spawn cell for objective ${objective.unitId}`);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    const idol = spawnUnitState(1000, config, 0, point.x, point.y, z, 3);
+    idol.ap = 0;
+    idol.maxAp = 0;
+    idol.countsForElimination = false;
+    state.entities.push(idol);
+  }
+  if (objective?.kind === "rescue") {
+    const config = pickUnit(options.units, objective.unitId);
+    const point = freeCellNear(generated.grid, generated.covers, state.entities, 2, Math.floor(state.grid.height / 2));
+    if (!point) throw new Error(`No free spawn cell for escortee ${objective.unitId}`);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    const escortee = spawnUnitState(1001, config, PLAYER_OWNER, point.x, point.y, z, 1);
+    escortee.countsForElimination = false;
+    state.entities.push(escortee);
+  }
   state.rngState = String(rng.getState());
   return state;
 }

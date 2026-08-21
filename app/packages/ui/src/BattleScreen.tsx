@@ -15,6 +15,7 @@ import {
   type ReachableCell,
   type RosterMods,
   type SkillStats,
+  type TacticsKernel,
   type WeaponStats,
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
@@ -98,7 +99,22 @@ export function BattleScreen() {
     return result;
   }, [content.skills]);
 
-  const kernel = useMemo(() => {
+  // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
+  // (сохранение 0.13.0) используется переданный снимок; в остальных случаях
+  // сражение строится заново по записи миссии либо режиму.
+  const [kernel] = useState<TacticsKernel>(() => {
+    const restored = session.takeRestoredBattle();
+    if (restored) {
+      const host = createTacticsKernel({
+        initial: restored.match,
+        weapons,
+        skills,
+        units: content.units,
+        fog: restored.fog,
+      });
+      session.bindTacticsHost(host);
+      return host;
+    }
     // Миссия кампании: карта и состав противников из записи точки; высадка —
     // выбранные бойцы дружины с учётом ранений и сохранённого здоровья.
     let initial: MatchState;
@@ -130,6 +146,13 @@ export function BattleScreen() {
         map: mission.map,
         playerSlots,
         enemies: mission.enemies,
+        objective: mission.type === "destroy"
+          ? { kind: "destroy", unitId: mission.objectiveUnitId! }
+          : mission.type === "rescue"
+            ? { kind: "rescue", unitId: mission.escorteeUnitId! }
+            : mission.type === "recon"
+              ? { kind: "recon" }
+              : undefined,
         seed: matchSeed || 1,
       });
     } else {
@@ -149,7 +172,7 @@ export function BattleScreen() {
     const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
     session.bindTacticsHost(host);
     return host;
-  }, [content.quickMatch, content.units, content.campaign, difficulty, battleKind, activeMissionId, deployment, matchSeed, session, skills, weapons]);
+  });
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -173,6 +196,29 @@ export function BattleScreen() {
 
   const visibleCells = useMemo(() => session.getBattleVisible(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
   const exploredCells = useMemo(() => session.getBattleExplored(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+
+  // Миссия кампании: запись точки для формулировки задачи и цели.
+  const mission = battleKind === "campaign" && activeMissionId
+    ? session.getCampaign().getMission(activeMissionId)
+    : undefined;
+  const objectiveEntity = mission
+    ? snapshot.entities.find((entity) =>
+        mission.type === "destroy"
+          ? entity.configId === mission.objectiveUnitId
+          : mission.type === "rescue"
+            ? entity.configId === mission.escorteeUnitId
+            : false,
+      )
+    : undefined;
+
+  // Уведомление о записи в начале хода стороны кампании (ui-design §8).
+  const [saveNotice, setSaveNotice] = useState(false);
+  useEffect(() => {
+    if (battleKind !== "campaign") return;
+    setSaveNotice(true);
+    const timer = window.setTimeout(() => setSaveNotice(false), 1600);
+    return () => window.clearTimeout(timer);
+  }, [snapshot.turnNumber, battleKind]);
 
   useEffect(() => {
     const first = snapshot.entities.find(isOwn);
@@ -648,12 +694,34 @@ export function BattleScreen() {
                 t("menu.quickMatch")
               )}
             </p>
-            <p>{t("battle.objectiveQuick")}</p>
+            <p>
+              {battleKind === "campaign" && mission
+                ? t(`battle.objective.${mission.type}`)
+                : t("battle.objectiveQuick")}
+            </p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
               {" · "}
               {t(sideKey)}
             </p>
+            {objectiveEntity ? (
+              <div className="objective-hud" aria-label={t("campaign.objective")}>
+                {unitPortrait(objectiveEntity.configId) ? (
+                  <img
+                    className={`objective-face${objectiveEntity.dead ? " is-dead" : ""}`}
+                    src={unitPortrait(objectiveEntity.configId)}
+                    alt=""
+                    draggable={false}
+                  />
+                ) : null}
+                <span className="objective-meta">
+                  <span className="objective-name">{t(unitNameKey(objectiveEntity.configId))}</span>
+                  <span className="objective-hp" aria-label={t("battle.hp", { current: objectiveEntity.hp, max: objectiveEntity.maxHp })}>
+                    <i style={{ width: `${Math.max(0, Math.min(100, (objectiveEntity.hp / objectiveEntity.maxHp) * 100))}%` }} />
+                  </span>
+                </span>
+              </div>
+            ) : null}
             {knownEnemies.length > 0 ? (
               <div className="enemies-strip" aria-label={t("field.sideEnemy")}>
                 {knownEnemies.map((entity) => {
@@ -704,6 +772,12 @@ export function BattleScreen() {
         </header>
 
         <div className="battle-mid">
+          {saveNotice ? (
+            <p className="save-toast" role="status" aria-live="polite">
+              <span className="save-toast-mark" aria-hidden="true">✓</span>
+              {t("battle.saved")}
+            </p>
+          ) : null}
           {log ? (
             <p className="battle-log" role="status">
               {log}

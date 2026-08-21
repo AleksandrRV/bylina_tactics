@@ -9,6 +9,8 @@ const PORTRAIT_FILES: Record<string, string> = {
   upyr: "upyr.jpg",
   leshy: "leshy.jpg",
   kikimora: "kikimora.jpg",
+  idol: "idol.jpg",
+  captive: "captive.jpg",
 };
 
 /** Абсолютный URL от baseURI документа — устойчиво к нестандартному base приложения. */

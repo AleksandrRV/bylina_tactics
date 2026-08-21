@@ -34,6 +34,9 @@ importers:
       '@bylina/settings':
         specifier: workspace:*
         version: link:../../packages/settings
+      '@bylina/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
       '@bylina/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -185,6 +188,22 @@ importers:
       typescript:
         specifier: ^5.6.3
         version: 5.9.3
+
+  packages/storage:
+    dependencies:
+      '@bylina/campaign':
+        specifier: workspace:*
+        version: link:../campaign
+      '@bylina/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      typescript:
+        specifier: ^5.6.3
+        version: 5.9.3
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.9(@types/node@22.20.1)(terser@5.50.0)
 
   packages/ui:
     dependencies:

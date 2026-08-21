@@ -3,8 +3,8 @@ import { CORE_VERSION, createTacticsKernel, makeGrid } from "../src/index.js";
 import type { EntityState } from "../src/types.js";
 
 describe("package version", () => {
-  it("is 0.12.0", () => {
-    expect(CORE_VERSION).toBe("0.12.0");
+  it("is 0.13.0", () => {
+    expect(CORE_VERSION).toBe("0.13.0");
   });
 });
 

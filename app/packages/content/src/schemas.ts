@@ -174,6 +174,10 @@ export const missionConfigSchema = z.object({
     count: z.number().int().min(1),
   }).strict()).min(1),
   generals: z.array(id).optional(),
+  /** Цель уничтожения: запись идола/строения (тип destroy, 0.13.0). */
+  objectiveUnitId: id.optional(),
+  /** Спасаемое лицо: запись сопровождаемого (тип rescue, 0.13.0). */
+  escorteeUnitId: id.optional(),
 }).strict().superRefine((value, context) => {
   const capacity = Math.max(0, 2 * (value.map.height - 2));
   const total = value.enemies.reduce((sum, entry) => sum + entry.count, 0);
@@ -182,6 +186,28 @@ export const missionConfigSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ["enemies"],
       message: `total enemy count ${total} exceeds map spawn capacity ${capacity}`,
+    });
+  }
+  if (value.type === "destroy" && value.objectiveUnitId === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["objectiveUnitId"],
+      message: "destroy missions require objectiveUnitId",
+    });
+  }
+  if (value.type === "rescue" && value.escorteeUnitId === undefined) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["escorteeUnitId"],
+      message: "rescue missions require escorteeUnitId",
+    });
+  }
+  // Зона эвакуации нужна спасению и разведке (base-design §3.2).
+  if ((value.type === "rescue" || value.type === "recon") && value.map.extract !== true) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["map", "extract"],
+      message: `${value.type} missions require map.extract = true`,
     });
   }
 });

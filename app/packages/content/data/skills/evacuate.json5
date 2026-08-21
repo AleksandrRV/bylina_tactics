@@ -1,0 +1,16 @@
+{
+  // Эвакуация из зоны выхода (base-design §3.2, math §6): юнит покидает поле
+  // из клетки с признаком зоны эвакуации. Пустой список следствий допустим
+  // только для умений с признаком extract (схема конфигурации).
+  id: "evacuate",
+  apCost: 1,
+  endsTurn: true,
+  range: 0,
+  requiresLOS: false,
+  category: "self",
+  resolution: "auto",
+  envDmg: 0,
+  extract: true,
+  cooldownTurns: 1,
+  effects: [],
+}

@@ -38,9 +38,10 @@ export function primaryAttackForEnemy(
     !target ||
     target.dead ||
     target.coverType > 0 ||
-    target.owner <= 0 ||
     target.owner === playerOwner
   ) return null;
+  // Владелец 0 — нейтральный объект миссии (идол): клик по нему включает
+  // основное оружие, как по противнику.
   const weaponId = selected.weaponId || selected.weaponIds?.[0];
   return weaponId ? { type: "weapon", id: weaponId } : null;
 }

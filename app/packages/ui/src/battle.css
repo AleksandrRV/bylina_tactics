@@ -492,6 +492,7 @@
 }
 
 .battle-mid {
+  position: relative;
   pointer-events: none;
   display: flex;
   flex-direction: column;
@@ -563,4 +564,118 @@
   border-color: var(--amber, #e0b34a);
   color: #f3ecdc;
   box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}
+
+/* Зона эвакуации и цель миссии (0.13.0) */
+
+/* HUD цели миссии: идол или спасаемое лицо в верхней панели */
+.objective-hud {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 4px 8px 4px 4px;
+  background: rgba(10, 14, 10, 0.55);
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  border-radius: 3px;
+  width: fit-content;
+}
+
+.objective-face {
+  width: 30px;
+  height: 30px;
+  border-radius: 3px;
+  object-fit: cover;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  transition: filter 300ms ease, opacity 300ms ease;
+}
+
+.objective-face.is-dead {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.objective-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 120px;
+}
+
+.objective-name {
+  font-size: 0.72rem;
+  color: var(--amber, #e0b34a);
+  letter-spacing: 0.04em;
+}
+
+.objective-hp {
+  display: block;
+  height: 5px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.objective-hp i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b8432f, #e06a3a);
+  border-radius: 3px;
+  transition: width 350ms ease;
+}
+
+.objective-hp.is-safe i {
+  background: linear-gradient(90deg, #3f8f4f, #7cc06a);
+}
+
+/* Тост сохранения партии (ui-design §8: уведомление в начале хода стороны) */
+.save-toast {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(16, 22, 16, 0.88);
+  border: 1px solid rgba(120, 190, 130, 0.5);
+  border-radius: 4px;
+  color: #cfe8c9;
+  font-size: 0.82rem;
+  letter-spacing: 0.06em;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  z-index: 60;
+  animation: save-toast-in 260ms ease-out, save-toast-out 420ms ease-in 1200ms forwards;
+  pointer-events: none;
+}
+
+.save-toast-mark {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(120, 190, 130, 0.18);
+  color: #8fd89a;
+  font-size: 0.7rem;
+}
+
+@keyframes save-toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes save-toast-out {
+  to {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
 }

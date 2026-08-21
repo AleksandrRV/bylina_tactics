@@ -1,5 +1,5 @@
 {
-  "name": "@bylina/content",
+  "name": "@bylina/storage",
   "version": "0.13.0",
   "type": "module",
   "exports": {
@@ -10,11 +10,10 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "json5": "^2.2.3",
-    "zod": "^3.24.1"
+    "@bylina/campaign": "workspace:*",
+    "@bylina/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "^22.10.2",
     "typescript": "^5.6.3",
     "vitest": "^2.1.8"
   }

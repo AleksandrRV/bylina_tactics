@@ -1,0 +1,17 @@
+{
+  // Спасаемое лицо (тип миссии rescue, 0.13.0): княжна, ожидающая вывода
+  // в зону эвакуации. Управляется игроком, не участвует в уничтожении стороны.
+  id: "captive",
+  classId: "captive",
+  side: "druzhina",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 4,
+  aim: 0,
+  defense: 0,
+  will: 20,
+  vision: 8,
+  weapons: [],
+  skills: ["evacuate"],
+  tags: [],
+}

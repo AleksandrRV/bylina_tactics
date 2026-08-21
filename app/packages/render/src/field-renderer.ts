@@ -296,6 +296,37 @@ function drawIllusion({ g, cx, cy }: TokenCtx): void {
   g.circle(cx, cy - 2, 4).fill({ color: 0xe8ffff, alpha: 0.6 });
 }
 
+/** Идол Нави: каменная стела с ликом; цель уничтожения (0.13.0). */
+function drawIdol({ g, cx, cy }: TokenCtx): void {
+  // Постамент.
+  g.roundRect(cx - 14, cy + 6, 28, 7, 2).fill({ color: 0x4a4a52, alpha: 1 }).stroke({ width: 1, color: 0x2e2e34 });
+  // Стела.
+  g.roundRect(cx - 11, cy - 14, 22, 21, 3).fill(0x5d5d66).stroke({ width: 1.2, color: 0x34343b });
+  // Лик.
+  g.circle(cx, cy - 6, 4.5).fill(0x3f3f47);
+  g.circle(cx - 1.6, cy - 7, 1).fill(0xb8b8c4);
+  g.circle(cx + 1.6, cy - 7, 1).fill(0xb8b8c4);
+  g.poly([cx - 2.6, cy - 3, cx + 2.6, cy - 3, cx, cy - 0.8]).fill(0x2c2c33);
+  // Руны по бокам.
+  g.poly([cx - 8, cy - 11, cx - 6, cy - 11, cx - 7, cy - 9]).fill(0x8a6f4a);
+  g.poly([cx + 8, cy - 11, cx + 6, cy - 11, cx + 7, cy - 9]).fill(0x8a6f4a);
+  g.poly([cx - 8, cy + 1, cx - 6, cy + 1, cx - 7, cy + 3]).fill(0x8a6f4a);
+}
+
+/** Княжна: спасаемое лицо; белая фигурка с кокошником и алой накидкой (0.13.0). */
+function drawCaptive({ g, cx, cy }: TokenCtx): void {
+  // Кокошник.
+  g.poly([cx - 7, cy - 10, cx + 7, cy - 10, cx + 5, cy - 4, cx - 5, cy - 4]).fill(0xd9b64a).stroke({ width: 0.8, color: 0x8a6f2a });
+  g.circle(cx, cy - 11, 3).fill(0xe8d9b0);
+  // Платье-колокол.
+  g.poly([cx - 8, cy - 2, cx + 8, cy - 2, cx + 11, cy + 12, cx - 11, cy + 12]).fill(0xb83a3a).stroke({ width: 0.8, color: 0x6e2222 });
+  // Пояс.
+  g.poly([cx - 8, cy - 2, cx + 8, cy - 2, cx + 8, cy + 1, cx - 8, cy + 1]).fill(0xd9b64a);
+  // Руки.
+  g.poly([cx - 10, cy + 1, cx - 13, cy + 6, cx - 10, cy + 6]).fill(0xe8d9b0);
+  g.poly([cx + 10, cy + 1, cx + 13, cy + 6, cx + 10, cy + 6]).fill(0xe8d9b0);
+}
+
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   bogatyr: drawBogatyr,
   strelets: drawStrelets,
@@ -306,6 +337,8 @@ const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   volkhv: drawVolkhv,
   forest_beast: drawForestBeast,
   illusion: drawIllusion,
+  idol: drawIdol,
+  captive: drawCaptive,
 };
 
 const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: 0x6d9a3a };
@@ -518,6 +551,7 @@ type Fx =
   | { kind: "flash"; x: number; y: number; start: number; crit: boolean; miss: boolean; angle: number }
   | { kind: "bolt"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; warm: boolean }
   | { kind: "poof"; x: number; y: number; start: number }
+  | { kind: "extract"; x: number; y: number; start: number }
   | { kind: "skill"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; style: string; success: boolean }
   | { kind: "status"; x: number; y: number; start: number; status: string; applied: boolean };
 
@@ -1248,6 +1282,22 @@ export function createFieldRenderer(): FieldRenderer {
         }
         g.circle(fx.x, fx.y - t * 12, 6 + t * 13).fill({ color: 0x2c2c28, alpha: 0.4 * (1 - t) });
         g.circle(fx.x - 4, fx.y - t * 8, 4 + t * 8).fill({ color: 0x3a3a34, alpha: 0.35 * (1 - t) });
+      } else if (fx.kind === "extract") {
+        // Эвакуация: световой столб, поднимающиеся искры и растворяющийся силуэт (0.13.0).
+        const t = (now - fx.start) / 700;
+        if (t >= 1) {
+          fxs.splice(i, 1);
+          continue;
+        }
+        const rise = t * 26;
+        g.ellipse(fx.x, fx.y - rise, 5 + t * 7, 2.4 + t * 3).fill({ color: 0xe8c96a, alpha: 0.5 * (1 - t) });
+        for (let p = 0; p < 5; p += 1) {
+          const phase = (p / 5 + t * 0.7) % 1;
+          const sway = Math.sin(phase * Math.PI * 4 + p * 2.1) * 4;
+          g.circle(fx.x + sway, fx.y - 8 - phase * 34, 1.8 * (1 - phase) + 0.6)
+            .fill({ color: 0xf2dd9a, alpha: 0.9 * (1 - phase) });
+        }
+        g.circle(fx.x, fx.y - rise * 0.4, 9 * (1 - t * 0.6)).stroke({ width: 1.6, color: 0xe8c96a, alpha: 0.8 * (1 - t) });
       }
     }
   };
@@ -1257,6 +1307,23 @@ export function createFieldRenderer(): FieldRenderer {
     const g = fxLayer;
     g.clear();
     const now = performance.now();
+
+    // Зона эвакуации: пульсирующее свечение у края поля (0.13.0).
+    // Рисуется под туманом войны: разведанные клетки зоны читаются как «выход».
+    const extractPulse = 0.5 + Math.sin(now * 0.0022) * 0.25;
+    for (const tile of view.snapshot.grid.tiles) {
+      if (!tile.extract) continue;
+      const z = visualLevel(tile);
+      const { fx, fy } = faceOf(tile.x, tile.y, z);
+      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: 0xe8c96a, alpha: 0.08 + extractPulse * 0.07 });
+      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({ width: 1.4, color: 0xe8c96a, alpha: 0.3 + extractPulse * 0.35 });
+      // Стрелка выхода по центру клетки.
+      g.poly([
+        fx + CELL_SIZE / 2, fy + 5,
+        fx + CELL_SIZE / 2 + 4, fy + 11,
+        fx + CELL_SIZE / 2 - 4, fy + 11,
+      ]).fill({ color: 0xf2dd9a, alpha: 0.5 + extractPulse * 0.3 });
+    }
 
     // Туман войны: анимированный оверлей поверх рельефа.
     if (view.visibleCells) {
@@ -1591,8 +1658,13 @@ export function createFieldRenderer(): FieldRenderer {
     if (event.type === "ENTITY_REMOVED") {
       const at = displayPixel(event.entityId);
       if (at) {
-        fxs.push({ kind: "poof", x: at.cx, y: at.cy, start: performance.now() });
-        await wait(260);
+        fxs.push({
+          kind: event.reason === "EXTRACTED" ? "extract" : "poof",
+          x: at.cx,
+          y: at.cy,
+          start: performance.now(),
+        });
+        await wait(event.reason === "EXTRACTED" ? 420 : 260);
       }
       display.delete(event.entityId);
       return;

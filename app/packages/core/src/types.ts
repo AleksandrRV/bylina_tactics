@@ -97,7 +97,22 @@ export interface MatchState {
   rngSeed?: string;
   /** Текущее ui32-состояние Mulberry32 в десятичном представлении. */
   rngState?: string;
+  /**
+   * Цель миссии кампании (типы destroy/rescue/recon, roadmap 0.13.0).
+   * destroy: уничтожить сущность записи unitId; rescue: эвакуировать указанное
+   * лицо; recon: эвакуировать хотя бы одного бойца высадки.
+   */
+  objective?: MissionObjective;
 }
+
+/**
+ * Цель миссии тактического сражения (base-design §3.2).
+ * Задаётся сценарием миссии в конфигурации кампании и проверяется ядром.
+ */
+export type MissionObjective =
+  | { kind: "destroy"; unitId: string }
+  | { kind: "rescue"; unitId: string }
+  | { kind: "recon" };
 
 export interface ReachableCell extends CellPos {
   mpCost: number;

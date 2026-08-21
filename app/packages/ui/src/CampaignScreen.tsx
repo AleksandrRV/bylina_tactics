@@ -106,6 +106,37 @@ function SwordsIcon() {
   );
 }
 
+function IdolIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 2.5h8" />
+      <path d="M7 2.5v3.5M13 2.5v3.5" />
+      <path d="M5.5 6h9l-.8 9.5h-7.4L5.5 6Z" />
+      <circle cx="10" cy="9.5" r="1.4" />
+      <path d="M8.6 12.5h2.8M10 12.5v1.8" />
+    </svg>
+  );
+}
+
+function RescueIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M10 2.5 15 4.5v4.6c0 3.4-2.2 6-5 7.4-2.8-1.4-5-4-5-7.4V4.5l5-2Z" />
+      <path d="M10 6.5v4M8 8.5h4" />
+    </svg>
+  );
+}
+
+function ReconIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2.5 10c2-4.5 4.5-6.5 7.5-6.5s5.5 2 7.5 6.5c-2 4.5-4.5 6.5-7.5 6.5S4.5 14.5 2.5 10Z" />
+      <circle cx="10" cy="10" r="2.2" />
+      <path d="M10 7.8v-2M12.2 10h2M10 12.2v2M7.8 10h-2" />
+    </svg>
+  );
+}
+
 function ShipIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -376,20 +407,36 @@ export function CampaignScreen() {
 
           <aside className="mission-panel" aria-live="polite">
             {selected && selectedPoint ? (
-              <div className={`mission-card${selectedPoint.status === "done" ? " is-done" : ""}`}>
+              <div className={`mission-card is-${selected.type}${selectedPoint.status === "done" ? " is-done" : ""}`}>
                 <div className="mission-head">
-                  <span className="mission-type-icon" aria-hidden="true">
-                    <SwordsIcon />
+                  <span className={`mission-type-icon is-${selected.type}`} aria-hidden="true">
+                    {selected.type === "destroy" ? <IdolIcon /> : selected.type === "rescue" ? <RescueIcon /> : selected.type === "recon" ? <ReconIcon /> : <SwordsIcon />}
                   </span>
                   <div>
                     <p className="mission-id">{selected.id}</p>
                     <h2 className="mission-title">
-                      {selected.type === "purge" ? t("campaign.type.purge") : selected.type}
+                      {t(`campaign.type.${selected.type}`)}
                     </h2>
                   </div>
                 </div>
                 {selectedPoint.status === "done" ? <p className="mission-status done">{t("campaign.done")}</p> : null}
                 <dl className="mission-facts">
+                  {selected.objectiveUnitId ? (
+                    <div className="fact-row">
+                      <dt>{t("campaign.objective")}</dt>
+                      <dd>
+                        <span className="foe-chip objective-chip">{t(unitName(selected.objectiveUnitId))}</span>
+                      </dd>
+                    </div>
+                  ) : null}
+                  {selected.escorteeUnitId ? (
+                    <div className="fact-row">
+                      <dt>{t("campaign.escortee")}</dt>
+                      <dd>
+                        <span className="foe-chip escortee-chip">{t(unitName(selected.escorteeUnitId))}</span>
+                      </dd>
+                    </div>
+                  ) : null}
                   <div className="fact-row">
                     <dt>{t("campaign.foes")}</dt>
                     <dd>

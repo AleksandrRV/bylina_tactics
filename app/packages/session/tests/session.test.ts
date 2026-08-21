@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.12.0", () => {
-    expect(APP_VERSION).toBe("0.12.0");
+  it("reports version 0.13.0", () => {
+    expect(APP_VERSION).toBe("0.13.0");
   });
 
   it("moves between menu and settings", () => {
@@ -255,5 +255,33 @@ describe("createSession debug auto win", () => {
   it("rejects the debug command outside a battle", () => {
     const session = createSession("menu");
     expect(session.debugAutoWinBattle()).toEqual({ ok: false, reason: "ILLEGAL" });
+  });
+});
+
+describe("createSession restored save (0.13.0)", () => {
+  it("restores a campaign battle screen from the saved state", () => {
+    const session = createSession("battle", {
+      battleKind: "campaign",
+      activeMissionId: "clearing_1",
+      deployment: [1, 2],
+      matchSeed: 7,
+      outcome: null,
+      difficulty: null,
+      paused: false,
+    });
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("campaign");
+    expect(session.get().activeMissionId).toBe("clearing_1");
+    expect(session.get().deployment).toEqual([1, 2]);
+    expect(session.get().matchSeed).toBe(7);
+  });
+
+  it("hands the restored battle to the battle screen exactly once", () => {
+    const session = createSession("battle", { battleKind: "campaign" });
+    const match = createDebugMatch();
+    session.setRestoredBattle({ match });
+    const taken = session.takeRestoredBattle();
+    expect(taken?.match).toBe(match);
+    expect(session.takeRestoredBattle()).toBeNull();
   });
 });

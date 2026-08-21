@@ -1,5 +1,6 @@
 {
-  // Кампания выпуска 0.12.0: Летучий Корабль, дружина, хозяйство.
+  // Кампания выпуска 0.13.0: Летучий Корабль, дружина, хозяйство,
+  // типы миссий «Уничтожение объекта», «Спасение», «Разведка».
   // Точки открываются сканированием (правила — поле scan); финальная миссия
   // «Игла» появится на этапе 5.
   rosterCap: 8,
@@ -129,6 +130,82 @@
       enemies: [
         { unitId: "upyr", count: 4 },
         { unitId: "leshy", count: 2 },
+      ],
+    },
+    {
+      // Уничтожение идола: цель задаётся сценарием миссии (0.13.0).
+      id: "destroy_idol_1",
+      type: "destroy",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 5,
+      x: 24,
+      y: 78,
+      rewards: { gold: 16, herbs: 5, artifacts: 1 },
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.05,
+        coverDensity: 0.07,
+        wallDensity: 0.03,
+        edgeCoverChance: 0.45,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+      },
+      objectiveUnitId: "idol",
+      enemies: [
+        { unitId: "upyr", count: 3 },
+        { unitId: "leshy", count: 1 },
+      ],
+    },
+    {
+      // Спасение княжны: вывести сопровождаемого в зону эвакуации (0.13.0).
+      id: "rescue_captive_1",
+      type: "rescue",
+      darknessOnVictory: 3,
+      darknessOnDefeat: 5,
+      x: 47,
+      y: 18,
+      rewards: { gold: 18, herbs: 6, artifacts: 1 },
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.04,
+        coverDensity: 0.07,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.4,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+        extract: true,
+      },
+      escorteeUnitId: "captive",
+      enemies: [
+        { unitId: "upyr", count: 3 },
+        { unitId: "kikimora", count: 1 },
+      ],
+    },
+    {
+      // Разведка: хотя бы один боец достигает зоны и эвакуируется (0.13.0).
+      id: "recon_route_1",
+      type: "recon",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      x: 71,
+      y: 82,
+      rewards: { gold: 14, herbs: 5, artifacts: 1 },
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.05,
+        coverDensity: 0.08,
+        wallDensity: 0.03,
+        edgeCoverChance: 0.45,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        extract: true,
+      },
+      enemies: [
+        { unitId: "upyr", count: 4 },
+        { unitId: "leshy", count: 1 },
       ],
     },
   ],

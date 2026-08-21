@@ -1,0 +1,17 @@
+{
+  // Идол Нави: объект уничтожения (тип миссии destroy, 0.13.0).
+  // В бою занимает клетку, не ходит и не атакует (ядро снимает ОД при спавне).
+  id: "idol",
+  classId: "idol",
+  side: "nav",
+  maxHealth: 14,
+  maxAP: 1,
+  mobility: 1,
+  aim: 0,
+  defense: 0,
+  will: 0,
+  vision: 0,
+  weapons: [],
+  skills: [],
+  tags: [],
+}

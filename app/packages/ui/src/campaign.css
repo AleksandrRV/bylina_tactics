@@ -1883,3 +1883,75 @@
     animation: none !important;
   }
 }
+
+/* Типы миссий 0.13.0: цветовой акцент иконок и карточек */
+.mission-type-icon.is-destroy {
+  color: #d97a4a;
+  border-color: rgba(217, 122, 74, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33241c, #1c1410);
+}
+
+.mission-type-icon.is-rescue {
+  color: #d96a6a;
+  border-color: rgba(217, 106, 106, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33201e, #1c1010);
+}
+
+.mission-type-icon.is-recon {
+  color: #7ab8d9;
+  border-color: rgba(122, 184, 217, 0.55);
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.mission-card.is-destroy {
+  border-top-color: rgba(217, 122, 74, 0.5);
+}
+
+.mission-card.is-rescue {
+  border-top-color: rgba(217, 106, 106, 0.5);
+}
+
+.mission-card.is-recon {
+  border-top-color: rgba(122, 184, 217, 0.5);
+}
+
+.objective-chip,
+.escortee-chip {
+  border-color: rgba(224, 179, 74, 0.45);
+  color: #e8cf9a;
+}
+
+/* Полировка 0.13.0: волна-кольцо у открытых миссий и мягкий подъём карточки */
+.map-marker.is-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  animation: marker-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes marker-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.mission-card {
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+}
+
+.mission-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}

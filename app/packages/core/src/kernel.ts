@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.12.0";
+export const CORE_VERSION = "0.13.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -30,6 +30,8 @@ export interface KernelOptions {
   skills?: Record<string, SkillStats>;
   units?: SpawnUnitConfig[];
   seed?: number;
+  /** Восстановленный туман войны (сохранение партии, версия 0.13.0). */
+  fog?: FogState;
 }
 
 export interface TacticsKernel {
@@ -45,6 +47,8 @@ export interface TacticsKernel {
   getSkillDefinition(skillId: string): SkillStats | undefined;
   getVisibleCells(owner: number): Set<string>;
   getExploredCells(owner: number): Set<string>;
+  /** Полный туман войны всех сторон (для сохранения партии). */
+  getFog(): FogState;
   apply(command: Command): ApplyResult;
   /**
    * Отладочная автопобеда (только для разработки и QA): мгновенно уничтожает
@@ -59,6 +63,7 @@ function cloneState(state: MatchState): MatchState {
   return {
     turnNumber: state.turnNumber,
     activeOwner: state.activeOwner,
+    objective: state.objective ? { ...state.objective } : undefined,
     grid: {
       width: state.grid.width,
       height: state.grid.height,
@@ -153,7 +158,20 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const listeners = new Set<() => void>();
   const owners = [...new Set(state.entities.filter((entity) => entity.owner > 0).map((entity) => entity.owner))];
   const fog: FogState = createFogState(state, owners);
+  // Восстановление сохранённой партии: туман войны переносится из снимка.
+  if (options.fog) {
+    for (const rawOwner of Object.keys(options.fog)) {
+      const owner = Number(rawOwner);
+      const entry = options.fog[owner];
+      if (entry && fog[owner]) {
+        fog[owner].explored = entry.explored;
+        fog[owner].visible = entry.visible;
+      }
+    }
+  }
   let ended = false;
+  /** Победа по цели миссии (эвакуация при rescue/recon), фиксируется ядром. */
+  let objectiveVictory = false;
   const eliminationEnabled = [PLAYER_OWNER, ENEMY_OWNER].every((owner) =>
     state.entities.some((entity) => !entity.dead && entity.owner === owner && entity.coverType === 0)
   );
@@ -473,8 +491,58 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const appendOutcome = (events: GameEvent[]): void => {
     if (ended || !eliminationEnabled) return;
+    const objective = state.objective;
     const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
     const enemies = state.entities.some((entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
+
+    // Уничтожение объекта: победа при гибели указанного идола/строения,
+    // независимо от оставшихся противников (base-design §3.2).
+    if (objective?.kind === "destroy") {
+      const targetAlive = state.entities.some((entity) => !entity.dead && entity.configId === objective.unitId);
+      if (!targetAlive) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+        return;
+      }
+      if (!players) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(ENEMY_OWNER), reason: "ELIMINATION" });
+      }
+      return;
+    }
+
+    // Спасение: победа — эвакуация указанного лица; поражение — его гибель
+    // либо гибель всех бойцов высадки. Эвакуированная сущность удалена с поля,
+    // погибшая остаётся с признаком гибели.
+    if (objective?.kind === "rescue") {
+      if (objectiveVictory) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+        return;
+      }
+      const escortee = state.entities.find((entity) => entity.configId === objective.unitId);
+      if (escortee?.dead || !players) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(ENEMY_OWNER), reason: "OBJECTIVE" });
+      }
+      return;
+    }
+
+    // Разведка: победа — эвакуация хотя бы одного бойца высадки; остальные
+    // могут остаться. Поражение — гибель всех бойцов.
+    if (objective?.kind === "recon") {
+      if (objectiveVictory) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+        return;
+      }
+      if (!players) {
+        ended = true;
+        events.push({ type: "MATCH_ENDED", winnerPlayerId: String(ENEMY_OWNER), reason: "ELIMINATION" });
+      }
+      return;
+    }
+
     if (players && enemies) return;
     ended = true;
     events.push({
@@ -938,6 +1006,19 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     getSkillDefinition: (skillId) => skills[skillId],
     getVisibleCells: (owner) => new Set(fog[owner]?.visible ?? []),
     getExploredCells: (owner) => new Set(fog[owner]?.explored ?? []),
+    getFog: () => {
+      const copy: FogState = {};
+      for (const rawOwner of Object.keys(fog)) {
+        const owner = Number(rawOwner);
+        const entry = fog[owner];
+        if (!entry) continue;
+        copy[owner] = {
+          explored: new Set(entry.explored),
+          visible: new Set(entry.visible),
+        };
+      }
+      return copy;
+    },
     apply: (command) => {
       if (ended) return { ok: false, reason: "ILLEGAL" };
 
@@ -1127,13 +1208,20 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
         // §6 math: извлечение — умение с признаком extract; юнит покидает поле
         // из клетки зоны эвакуации. Событие ENTITY_REMOVED (EXTRACTED).
-        // Эвакуация не запускает исход по уничтожению: завершение миссии
-        // (успех спасения/разведки) определяется слоем кампании.
+        // Исход миссии: спасение — эвакуация указанного лица, разведка —
+        // эвакуация бойца высадки (base-design §3.2).
         if (skill.extract) {
           const tile = tileAt(state.grid, actor.x, actor.y);
           if (!tile?.extract) return { ok: false, reason: "ILLEGAL" };
           removeEntity(actor, "EXTRACTED", events);
           success = true;
+          const objective = state.objective;
+          if (objective?.kind === "recon" && actor.owner === PLAYER_OWNER && actor.countsForElimination !== false) {
+            objectiveVictory = true;
+          }
+          if (objective?.kind === "rescue" && actor.configId === objective.unitId) {
+            objectiveVictory = true;
+          }
         } else if (skill.detectsHidden && preview.targetPos) {
           const radius = skill.radius ?? 0;
           for (const hidden of state.entities
@@ -1207,7 +1295,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
         });
         spendAction(actor, skill.apCost, skill.endsTurn, events);
-        if (!skill.extract) appendOutcome(events);
+        appendOutcome(events);
         emit();
         return { ok: true, events };
       }

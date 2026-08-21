@@ -170,6 +170,26 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
           issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown general: ${generalId}` });
         }
       }
+      if (mission.objectiveUnitId !== undefined && !unitIds.has(mission.objectiveUnitId)) {
+        issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown objective unit: ${mission.objectiveUnitId}` });
+      }
+      if (mission.escorteeUnitId !== undefined && !unitIds.has(mission.escorteeUnitId)) {
+        issues.push({ file: "campaign.json5", message: `mission ${mission.id}: unknown escortee unit: ${mission.escorteeUnitId}` });
+      }
+      // Спасаемое лицо обязано уметь эвакуироваться (умение с признаком extract),
+      // иначе миссия спасения невыполнима.
+      if (mission.escorteeUnitId !== undefined) {
+        const escortee = units.find((unit) => unit.id === mission.escorteeUnitId);
+        const hasExtractSkill = escortee?.skills.some((skillId) =>
+          skills.find((skill) => skill.id === skillId)?.extract === true
+        );
+        if (!hasExtractSkill) {
+          issues.push({
+            file: "campaign.json5",
+            message: `mission ${mission.id}: escortee ${mission.escorteeUnitId} lacks an extract skill`,
+          });
+        }
+      }
     }
     // Ссылки дружины: рекрут и стартовый состав обязаны существовать среди записей юнитов.
     if (!unitIds.has(campaignConfig.recruitUnitId)) {

@@ -56,6 +56,7 @@ export type {
   GameEvent,
   Grid,
   MatchState,
+  MissionObjective,
   ReachableCell,
   RejectReason,
   Tile,

@@ -158,6 +158,8 @@ export interface CampaignOptions {
   unitStats?: Record<string, { maxHealth: number }>;
   /** Записи предметов Кузни (из модуля содержания). */
   items?: ItemConfig[];
+  /** Восстановленное состояние кампании (сохранение, версия 0.13.0). */
+  initialState?: CampaignState;
 }
 
 export function createCampaign(config: CampaignConfig, options: CampaignOptions = {}): CampaignApi {
@@ -167,8 +169,11 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   const initialRoster = config.initialRoster.length > 0
     ? config.initialRoster
     : ["bogatyr", "strelets", "znaharka"];
-  let nextFighterId = 1;
-  let nameCursor = 0;
+  // Восстановление сохранённой кампании (0.13.0): счётчики идентификаторов
+  // и имён переносятся из состояния, чтобы новые бойцы не конфликтовали
+  // с уже существующими.
+  let nextFighterId = options.initialState ? Math.max(0, ...options.initialState.fighters.map((fighter) => fighter.id)) + 1 : 1;
+  let nameCursor = options.initialState?.fighters.length ?? 0;
 
   const makeFighter = (unitId: string, level: number, hp?: number): FighterState => {
     const maxHp = hpOf(unitId);
@@ -189,7 +194,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   };
 
   const firstMission = missions[0];
-  const state: CampaignState = {
+  const freshState: CampaignState = {
     darkness: 0,
     darknessMax: config.darknessMax,
     phase: "active",
@@ -204,6 +209,18 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     activeMissionId: null,
     lastResult: null,
   };
+  const state: CampaignState = options.initialState
+    ? {
+        ...options.initialState,
+        darknessMax: config.darknessMax,
+        resources: { ...options.initialState.resources },
+        inventory: [...options.initialState.inventory],
+        shipPosition: { ...options.initialState.shipPosition },
+        missions: options.initialState.missions.map((mission) => ({ ...mission })),
+        fighters: options.initialState.fighters.map((fighter) => ({ ...fighter })),
+        lastResult: options.initialState.lastResult ? { ...options.initialState.lastResult } : null,
+      }
+    : freshState;
   const listeners = new Set<() => void>();
 
   const emit = (): void => {
