@@ -188,6 +188,9 @@ export function generateBattlefield(
       const coverType = edge !== undefined
         ? (rng.nextInt(1, 100) <= 60 ? 1 : 2) as 1 | 2
         : rng.nextInt(1, 2) as 1 | 2;
+      // Граневые укрытия НЕ занимают клетку (obstacle: false).
+      // Они влияют только на проход через конкретную грань.
+      const occupiesCell = edge === undefined;
 
       covers.push({
         id: 200 + covers.length,
@@ -206,7 +209,7 @@ export function generateBattlefield(
         defense: 0,
         vision: 0,
         weaponId: "",
-        obstacle: true,
+        obstacle: occupiesCell,
         dead: false,
         flying: false,
         coverType,

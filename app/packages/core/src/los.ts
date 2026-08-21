@@ -171,11 +171,24 @@ export function evaluateObstacles(
     }
 
     // Перепад высот: rz < tile.z → поверхность прерывает луч.
+    // Но если перепад ровно 1 ярус — считаем полуукрытием (§7.3).
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
     if (rz < tile.z) {
-      blocked = true;
-      breakCell = { x: cell.x, y: cell.y, z: tile.z };
-      break;
+      const heightDiff = tile.z - rz;
+      if (heightDiff > 1.01) {
+        // Перепад более 1 яруса — полная блокировка.
+        blocked = true;
+        breakCell = { x: cell.x, y: cell.y, z: tile.z };
+        break;
+      } else {
+        // Перепад ровно 1 ярус — полуукрытие (штраф −25).
+        // Учитываем как промежуточное укрытие.
+        if (cell.type === "full") {
+          maxPenalty = Math.max(maxPenalty, 50); // полное пересечение полуукрытия = -50
+        } else {
+          maxPenalty = Math.max(maxPenalty, 25); // касательное полуукрытие = -25
+        }
+      }
     }
 
     // Стена (blockLOS) = полное укрытие (§7.2).

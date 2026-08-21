@@ -841,7 +841,7 @@ export function createFieldRenderer(): FieldRenderer {
       }
     }
 
-    // Линия прицеливания: сплошная до точки разрыва, затем пунктир.
+    // Линия прицеливания: всегда прямая от A к Ц, меняет стиль в точке препятствия.
     const selected = view.snapshot.entities.find((entity) => entity.id === view?.selectedId);
     const aimed = view.snapshot.entities.find((entity) => entity.id === view?.aimId);
     if (selected && aimed && !selected.dead && !aimed.dead) {
@@ -849,28 +849,45 @@ export function createFieldRenderer(): FieldRenderer {
       const b = entityPixel(aimed);
       const color = view.aimOk ? 0xe8b64c : 0xc45c5c;
 
+      // Вычислить точку разрыва на прямой A→Ц.
+      let breakRatio = 1; // 1 = нет разрыва
       if (view.aimBreakCell) {
+        // Точка препятствия: центр клетки breakCell, спроецированный на прямую A→Ц.
         const breakTile = view.snapshot.grid.tiles.find((t) => t.x === view!.aimBreakCell!.x && t.y === view!.aimBreakCell!.y);
         const breakZ = visualLevel(breakTile ?? ({ pit: false, z: 0 } as Tile));
-        const bp = centerOf(view.aimBreakCell.x, view.aimBreakCell.y, breakZ);
-        // Сплошная часть до точки разрыва.
-        g.moveTo(a.cx, a.cy).lineTo(bp.cx, bp.cy).stroke({ width: 2, color, alpha: 0.85 });
+        const bc = centerOf(view.aimBreakCell.x, view.aimBreakCell.y, breakZ);
+        // Проекция breakCell центра на прямую A→Ц.
+        const abx = b.cx - a.cx;
+        const aby = b.cy - a.cy;
+        const abLen2 = abx * abx + aby * aby;
+        if (abLen2 > 1) {
+          const t = Math.max(0, Math.min(1, ((bc.cx - a.cx) * abx + (bc.cy - a.cy) * aby) / abLen2));
+          breakRatio = t;
+        }
+      }
+
+      if (breakRatio < 1) {
+        // Точка разрыва на прямой.
+        const bx = a.cx + (b.cx - a.cx) * breakRatio;
+        const by = a.cy + (b.cy - a.cy) * breakRatio;
+        // Сплошная часть.
+        g.moveTo(a.cx, a.cy).lineTo(bx, by).stroke({ width: 2, color, alpha: 0.85 });
         // Пунктирная часть от разрыва до цели.
-        const dx = b.cx - bp.cx;
-        const dy = b.cy - bp.cy;
+        const dx = b.cx - bx;
+        const dy = b.cy - by;
         const len = Math.hypot(dx, dy);
         const dashLen = 6;
         const gapLen = 5;
-        const steps = Math.floor(len / (dashLen + gapLen));
+        const steps = Math.max(1, Math.floor(len / (dashLen + gapLen)));
         const ux = dx / (len || 1);
         const uy = dy / (len || 1);
         let pos = 0;
         for (let i = 0; i < steps; i += 1) {
-          const x0 = bp.cx + ux * pos;
-          const y0 = bp.cy + uy * pos;
+          const x0 = bx + ux * pos;
+          const y0 = by + uy * pos;
           pos += dashLen;
-          const x1 = bp.cx + ux * Math.min(pos, len);
-          const y1 = bp.cy + uy * Math.min(pos, len);
+          const x1 = bx + ux * Math.min(pos, len);
+          const y1 = by + uy * Math.min(pos, len);
           g.moveTo(x0, y0).lineTo(x1, y1).stroke({ width: 1.5, color, alpha: 0.4 });
           pos += gapLen;
           if (pos >= len) break;
