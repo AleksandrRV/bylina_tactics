@@ -324,6 +324,15 @@ export function BattleScreen() {
     return null;
   }, [hit, selected, aimed]);
 
+  const hoverCell = useMemo(() => {
+    if (!preview) return null;
+    const [xs, ys] = preview.split(",");
+    const x = Number(xs);
+    const y = Number(ys);
+    const tile = snapshot.grid.tiles.find((t) => t.x === x && t.y === y);
+    return { x, y, z: tile?.z ?? 0 };
+  }, [preview, snapshot.grid]);
+
   useEffect(() => {
     rendererRef.current?.update({
       snapshot,
@@ -337,8 +346,9 @@ export function BattleScreen() {
       visibleCells,
       exploredCells,
       aimBreakCell,
+      hoverCell,
     });
-  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell]);
+  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

@@ -28,6 +28,8 @@ export interface FieldView {
   exploredCells?: Set<string>;
   /** Клетка, до которой линия прицеливания сплошная (препятствие или макс. дальность). */
   aimBreakCell?: CellPos | null;
+  /** Клетка, над которой сейчас курсор (для подсветки защиты при перемещении). */
+  hoverCell?: CellPos | null;
 }
 
 export interface FieldRenderer {
@@ -266,6 +268,80 @@ const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, n
 /** Деревянная завала-укрытие: полубрус (1) или высокий сруб (2). */
 /** Смещение для граневых укрытий: N=0, E=1, S=2, W=3. */
 const EDGE_OFFSET: [number, number][] = [[0, -14], [14, 0], [0, 14], [-14, 0]];
+const C = CELL_SIZE;
+const HALF = C / 2;
+
+/**
+ * Граневое укрытие: бревна вдоль всей грани клетки.
+ * N/S — горизонтальные, E/W — вертикальные.
+ */
+function drawEdgeCover(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  coverType: 1 | 2,
+  edge: 0 | 1 | 2 | 3,
+): void {
+  const isHorizontal = edge === 0 || edge === 2;
+  const length = C - 4; // длина бревна (чуть меньше клетки)
+  const thick = coverType === 2 ? 10 : 6; // толщина
+  const logColor = coverType === 2 ? 0x7a5a32 : 0xa08050;
+  const logStroke = coverType === 2 ? 0x3a2a18 : 0x5a4a38;
+  const endColor = coverType === 2 ? 0xb28a58 : 0xc4a870;
+  const endStroke = 0x4a3a28;
+  const endDot = 0x6b4f2a;
+
+  // Позиция: на грани клетки.
+  let bx: number, by: number, bw: number, bh: number;
+  if (edge === 0) { bx = cx - HALF + 2; by = cy - HALF - thick / 2; bw = length; bh = thick; }
+  else if (edge === 2) { bx = cx - HALF + 2; by = cy + HALF - thick / 2; bw = length; bh = thick; }
+  else if (edge === 1) { bx = cx + HALF - thick / 2; by = cy - HALF + 2; bw = thick; bh = length; }
+  else { bx = cx - HALF - thick / 2; by = cy - HALF + 2; bw = thick; bh = length; }
+
+  if (isHorizontal) {
+    // Горизонтальное бревно.
+    g.roundRect(bx, by, bw, bh, thick / 3).fill(logColor);
+    g.roundRect(bx, by, bw, bh, thick / 3).stroke({ width: 0.8, color: logStroke });
+    // Торцы (кругляши).
+    const er = thick / 2 - 0.5;
+    g.circle(bx + er + 0.5, by + thick / 2, er).fill(endColor);
+    g.circle(bx + er + 0.5, by + thick / 2, er).stroke({ width: 0.6, color: endStroke });
+    g.circle(bx + er + 0.5, by + thick / 2, er).fill(endDot);
+    g.circle(bx + bw - er - 0.5, by + thick / 2, er).fill(endColor);
+    g.circle(bx + bw - er - 0.5, by + thick / 2, er).stroke({ width: 0.6, color: endStroke });
+    g.circle(bx + bw - er - 0.5, by + thick / 2, er).fill(endDot);
+    // Второе бревно для полного укрытия.
+    if (coverType === 2) {
+      const by2 = edge === 0 ? by - thick + 1 : by + thick - 1;
+      g.roundRect(bx, by2, bw, bh, thick / 3).fill(logColor);
+      g.roundRect(bx, by2, bw, bh, thick / 3).stroke({ width: 0.8, color: logStroke });
+      g.circle(bx + er + 0.5, by2 + thick / 2, er).fill(endColor);
+      g.circle(bx + er + 0.5, by2 + thick / 2, er).stroke({ width: 0.6, color: endStroke });
+      g.circle(bx + bw - er - 0.5, by2 + thick / 2, er).fill(endColor);
+      g.circle(bx + bw - er - 0.5, by2 + thick / 2, er).stroke({ width: 0.6, color: endStroke });
+    }
+  } else {
+    // Вертикальное бревно.
+    g.roundRect(bx, by, bw, bh, thick / 3).fill(logColor);
+    g.roundRect(bx, by, bw, bh, thick / 3).stroke({ width: 0.8, color: logStroke });
+    const er = thick / 2 - 0.5;
+    g.circle(bx + thick / 2, by + er + 0.5, er).fill(endColor);
+    g.circle(bx + thick / 2, by + er + 0.5, er).stroke({ width: 0.6, color: endStroke });
+    g.circle(bx + thick / 2, by + er + 0.5, er).fill(endDot);
+    g.circle(bx + thick / 2, by + bh - er - 0.5, er).fill(endColor);
+    g.circle(bx + thick / 2, by + bh - er - 0.5, er).stroke({ width: 0.6, color: endStroke });
+    g.circle(bx + thick / 2, by + bh - er - 0.5, er).fill(endDot);
+    if (coverType === 2) {
+      const bx2 = edge === 1 ? bx + thick - 1 : bx - thick + 1;
+      g.roundRect(bx2, by, bw, bh, thick / 3).fill(logColor);
+      g.roundRect(bx2, by, bw, bh, thick / 3).stroke({ width: 0.8, color: logStroke });
+      g.circle(bx2 + thick / 2, by + er + 0.5, er).fill(endColor);
+      g.circle(bx2 + thick / 2, by + er + 0.5, er).stroke({ width: 0.6, color: endStroke });
+      g.circle(bx2 + thick / 2, by + bh - er - 0.5, er).fill(endColor);
+      g.circle(bx2 + thick / 2, by + bh - er - 0.5, er).stroke({ width: 0.6, color: endStroke });
+    }
+  }
+}
 
 function drawCover(
   g: Graphics,
@@ -274,33 +350,25 @@ function drawCover(
   coverType: 1 | 2,
   edge?: 0 | 1 | 2 | 3,
 ): void {
-  // Граневое укрытие: сместить к грани клетки.
-  let ox = 0;
-  let oy = 0;
   if (edge !== undefined) {
-    const [dx, dy] = EDGE_OFFSET[edge]!;
-    ox = dx;
-    oy = dy;
+    drawEdgeCover(g, cx, cy, coverType, edge);
+    return;
   }
-  const px = cx + ox;
-  const py = cy + oy;
-
-  // Тень.
+  // Целоклеточное укрытие.
+  const px = cx;
+  const py = cy;
   g.ellipse(px, py + 11, 15, 4.5).fill({ color: 0x000000, alpha: 0.3 });
 
   if (coverType === 1) {
-    // Полуукрытие: низкий брус, светлее и компактнее.
     const ly = py + 4;
     g.roundRect(px - 11, ly - 3.5, 22, 7, 3.5).fill(0xa08050);
     g.roundRect(px - 11, ly - 3.5, 22, 7, 3.5).stroke({ width: 0.8, color: 0x4a3a28 });
     g.circle(px - 8, ly, 2.5).fill(0xc4a870);
     g.circle(px - 8, ly, 2.5).stroke({ width: 0.6, color: 0x4a3a28 });
     g.circle(px - 8, ly, 0.9).fill(0x6b4f2a);
-    // Верхняя доска.
     g.roundRect(px - 9, ly - 6, 18, 3.5, 1.8).fill(0xb89060);
     g.roundRect(px - 9, ly - 6, 18, 3.5, 1.8).stroke({ width: 0.6, color: 0x4a3a28 });
   } else {
-    // Полное укрытие: три бревна, высокий сруб.
     for (let i = 0; i < 3; i += 1) {
       const ly = py + 6 - i * 6;
       g.roundRect(px - 13, ly - 4.4, 26, 8.8, 4.2).fill(0x8a6a42);
@@ -314,15 +382,28 @@ function drawCover(
       .stroke({ width: 2.2, color: 0x6b4f2a });
     g.poly([px + 11, py - 14, px + 9, py - 11.6, px + 12.4, py - 11.4]).fill(0x3a2a18);
   }
+}
 
-  // Метка грани: тонкая полоска-индикатор у граневых укрытий.
-  if (edge !== undefined) {
-    const markColor = coverType === 2 ? 0xe8b64c : 0x8fd0ff;
-    if (edge === 0) g.rect(px - 8, py - 18, 16, 2).fill({ color: markColor, alpha: 0.6 });
-    if (edge === 2) g.rect(px - 8, py + 16, 16, 2).fill({ color: markColor, alpha: 0.6 });
-    if (edge === 1) g.rect(px + 16, py - 8, 2, 16).fill({ color: markColor, alpha: 0.6 });
-    if (edge === 3) g.rect(px - 18, py - 8, 2, 16).fill({ color: markColor, alpha: 0.6 });
-  }
+/**
+ * Подсветка защищённой грани: рисуется на грани клетки, ближе к персонажу.
+ * Полуукрытие — голубой, полное — янтарный.
+ */
+function drawProtectionEdge(
+  g: Graphics,
+  cx: number,
+  cy: number,
+  edge: 0 | 1 | 2 | 3,
+  coverType: 1 | 2,
+): void {
+  const color = coverType === 2 ? 0xe8b64c : 0x60c8ff;
+  const len = C - 8;
+  const thick = 3;
+  // Смещение ближе к центру клетки (к персонажу).
+  const inset = 6;
+  if (edge === 0) g.rect(cx - len / 2, cy - HALF + inset, len, thick).fill({ color, alpha: 0.55 });
+  if (edge === 2) g.rect(cx - len / 2, cy + HALF - inset - thick, len, thick).fill({ color, alpha: 0.55 });
+  if (edge === 1) g.rect(cx + HALF - inset - thick, cy - len / 2, thick, len).fill({ color, alpha: 0.55 });
+  if (edge === 3) g.rect(cx - HALF + inset, cy - len / 2, thick, len).fill({ color, alpha: 0.55 });
 }
 
 /** Могильная отметина павшего: камешки и череп. */
@@ -420,6 +501,81 @@ export function createFieldRenderer(): FieldRenderer {
    * Привязка указателя к клетке: учитывает поднятую грань и откос под ней.
    * Ряды обходятся снизу вверх — в зоне наложения видна грань южной клетки.
    */
+  /**
+   * Подсветка защищённых граней для сущности: проверяет соседние укрытия
+   * и рисует цветную полоску на общей грани.
+   */
+  const drawProtectionHighlights = (g: Graphics, entity: EntityState, v: FieldView): void => {
+    for (const cover of v.snapshot.entities) {
+      if (!cover || cover.dead || cover.coverType === 0 || cover.edge === undefined) continue;
+      const dx = cover.x - entity.x;
+      const dy = cover.y - entity.y;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
+      if (dx === 0 && dy === 0) continue;
+      // Определить общую грань.
+      let sharedEdge: 0 | 1 | 2 | 3 | null = null;
+      if (dx === 0 && dy === -1) sharedEdge = 0; // cover is north
+      if (dx === 1 && dy === 0) sharedEdge = 1;  // cover is east
+      if (dx === 0 && dy === 1) sharedEdge = 2;  // cover is south
+      if (dx === -1 && dy === 0) sharedEdge = 3; // cover is west
+      if (sharedEdge === null) continue;
+      // Проверить, что укрытие на правильной грани (смотрит на entity).
+      const oppositeEdge = (sharedEdge + 2) % 4;
+      if (cover.edge !== oppositeEdge && cover.edge !== sharedEdge) continue;
+      // Если укрытие в соседней клетке и его edge = sharedEdge (грань смотрит ОТ entity),
+      // или укрытие в клетке entity и его edge = oppositeEdge — не подходит.
+      // Правильно: укрытие в соседней клетке, edge = oppositeEdge (грань смотрит НА entity).
+      // ИЛИ укрытие в клетке entity, edge = sharedEdge (грань смотрит на соседа).
+      const isAdjacentCover = (dx !== 0 || dy !== 0) && cover.edge === oppositeEdge;
+      const isSameCellCover = (dx === 0 && dy === 0);
+      if (!isAdjacentCover && !isSameCellCover) continue;
+      const { cx, cy } = centerOf(entity.x, entity.y, entity.z);
+      drawProtectionEdge(g, cx, cy, sharedEdge, cover.coverType as 1 | 2);
+    }
+  };
+
+  /**
+   * Маркеры пересечения луча прицеливания с укрытиями.
+   * Рисует ромб в точке пересечения луча с гранью укрытия.
+   */
+  const drawAimIntersections = (g: Graphics, v: FieldView): void => {
+    const sel = v.snapshot.entities.find((e) => e.id === v.selectedId);
+    const aim = v.snapshot.entities.find((e) => e.id === v.aimId);
+    if (!sel || !aim || sel.dead || aim.dead) return;
+    const a = centerOf(sel.x, sel.y, sel.z);
+    const b = centerOf(aim.x, aim.y, aim.z);
+    const abx = b.cx - a.cx;
+    const aby = b.cy - a.cy;
+    const abLen = Math.hypot(abx, aby);
+    if (abLen < 1) return;
+
+    for (const cover of v.snapshot.entities) {
+      if (!cover || cover.dead || cover.coverType === 0) continue;
+      // Только укрытия на пути луча.
+      const cc = centerOf(cover.x, cover.y, cover.z);
+      // Проекция центра укрытия на луч.
+      const t = ((cc.cx - a.cx) * abx + (cc.cy - a.cy) * aby) / (abLen * abLen);
+      if (t < 0.05 || t > 0.95) continue; // слишком близко к концам
+      // Расстояние от центра укрытия до луча.
+      const projX = a.cx + abx * t;
+      const projY = a.cy + aby * t;
+      const dist = Math.hypot(cc.cx - projX, cc.cy - projY);
+      if (dist > CELL_SIZE * 0.8) continue; // слишком далеко от луча
+
+      // Найти точку пересечения с гранью укрытия.
+      const color = cover.coverType === 2 ? 0xe8b64c : 0x60c8ff;
+      const markerSize = 4;
+      // Рисуем ромб в точке проекции.
+      g.moveTo(projX, projY - markerSize)
+        .lineTo(projX + markerSize, projY)
+        .lineTo(projX, projY + markerSize)
+        .lineTo(projX - markerSize, projY)
+        .closePath()
+        .fill({ color, alpha: 0.8 })
+        .stroke({ width: 1, color: 0xffffff, alpha: 0.6 });
+    }
+  };
+
   const cellFromLocal = (lx: number, ly: number): { x: number; y: number } | null => {
     if (!view) return null;
     const { tiles, width, height } = view.snapshot.grid;
@@ -933,6 +1089,29 @@ export function createFieldRenderer(): FieldRenderer {
         continue;
       }
       drawToken(g, entity);
+    }
+
+    // Подсветка защищённых граней выбранного персонажа.
+    if (view.selectedId !== null) {
+      const sel = view.snapshot.entities.find((e) => e.id === view!.selectedId);
+      if (sel && !sel.dead && sel.coverType === 0) {
+        drawProtectionHighlights(g, sel, view);
+      }
+    }
+
+    // Подсветка защищённых граней клетки под курсором (при перемещении).
+    if (view.hoverCell) {
+      const hx = view.hoverCell.x;
+      const hy = view.hoverCell.y;
+      const hoverEntity: EntityState = {
+        x: hx, y: hy, z: view.hoverCell.z,
+      } as EntityState;
+      drawProtectionHighlights(g, hoverEntity, view);
+    }
+
+    // Маркеры пересечения луча прицеливания с укрытиями.
+    if (view.selectedId !== null && view.aimId !== null) {
+      drawAimIntersections(g, view);
     }
 
     drawFxList(g, now);
