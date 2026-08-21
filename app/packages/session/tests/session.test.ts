@@ -276,12 +276,19 @@ describe("createSession restored save (0.13.0)", () => {
     expect(session.get().matchSeed).toBe(7);
   });
 
-  it("hands the restored battle to the battle screen exactly once", () => {
-    const session = createSession("battle", { battleKind: "campaign" });
+  it("keeps the restored battle in the session state for the battle screen", () => {
     const match = createDebugMatch();
-    session.setRestoredBattle({ match });
-    const taken = session.takeRestoredBattle();
-    expect(taken?.match).toBe(match);
-    expect(session.takeRestoredBattle()).toBeNull();
+    const session = createSession("battle", { battleKind: "campaign", restoredMatch: match });
+    // Идемпотентное чтение: повторный вызов инициализатора (StrictMode)
+    // не теряет восстановленный снимок.
+    expect(session.get().restoredMatch).toBe(match);
+    expect(session.get().restoredMatch).toBe(match);
+  });
+
+  it("drops the restored battle when leaving the battle screen", () => {
+    const match = createDebugMatch();
+    const session = createSession("battle", { battleKind: "campaign", restoredMatch: match });
+    session.goTo("menu");
+    expect(session.get().restoredMatch).toBeUndefined();
   });
 });

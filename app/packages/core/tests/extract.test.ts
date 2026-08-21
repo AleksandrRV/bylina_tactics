@@ -307,3 +307,87 @@ describe("mission objectives (0.13.0)", () => {
     });
   });
 });
+
+describe("extraction accounting and debug auto win (QA 0.13.0)", () => {
+  const BOGATYR: SpawnUnitConfig = {
+    id: "bogatyr", maxHealth: 12, maxAP: 2, mobility: 5, aim: 70, defense: 10, will: 40,
+    vision: 12, weapons: ["sword"], skills: [], tags: [],
+  };
+  const UPYR: SpawnUnitConfig = {
+    id: "upyr", maxHealth: 8, maxAP: 2, mobility: 5, aim: 60, defense: 0, will: 20,
+    vision: 10, weapons: ["claws"], skills: [], tags: [],
+  };
+
+  function matchWith(objective: NonNullable<MatchState["objective"]>): MatchState {
+    return createMissionMatch({
+      units: [BOGATYR, UPYR, IDOL, CAPTIVE],
+      map: MAP,
+      playerSlots: ["bogatyr"],
+      enemies: [{ unitId: "upyr", count: 1 }],
+      objective,
+      seed: 71,
+    });
+  }
+
+  it("records an extracted roster fighter with hp for mission accounting", () => {
+    const match = matchWith({ kind: "recon" });
+    const kernel = createTacticsKernel({
+      initial: match,
+      weapons: { sword: SWORD },
+      skills: { [EVACUATE.id]: EVACUATE },
+      seed: 71,
+    });
+    const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    const zone = kernel.getReachable(bogatyr.id).find((cell) => cell.x === 0);
+    expect(zone).toBeDefined();
+    if (!zone) return;
+    expect(kernel.apply({ type: "MOVE", actorId: bogatyr.id, to: zone }).ok).toBe(true);
+    const result = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: EVACUATE.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const snapshot = kernel.getSnapshot();
+    expect(snapshot.extracted).toEqual([{ rosterIndex: 0, hp: BOGATYR.maxHealth }]);
+    expect(snapshot.entities.some((entity) => entity.id === bogatyr.id)).toBe(false);
+  });
+
+  it("debug auto win completes destroy by killing the idol", () => {
+    const kernel = createTacticsKernel({
+      initial: matchWith({ kind: "destroy", unitId: "idol" }),
+      weapons: { sword: SWORD },
+      skills: { [EVACUATE.id]: EVACUATE },
+      seed: 72,
+    });
+    const result = kernel.debugAutoWin();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+  });
+
+  it("debug auto win completes rescue by extracting the escortee", () => {
+    const kernel = createTacticsKernel({
+      initial: matchWith({ kind: "rescue", unitId: "captive" }),
+      weapons: { sword: SWORD },
+      skills: { [EVACUATE.id]: EVACUATE },
+      seed: 73,
+    });
+    const result = kernel.debugAutoWin();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(result.events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED")).toBe(true);
+  });
+
+  it("debug auto win completes recon by extracting a deployed fighter", () => {
+    const kernel = createTacticsKernel({
+      initial: matchWith({ kind: "recon" }),
+      weapons: { sword: SWORD },
+      skills: { [EVACUATE.id]: EVACUATE },
+      seed: 74,
+    });
+    const result = kernel.debugAutoWin();
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(kernel.getSnapshot().extracted?.[0]?.rosterIndex).toBe(0);
+  });
+});

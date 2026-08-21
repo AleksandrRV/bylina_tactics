@@ -64,6 +64,7 @@ function cloneState(state: MatchState): MatchState {
     turnNumber: state.turnNumber,
     activeOwner: state.activeOwner,
     objective: state.objective ? { ...state.objective } : undefined,
+    extracted: state.extracted ? state.extracted.map((entry) => ({ ...entry })) : undefined,
     grid: {
       width: state.grid.width,
       height: state.grid.height,
@@ -1213,6 +1214,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if (skill.extract) {
           const tile = tileAt(state.grid, actor.x, actor.y);
           if (!tile?.extract) return { ok: false, reason: "ILLEGAL" };
+          // Эвакуация бойца высадки фиксируется в состоянии: при учёте исходов
+          // миссии эвакуированный считается выжившим с запасом здоровья на
+          // момент ухода (разведка; base-design §3.2).
+          if (actor.rosterIndex !== undefined) {
+            state.extracted = [...(state.extracted ?? []), { rosterIndex: actor.rosterIndex, hp: actor.hp }];
+          }
           removeEntity(actor, "EXTRACTED", events);
           success = true;
           const objective = state.objective;
@@ -1357,6 +1364,31 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       for (const entity of state.entities) {
         if (entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.dead) {
           kill(entity, "DAMAGE", events);
+        }
+      }
+      // Цели миссий 0.13.0: автопобеда доводит до победы любой тип миссии
+      // (debug-mode §3.2: «мгновенно уничтожает всех живых противников
+      // и фиксирует победу стороны игрока»).
+      const objective = state.objective;
+      if (objective?.kind === "destroy") {
+        const idol = state.entities.find((entity) => !entity.dead && entity.configId === objective.unitId);
+        if (idol) kill(idol, "DAMAGE", events);
+      } else if (objective?.kind === "rescue") {
+        const escortee = state.entities.find((entity) => !entity.dead && entity.configId === objective.unitId);
+        if (escortee) {
+          removeEntity(escortee, "EXTRACTED", events);
+          objectiveVictory = true;
+        }
+      } else if (objective?.kind === "recon") {
+        const scout = state.entities.find((entity) =>
+          !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.rosterIndex !== undefined,
+        );
+        if (scout) {
+          if (scout.rosterIndex !== undefined) {
+            state.extracted = [...(state.extracted ?? []), { rosterIndex: scout.rosterIndex, hp: scout.hp }];
+          }
+          removeEntity(scout, "EXTRACTED", events);
+          objectiveVictory = true;
         }
       }
       // Победа фиксируется обычным механизмом исхода; Тьма/награды/уровни

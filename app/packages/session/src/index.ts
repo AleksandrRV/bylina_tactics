@@ -60,6 +60,13 @@ export interface SessionState {
   deployment: number[];
   matchSeed: number;
   outcome: MatchOutcome | null;
+  /**
+   * Восстановленная партия кампании (0.13.0). Хранится в состоянии сессии,
+   * а не одноразовым запросом: BattleScreen читает её при создании ядра,
+   * и повторный вызов инициализатора (StrictMode) не теряет снимок.
+   */
+  restoredMatch?: MatchState;
+  restoredFog?: FogState;
 }
 
 export interface SessionApi {
@@ -105,10 +112,6 @@ export interface SessionApi {
   getBattleFullSnapshot(): MatchState | null;
   /** Полный туман войны всех сторон для сохранения партии (0.13.0). */
   getBattleFog(): FogState | null;
-  /** Передать восстановленную партию кампании; BattleScreen заберёт её при монтаже. */
-  setRestoredBattle(battle: { match: MatchState; fog?: FogState }): void;
-  /** Забрать восстановленную партию (однократно) при создании ядра боя. */
-  takeRestoredBattle(): { match: MatchState; fog?: FogState } | null;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -124,11 +127,6 @@ const idle: Omit<SessionState, "screen"> = {
   outcome: null,
 };
 
-export interface RestoredBattle {
-  match: MatchState;
-  fog?: FogState;
-}
-
 export function createSession(
   initial: AppScreen = "boot",
   restored?: Partial<Omit<SessionState, "screen">>,
@@ -136,7 +134,6 @@ export function createSession(
   let state: SessionState = { screen: initial, ...idle, ...(restored ?? {}) };
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
-  let restoredBattle: RestoredBattle | null = null;
   const listeners = new Set<(state: SessionState) => void>();
   const requireTacticsHost = (): TacticsKernel => {
     if (!tacticsHost) throw new Error("Tactics host is not bound");
@@ -254,14 +251,6 @@ export function createSession(
     getBattleSnapshot: (owner) => requireTacticsHost().getSnapshotFor(owner),
     getBattleFullSnapshot: () => (tacticsHost ? tacticsHost.getSnapshot() : null),
     getBattleFog: () => (tacticsHost ? tacticsHost.getFog() : null),
-    setRestoredBattle: (battle) => {
-      restoredBattle = battle;
-    },
-    takeRestoredBattle: () => {
-      const battle = restoredBattle;
-      restoredBattle = null;
-      return battle;
-    },
     getBattleReachable: (actorId) => requireTacticsHost().getReachable(actorId),
     getBattlePath: (actorId, to) => requireTacticsHost().getPath(actorId, to),
     getBattleHitPreview: (actorId, targetId, weaponId) => requireTacticsHost().getHitPreview(actorId, targetId, weaponId),

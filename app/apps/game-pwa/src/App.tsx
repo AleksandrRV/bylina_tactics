@@ -4,6 +4,7 @@ import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
 import { createSaveStorage, deserializeFog, serializeFog } from "@bylina/storage";
+import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
 import { loadAppContent } from "./content-files.js";
 import { useInstallPrompt } from "./install.js";
@@ -52,15 +53,19 @@ export function App() {
       entry?.screen === "battle" && entry?.battleKind === "campaign"
         ? "battle"
         : ((entry?.screen as "boot" | "menu" | "campaign" | "deployment" | "missionResult") ?? "boot");
-    return createSession(screen, entry ? {
-      battleKind: entry.battleKind,
-      activeMissionId: entry.activeMissionId,
-      deployment: entry.deployment,
-      matchSeed: entry.matchSeed,
-      outcome: entry.outcome,
-      difficulty: entry.difficulty as DifficultyId | null,
+    const restoredBattle = saved?.match && entry?.battleKind === "campaign" && entry?.screen === "battle"
+      ? { restoredMatch: saved.match, restoredFog: deserializeFog(saved.fog) }
+      : undefined;
+    return createSession(screen, {
+      battleKind: entry?.battleKind ?? null,
+      activeMissionId: entry?.activeMissionId ?? null,
+      deployment: entry?.deployment ?? [],
+      matchSeed: entry?.matchSeed ?? 0,
+      outcome: entry?.outcome ?? null,
+      difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
       paused: false,
-    } : undefined);
+      ...restoredBattle,
+    });
     // createSession создаётся один раз за жизнь приложения.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -87,21 +92,27 @@ export function App() {
     if (campaign) session.bindCampaign(campaign);
   }, [session, campaign]);
 
-  // Восстановление активной партии кампании: снимок и туман войны.
-  useEffect(() => {
-    if (saved?.match && saved.session?.battleKind === "campaign" && saved.session?.screen === "battle") {
-      session.setRestoredBattle({ match: saved.match, fog: deserializeFog(saved.fog) });
-    }
-  }, [session, saved]);
-
   // Автосохранение: кампания и активная партия пишутся при каждом изменении.
+  // Пока ядро боя не привязано (экран «battle» смонтирован, BattleScreen ещё
+  // создаёт ядро), используется последний известный снимок партии — иначе
+  // стартовое сохранение затрёт восстановленный бой.
+  const lastMatchRef = useRef<{ match?: MatchState; fog?: FogState }>({
+    match: saved?.match,
+    fog: saved?.match ? deserializeFog(saved.fog) : undefined,
+  });
   const persistRef = useRef<() => void>(() => undefined);
   persistRef.current = () => {
     if (!campaign) return;
     const state = session.get();
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
-    const match = inCampaignBattle ? (session.getBattleFullSnapshot() ?? undefined) : undefined;
-    const fog = match ? session.getBattleFog() : undefined;
+    if (!inCampaignBattle) lastMatchRef.current = {};
+    let match = inCampaignBattle ? (session.getBattleFullSnapshot() ?? undefined) : undefined;
+    let fog: FogState | undefined = match ? (session.getBattleFog() ?? undefined) : undefined;
+    if (!match && inCampaignBattle) {
+      match = lastMatchRef.current.match;
+      fog = lastMatchRef.current.fog;
+    }
+    if (match) lastMatchRef.current = { match, fog };
     const screen = inCampaignBattle
       ? "battle"
       : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"

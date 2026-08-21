@@ -100,17 +100,17 @@ export function BattleScreen() {
   }, [content.skills]);
 
   // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
-  // (сохранение 0.13.0) используется переданный снимок; в остальных случаях
-  // сражение строится заново по записи миссии либо режиму.
+  // (сохранение 0.13.0) используется снимок из состояния сессии; инициализатор
+  // может вызываться повторно (StrictMode) — чтение состояния идемпотентно.
   const [kernel] = useState<TacticsKernel>(() => {
-    const restored = session.takeRestoredBattle();
+    const restored = session.get().restoredMatch;
     if (restored) {
       const host = createTacticsKernel({
-        initial: restored.match,
+        initial: restored,
         weapons,
         skills,
         units: content.units,
-        fog: restored.fog,
+        fog: session.get().restoredFog,
       });
       session.bindTacticsHost(host);
       return host;
@@ -287,7 +287,7 @@ export function BattleScreen() {
     if (battleKind === "campaign") {
       // Исходы бойцов высадки: сопоставление по явной метке rosterIndex,
       // а не по порядку идентификаторов. Метка не зависит от призывов,
-      // иллюзий и удалённых с поля сущностей (FLED/EXTRACTED).
+      // иллюзий и удалённых с поля сущностей.
       const final = session.getBattleSnapshot(PLAYER_OWNER);
       const participants = deployment.map((fighterId, index) => {
         const entity = final.entities.find((candidate) =>
@@ -295,11 +295,12 @@ export function BattleScreen() {
           candidate.coverType === 0 &&
           candidate.rosterIndex === index,
         );
-        return {
-          fighterId,
-          survived: Boolean(entity && !entity.dead),
-          hp: entity?.hp ?? 0,
-        };
+        if (entity) return { fighterId, survived: !entity.dead, hp: entity.hp };
+        // Эвакуированный боец (разведка) выжил: здоровье на момент ухода
+        // зафиксировано ядром в состоянии боя (0.13.0).
+        const extracted = (final.extracted ?? []).find((entry) => entry.rosterIndex === index);
+        if (extracted) return { fighterId, survived: true, hp: extracted.hp };
+        return { fighterId, survived: false, hp: 0 };
       });
       session.finishCampaignMission(outcome, participants);
       return;
@@ -411,6 +412,16 @@ export function BattleScreen() {
       setEnemyPhase(false);
     }
   };
+
+  // Восстановление партии, сохранённой в ход Нави: алгоритм противника
+  // продолжает ход с текущего состояния (иначе сторона осталась бы без хода).
+  useEffect(() => {
+    if (session.getBattleOutcome() !== "ongoing") return;
+    if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== ENEMY_OWNER) return;
+    void runEnemyPhase();
+    // Только при создании ядра (монтаж экрана, включая восстановление).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kernel]);
 
   const endTurn = (): void => {
     if (paused || busy) return;
@@ -1043,7 +1054,16 @@ export function BattleScreen() {
                 {t("battle.toCampaignMap")}
               </button>
             ) : null}
-            <button type="button" className="hud-btn" onClick={() => session.goTo("menu")}>
+            <button
+              type="button"
+              className="hud-btn"
+              onClick={() => {
+                // Выход в меню из боя кампании отменяет начатую миссию:
+                // иначе автомат кампании останется с незакрытой миссией.
+                if (battleKind === "campaign") session.leaveCampaignMission();
+                session.goTo("menu");
+              }}
+            >
               {t("battle.toMenu")}
             </button>
           </div>
