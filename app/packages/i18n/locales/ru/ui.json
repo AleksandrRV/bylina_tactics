@@ -96,7 +96,19 @@
       "NO_AP": "Нет очков действия",
       "ILLEGAL": "Нельзя",
       "NOT_FOUND": "Нет цели"
-    }
+    },
+    "breakdown": "Расчёт попадания",
+    "bdBaseAim": "Меткость",
+    "bdWeaponMod": "Модификатор оружия",
+    "bdHeight": "Высота",
+    "bdDefense": "Защита цели",
+    "bdDefend": "Защитная стойка",
+    "bdAdjDefense": "Смежные укрытия",
+    "bdCover": "Укрытие цели",
+    "bdObstacles": "Препятствия на пути",
+    "bdRange": "Дальность",
+    "bdTotal": "Итого",
+    "bdObstacleList": "Препятствия:"
   },
   "settings": {
     "title": "Настройки",

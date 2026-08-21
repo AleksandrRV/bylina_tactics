@@ -96,7 +96,19 @@
       "NO_AP": "No action points",
       "ILLEGAL": "Not allowed",
       "NOT_FOUND": "No target"
-    }
+    },
+    "breakdown": "Hit calculation",
+    "bdBaseAim": "Base aim",
+    "bdWeaponMod": "Weapon mod",
+    "bdHeight": "Height",
+    "bdDefense": "Target defense",
+    "bdDefend": "Defensive stance",
+    "bdAdjDefense": "Adjacent cover",
+    "bdCover": "Target cover",
+    "bdObstacles": "Obstacles",
+    "bdRange": "Range penalty",
+    "bdTotal": "Total",
+    "bdObstacleList": "Obstacles:"
   },
   "settings": {
     "title": "Settings",

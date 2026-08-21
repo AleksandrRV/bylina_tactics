@@ -1,10 +1,36 @@
 import { evaluateCover } from "./cover.js";
-import { distH } from "./grid.js";
-import { evaluateObstacles } from "./los.js";
+import { distH, tileAt } from "./grid.js";
+import { effectiveCoverTier, evaluateObstacles, traceRay } from "./los.js";
 import { heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 import { clampChance, type Rng } from "./rng.js";
 import type { CellPos, EntityState, Grid } from "./types.js";
 import type { WeaponStats } from "./weapons.js";
+
+export interface ObstacleDetail {
+  x: number;
+  y: number;
+  z: number;
+  type: "wall" | "full_cover" | "half_cover" | "terrain_full" | "terrain_half";
+  intersection: "full" | "glancing";
+  adjacentTo: "attacker" | "target" | "none";
+  heightDiff: number; // coverZ - attackerZ (positive = cover above attacker)
+  penalty: number; // how much this obstacle reduces hit chance
+  label: string;
+}
+
+export interface HitBreakdown {
+  baseAim: number;
+  weaponMod: number;
+  heightAim: number;
+  targetDefense: number;
+  defendBonus: number;
+  adjacentDefenseBonus: number;
+  obstaclePenalty: number;
+  rangePenalty: number;
+  coverPenalty: number;
+  finalChance: number;
+  obstacles: ObstacleDetail[];
+}
 
 export interface HitPreview {
   available: boolean;
@@ -16,10 +42,9 @@ export interface HitPreview {
   heightMod?: -1 | 0 | 1;
   flanked?: boolean;
   actionType?: "MELEE" | "RANGED";
-  /** Клетка, до которой линия прицеливания сплошная (препятствие или макс. дальность). */
   breakCell?: CellPos | null;
-  /** Суммарный штраф от промежуточных препятствий (§9.5). */
   obstaclePenalty?: number;
+  breakdown?: HitBreakdown;
 }
 
 export interface AttackResolution {
@@ -111,6 +136,13 @@ export function previewAttack(
   // Обновить breakCell из препятствий (если есть).
   if (obstacles.breakCell) breakCell = obstacles.breakCell;
 
+  // Подробная разбивка расчёта попадания.
+  const breakdown = computeBreakdown(
+    grid, entities, attacker, target, weapon, melee,
+    heightMod, heightAim, cover, obstacles, rangePenalty, obstaclePenalty,
+    defendBonus,
+  );
+
   return {
     available: true,
     chance,
@@ -122,6 +154,7 @@ export function previewAttack(
     actionType: melee ? "MELEE" : "RANGED",
     breakCell,
     obstaclePenalty,
+    breakdown,
   };
 }
 
@@ -170,5 +203,100 @@ export function resolveAttack(
     heightMod: preview.heightMod ?? 0,
     cover: cover.coverType,
     actionType: preview.actionType ?? "RANGED",
+  };
+}
+
+function computeBreakdown(
+  grid: Grid,
+  entities: readonly EntityState[],
+  attacker: EntityState,
+  target: EntityState,
+  weapon: WeaponStats,
+  melee: boolean,
+  heightMod: -1 | 0 | 1,
+  heightAim: number,
+  cover: { penalty: number; coverType: 0 | 1 | 2; flanked: boolean; adjacentDefenseBonus: number },
+  obstacles: { blocked: boolean; obstaclePenalty: number; breakCell: CellPos | null },
+  rangePenalty: number,
+  obstaclePenalty: number,
+  defendBonus: number,
+): HitBreakdown {
+  const obstacleDetails: ObstacleDetail[] = [];
+
+  if (!melee) {
+    const traced = traceRay(attacker.x, attacker.y, target.x, target.y);
+    for (const cell of traced) {
+      if ((cell.x === attacker.x && cell.y === attacker.y) || (cell.x === target.x && cell.y === target.y)) continue;
+      const tile = tileAt(grid, cell.x, cell.y);
+      if (!tile) continue;
+      const distToAttacker = Math.max(Math.abs(cell.x - attacker.x), Math.abs(cell.y - attacker.y));
+      const distToTarget = Math.max(Math.abs(cell.x - target.x), Math.abs(cell.y - target.y));
+      const adjacentTo: "attacker" | "target" | "none" = distToAttacker <= 1 ? "attacker" : distToTarget <= 1 ? "target" : "none";
+      const heightDiff = tile.z - attacker.z;
+
+      // Стена.
+      if (tile.blockLOS) {
+        obstacleDetails.push({
+          x: cell.x, y: cell.y, z: tile.z,
+          type: "wall",
+          intersection: cell.type,
+          adjacentTo,
+          heightDiff,
+          penalty: cell.type === "full" ? -100 : -50,
+          label: `Стена (${cell.x},${cell.y}) z=${tile.z} [${cell.type === "full" ? "полное" : "касательное"}]${adjacentTo !== "none" ? ` [у ${adjacentTo === "attacker" ? "атакующего" : "цели"}]` : ""} → ${cell.type === "full" ? "БЛОК" : "−50"}`,
+        });
+      }
+
+      // Перепад высот.
+      if (!tile.blockLOS && !tile.pit && tile.z > attacker.z) {
+        const tier = tile.z - attacker.z >= 2 ? "terrain_full" : "terrain_half";
+        const pen = tier === "terrain_full" ? (cell.type === "full" ? -50 : -25) : (cell.type === "full" ? -50 : -25);
+        obstacleDetails.push({
+          x: cell.x, y: cell.y, z: tile.z,
+          type: tier as "terrain_full" | "terrain_half",
+          intersection: cell.type,
+          adjacentTo,
+          heightDiff,
+          penalty: pen,
+          label: `Высота +${tile.z - attacker.z} (${cell.x},${cell.y}) z=${tile.z} [${cell.type === "full" ? "полное" : "касательное"}] → −${pen < 0 ? -pen : pen}`,
+        });
+      }
+
+      // Укрытия-сущности.
+      for (const entity of entities) {
+        if (!entity || entity.dead || entity.coverType === 0) continue;
+        if (entity.x !== cell.x || entity.y !== cell.y) continue;
+        const eTier = effectiveCoverTier(entity.coverType, false, target.z, entity.z);
+        if (eTier === 0) continue;
+        const pen = eTier === 2 ? (cell.type === "full" ? -100 : -50) : (cell.type === "full" ? -50 : -25);
+        obstacleDetails.push({
+          x: cell.x, y: cell.y, z: entity.z,
+          type: eTier === 2 ? "full_cover" : "half_cover",
+          intersection: cell.type,
+          adjacentTo,
+          heightDiff: entity.z - attacker.z,
+          penalty: pen,
+          label: `${eTier === 2 ? "Полное укрытие" : "Полуукрытие"} (${cell.x},${cell.y}) z=${entity.z} h=${entity.z - attacker.z >= 0 ? "+" : ""}${entity.z - attacker.z} [${cell.type === "full" ? "полное" : "касательное"}]${adjacentTo !== "none" ? ` [у ${adjacentTo === "attacker" ? "атакующего" : "цели"}]` : ""} → ${pen < 0 ? pen : "−" + pen}`,
+        });
+      }
+    }
+  }
+
+  return {
+    baseAim: attacker.aim,
+    weaponMod: weapon.aimMod,
+    heightAim,
+    targetDefense: target.defense,
+    defendBonus,
+    adjacentDefenseBonus: cover.adjacentDefenseBonus,
+    obstaclePenalty,
+    rangePenalty,
+    coverPenalty: cover.penalty,
+    finalChance: clampChance(
+      attacker.aim + weapon.aimMod + heightAim
+      - target.defense - defendBonus - cover.adjacentDefenseBonus
+      - obstaclePenalty - rangePenalty,
+    ),
+    obstacles: obstacleDetails,
   };
 }

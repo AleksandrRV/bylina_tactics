@@ -1,4 +1,7 @@
 import {
+  effectiveCoverTier,
+  terrainCoverTier,
+  tileAt,
   type CellPos,
   type EntityState,
   type GameEvent,
@@ -490,7 +493,8 @@ export function createFieldRenderer(): FieldRenderer {
   const world = new Container();
   const ground = new Container();
   const fxLayer = new Graphics();
-  world.addChild(ground, fxLayer);
+  const debugLayer = new Container();
+  world.addChild(ground, fxLayer, debugLayer);
   world.eventMode = "static";
   world.hitArea = new Rectangle(-4000, -4000, 12000, 12000);
 
@@ -564,6 +568,8 @@ export function createFieldRenderer(): FieldRenderer {
       const nx = entity.x + dx;
       const ny = entity.y + dy;
       let bestTier: 0 | 1 | 2 = 0;
+
+      // Проверить укрытия-сущности в соседней клетке.
       for (const cover of v.snapshot.entities) {
         if (!cover || cover.dead || cover.coverType === 0) continue;
         if (cover.x !== nx || cover.y !== ny) continue;
@@ -573,15 +579,37 @@ export function createFieldRenderer(): FieldRenderer {
           const oppositeEdge = (edge + 2) % 4;
           if (cover.edge !== oppositeEdge) continue;
         }
-        if (cover.coverType > bestTier) bestTier = cover.coverType;
+        // Эффективная ступень с учётом высоты защитника.
+        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, cover.z);
+        if (eTier > bestTier) bestTier = eTier;
       }
-      // Также проверить целоклеточные укрытия в самой клетке entity (edge-based).
+
+      // Проверить укрытия-сущности в самой клетке entity (edge-based).
       for (const cover of v.snapshot.entities) {
         if (!cover || cover.dead || cover.coverType === 0 || cover.edge === undefined) continue;
         if (cover.x !== entity.x || cover.y !== entity.y) continue;
-        if (cover.edge !== edge) continue; // грань смотрит в направлении edge
-        if (cover.coverType > bestTier) bestTier = cover.coverType;
+        if (cover.edge !== edge) continue;
+        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, cover.z);
+        if (eTier > bestTier) bestTier = eTier;
       }
+
+      // Проверить стены (blockLOS) в соседней клетке.
+      const neighborTile = tileAt(v.snapshot.grid, nx, ny);
+      if (neighborTile && neighborTile.blockLOS) {
+        const eTier = effectiveCoverTier(0, true, entity.z, neighborTile.z);
+        if (eTier > bestTier) bestTier = eTier;
+      }
+
+      // Проверить перепад высот (terrain cover).
+      if (neighborTile && !neighborTile.pit) {
+        const heightDiff = neighborTile.z - entity.z;
+        if (heightDiff >= 2) {
+          if (2 > bestTier) bestTier = 2;
+        } else if (heightDiff === 1) {
+          if (1 > bestTier) bestTier = 1;
+        }
+      }
+
       if (bestTier > 0) {
         const { cx, cy } = centerOf(entity.x, entity.y, entity.z);
         drawShieldIcon(g, cx, cy, edge, bestTier as 1 | 2, alpha);
@@ -820,26 +848,12 @@ export function createFieldRenderer(): FieldRenderer {
     return g;
   };
 
+  // drawDebugLabel used for terrain cover display
   const drawDebugLabel = (tile: Tile): Text | null => {
     if (!view?.debugMovement) return null;
     const reachCell = view.reachable.find((cell) => cell.x === tile.x && cell.y === tile.y);
     if (!reachCell) return null;
-    const z = visualLevel(tile);
-    const { fy } = faceOf(tile.x, tile.y, z);
-    const label = new Text({
-      text: String(reachCell.mpCost),
-      style: {
-        fontFamily: "monospace",
-        fontSize: 12,
-        fontWeight: "600",
-        fill: 0xf3ecdc,
-        stroke: { color: 0x0c120c, width: 3 },
-      },
-    });
-    label.anchor.set(1, 1);
-    label.position.set(PAD + tile.x * CELL_SIZE + CELL_SIZE - 4, fy + CELL_SIZE - 3);
-    label.zIndex = tile.y * 100 + z * 10 + 5;
-    return label;
+    return null; // moved to paintDebug
   };
 
   const paintStatic = (): void => {
@@ -847,10 +861,50 @@ export function createFieldRenderer(): FieldRenderer {
     ground.removeChildren().forEach((child) => child.destroy());
     for (const tile of view.snapshot.grid.tiles) {
       ground.addChild(drawTile(tile));
-      const label = drawDebugLabel(tile);
-      if (label) ground.addChild(label);
     }
     ground.sortableChildren = true;
+    paintDebug();
+  };
+
+  const paintDebug = (): void => {
+    debugLayer.removeChildren().forEach((child) => child.destroy());
+    if (!view?.debugMovement) return;
+    for (const tile of view.snapshot.grid.tiles) {
+      const z = visualLevel(tile);
+      const { fx, fy } = faceOf(tile.x, tile.y, z);
+      // Координаты клетки (верхний левый угол).
+      const coordLabel = new Text({
+        text: `${tile.x},${tile.y}`,
+        style: {
+          fontFamily: "monospace",
+          fontSize: 9,
+          fill: 0xaaaaaa,
+          stroke: { color: 0x000000, width: 2 },
+        },
+      });
+      coordLabel.position.set(fx + 2, fy + 1);
+      coordLabel.zIndex = 9999;
+      debugLayer.addChild(coordLabel);
+      // Стоимость движения (нижний правый угол).
+      const reachCell = view.reachable.find((c) => c.x === tile.x && c.y === tile.y);
+      if (reachCell) {
+        const mpLabel = new Text({
+          text: String(reachCell.mpCost),
+          style: {
+            fontFamily: "monospace",
+            fontSize: 12,
+            fontWeight: "700",
+            fill: 0xf3ecdc,
+            stroke: { color: 0x0c120c, width: 3 },
+          },
+        });
+        mpLabel.anchor.set(1, 1);
+        mpLabel.position.set(fx + CELL_SIZE - 3, fy + CELL_SIZE - 2);
+        mpLabel.zIndex = 9999;
+        debugLayer.addChild(mpLabel);
+      }
+    }
+    debugLayer.zIndex = 9999;
   };
 
   /* ---------- динамический слой: фишки и эффекты ---------- */

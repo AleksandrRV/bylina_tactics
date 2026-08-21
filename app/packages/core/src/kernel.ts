@@ -474,6 +474,50 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (ap === null) return { ok: false, reason: "OCCUPIED" };
       if (actor.ap < ap) return { ok: false, reason: "NO_AP" };
 
+      // Туман войны: проверка пути на неразведанные клетки.
+      const ownerFog = fog[actor.owner];
+      if (ownerFog) {
+        let truncatedPath: CellPos[] | null = null;
+        for (let i = 0; i < found.path.length; i++) {
+          const cell = found.path[i]!;
+          const key = `${cell.x},${cell.y}`;
+          const explored = ownerFog.explored.has(key);
+          if (!explored) {
+            // Неразведанная клетка: движение заблокировано.
+            if (i === 0) return { ok: false, reason: "OCCUPIED" };
+            // Обрезать путь до последней разведанной клетки.
+            truncatedPath = found.path.slice(0, i);
+            break;
+          }
+          // Разведанная но невидимая клетка: проверить препятствия.
+          const visible = ownerFog.visible.has(key);
+          if (!visible) {
+            // Проверить, нет ли врага или укрытия в этой клетке.
+            const blocker = state.entities.find(
+              (e) => !e.dead && e.x === cell.x && e.y === cell.y && e.coverType === 0 && e.owner !== actor.owner && e.obstacle,
+            );
+            if (blocker) {
+              // Персонаж упирается в препятствие.
+              truncatedPath = found.path.slice(0, i);
+              break;
+            }
+          }
+        }
+        if (truncatedPath !== null) {
+          if (truncatedPath.length === 0) return { ok: false, reason: "OCCUPIED" };
+          // Пересчитать путь и стоимость.
+          const lastCell = truncatedPath[truncatedPath.length - 1]!;
+          const newFound = findPath(state.grid, state.entities, actor, lastCell.x, lastCell.y);
+          if (!newFound || newFound.mpCost <= 0) return { ok: false, reason: "OCCUPIED" };
+          const newAp = apCostFor(newFound.mpCost, actor.mobility);
+          if (newAp === null) return { ok: false, reason: "OCCUPIED" };
+          if (actor.ap < newAp) return { ok: false, reason: "NO_AP" };
+          // Заменить путь на обрезанный.
+          found.path = newFound.path;
+          (found as any).mpCost = newFound.mpCost;
+        }
+      }
+
       const dest = found.path[found.path.length - 1];
       if (!dest) return { ok: false, reason: "ILLEGAL" };
       const prevX = actor.x;
