@@ -3,7 +3,7 @@ import { isCoverCandidate, isCoverOnFireLine } from "./cover.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import type { SpawnUnitConfig } from "./defaults.js";
 import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
-import { distH, facingAfterStep, tileAt } from "./grid.js";
+import { distH, facingAfterStep, isCardinal, tileAt } from "./grid.js";
 import { effectiveCoverTier, hasLineOfSight } from "./los.js";
 import { edgeCost, edgeCoverBetween } from "./occupancy.js";
 import { apCostFor, findPath, listReachable } from "./pathfinding.js";
@@ -244,11 +244,15 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const before = target.hp;
     target.hp = Math.max(0, target.hp - damage);
     events.push({ type: "STAT_CHANGED", entityId: target.id, stat: "HP", newValue: target.hp, delta: target.hp - before });
-    if (target.fleeHp !== undefined && target.hp <= target.fleeHp) {
-      removeEntity(target, "FLED", events);
+    // Гибель (включая снижение здоровья до нуля) окончательна: пороговый уход
+    // (§15.6) применяется только при положительном запасе здоровья.
+    if (target.hp <= 0) {
+      kill(target, cause, events);
       return;
     }
-    if (target.hp <= 0) kill(target, cause, events);
+    if (target.fleeHp !== undefined && target.hp <= target.fleeHp) {
+      removeEntity(target, "FLED", events);
+    }
   };
 
   const damageCover = (cover: EntityState, events: GameEvent[]): void => {
@@ -308,6 +312,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     target: EntityState,
     effect: Extract<SkillEffect, { type: "applyStatus" }>,
     events: GameEvent[],
+    affectsFlying = false,
   ): boolean => {
     const duration = effect.duration;
     if (effect.status === "poison") {
@@ -321,7 +326,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       return true;
     }
     if (effect.status === "immobile") {
-      if (target.flying) return false;
+      // §15.4: полёт отменяет обездвиживание, кроме умений с признаком affectsFlying.
+      if (target.flying && !affectsFlying) return false;
       target.immobileTurns = Math.max(target.immobileTurns ?? 0, duration);
       events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "IMMOBILE", applied: true, duration: target.immobileTurns, sourceId: source.id });
       return true;
@@ -471,6 +477,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const canOverwatchHit = (observer: EntityState, target: EntityState, weapon: WeaponStats): boolean => {
     if (target.hidden || !inFrontHalfPlane(observer, target.x, target.y)) return false;
+    // §9.5: полная грань запрещает обычную ближнюю атаку — и ответный огонь дозора тоже.
+    if (weapon.category === "melee" && edgeCoverOnLine(observer, target)?.coverType === 2) return false;
     return canWeaponReach(state.grid, observer, target, weapon) === null;
   };
 
@@ -484,8 +492,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (!weapon || !canOverwatchHit(observer, mover, weapon)) continue;
       observer.overwatch = false;
       events.push({ type: "STATUS_CHANGED", entityId: observer.id, status: "OVERWATCH", applied: false });
+      // §8.2: выполненная атака снимает скрытность наблюдающего.
+      reveal(observer, events);
       events.push({ type: "OVERWATCH_FIRED", watcherId: observer.id, triggerId: mover.id, at: cellPos(mover) });
-      const resolved = resolveAttack(state.grid, state.entities, observer, mover, weapon, rng, { ignoreAp: true });
+      const edgeOptions = weapon.category === "melee" ? currentEdgeOptions(observer, mover, weapon) : undefined;
+      const resolved = resolveAttack(state.grid, state.entities, observer, mover, weapon, rng, {
+        ignoreAp: true,
+        ...(edgeOptions ?? {}),
+      });
       if (!resolved) continue;
       events.push({
         type: "COMBAT_RESOLVED",
@@ -582,7 +596,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         .filter((cell) => cell.apCost === 1 && distH(cell.x, cell.y, source.x, source.y) > distH(unit.x, unit.y, source.x, source.y))
         .sort((a, b) => {
           const distance = distH(b.x, b.y, source.x, source.y) - distH(a.x, a.y, source.x, source.y);
-          return distance || a.x - b.x || a.y - b.y;
+          if (distance !== 0) return distance;
+          // §15.3 → §5.2: при равенстве дистанции кардинальный шаг предпочтительнее диагонального.
+          const aCardinal = isCardinal(a.x - unit.x, a.y - unit.y);
+          const bCardinal = isCardinal(b.x - unit.x, b.y - unit.y);
+          if (aCardinal !== bCardinal) return aCardinal ? -1 : 1;
+          if (a.x !== b.x) return a.x - b.x;
+          return a.y - b.y;
         });
       const destination = candidates[0];
       if (destination) {
@@ -621,6 +641,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     target: EntityState | undefined,
     targetPos: CellPos | undefined,
     events: GameEvent[],
+    skipCoverDamage = false,
   ): boolean => {
     let changed = false;
     const effectTarget = target ?? source;
@@ -635,14 +656,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           changed = true;
         }
       } else if (effect.type === "applyStatus") {
-        changed = applyStatus(source, effectTarget, effect, events) || changed;
+        changed = applyStatus(source, effectTarget, effect, events, skill.affectsFlying) || changed;
       } else if (effect.type === "removeStatus") {
         changed = clearStatus(effectTarget, effect.status, events) || changed;
       } else if (effect.type === "destroyCover") {
         if (target?.coverType && skill.envDmg >= 1) {
           damageCover(target, events);
           changed = true;
-        } else if (target && skill.affectsEnvironment && skill.envDmg >= 1) {
+        } else if (target && skill.affectsEnvironment && skill.envDmg >= 1 && !skipCoverDamage) {
+          // Направленное укрытие уже повреждено ударом через грань (§12.1):
+          // повторное разрушение эффектом не выполняется.
           const cover = coverOnFireLine(source, target);
           if (cover) {
             damageCover(cover, events);
@@ -684,6 +707,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     }
     if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
+    // §15.7: погибшая сущность не является допустимой целью.
+    if (target && target.dead) return { available: false, reason: "ILLEGAL" };
     if (target) {
       const isCover = target.coverType > 0;
       const filter = skill.filter;
@@ -696,6 +721,11 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             : true;
       if (!matches) return { available: false, reason: "ILLEGAL" };
     }
+    // §10.4: атака по укрытию допустима только при разрушающей силе ≥ 1.
+    if (target && target.coverType > 0 && skill.resolution === "attack") {
+      const destroysCover = skill.effects.some((effect) => effect.type === "destroyCover") && (skill.envDmg ?? 0) >= 1;
+      if (!destroysCover) return { available: false, reason: "ILLEGAL" };
+    }
     const requestedTile = targetPos ? tileAt(state.grid, targetPos.x, targetPos.y) : undefined;
     const normalizedTargetPos = targetPos && requestedTile ? { x: targetPos.x, y: targetPos.y, z: requestedTile.z } : targetPos;
     const pos = target ? cellPos(target) : normalizedTargetPos!;
@@ -703,8 +733,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       ? inMeleeReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)
       : inRangedReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z, skill.range);
     if (!inReach) return { available: false, reason: "OUT_OF_RANGE" };
+    // §12.1: полную грань пробивает только разрушающее оружие/умение ближнего боя.
     if (target && skill.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2) {
-      return { available: false, reason: "ILLEGAL" };
+      const weapon = skillWeapon(skill);
+      if (skill.resolution !== "attack" || !weapon || (weapon.envDmg ?? 0) < 1) {
+        return { available: false, reason: "ILLEGAL" };
+      }
     }
     if (skill.requiresLOS && !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)) {
       return { available: false, reason: "NO_LOS" };
@@ -750,13 +784,18 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (target && target.coverType === 0 && skill.resolution === "attack") {
       const weapon = skillWeapon(skill);
       if (weapon) {
+        const breach = edgeBreach(actor, target, weapon);
+        if (weapon.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2 && !breach) {
+          return { available: false, reason: "ILLEGAL" };
+        }
+        const edgeOptions = breach?.options ?? currentEdgeOptions(actor, target, weapon);
         const combat = previewAttack(
           state.grid,
           state.entities,
           actor,
           target,
           weapon,
-          currentEdgeOptions(actor, target, weapon),
+          edgeOptions,
         );
         return {
           available: combat.available,
@@ -820,15 +859,17 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     getReachable: (actorId) => {
       const actor = actorOf(actorId);
       if (!actor || actor.dead || actor.panic || actor.immobileTurns || actor.owner !== state.activeOwner) return [];
-      const visible = fog[actor.owner]?.visible;
+      // §8.3: перемещение допустимо в любые известные стороне клетки
+      // (разведанные, включая не наблюдаемые сейчас).
+      const explored = fog[actor.owner]?.explored;
       return listReachable(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor)
-        .filter((cell) => !visible || visible.has(`${cell.x},${cell.y}`));
+        .filter((cell) => !explored || explored.has(`${cell.x},${cell.y}`));
     },
     getPath: (actorId, to) => {
       const actor = actorOf(actorId);
       if (!actor || actor.dead || actor.panic || actor.immobileTurns || actor.owner !== state.activeOwner) return null;
-      const visible = fog[actor.owner]?.visible;
-      if (visible && !visible.has(`${to.x},${to.y}`)) return null;
+      const explored = fog[actor.owner]?.explored;
+      if (explored && !explored.has(`${to.x},${to.y}`)) return null;
       const found = findPath(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor, to.x, to.y);
       if (!found || found.mpCost + (actor.movementSpent ?? 0) > actor.mobility * 2) return null;
       const ap = apCostFor(found.mpCost, actor.mobility);
@@ -1092,9 +1133,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         } else if (skill.resolution === "attack" && target?.coverType && skill.effects.some((effect) => effect.type === "destroyCover") && skill.envDmg >= 1) {
           success = applySkillEffects(actor, skill, target, command.targetPos, events);
         } else if (skill.resolution === "attack" && target && weapon) {
-          success = resolveCombatAgainst(actor, target, weapon, events, currentEdgeOptions(actor, target, weapon));
+          // §12.1: разрушающее умение ближнего боя пробивает полную грань, как палица.
+          const breach = edgeBreach(actor, target, weapon);
+          const edgeOptions = breach?.options ?? currentEdgeOptions(actor, target, weapon);
+          if (breach) damageCover(breach.cover, events);
+          success = resolveCombatAgainst(actor, target, weapon, events, edgeOptions);
           if (success) {
-            applySkillEffects(actor, skill, target, command.targetPos, events);
+            applySkillEffects(actor, skill, target, command.targetPos, events, Boolean(breach));
             if (!target.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, target, events);
           }
         } else if (skill.resolution === "auto") {
@@ -1136,14 +1181,21 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
       if (command.type !== "MOVE") return { ok: false, reason: "ILLEGAL" };
       if (actor.immobileTurns) return { ok: false, reason: "ILLEGAL" };
-      const visible = fog[actor.owner]?.visible;
-      if (visible && !visible.has(`${command.to.x},${command.to.y}`)) return { ok: false, reason: "ILLEGAL" };
+      // §8.3: назначение должно быть известно стороне (разведано).
+      const explored = fog[actor.owner]?.explored;
+      if (explored && !explored.has(`${command.to.x},${command.to.y}`)) return { ok: false, reason: "ILLEGAL" };
       const tile = tileAt(state.grid, command.to.x, command.to.y);
       if (!tile) return { ok: false, reason: "NOT_FOUND" };
       const knownPath = findPath(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor, command.to.x, command.to.y);
       const found = findPath(state.grid, state.entities, actor, command.to.x, command.to.y);
       if (!knownPath || !found || found.mpCost <= 0) return { ok: false, reason: "OCCUPIED" };
-      if (!samePath(knownPath.path, found.path)) return { ok: false, reason: "ILLEGAL" };
+      if (!samePath(knownPath.path, found.path)) {
+        // Расхождение допустимо только за счёт скрытых сущностей: реальный путь
+        // обязан оставаться в пределах разведанной местности.
+        if (explored && found.path.some((cell) => !explored.has(`${cell.x},${cell.y}`))) {
+          return { ok: false, reason: "ILLEGAL" };
+        }
+      }
       if (found.mpCost + (actor.movementSpent ?? 0) > actor.mobility * 2) return { ok: false, reason: "OUT_OF_RANGE" };
       const ap = apCostFor(found.mpCost, actor.mobility);
       if (ap === null) return { ok: false, reason: "OUT_OF_RANGE" };

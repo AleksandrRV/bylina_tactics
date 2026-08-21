@@ -10,6 +10,8 @@ export type IntersectionType = "full" | "glancing";
 
 export interface TracedCell extends Cell {
   type: IntersectionType;
+  /** Вершина решётки, которой касается луч; заполнено для glancing-клеток. */
+  corner?: { x: number; y: number };
 }
 
 export function traceRay(ax: number, ay: number, bx: number, by: number): TracedCell[] {
@@ -32,11 +34,11 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
   let tmaxY = stepY === 0 ? Number.POSITIVE_INFINITY : (stepY > 0 ? iy + 1 - y0 : y0 - iy) * tdy;
 
   const seen = new Set<string>();
-  const push = (x: number, y: number, type: IntersectionType): void => {
+  const push = (x: number, y: number, type: IntersectionType, corner?: { x: number; y: number }): void => {
     const key = `${x},${y}`;
     if (seen.has(key)) return;
     seen.add(key);
-    cells.push({ x, y, type });
+    cells.push(corner ? { x, y, type, corner } : { x, y, type });
   };
 
   push(ix, iy, "full");
@@ -50,8 +52,13 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
       iy += stepY; tmaxY += tdy;
       push(ix, iy, "full");
     } else {
-      push(ix + stepX, iy, "glancing");
-      push(ix, iy + stepY, "glancing");
+      // Пересечение вершины: обе касающиеся клетки принадлежат одной вершине (§7.4).
+      const corner = {
+        x: ix + (stepX > 0 ? 1 : 0),
+        y: iy + (stepY > 0 ? 1 : 0),
+      };
+      push(ix + stepX, iy, "glancing", corner);
+      push(ix, iy + stepY, "glancing", corner);
       ix += stepX; iy += stepY;
       tmaxX += tdx; tmaxY += tdy;
       push(ix, iy, "full");
@@ -109,7 +116,9 @@ export function evaluateObstacles(
   let maxPenalty = 0;
   let breakCell: { x: number; y: number; z: number } | null = null;
 
-  const glancingWalls: { x: number; y: number }[] = [];
+  // §7.4: линию прерывает только пара glancing-касаний в одной вершине.
+  const glancingByCorner = new Map<string, { x: number; y: number; count: number }>();
+  let glancingCount = 0;
 
   for (const cell of traced) {
     if ((cell.x === ax && cell.y === ay) || (cell.x === bx && cell.y === by)) continue;
@@ -131,25 +140,28 @@ export function evaluateObstacles(
 
     if (tile.blockLOS) {
       if (cell.type === "full") { blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break; }
-      glancingWalls.push({ x: cell.x, y: cell.y });
+      glancingCount += 1;
+      const corner = cell.corner;
+      if (corner) {
+        const key = `${corner.x},${corner.y}`;
+        const entry = glancingByCorner.get(key);
+        if (entry) entry.count += 1;
+        else glancingByCorner.set(key, { x: corner.x, y: corner.y, count: 1 });
+      }
     }
 
   }
 
   if (!blocked) {
-    if (glancingWalls.length >= 2) {
-      for (let i = 0; i < glancingWalls.length && !blocked; i++) {
-        for (let j = i + 1; j < glancingWalls.length; j++) {
-          const a = glancingWalls[i]!;
-          const b = glancingWalls[j]!;
-          if (Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1) {
-            blocked = true; breakCell = { x: a.x, y: a.y, z: 0 }; break;
-          }
-        }
+    for (const entry of glancingByCorner.values()) {
+      if (entry.count >= 2) {
+        blocked = true;
+        breakCell = { x: entry.x, y: entry.y, z: 0 };
+        break;
       }
     }
     if (!blocked) {
-      if (glancingWalls.length > 0) maxPenalty = Math.max(maxPenalty, 50);
+      if (glancingCount > 0) maxPenalty = Math.max(maxPenalty, 50);
     }
   }
 
@@ -167,7 +179,8 @@ export function hasLineOfSight(
   const x0 = ax + 0.5, y0 = ay + 0.5, z0 = az + 0.5;
   const x1 = bx + 0.5, y1 = by + 0.5, z1 = bz + 0.5;
 
-  const glancingFull: Cell[] = [];
+  // §7.4: линию прерывает только пара glancing-касаний в одной вершине.
+  const glancingByCorner = new Map<string, number>();
 
   for (const cell of traced) {
     if ((cell.x === ax && cell.y === ay) || (cell.x === bx && cell.y === by)) continue;
@@ -179,18 +192,16 @@ export function hasLineOfSight(
 
     if (tile.blockLOS) {
       if (cell.type === "full") return false;
-      glancingFull.push(cell);
+      const corner = cell.corner;
+      if (corner) {
+        const key = `${corner.x},${corner.y}`;
+        glancingByCorner.set(key, (glancingByCorner.get(key) ?? 0) + 1);
+      }
     }
   }
 
-  if (glancingFull.length >= 2) {
-    for (let i = 0; i < glancingFull.length; i++) {
-      for (let j = i + 1; j < glancingFull.length; j++) {
-        const a = glancingFull[i]!;
-        const b = glancingFull[j]!;
-        if (Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1) return false;
-      }
-    }
+  for (const count of glancingByCorner.values()) {
+    if (count >= 2) return false;
   }
 
   return true;
@@ -234,7 +245,8 @@ export function effectiveCoverTier(
  * Перепад высот как укрытие. Возвышение между атакующим и защищающимся:
  * - Высота +1 над атакующим → полуукрытие (1).
  * - Высота +2 над атакующим → полное укрытие (2).
- * Учитывается только если возвышение на линии огня.
+ * Учитывается только если возвышение на линии огня и поверхность
+ * действительно поднимается над лучом (0 < h ≤ 1, §7.2).
  */
 export function terrainCoverTier(
   grid: Grid,
@@ -243,13 +255,23 @@ export function terrainCoverTier(
   attackerZ: number,
   defenderX: number,
   defenderY: number,
+  defenderZ: number,
 ): 0 | 1 | 2 {
   const cells = traceRay(attackerX, attackerY, defenderX, defenderY);
+  const x0 = attackerX + 0.5;
+  const y0 = attackerY + 0.5;
+  const z0 = attackerZ + 0.5;
+  const x1 = defenderX + 0.5;
+  const y1 = defenderY + 0.5;
+  const z1 = defenderZ + 0.5;
   let best: 0 | 1 | 2 = 0;
   for (const cell of cells) {
     if ((cell.x === attackerX && cell.y === attackerY) || (cell.x === defenderX && cell.y === defenderY)) continue;
     const tile = tileAt(grid, cell.x, cell.y);
     if (!tile || tile.pit || tile.blockLOS) continue;
+    const h = tile.z - rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
+    // Поверхность не поднимается над лучом — укрытия нет (§7.2).
+    if (h <= 0 || h > 1.01) continue;
     const diff = tile.z - attackerZ;
     let tier: 0 | 1 | 2 = diff >= 2 ? 2 : diff === 1 ? 1 : 0;
     if (cell.type === "glancing") tier = Math.max(0, tier - 1) as 0 | 1 | 2;

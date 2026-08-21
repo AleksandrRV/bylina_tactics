@@ -89,6 +89,7 @@ export const skillConfigSchema = z.object({
   radius: z.number().int().min(0).optional(),
   willPower: z.number().optional(),
   filter: z.enum(["enemies", "allies", "all", "cover"]).optional(),
+  affectsFlying: z.boolean().optional(),
   cooldownTurns: z.number().int().min(1).max(5).optional(),
   maxUsesPerBattle: z.number().int().min(1).optional(),
   effects: z.array(skillEffectSchema).min(1),

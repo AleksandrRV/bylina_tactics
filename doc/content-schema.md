@@ -85,6 +85,7 @@ interface SkillConfig {
   radius?: number;           // область; 0 или отсутствие — одна клетка
   willPower?: number;        // для resolution = "will"
   filter?: "enemies" | "allies" | "all" | "cover";
+  affectsFlying?: boolean;   // обездвиживание действует и на летающих; по умолчанию полёт отменяет его (§15.4)
   cooldownTurns?: number;    // 1…5 собственных ходов; обязательно для непризывных умений
   maxUsesPerBattle?: number; // предел применений; для любого spawn обязан быть равен 1
   effects: SkillEffect[];

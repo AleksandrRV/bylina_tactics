@@ -147,7 +147,8 @@ export function previewAttack(
     dmgMax: Math.max(0, weapon.maxDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0)),
     cover: options.coverTypeOverride ?? (camouflage && cover.coverType < 1 ? 1 : cover.coverType),
     heightMod,
-    flanked: options.flankedOverride ?? (camouflage ? false : cover.flanked),
+    // Маскировка не является направленным укрытием и не отменяет фланговый охват (§9.6).
+    flanked: options.flankedOverride ?? cover.flanked,
     actionType: melee ? "MELEE" : "RANGED",
     breakCell,
     breakdown,
