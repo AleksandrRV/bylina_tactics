@@ -1,9 +1,9 @@
-import { previewAttack, resolveAttack, type HitPreview } from "./combat.js";
+import { previewAttack, resolveAttack, type AttackOptions, type HitPreview } from "./combat.js";
 import { isCoverCandidate, isCoverOnFireLine } from "./cover.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
 import { distH, facingAfterStep, tileAt } from "./grid.js";
-import { hasLineOfSight } from "./los.js";
+import { effectiveCoverTier, hasLineOfSight } from "./los.js";
 import { edgeCost, edgeCoverBetween } from "./occupancy.js";
 import { apCostFor, findPath, listReachable } from "./pathfinding.js";
 import { inMeleeReach, inRangedReach } from "./range.js";
@@ -249,6 +249,75 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return candidates[0] ?? null;
   };
 
+  /**
+   * Палица сначала принимает разрушаемое граневое укрытие на удар, затем
+   * разрешает атаку по оставшейся ступени. Полученный средой урон вычитается
+   * из урона по цели.
+   */
+  const edgeCoverOnLine = (attacker: EntityState, target: EntityState): EntityState | undefined => state.entities
+    .filter((entity) =>
+      entity.edge !== undefined &&
+      isCoverCandidate(target, entity) &&
+      isCoverOnFireLine(attacker, target, entity)
+    )
+    .sort((a, b) => b.coverType - a.coverType || a.id - b.id)[0];
+
+  const edgeAttackOptions = (
+    attacker: EntityState,
+    target: EntityState,
+    cover: EntityState,
+    rawTier: 0 | 1 | 2,
+    ignoreHalfCover: boolean,
+    damageReduction = 0,
+  ): AttackOptions => {
+    const effectiveTier = target.flying
+      ? 0
+      : effectiveCoverTier(rawTier, false, attacker.z, target.z, cover.z);
+    const rawPenalty = effectiveTier === 2 ? 50 : effectiveTier === 1 ? 25 : 0;
+    return {
+      coverPenaltyOverride: ignoreHalfCover && rawPenalty === 25 ? 0 : rawPenalty,
+      coverTypeOverride: effectiveTier,
+      flankedOverride: false,
+      coverDetailsOverride: [],
+      damageReduction,
+    };
+  };
+
+  const edgeBreach = (
+    attacker: EntityState,
+    target: EntityState,
+    weapon: WeaponStats,
+  ): { cover: EntityState; options: AttackOptions } | null => {
+    const environmentDamage = weapon.envDmg ?? 0;
+    if (weapon.category !== "melee" || environmentDamage < 1) return null;
+    const cover = edgeCoverOnLine(attacker, target);
+    if (!cover) return null;
+    const remainingRaw = Math.max(0, cover.coverType - 1) as 0 | 1 | 2;
+    return {
+      cover,
+      options: edgeAttackOptions(
+        attacker,
+        target,
+        cover,
+        remainingRaw,
+        Boolean(weapon.ignoreHalfCover),
+        environmentDamage,
+      ),
+    };
+  };
+
+  const currentEdgeOptions = (
+    attacker: EntityState,
+    target: EntityState,
+    weapon: WeaponStats,
+  ): AttackOptions | undefined => {
+    if (weapon.category !== "melee") return undefined;
+    const cover = edgeCoverOnLine(attacker, target);
+    return cover
+      ? edgeAttackOptions(attacker, target, cover, cover.coverType, Boolean(weapon.ignoreHalfCover))
+      : undefined;
+  };
+
   const appendOutcome = (events: GameEvent[]): void => {
     if (ended || !eliminationEnabled) return;
     const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0);
@@ -355,18 +424,40 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (actor.ap < skill.apCost) return { available: false, reason: "NO_AP" };
     if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
+    if (target) {
+      const isCover = target.coverType > 0;
+      const filter = skill.filter;
+      const matches = filter === "cover"
+        ? isCover
+        : filter === "enemies"
+          ? !isCover && target.owner > 0 && target.owner !== actor.owner
+          : filter === "allies"
+            ? !isCover && target.owner === actor.owner
+            : true;
+      if (!matches) return { available: false, reason: "ILLEGAL" };
+    }
     const pos = target ? cellPos(target) : targetPos!;
     const inReach = skill.category === "melee"
       ? inMeleeReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)
       : inRangedReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z, skill.range);
     if (!inReach) return { available: false, reason: "OUT_OF_RANGE" };
+    if (target && skill.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2) {
+      return { available: false, reason: "ILLEGAL" };
+    }
     if (skill.requiresLOS && !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)) {
       return { available: false, reason: "NO_LOS" };
     }
     if (target && target.coverType === 0 && skill.resolution === "attack") {
       const weapon = skillWeapon(skill);
       if (weapon) {
-        const combat = previewAttack(state.grid, state.entities, actor, target, weapon);
+        const combat = previewAttack(
+          state.grid,
+          state.entities,
+          actor,
+          target,
+          weapon,
+          currentEdgeOptions(actor, target, weapon),
+        );
         return {
           available: combat.available,
           reason: combat.reason,
@@ -383,8 +474,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return { available: true, targetPos: pos };
   };
 
-  const resolveCombatAgainst = (actor: EntityState, target: EntityState, weapon: WeaponStats, events: GameEvent[]): boolean => {
-    const resolved = resolveAttack(state.grid, state.entities, actor, target, weapon, rng);
+  const resolveCombatAgainst = (
+    actor: EntityState,
+    target: EntityState,
+    weapon: WeaponStats,
+    events: GameEvent[],
+    options: AttackOptions = {},
+  ): boolean => {
+    const resolved = resolveAttack(state.grid, state.entities, actor, target, weapon, rng, options);
     if (!resolved) return false;
     events.push({
       type: "COMBAT_RESOLVED",
@@ -461,7 +558,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           actionType: weapon.category === "melee" ? "MELEE" : "RANGED",
         };
       }
-      return previewAttack(state.grid, state.entities, actor, target, weapon);
+      const breach = edgeBreach(actor, target, weapon);
+      if (weapon.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2 && !breach) {
+        return { available: false, reason: "ILLEGAL" };
+      }
+      const edgeOptions = breach?.options ?? currentEdgeOptions(actor, target, weapon);
+      return previewAttack(state.grid, state.entities, actor, target, weapon, edgeOptions);
     },
     getSkillPreview: (actorId, skillId, targetId, targetPos) => {
       const actor = actorOf(actorId);
@@ -567,12 +669,18 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           return { ok: true, events };
         }
 
-        const preview = previewAttack(state.grid, state.entities, actor, target, weapon);
+        const breach = edgeBreach(actor, target, weapon);
+        if (weapon.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2 && !breach) {
+          return { ok: false, reason: "ILLEGAL" };
+        }
+        const edgeOptions = breach?.options ?? currentEdgeOptions(actor, target, weapon);
+        const preview = previewAttack(state.grid, state.entities, actor, target, weapon, edgeOptions);
         if (!preview.available) return { ok: false, reason: preview.reason ?? "ILLEGAL" };
         reveal(actor, events);
-        const hit = resolveCombatAgainst(actor, target, weapon, events);
+        if (breach) damageCover(breach.cover, events);
+        const hit = resolveCombatAgainst(actor, target, weapon, events, edgeOptions);
         spendAction(actor, weapon.apCost, weapon.endsTurn, events);
-        if ((weapon.envDmg ?? 0) >= 1 && hit) {
+        if (!breach && (weapon.envDmg ?? 0) >= 1 && hit) {
           const cover = coverOnFireLine(actor, target);
           if (cover) damageCover(cover, events);
         }
@@ -611,7 +719,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           damageCover(target, events);
           success = true;
         } else if (target && weapon) {
-          success = resolveCombatAgainst(actor, target, weapon, events);
+          success = resolveCombatAgainst(actor, target, weapon, events, currentEdgeOptions(actor, target, weapon));
           if (success && skill.affectsEnvironment && skill.envDmg >= 1) {
             const cover = coverOnFireLine(actor, target);
             if (cover) damageCover(cover, events);

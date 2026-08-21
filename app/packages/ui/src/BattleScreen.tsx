@@ -128,7 +128,7 @@ export function BattleScreen() {
   useEffect(() => {
     const first = snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
-    setAction(first?.weaponId ? { type: "weapon", id: first.weaponId } : null);
+    setAction(null);
     setAimId(null);
     setPreview(null);
   }, [snapshot.turnNumber]);
@@ -137,9 +137,9 @@ export function BattleScreen() {
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
 
   const reachable = useMemo(() => {
-    if (selectedId === null || paused || busy) return [] as ReachableCell[];
+    if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
     return session.getBattleReachable(selectedId);
-  }, [kernel, selectedId, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
+  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -278,15 +278,16 @@ export function BattleScreen() {
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
     const reach = byReach.get(cellKey(x, y));
-    const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach));
+    const targeting = action !== null;
+    const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
     if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0) {
       setSelectedId(entity.id);
-      setAction(entity.weaponId ? { type: "weapon", id: entity.weaponId } : null);
+      setAction(null);
       setAimId(null);
       setPreview(null);
       return;
     }
-    if (entity && selectedId !== null) {
+    if (entity && selectedId !== null && targeting) {
       if (aimId === entity.id && hit?.available) {
         tryAttack(entity.id);
         return;
@@ -296,9 +297,9 @@ export function BattleScreen() {
       return;
     }
 
-    // Проходимая клетка всегда означает перемещение. Граневое укрытие в ней
-    // не перехватывает выбор как цель атаки.
-    if (reach) {
+    // В режиме перемещения проходимая клетка всегда означает движение.
+    // Граневое укрытие в ней не перехватывает выбор как цель атаки.
+    if (reach && !targeting) {
       const id = cellKey(x, y);
       const coarse = window.matchMedia("(pointer: coarse)").matches;
       if (coarse && preview !== id) {
@@ -398,19 +399,21 @@ export function BattleScreen() {
         const next = pool[(index + 1) % pool.length];
         if (next) {
           setSelectedId(next.id);
-          setAction(next.weaponId ? { type: "weapon", id: next.weaponId } : null);
+          setAction(null);
           setAimId(null);
         }
         return;
       }
       if (event.key === "9" && selectedId !== null && selected && selected.ap > 0) {
         session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+        setAction(null);
         setAimId(null);
         setPreview(null);
         return;
       }
       if (event.key === "0" && selectedId !== null && selected && selected.ap > 0) {
         session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+        setAction(null);
         setAimId(null);
         setPreview(null);
         return;
@@ -424,8 +427,14 @@ export function BattleScreen() {
         ];
         const chosen = entries[index];
         if (!chosen) return;
-        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") useSelfSkill(chosen.id);
-        else setAction(chosen);
+        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
+          useSelfSkill(chosen.id);
+        } else {
+          const active = action?.type === chosen.type && action.id === chosen.id;
+          setAction(active ? null : chosen);
+          setAimId(null);
+          setPreview(null);
+        }
         return;
       }
       const step = 28;
@@ -445,7 +454,7 @@ export function BattleScreen() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, [paused, busy, snapshot, selectedId, aimId, hit, session]);
+  }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
   const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
@@ -514,7 +523,7 @@ export function BattleScreen() {
                   onClick={() => {
                     if (entity.dead) return;
                     setSelectedId(entity.id);
-                    setAction(entity.weaponId ? { type: "weapon", id: entity.weaponId } : null);
+                    setAction(null);
                     setAimId(null);
                   }}
                 >
@@ -674,8 +683,10 @@ export function BattleScreen() {
                 className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
                 disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
                 onClick={() => {
-                  setAction({ type: "weapon", id: weaponId });
-                  if (aimId !== null && action?.type === "weapon" && action.id === weaponId && hit?.available) tryAttack(aimId);
+                  const active = action?.type === "weapon" && action.id === weaponId;
+                  setAction(active ? null : { type: "weapon", id: weaponId });
+                  setAimId(null);
+                  setPreview(null);
                 }}
               >
                 {index < 4 ? <kbd>{index + 1}</kbd> : null}
@@ -712,6 +723,7 @@ export function BattleScreen() {
               onClick={() => {
                 if (selectedId === null) return;
                 session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+                setAction(null);
                 setAimId(null);
                 setPreview(null);
               }}
@@ -727,6 +739,7 @@ export function BattleScreen() {
               onClick={() => {
                 if (selectedId === null) return;
                 session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+                setAction(null);
                 setAimId(null);
                 setPreview(null);
               }}

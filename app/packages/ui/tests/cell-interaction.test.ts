@@ -35,7 +35,12 @@ describe("cell interaction priority", () => {
     expect(interactiveEntityAt([edgeCover], 2, 2, true)).toBeUndefined();
   });
 
-  it("allows targeting cover when its cell is not reachable", () => {
+  it("allows targeting cover when movement is disabled by weapon mode", () => {
+    const edgeCover = entity({ edge: 1, coverType: 2 });
+    expect(interactiveEntityAt([edgeCover], 2, 2, false)?.id).toBe(edgeCover.id);
+  });
+
+  it("allows targeting full cover when its cell is not reachable", () => {
     const fullCover = entity({ obstacle: true, coverType: 2 });
     expect(interactiveEntityAt([fullCover], 2, 2, false)?.id).toBe(fullCover.id);
   });

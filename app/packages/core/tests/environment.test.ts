@@ -5,7 +5,22 @@ import { defaultTrainingWeapons } from "../src/defaults.js";
 import { PLAYER_OWNER, ENEMY_OWNER } from "../src/debug-map.js";
 import type { SkillStats } from "../src/skills.js";
 import type { WeaponStats } from "../src/weapons.js";
-import { tileAt } from "../src/grid.js";
+import { makeGrid, tileAt } from "../src/grid.js";
+import type { EntityState, MatchState } from "../src/types.js";
+
+const MACE: WeaponStats = {
+  id: "mace", category: "melee", apCost: 1, endsTurn: true, range: 1,
+  requiresLOS: false, aimMod: 0, minDmg: 5, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 1,
+};
+
+const SHIELD_BASH: SkillStats = {
+  id: "shield_bash", apCost: 1, endsTurn: true, range: 1, requiresLOS: false,
+  category: "melee", resolution: "attack", envDmg: 0, filter: "enemies",
+  effects: [
+    { type: "damage", minDmg: 1, maxDmg: 1, crit: 0, critBonus: 0 },
+    { type: "knockback" },
+  ],
+};
 
 const ENV_BOW: WeaponStats = {
   id: "env_bow", category: "ranged", apCost: 1, endsTurn: true, range: 8,
@@ -33,6 +48,33 @@ const BREACH: SkillStats = {
     { type: "knockback" },
   ],
 };
+
+function fighter(partial: Partial<EntityState>): EntityState {
+  return {
+    id: 1, configId: "fighter", owner: PLAYER_OWNER, x: 1, y: 1, z: 1, dir: 1,
+    ap: 2, maxAp: 2, mobility: 5, hp: 20, maxHp: 20, aim: 100, defense: 0, vision: 10,
+    weaponId: MACE.id, weaponIds: [MACE.id], skillIds: [], obstacle: true, dead: false,
+    flying: false, hidden: false, coverType: 0, overwatch: false, defending: false,
+    movementSpent: 0,
+    ...partial,
+  } as EntityState;
+}
+
+function edgeMaceScenario(coverType: 1 | 2): { state: MatchState; attacker: EntityState; target: EntityState; cover: EntityState } {
+  const attacker = fighter({ id: 1, owner: PLAYER_OWNER, x: 1, y: 1, dir: 1 });
+  const target = fighter({ id: 2, owner: ENEMY_OWNER, x: 2, y: 1, dir: 3, weaponId: "", weaponIds: [] });
+  const cover = fighter({
+    id: 200, configId: "edge_cover", owner: 0, x: 2, y: 1, ap: 0, maxAp: 0,
+    mobility: 0, hp: 2, maxHp: 2, aim: 0, vision: 0, weaponId: "", weaponIds: [],
+    obstacle: false, coverType, edge: 3,
+  });
+  return {
+    attacker,
+    target,
+    cover,
+    state: { turnNumber: 1, activeOwner: PLAYER_OWNER, grid: makeGrid(5, 3, 1), entities: [cover, attacker, target] },
+  };
+}
 
 function visibleCoverScenario(seed: number) {
   const match = createQuickMatch({ enemyCount: 3, seed });
@@ -74,6 +116,49 @@ describe("cover destruction (§12)", () => {
   });
 });
 
+describe("mace attack through edge cover", () => {
+  it("allows the destructive mace but blocks an ordinary melee weapon at a full edge", () => {
+    const { state, attacker, target } = edgeMaceScenario(2);
+    const sword = { ...MACE, id: "plain_sword", envDmg: 0 };
+    attacker.weaponId = sword.id;
+    attacker.weaponIds = [sword.id, MACE.id];
+    const kernel = createTacticsKernel({ initial: state, weapons: { [sword.id]: sword, [MACE.id]: MACE } });
+    expect(kernel.getHitPreview(attacker.id, target.id, sword.id)).toMatchObject({ available: false, reason: "ILLEGAL" });
+    expect(kernel.getHitPreview(attacker.id, target.id, MACE.id).available).toBe(true);
+  });
+
+  it("destroys half cover before the roll and transfers one damage to environment", () => {
+    const { state, attacker, target, cover } = edgeMaceScenario(1);
+    const kernel = createTacticsKernel({ initial: state, weapons: { [MACE.id]: MACE }, seed: 1 });
+    const preview = kernel.getHitPreview(attacker.id, target.id, MACE.id);
+    expect(preview).toMatchObject({ available: true, chance: 100, cover: 0, dmgMin: 4, dmgMax: 4 });
+    const result = kernel.apply({ type: "ATTACK", actorId: attacker.id, targetId: target.id, weaponId: MACE.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const coverIndex = result.events.findIndex((event) => event.type === "COVER_DESTROYED");
+    const combatIndex = result.events.findIndex((event) => event.type === "COMBAT_RESOLVED");
+    expect(coverIndex).toBeGreaterThanOrEqual(0);
+    expect(coverIndex).toBeLessThan(combatIndex);
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === cover.id)?.coverType).toBe(0);
+    expect(result.events.find((event) => event.type === "COMBAT_RESOLVED")).toMatchObject({ damageDealt: 4 });
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === target.id)?.hp).toBe(16);
+  });
+
+  it("reduces full cover to half before the roll and keeps its hit penalty", () => {
+    const { state, attacker, target, cover } = edgeMaceScenario(2);
+    const kernel = createTacticsKernel({ initial: state, weapons: { [MACE.id]: MACE }, seed: 1 });
+    const preview = kernel.getHitPreview(attacker.id, target.id, MACE.id);
+    expect(preview).toMatchObject({ available: true, chance: 75, cover: 1, dmgMin: 4, dmgMax: 4 });
+    const result = kernel.apply({ type: "ATTACK", actorId: attacker.id, targetId: target.id, weaponId: MACE.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === cover.id)?.coverType).toBe(1);
+    const combat = result.events.find((event) => event.type === "COMBAT_RESOLVED");
+    expect(combat).toMatchObject({ damageDealt: 4 });
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === target.id)?.hp).toBe(16);
+  });
+});
+
 describe("0.8 skills and displacement", () => {
   it("circular sweep resolves all adjacent enemies in ascending id order", () => {
     const match = createQuickMatch({ enemyCount: 3, seed: 400 });
@@ -89,6 +174,28 @@ describe("0.8 skills and displacement", () => {
     const ids = result.events.filter((event) => event.type === "COMBAT_RESOLVED").map((event) => event.targetId);
     expect(ids).toEqual([...ids].sort((a, b) => a - b));
     expect(ids).toEqual(expect.arrayContaining(enemies.map((entity) => entity.id)));
+  });
+
+  it("shield bash deals low damage and pushes the enemy one cell", () => {
+    const { state, attacker, target } = edgeMaceScenario(1);
+    state.entities = [attacker, target];
+    attacker.skillIds = [SHIELD_BASH.id];
+    const kernel = createTacticsKernel({
+      initial: state,
+      weapons: { [MACE.id]: MACE },
+      skills: { [SHIELD_BASH.id]: SHIELD_BASH },
+      seed: 1,
+    });
+    const result = kernel.apply({ type: "USE_SKILL", actorId: attacker.id, skillId: SHIELD_BASH.id, targetId: target.id });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events).toEqual(expect.arrayContaining([
+      expect.objectContaining({ type: "COMBAT_RESOLVED", damageDealt: 1 }),
+      expect.objectContaining({ type: "ENTITY_DISPLACED", entityId: target.id, cause: "KNOCKBACK" }),
+    ]));
+    const after = kernel.getSnapshot().entities.find((entity) => entity.id === target.id)!;
+    expect(after.hp).toBe(19);
+    expect(after.x).toBe(3);
   });
 
   it("kills a flying unit that loses flight over a pit", () => {

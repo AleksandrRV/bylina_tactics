@@ -176,6 +176,9 @@
     },
     "breach": {
       "name": "Breach"
+    },
+    "shield_bash": {
+      "name": "Shield bash"
     }
   }
 }

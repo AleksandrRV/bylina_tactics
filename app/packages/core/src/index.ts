@@ -36,7 +36,7 @@ export type { IntersectionType, ObstacleResult, TracedCell } from "./los.js";
 export { effectiveRange, heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 export { evaluateCover } from "./cover.js";
 export { previewAttack, resolveAttack } from "./combat.js";
-export type { AttackResolution, HitPreview } from "./combat.js";
+export type { AttackOptions, AttackResolution, HitPreview } from "./combat.js";
 export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
 export type { SkillEffect, SkillPreview, SkillStats } from "./skills.js";

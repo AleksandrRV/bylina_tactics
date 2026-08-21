@@ -1,0 +1,15 @@
+{
+  id: "shield_bash",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee",
+  resolution: "attack",
+  envDmg: 0,
+  filter: "enemies",
+  effects: [
+    { type: "damage", minDmg: 1, maxDmg: 2, crit: 0, critBonus: 0 },
+    { type: "knockback" },
+  ],
+}

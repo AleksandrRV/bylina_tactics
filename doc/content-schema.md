@@ -55,7 +55,7 @@ interface WeaponConfig {
   maxDmg: number;            // ≥ minDmg
   crit: number;              // 0…100
   critBonus: number;         // ≥ 0
-  envDmg: number;            // 0 — среда не изменяется; ≥ 1 — одна ступень
+  envDmg: number;            // 0 — среда не изменяется; ≥ 1 — одна ступень; при ударе через грань столько урона принимает среда
   ignoreHalfCover?: boolean;
   closeRangePenalty?: {      // вычет дальности
     distHLessThan: number;

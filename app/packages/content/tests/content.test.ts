@@ -35,7 +35,11 @@ describe("parseContent", () => {
       "upyr",
       "znaharka",
     ]);
-    expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual(["circular_sweep", "breach"]);
+    expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual([
+      "circular_sweep",
+      "breach",
+      "shield_bash",
+    ]);
     expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual([
       "bow",
       "bow_debug",
@@ -47,7 +51,11 @@ describe("parseContent", () => {
       "sword",
       "sword_debug",
     ]);
-    expect(result.data.skills.map((skill) => skill.id).sort()).toEqual(["breach", "circular_sweep"]);
+    expect(result.data.skills.map((skill) => skill.id).sort()).toEqual([
+      "breach",
+      "circular_sweep",
+      "shield_bash",
+    ]);
     expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");
