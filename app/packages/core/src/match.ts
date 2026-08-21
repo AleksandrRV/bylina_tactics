@@ -66,11 +66,24 @@ export interface QuickMatchOptions {
   seed: number;
 }
 
+export type RosterMods = {
+  aimMod?: number;
+  defenseMod?: number;
+  mobilityMod?: number;
+  /** Начальный запас здоровья высадки (сохранённый после прошлой миссии). */
+  hp?: number;
+};
+
+export interface RosterSlot extends RosterMods {
+  /** Запись юнита высадки. */
+  unitId: string;
+}
+
 export interface MissionMatchOptions {
   units: SpawnUnitConfig[];
   map: MapGenConfig;
-  /** Высадка: идентификаторы записей бойцов, до пяти. */
-  playerSlots: readonly string[];
+  /** Высадка: записи бойцов, от одного до пяти. */
+  playerSlots: readonly (string | RosterSlot)[];
   /** Состав противников миссии: тип и число. */
   enemies: readonly { unitId: string; count: number }[];
   seed: number;
@@ -93,7 +106,11 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     throw new Error(`Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${expanded.length}`);
   }
   const generated = generateBattlefield(map, rng, players, enemies);
-  const roster = options.playerSlots.map((id) => pickUnit(options.units, id));
+  const roster = options.playerSlots.map((slot) => {
+    const unitId = typeof slot === "string" ? slot : slot.unitId;
+    const mods: RosterMods = typeof slot === "string" ? {} : slot;
+    return { unitId, mods };
+  });
 
   const state: MatchState = {
     turnNumber: 1,
@@ -104,10 +121,16 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     rngState: String(rng.getState()),
   };
 
-  roster.forEach((config, index) => {
+  roster.forEach((entry, index) => {
+    const config = pickUnit(options.units, entry.unitId);
     const point = players[index] ?? players[0]!;
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+    const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1);
+    if (entry.mods.aimMod) spawned.aim += entry.mods.aimMod;
+    if (entry.mods.defenseMod) spawned.defense += entry.mods.defenseMod;
+    if (entry.mods.mobilityMod) spawned.mobility = Math.max(1, spawned.mobility + entry.mods.mobilityMod);
+    if (entry.mods.hp !== undefined) spawned.hp = Math.max(1, Math.min(spawned.maxHp, entry.mods.hp));
+    state.entities.push(spawned);
   });
 
   enemies.forEach((point, index) => {

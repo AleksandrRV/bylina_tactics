@@ -276,13 +276,45 @@
     },
     "ship": "Летучий Корабль",
     "kingdom": "Тридевятое царство",
-    "tabNoteSoon": "с {version}"
+    "tabNoteSoon": "с {version}",
+    "tabMap": "Карта",
+    "lostRosterBody": "Дружина пала: в живых не осталось ни одного бойца. Кампания окончена."
   },
   "missionResult": {
-    "title": "Итог миссии",
-    "darknessGained": "Тьма возросла на {value}",
-    "toMap": "К карте",
-    "victoryHint": "Дружина одолела Навь — Тьма отступила.",
-    "defeatHint": "Дружина отступила — Тьма крепнет."
+    "rosterOutcomes": "Итоги дружины",
+    "fallen": "Пали в бою",
+    "wounded": "Ранены",
+    "leveledUp": "Получили уровень",
+    "newRecruit": "Новый рекрут"
+  },
+  "deployment": {
+    "title": "Высадка",
+    "hint": "Выберите от {min} до {max} бойцов",
+    "listLabel": "Бойцы дружины",
+    "count": "Выбрано {current} из {max}",
+    "confirm": "В бой",
+    "back": "Назад к карте",
+    "wounded": "Ранен",
+    "woundedHint": "Ранение: меткость {aim}, защита {defense}, подвижность {mobility}"
+  },
+  "roster": {
+    "count": "В дружине {current} из {max}",
+    "recruit": "Рекрут",
+    "fallen": "Погиб",
+    "fallenHp": "—",
+    "level": "Уровень {level}",
+    "train": "Обучить",
+    "trainTitle": "Выбор класса: {name}",
+    "trainHint": "Рекрут созрел для обучения. Выберите класс дружины.",
+    "wounded": "Ранен",
+    "woundedHint": "Ранение: меткость {aim}, защита {defense}, подвижность {mobility}",
+    "ready": "Готов к высадке"
+  },
+  "chamber": {
+    "count": "Раненых: {current}",
+    "empty": "Все бойцы здоровы",
+    "emptyBody": "В Горнице пусто: раненых нет.",
+    "heal": "Лечить",
+    "healAll": "Лечить всех"
   }
 }

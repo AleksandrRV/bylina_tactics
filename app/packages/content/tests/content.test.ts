@@ -33,6 +33,7 @@ describe("parseContent", () => {
       "illusion",
       "kikimora",
       "leshy",
+      "recruit",
       "strelets",
       "upyr",
       "volkhv",

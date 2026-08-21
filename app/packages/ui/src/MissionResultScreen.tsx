@@ -27,6 +27,31 @@ function DefeatEmblem() {
   );
 }
 
+function SkullIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="10" cy="9" r="6.4" />
+      <path d="M7 9h.01M13 9h.01M10 15v2M7.5 17.5h5" />
+    </svg>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+      <path d="M8 2.5v11M2.5 8h11" />
+    </svg>
+  );
+}
+
+function ArrowUpIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8 13V3M3.5 7.5 8 3l4.5 4.5" />
+    </svg>
+  );
+}
+
 export function MissionResultScreen() {
   useI18nTick();
   const t = useT();
@@ -39,6 +64,7 @@ export function MissionResultScreen() {
   const previous = Math.max(0, state.darkness - (last?.darknessGained ?? 0));
   const gainedPercent = last ? Math.min(100, ((state.darkness - previous) / state.darknessMax) * 100) : 0;
   const previousPercent = Math.min(100, (previous / state.darknessMax) * 100);
+  const lostByRoster = state.phase === "lost" && last && state.fighters.every((fighter) => !fighter.alive);
 
   return (
     <div className="screen menu-screen mission-result-screen">
@@ -52,6 +78,47 @@ export function MissionResultScreen() {
         <h1 className="display-title">{victory ? t("result.victory") : t("result.defeat")}</h1>
         <p className="muted">{victory ? t("missionResult.victoryHint") : t("missionResult.defeatHint")}</p>
       </header>
+
+      {last ? (
+        <div className="roster-outcomes" aria-label={t("missionResult.rosterOutcomes")}>
+          {last.fallen.length > 0 ? (
+            <div className="outcome-group is-fallen">
+              <span className="outcome-icon"><SkullIcon /></span>
+              <div>
+                <p className="outcome-title">{t("missionResult.fallen")}</p>
+                <p className="outcome-names">{last.fallen.join(", ")}</p>
+              </div>
+            </div>
+          ) : null}
+          {last.wounded.length > 0 ? (
+            <div className="outcome-group is-wounded">
+              <span className="outcome-icon"><CrossIcon /></span>
+              <div>
+                <p className="outcome-title">{t("missionResult.wounded")}</p>
+                <p className="outcome-names">{last.wounded.join(", ")}</p>
+              </div>
+            </div>
+          ) : null}
+          {last.leveledUp.length > 0 ? (
+            <div className="outcome-group is-level">
+              <span className="outcome-icon"><ArrowUpIcon /></span>
+              <div>
+                <p className="outcome-title">{t("missionResult.leveledUp")}</p>
+                <p className="outcome-names">{last.leveledUp.join(", ")}</p>
+              </div>
+            </div>
+          ) : null}
+          {last.newRecruit ? (
+            <div className="outcome-group is-recruit">
+              <span className="outcome-icon">✦</span>
+              <div>
+                <p className="outcome-title">{t("missionResult.newRecruit")}</p>
+                <p className="outcome-names">{last.newRecruit}</p>
+              </div>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       {last && state.phase !== "lost" ? (
         <div className="darkness-summary" aria-label={t("campaign.darknessLabel")}>
@@ -70,7 +137,7 @@ export function MissionResultScreen() {
 
       {state.phase === "lost" ? (
         <div className="loss-banner" role="alert">
-          {t("campaign.lostBody", { value: state.darknessMax })}
+          {lostByRoster ? t("campaign.lostRosterBody") : t("campaign.lostBody", { value: state.darknessMax })}
         </div>
       ) : null}
 

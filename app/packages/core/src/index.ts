@@ -24,7 +24,7 @@ export type { SpawnUnitConfig } from "./defaults.js";
 export { QUICK_MATCH_MAP, enemySpawns, generateBattlefield, playerSpawns } from "./mapgen.js";
 export type { MapGenConfig, SpawnPoint } from "./mapgen.js";
 export { createMissionMatch, createQuickMatch } from "./match.js";
-export type { MissionMatchOptions, QuickMatchOptions } from "./match.js";
+export type { MissionMatchOptions, QuickMatchOptions, RosterMods, RosterSlot } from "./match.js";
 export { isCombatant, livingOf, matchOutcome } from "./outcome.js";
 export type { MatchOutcome } from "./outcome.js";
 export { pickEnemyCommand, runEnemyTurn } from "./ai.js";

@@ -83,3 +83,28 @@ describe("createMissionMatch", () => {
     ).toThrow();
   });
 });
+
+describe("createMissionMatch roster modifiers", () => {
+  it("applies wound penalties and preserved hp to deployed fighters", () => {
+    const match = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: [
+        { unitId: "bogatyr", aimMod: -15, defenseMod: -10, mobilityMod: -1, hp: 4 },
+        "strelets",
+      ],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      seed: 51,
+    });
+    const bogatyr = livingOf(match, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
+    const strelets = livingOf(match, PLAYER_OWNER).find((entity) => entity.configId === "strelets")!;
+    const base = DEFAULT_TRAINING_UNITS.bogatyr!;
+    expect(bogatyr.aim).toBe(base.aim - 15);
+    expect(bogatyr.defense).toBe(base.defense - 10);
+    expect(bogatyr.mobility).toBe(base.mobility - 1);
+    expect(bogatyr.hp).toBe(4);
+    expect(bogatyr.maxHp).toBe(base.maxHealth);
+    expect(strelets.aim).toBe(DEFAULT_TRAINING_UNITS.strelets!.aim);
+    expect(strelets.hp).toBe(DEFAULT_TRAINING_UNITS.strelets!.maxHealth);
+  });
+});
