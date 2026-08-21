@@ -35,6 +35,8 @@ function unit(partial: Partial<EntityState> = {}): EntityState {
     dead: false,
     flying: false,
     coverType: 0,
+    overwatch: false,
+    defending: false,
     ...partial,
   };
 }

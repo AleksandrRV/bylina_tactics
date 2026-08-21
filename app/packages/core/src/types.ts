@@ -39,6 +39,10 @@ export interface EntityState {
   dead: boolean;
   flying: boolean;
   coverType: 0 | 1 | 2;
+  /** Признак дозора (§14). Снимается при ответном действии или в начале хода стороны. */
+  overwatch: boolean;
+  /** Защитная стойка: бонус к увороту и снижение урона. Снимается в начале хода стороны. */
+  defending: boolean;
 }
 
 export interface MatchState {
@@ -56,6 +60,8 @@ export interface ReachableCell extends CellPos {
 export type Command =
   | { type: "MOVE"; actorId: number; to: CellPos; path?: CellPos[] }
   | { type: "ATTACK"; actorId: number; targetId: number; weaponId?: string }
+  | { type: "OVERWATCH"; actorId: number }
+  | { type: "DEFEND"; actorId: number }
   | { type: "END_TURN"; playerId: string };
 
 export type GameEvent =
@@ -77,8 +83,14 @@ export type GameEvent =
       damageDealt: number;
       isFlanked: boolean;
       heightMod: -1 | 0 | 1;
+      /** Установлено если это ответное действие дозора. */
+      overwatch?: boolean;
     }
-  | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" };
+  | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" }
+  | { type: "OVERWATCH_SET"; entityId: number }
+  | { type: "OVERWATCH_CLEARED"; entityId: number }
+  | { type: "DEFEND_SET"; entityId: number }
+  | { type: "DEFEND_CLEARED"; entityId: number };
 
 export type RejectReason =
   | "ILLEGAL"

@@ -2,7 +2,9 @@ import { previewAttack, resolveAttack, type HitPreview } from "./combat.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
 import { facingAfterStep, tileAt } from "./grid.js";
+import { hasLineOfSight } from "./los.js";
 import { apCostFor, findPath, listReachable } from "./pathfinding.js";
+import { effectiveRange, inMeleeReach, inRangedReach } from "./range.js";
 import { createMulberry32, type Rng } from "./rng.js";
 import type {
   ApplyResult,
@@ -15,7 +17,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.6.0";
+export const CORE_VERSION = "0.7.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -61,6 +63,38 @@ function nextOwner(state: MatchState, current: number): number {
   return order[(index + 1) % order.length] ?? current;
 }
 
+/**
+ * §14. Вектор ориентации (dir: 0=север, 1=восток, 2=юг, 3=запад).
+ * Скалярное произведение с вектором к клетке C ≥ 0 — передняя полуплоскость.
+ */
+function inFrontHalfPlane(observer: EntityState, cx: number, cy: number): boolean {
+  const dx = cx - observer.x;
+  const dy = cy - observer.y;
+  if (dx === 0 && dy === 0) return true;
+  // dir 0 = (0, -1), 1 = (1, 0), 2 = (0, 1), 3 = (-1, 0)
+  const dirs: [number, number][] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const [fx, fy] = dirs[observer.dir] ?? [0, -1];
+  return fx * dx + fy * dy >= 0;
+}
+
+/** Проверка: может ли наблюдатель атаковать цель в клетке (cx, cy) дозорным оружием. */
+function canOverwatchHit(
+  grid: MatchState["grid"],
+  observer: EntityState,
+  cx: number,
+  cy: number,
+  cz: number,
+  weapon: WeaponStats,
+): boolean {
+  const melee = weapon.category === "melee";
+  const inReach = melee
+    ? inMeleeReach(observer.x, observer.y, observer.z, cx, cy, cz)
+    : inRangedReach(observer.x, observer.y, observer.z, cx, cy, cz, effectiveRange(observer.z, cz, weapon.range));
+  if (!inReach) return false;
+  if (weapon.requiresLOS && !hasLineOfSight(grid, observer.x, observer.y, observer.z, cx, cy, cz)) return false;
+  return true;
+}
+
 export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel {
   let state = options.initial ?? createDebugMatch();
   const weapons = { ...defaultWeapons(), ...options.weapons };
@@ -78,6 +112,61 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const weaponOf = (entity: EntityState, weaponId?: string): WeaponStats | undefined => {
     return weapons[weaponId || entity.weaponId];
+  };
+
+  /**
+   * §14. Проверка дозора при входе в клетку. Ответные действия наблюдателей
+   * противника, упорядоченных по возрастанию ID.
+   */
+  const triggerOverwatch = (mover: EntityState, cell: CellPos, events: GameEvent[]): boolean => {
+    const observers = state.entities
+      .filter((e) => e.overwatch && !e.dead && e.owner !== mover.owner && e.coverType === 0)
+      .sort((a, b) => a.id - b.id);
+    for (const observer of observers) {
+      if (mover.dead) break;
+      if (observer.dead) continue;
+      if (!inFrontHalfPlane(observer, cell.x, cell.y)) continue;
+      const weapon = weaponOf(observer);
+      if (!weapon) continue;
+      if (!canOverwatchHit(state.grid, observer, cell.x, cell.y, cell.z, weapon)) continue;
+
+      const resolved = resolveAttack(state.grid, state.entities, observer, mover, weapon, rng);
+      if (!resolved) continue;
+
+      observer.overwatch = false;
+      events.push({ type: "OVERWATCH_CLEARED", entityId: observer.id });
+      events.push({
+        type: "COMBAT_RESOLVED",
+        sourceId: observer.id,
+        targetId: mover.id,
+        actionType: resolved.actionType,
+        result: resolved.result,
+        damageDealt: resolved.damage,
+        isFlanked: resolved.flanked,
+        heightMod: resolved.heightMod,
+        overwatch: true,
+      });
+      if (resolved.damage > 0) {
+        mover.hp -= resolved.damage;
+        events.push({
+          type: "STAT_CHANGED",
+          entityId: mover.id,
+          stat: "HP",
+          newValue: mover.hp,
+          delta: -resolved.damage,
+        });
+      }
+      if (mover.hp <= 0 && !mover.dead) {
+        mover.dead = true;
+        mover.obstacle = false;
+        mover.ap = 0;
+        mover.overwatch = false;
+        mover.defending = false;
+        events.push({ type: "ENTITY_DIED", entityId: mover.id, causeOfDeath: "DAMAGE" });
+        return true; // гибель прерывает маршрут
+      }
+    }
+    return false;
   };
 
   const kernel: TacticsKernel = {
@@ -115,10 +204,27 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       return entry ? new Set(entry.explored) : new Set();
     },
     apply: (command) => {
+      // ---------- END_TURN (§16) ----------
       if (command.type === "END_TURN") {
         const events: GameEvent[] = [];
         const upcoming = nextOwner(state, state.activeOwner);
         state.activeOwner = upcoming;
+
+        // §16.3: снять дозор юнитов стороны, если не был произведён ответ.
+        // §16: снять защитную стойку.
+        for (const entity of state.entities) {
+          if (entity.owner !== upcoming) continue;
+          if (entity.overwatch) {
+            entity.overwatch = false;
+            events.push({ type: "OVERWATCH_CLEARED", entityId: entity.id });
+          }
+          if (entity.defending) {
+            entity.defending = false;
+            events.push({ type: "DEFEND_CLEARED", entityId: entity.id });
+          }
+        }
+
+        // §16.4: восстановить ОД.
         for (const entity of state.entities) {
           if (entity.dead || entity.owner !== upcoming || entity.maxAp <= 0) continue;
           if (entity.ap !== entity.maxAp) {
@@ -145,6 +251,43 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         return { ok: true, events };
       }
 
+      // ---------- OVERWATCH (§14) ----------
+      if (command.type === "OVERWATCH") {
+        const actor = actorOf(command.actorId);
+        if (!actor) return { ok: false, reason: "NOT_FOUND" };
+        if (actor.dead) return { ok: false, reason: "ILLEGAL" };
+        if (actor.owner !== state.activeOwner) return { ok: false, reason: "NOT_YOUR_TURN" };
+        if (actor.ap <= 0) return { ok: false, reason: "NO_AP" };
+        actor.overwatch = true;
+        actor.ap = 0;
+        const events: GameEvent[] = [
+          { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -actor.maxAp },
+          { type: "OVERWATCH_SET", entityId: actor.id },
+        ];
+        emit();
+        return { ok: true, events };
+      }
+
+      // ---------- DEFEND ----------
+      if (command.type === "DEFEND") {
+        const actor = actorOf(command.actorId);
+        if (!actor) return { ok: false, reason: "NOT_FOUND" };
+        if (actor.dead) return { ok: false, reason: "ILLEGAL" };
+        if (actor.owner !== state.activeOwner) return { ok: false, reason: "NOT_YOUR_TURN" };
+        actor.defending = true;
+        const prevAp = actor.ap;
+        actor.ap = 0;
+        const events: GameEvent[] = [
+          { type: "DEFEND_SET", entityId: actor.id },
+        ];
+        if (prevAp > 0) {
+          events.push({ type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -prevAp });
+        }
+        emit();
+        return { ok: true, events };
+      }
+
+      // ---------- ATTACK ----------
       if (command.type === "ATTACK") {
         const actor = actorOf(command.actorId);
         const target = actorOf(command.targetId);
@@ -187,12 +330,15 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           target.dead = true;
           target.obstacle = false;
           target.ap = 0;
+          target.overwatch = false;
+          target.defending = false;
           events.push({ type: "ENTITY_DIED", entityId: target.id, causeOfDeath: "DAMAGE" });
         }
         emit();
         return { ok: true, events };
       }
 
+      // ---------- MOVE ----------
       if (command.type !== "MOVE") return { ok: false, reason: "ILLEGAL" };
 
       const actor = actorOf(command.actorId);
@@ -240,6 +386,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           apSpent: ap,
         },
       ];
+
+      // §14: проверка дозора по клетке назначения.
+      triggerOverwatch(actor, dest, events);
+
       emit();
       return { ok: true, events };
     },

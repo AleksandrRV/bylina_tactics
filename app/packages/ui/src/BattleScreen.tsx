@@ -357,6 +357,14 @@ export function BattleScreen() {
         tryAttack(aimId);
         return;
       }
+      if (event.key === "2" && selectedId !== null && selected && selected.ap > 0) {
+        kernel.apply({ type: "OVERWATCH", actorId: selectedId });
+        return;
+      }
+      if (event.key === "3" && selectedId !== null && selected) {
+        kernel.apply({ type: "DEFEND", actorId: selectedId });
+        return;
+      }
       const step = 28;
       if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") rendererRef.current?.pan(step, 0);
       if (event.key === "ArrowRight" || event.key === "d" || event.key === "D") rendererRef.current?.pan(-step, 0);
@@ -525,6 +533,32 @@ export function BattleScreen() {
             >
               <kbd>1</kbd>
               {weaponName || t("battle.weapon")}
+            </button>
+            <button
+              type="button"
+              className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              title={t("battle.overwatchHint")}
+              onClick={() => {
+                if (selectedId === null) return;
+                kernel.apply({ type: "OVERWATCH", actorId: selectedId });
+              }}
+            >
+              <kbd>2</kbd>
+              {t("battle.overwatch")}
+            </button>
+            <button
+              type="button"
+              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
+              disabled={!selected || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              title={t("battle.defendHint")}
+              onClick={() => {
+                if (selectedId === null) return;
+                kernel.apply({ type: "DEFEND", actorId: selectedId });
+              }}
+            >
+              <kbd>3</kbd>
+              {t("battle.defend")}
             </button>
           </div>
           <button

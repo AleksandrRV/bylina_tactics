@@ -66,8 +66,9 @@ export function previewAttack(
   }
 
   const heightAim = heightMod === 1 ? 20 : heightMod === -1 ? -20 : 0;
+  const defendBonus = target.defending ? 25 : 0;
   const chance = clampChance(
-    attacker.aim + weapon.aimMod + heightAim - target.defense - cover.penalty - rangePenalty,
+    attacker.aim + weapon.aimMod + heightAim - target.defense - defendBonus - cover.penalty - rangePenalty,
   );
 
   return {
@@ -115,7 +116,9 @@ export function resolveAttack(
   const critRoll = rng.nextInt(1, 100);
   const crit = critRoll <= critChance;
   const base = rng.nextInt(weapon.minDmg, weapon.maxDmg);
-  const damage = base + (crit ? weapon.critBonus : 0);
+  const raw = base + (crit ? weapon.critBonus : 0);
+  const defendReduction = target.defending ? 2 : 0;
+  const damage = Math.max(0, raw - defendReduction);
   return {
     result: crit ? "CRIT" : "HIT",
     damage,
