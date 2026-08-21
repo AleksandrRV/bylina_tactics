@@ -29,6 +29,7 @@ describe("generateBattlefield", () => {
         maxHp: 1,
         aim: 0,
         defense: 0,
+        vision: 0,
         weaponId: "",
         obstacle: false,
         dead: false,

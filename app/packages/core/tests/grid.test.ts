@@ -28,6 +28,7 @@ function walker(partial: Partial<EntityState> = {}): EntityState {
     maxHp: 10,
     aim: 70,
     defense: 0,
+    vision: 12,
     weaponId: "bow_debug",
     obstacle: true,
     dead: false,
@@ -107,9 +108,9 @@ describe("edges and occupancy", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.5.0 and does not touch the document object", () => {
+  it("reports 0.6.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.5.0");
+    expect(kernel.version).toBe("0.6.0");
     expect(typeof globalThis.document).toBe("undefined");
   });
 

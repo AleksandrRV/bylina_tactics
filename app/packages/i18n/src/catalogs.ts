@@ -23,7 +23,7 @@ const bundled: Record<string, Catalog[]> = {
   en: [enUi as Catalog],
 };
 
-/** Каталоги ru/en для испытаний в Node.js. */
+/** Каталоги ru/en для тестов в Node.js. */
 export function loadBundledCatalogs(): Record<string, Catalog> {
   const result: Record<string, Catalog> = {};
   for (const [code, parts] of Object.entries(bundled)) {

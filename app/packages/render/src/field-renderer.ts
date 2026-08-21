@@ -6,7 +6,7 @@ import {
   type ReachableCell,
   type Tile,
 } from "@bylina/core";
-import { Application, Container, Graphics, Rectangle, type FederatedPointerEvent } from "pixi.js";
+import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -21,6 +21,11 @@ export interface FieldView {
   path: CellPos[];
   aimOk: boolean;
   heightMod: -1 | 0 | 1;
+  debugMovement?: boolean;
+  /** Клетки, которые сторона наблюдает сейчас (ключи «x,y»). Пустое множество = без тумана. */
+  visibleCells?: Set<string>;
+  /** Клетки, которые сторона когда-либо наблюдала (ключи «x,y»). */
+  exploredCells?: Set<string>;
 }
 
 export interface FieldRenderer {
@@ -552,9 +557,45 @@ export function createFieldRenderer(): FieldRenderer {
       }
     }
 
+    // Туман войны: затемнение для неразведанных и ранее виденных клеток.
+    if (view?.visibleCells) {
+      const key = `${tile.x},${tile.y}`;
+      const isVisible = view.visibleCells.has(key);
+      const isExplored = view.exploredCells?.has(key) ?? false;
+      if (!isVisible && !isExplored) {
+        // Неразведанная клетка: плотный тёмный оверлей.
+        g.rect(0, 0, C, C).fill({ color: 0x06080a, alpha: 0.88 });
+      } else if (!isVisible && isExplored) {
+        // Ранее виденная: лёгкое затемнение, рельеф виден.
+        g.rect(0, 0, C, C).fill({ color: 0x0c1218, alpha: 0.42 });
+      }
+    }
+
     g.position.set(PAD + tile.x * CELL_SIZE, fy);
     g.zIndex = tile.y * 100 + z * 10;
     return g;
+  };
+
+  const drawDebugLabel = (tile: Tile): Text | null => {
+    if (!view?.debugMovement) return null;
+    const reachCell = view.reachable.find((cell) => cell.x === tile.x && cell.y === tile.y);
+    if (!reachCell) return null;
+    const z = visualLevel(tile);
+    const { fy } = faceOf(tile.x, tile.y, z);
+    const label = new Text({
+      text: String(reachCell.mpCost),
+      style: {
+        fontFamily: "monospace",
+        fontSize: 12,
+        fontWeight: "600",
+        fill: 0xf3ecdc,
+        stroke: { color: 0x0c120c, width: 3 },
+      },
+    });
+    label.anchor.set(1, 1);
+    label.position.set(PAD + tile.x * CELL_SIZE + CELL_SIZE - 4, fy + CELL_SIZE - 3);
+    label.zIndex = tile.y * 100 + z * 10 + 5;
+    return label;
   };
 
   const paintStatic = (): void => {
@@ -562,6 +603,8 @@ export function createFieldRenderer(): FieldRenderer {
     ground.removeChildren().forEach((child) => child.destroy());
     for (const tile of view.snapshot.grid.tiles) {
       ground.addChild(drawTile(tile));
+      const label = drawDebugLabel(tile);
+      if (label) ground.addChild(label);
     }
     ground.sortableChildren = true;
   };
@@ -735,6 +778,11 @@ export function createFieldRenderer(): FieldRenderer {
       return pa.cy - pb.cy || a.id - b.id;
     });
     for (const entity of drawOrder) {
+      // Туман войны: скрывать чужие сущности вне зоны видимости.
+      if (view.visibleCells && entity.owner !== 1 && entity.coverType === 0) {
+        const key = `${entity.x},${entity.y}`;
+        if (!view.visibleCells.has(key)) continue;
+      }
       const shown = display.get(entity.id);
       const dead = shown?.dead ?? entity.dead;
       if (dead && entity.coverType === 0 && !dying.has(entity.id)) {

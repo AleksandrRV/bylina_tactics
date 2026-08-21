@@ -2,7 +2,7 @@ import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import { tileAt } from "./grid.js";
 import { createMulberry32 } from "./rng.js";
 import { enemySpawns, generateBattlefield, playerSpawns, QUICK_MATCH_MAP, type MapGenConfig } from "./mapgen.js";
-import { DEFAULT_TRAINING_UNITS, type SpawnUnitConfig } from "./training-map.js";
+import { DEFAULT_TRAINING_UNITS, type SpawnUnitConfig } from "./defaults.js";
 import type { EntityState, MatchState } from "./types.js";
 
 function pickUnit(units: SpawnUnitConfig[] | undefined, id: string): SpawnUnitConfig {
@@ -34,6 +34,7 @@ function spawn(
     maxHp: config.maxHealth,
     aim: config.aim,
     defense: config.defense,
+    vision: config.vision,
     weaponId,
     obstacle: true,
     dead: false,

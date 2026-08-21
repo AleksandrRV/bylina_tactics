@@ -29,6 +29,7 @@ function unit(partial: Partial<EntityState> = {}): EntityState {
     maxHp: 10,
     aim: 80,
     defense: 0,
+    vision: 12,
     weaponId: DEBUG_BOW.id,
     obstacle: true,
     dead: false,

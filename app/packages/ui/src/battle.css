@@ -329,6 +329,48 @@
   margin-top: 10px;
 }
 
+.top-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.hud-icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  min-height: 36px;
+  min-width: 36px;
+  color: #9a9384;
+}
+
+.hud-icon-btn:hover,
+.hud-icon-btn:focus-visible {
+  color: #d5cfc0;
+}
+
+.hud-icon-btn.is-on {
+  color: #e0b34a;
+  border-color: #e0b34a;
+  background: #2a332c;
+}
+
+.debug-toggle {
+  font-size: 0.82rem;
+  letter-spacing: 0.04em;
+  border-color: #3a4550;
+  color: #9a9384;
+}
+
+.debug-toggle.is-on {
+  border-color: #e0b34a;
+  color: #f3ecdc;
+  background: #2a332c;
+  box-shadow: inset 0 0 0 1px rgba(224, 179, 74, 0.4);
+}
+
 @media (min-width: 880px) {
   .battle-top {
     align-items: flex-start;

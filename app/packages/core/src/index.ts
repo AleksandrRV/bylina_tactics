@@ -1,6 +1,4 @@
-export const CORE_VERSION = "0.5.0";
-
-export { createTacticsKernel } from "./kernel.js";
+export { CORE_VERSION, createTacticsKernel } from "./kernel.js";
 export type { KernelOptions, TacticsKernel } from "./kernel.js";
 export {
   createDebugMatch,
@@ -13,22 +11,16 @@ export {
 } from "./debug-map.js";
 export {
   BOW,
+  BRANCH,
   CLAWS,
   DEFAULT_TRAINING_UNITS,
+  NEEDLE,
   SLING,
   SWORD,
-  TRAINING_BOGATYR_ID,
-  TRAINING_COVER_ID,
-  TRAINING_STRELETS_ID,
-  TRAINING_UPYR_A_ID,
-  TRAINING_UPYR_B_ID,
-  TRAINING_UPYR_C_ID,
-  TRAINING_ZNAHARKA_ID,
-  createTrainingMatch,
   defaultTrainingWeapons,
   weaponStatsFromRecord,
-} from "./training-map.js";
-export type { SpawnUnitConfig } from "./training-map.js";
+} from "./defaults.js";
+export type { SpawnUnitConfig } from "./defaults.js";
 export { QUICK_MATCH_MAP, enemySpawns, generateBattlefield, playerSpawns } from "./mapgen.js";
 export type { MapGenConfig, SpawnPoint } from "./mapgen.js";
 export { createQuickMatch } from "./match.js";
@@ -47,6 +39,13 @@ export type { AttackResolution, HitPreview } from "./combat.js";
 export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
 export { clampChance, createMulberry32 } from "./rng.js";
+export {
+  cellVisibility,
+  computeVisibleCells,
+  createFogState,
+  refreshFog,
+} from "./fog.js";
+export type { CellVisibility, FogOfOwner, FogState } from "./fog.js";
 export type {
   ApplyResult,
   CellPos,

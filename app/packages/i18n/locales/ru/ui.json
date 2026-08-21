@@ -12,13 +12,11 @@
     "quickMatch": "Быстрый матч",
     "campaign": "Новая былина",
     "pvp": "Потешные бои",
-    "debugField": "Испытание сетки",
-    "training": "Служебная стычка",
     "settings": "Настройки",
     "install": "Установить игру",
     "unavailableTitle": "Режим ещё не открыт",
     "unavailableBody": "Этот режим будет доступен в версии {version}.",
-    "unavailableHint": "Доступны быстрый матч, служебная стычка, испытание сетки и настройки."
+    "unavailableHint": "Доступны быстрый матч и настройки."
   },
   "difficulty": {
     "title": "Трудность",
@@ -40,30 +38,14 @@
     "toMenu": "В меню"
   },
   "field": {
-    "title": "Испытание сетки",
-    "back": "В меню",
     "endTurn": "Завершить ход",
     "turn": "Ход {turn}",
     "ap": "ОД {current} / {max}",
-    "height": "Ярус {z}",
-    "pit": "Яма",
-    "wall": "Стена",
-    "cover": "Укрытие",
-    "legendLow": "Низ",
-    "legendMid": "Земля",
-    "legendHigh": "Верх",
-    "legendWalk": "Шаг",
-    "legendDash": "Рывок",
-    "legendPit": "Яма",
-    "legendWall": "Стена",
-    "legendCover": "Укрытие",
-    "legendEnemy": "Противник",
     "sidePlayer": "Дружина",
     "sideEnemy": "Навь"
   },
   "battle": {
-    "title": "Служебная стычка",
-    "objective": "Уничтожьте мишени",
+    "title": "Быстрый матч",
     "objectiveQuick": "Уничтожьте всех противников",
     "enemyTurn": "Ход Нави",
     "pause": "Пауза",
@@ -72,7 +54,10 @@
     "hp": "Здоровье {current} / {max}",
     "weapon": "Оружие",
     "empty": "Нет выбранного",
-    "apLeft": "ОД"
+    "apLeft": "ОД",
+    "debugMovement": "Очки движения",
+    "debugMovementHint": "Показана стоимость клеток в ОД",
+    "fogUnknown": "Не разведано"
   },
   "unit": {
     "bogatyr": { "name": "Богатырь" },

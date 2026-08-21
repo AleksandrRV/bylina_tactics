@@ -1,10 +1,10 @@
-export const APP_VERSION = "0.5.0";
+export const APP_VERSION = "0.6.0";
 
-export type AppScreen = "boot" | "menu" | "settings" | "field" | "battle" | "difficulty" | "result";
+export type AppScreen = "boot" | "menu" | "settings" | "battle" | "difficulty" | "result";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "training" | "quick";
+export type BattleKind = "quick";
 
 export type DifficultyId = "easy" | "normal" | "hard";
 
@@ -29,8 +29,6 @@ export interface SessionState {
 export interface SessionApi {
   get(): SessionState;
   goTo(screen: AppScreen): void;
-  openField(): void;
-  openBattle(): void;
   openQuickMatch(): void;
   selectDifficulty(id: DifficultyId): void;
   finishMatch(outcome: MatchOutcome): void;
@@ -63,12 +61,6 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
     get: () => state,
     goTo: (screen) => {
       emit({ screen, ...idle });
-    },
-    openField: () => {
-      emit({ screen: "field", ...idle });
-    },
-    openBattle: () => {
-      emit({ ...idle, screen: "battle", battleKind: "training" });
     },
     openQuickMatch: () => {
       emit({ ...idle, screen: "difficulty" });
