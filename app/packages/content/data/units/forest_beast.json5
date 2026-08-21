@@ -1,0 +1,17 @@
+{
+  id: "forest_beast",
+  classId: "forest_beast",
+  side: "druzhina",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 7,
+  aim: 70,
+  defense: 5,
+  will: 25,
+  vision: 8,
+  weapons: ["claws"],
+  skills: [],
+  tags: [],
+  timedLife: 2,
+  providesCamouflage: true,
+}

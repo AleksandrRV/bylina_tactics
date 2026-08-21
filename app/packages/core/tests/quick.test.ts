@@ -77,6 +77,11 @@ describe("matchOutcome", () => {
       }
     }
     expect(matchOutcome(lost)).toBe("defeat");
+    const temporary = lost.entities.find((entity) => entity.owner === PLAYER_OWNER)!;
+    temporary.dead = false;
+    temporary.hp = 1;
+    temporary.countsForElimination = false;
+    expect(matchOutcome(lost)).toBe("defeat");
   });
 });
 

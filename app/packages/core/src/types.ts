@@ -51,6 +51,19 @@ export interface EntityState {
   flying: boolean;
   hidden?: boolean;
   decoy?: boolean;
+  /** Отравление обрабатывается в начале хода владельца. */
+  poison?: { damagePerTurn: number; turnsLeft: number };
+  /** Паника хранит источник бегства и число оставшихся срабатываний. */
+  panic?: { sourceId: number; turnsLeft: number };
+  /** Обездвиживание действует до конца указанного числа ходов владельца. */
+  immobileTurns?: number;
+  /** Ограниченное существование призыва/иллюзии. */
+  timedLife?: number;
+  /** Учитывается ли сущность в условии уничтожения стороны. */
+  countsForElimination?: boolean;
+  camouflageMinCover?: boolean;
+  providesCamouflage?: boolean;
+  fleeHp?: number;
   coverType: 0 | 1 | 2;
   /** Граневое укрытие: 0=N, 1=E, 2=S, 3=W. undefined = занимает всю клетку. */
   edge?: 0 | 1 | 2 | 3;
@@ -111,9 +124,13 @@ export type GameEvent =
   | {
       type: "STATUS_CHANGED";
       entityId: number;
-      status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+      status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED" | "CAMOUFLAGE";
       applied: boolean;
+      duration?: number;
+      magnitude?: number;
+      sourceId?: number;
     }
+  | { type: "ENTITY_SPAWNED"; entity: EntityState; cause: "SUMMON" | "ILLUSION" | "RESURRECTION" }
   | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE" }
   | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON" }
   | { type: "ENTITY_REMOVED"; entityId: number; reason: "FLED" | "EXPIRED" | "EXTRACTED" }

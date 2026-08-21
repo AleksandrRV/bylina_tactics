@@ -1,0 +1,12 @@
+{
+  id: "poison_needles",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "enemies",
+  effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
+}

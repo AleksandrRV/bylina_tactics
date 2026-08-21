@@ -77,7 +77,8 @@
     "overwatchHint": "Встать в дозор: ответный выстрел при движении врага. Завершает активацию.",
     "debugMovement": "Очки движения",
     "defend": "Защитная стойка",
-    "defendHint": "Защитная стойка: −25 к шансу попадания и −2 к урону от атак. Завершает активацию."
+    "defendHint": "Защитная стойка: −25 к шансу попадания и −2 к урону от атак. Завершает активацию.",
+    "statuses": "Состояния"
   },
   "unit": {
     "bogatyr": {
@@ -97,6 +98,15 @@
     },
     "kikimora": {
       "name": "Кикимора"
+    },
+    "volkhv": {
+      "name": "Волхв"
+    },
+    "forest_beast": {
+      "name": "Лесной зверь"
+    },
+    "illusion": {
+      "name": "Иллюзия"
     }
   },
   "weapon": {
@@ -120,6 +130,9 @@
     },
     "mace": {
       "name": "Палица"
+    },
+    "pishchal": {
+      "name": "Пищаль"
     }
   },
   "combat": {
@@ -179,6 +192,46 @@
     },
     "shield_bash": {
       "name": "Удар щитом"
+    },
+    "heal": {
+      "name": "Лечение"
+    },
+    "cleanse": {
+      "name": "Очищение"
+    },
+    "summon_forest_beast": {
+      "name": "Призыв зверя"
+    },
+    "aimed_eye": {
+      "name": "Меткий глаз"
+    },
+    "roots": {
+      "name": "Корни"
+    },
+    "poison_needles": {
+      "name": "Ядовитые иглы"
+    },
+    "raise_skeleton": {
+      "name": "Поднять костяка"
+    },
+    "panic": {
+      "name": "Морок страха"
+    },
+    "create_illusion": {
+      "name": "Иллюзия"
+    },
+    "teleport_ally": {
+      "name": "Перенос"
     }
+  },
+  "status": {
+    "poison": "Яд · {turns}",
+    "panic": "Паника",
+    "immobile": "Корни",
+    "hidden": "Скрытность",
+    "flying": "Полёт",
+    "timed": "Срок · {turns}",
+    "defending": "Стойка",
+    "overwatch": "Дозор"
   }
 }

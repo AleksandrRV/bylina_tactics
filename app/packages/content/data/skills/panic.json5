@@ -1,0 +1,13 @@
+{
+  id: "panic",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "will",
+  willPower: 75,
+  envDmg: 0,
+  filter: "enemies",
+  effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
+}

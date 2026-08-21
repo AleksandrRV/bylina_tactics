@@ -99,7 +99,7 @@ export function BattleScreen() {
       enemyCount: count,
       seed: matchSeed || 1,
     });
-    const host = createTacticsKernel({ initial, weapons, skills });
+    const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
     session.bindTacticsHost(host);
     return host;
   }, [content.quickMatch, content.units, difficulty, matchSeed, session, skills, weapons]);
@@ -108,6 +108,7 @@ export function BattleScreen() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
   const [aimId, setAimId] = useState<number | null>(null);
+  const [skillTargetPos, setSkillTargetPos] = useState<CellPos | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -131,6 +132,7 @@ export function BattleScreen() {
     setSelectedId(first?.id ?? null);
     setAction(null);
     setAimId(null);
+    setSkillTargetPos(null);
     setPreview(null);
   }, [snapshot.turnNumber]);
 
@@ -156,9 +158,13 @@ export function BattleScreen() {
   }, [preview, selectedId, kernel, snapshot.turnNumber]);
 
   const hit: HitPreview | null = useMemo(() => {
-    if (selectedId === null || aimId === null || !action) return null;
-    if (action.type === "weapon") return session.getBattleHitPreview(selectedId, aimId, action.id);
-    const result = session.getBattleSkillPreview(selectedId, action.id, aimId);
+    if (selectedId === null || !action) return null;
+    if (action.type === "weapon") {
+      if (aimId === null) return null;
+      return session.getBattleHitPreview(selectedId, aimId, action.id);
+    }
+    if (aimId === null && !skillTargetPos) return null;
+    const result = session.getBattleSkillPreview(selectedId, action.id, aimId ?? undefined, skillTargetPos ?? undefined);
     return {
       available: result.available,
       reason: result.reason,
@@ -169,7 +175,7 @@ export function BattleScreen() {
       heightMod: result.heightMod,
       flanked: result.flanked,
     };
-  }, [kernel, selectedId, aimId, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+  }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -211,11 +217,12 @@ export function BattleScreen() {
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
     const result = action.type === "weapon"
       ? session.applyBattleCommand({ type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id })
-      : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, skillId: action.id });
+      : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id });
     if (!result.ok) return;
     announce(result.events);
     setAction(null);
     setAimId(null);
+    setSkillTargetPos(null);
     playThen(result.events);
   };
 
@@ -225,6 +232,29 @@ export function BattleScreen() {
     if (!result.ok) return;
     announce(result.events);
     setAimId(null);
+    playThen(result.events);
+  };
+
+  const tryPositionSkill = (pos: CellPos): void => {
+    if (selectedId === null || action?.type !== "skill" || paused || busy) return;
+    const same = skillTargetPos?.x === pos.x && skillTargetPos.y === pos.y && skillTargetPos.z === pos.z;
+    if (!same) {
+      setSkillTargetPos(pos);
+      setPreview(null);
+      return;
+    }
+    const result = session.applyBattleCommand({
+      type: "USE_SKILL",
+      actorId: selectedId,
+      skillId: action.id,
+      targetId: aimId ?? undefined,
+      targetPos: pos,
+    });
+    if (!result.ok) return;
+    announce(result.events);
+    setAction(null);
+    setAimId(null);
+    setSkillTargetPos(null);
     playThen(result.events);
   };
 
@@ -268,7 +298,8 @@ export function BattleScreen() {
     void (async () => {
       try {
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
-        if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
+        finishFromEvents(result.events);
+        if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
         }
       } finally {
@@ -281,10 +312,14 @@ export function BattleScreen() {
     if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
     const reach = byReach.get(cellKey(x, y));
     const targeting = action !== null;
+    const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
+    const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
+    const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
-    if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0) {
+    if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
       setSelectedId(entity.id);
       setAction(null);
+      setSkillTargetPos(null);
       setAimId(null);
       setPreview(null);
       return;
@@ -304,7 +339,15 @@ export function BattleScreen() {
         return;
       }
       setAimId(entity.id);
+      if (!selectedSkill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
       setPreview(null);
+      return;
+    }
+
+    const needsPosition = selectedSkill?.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
+    if (needsPosition && action?.type === "skill") {
+      const tile = snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
+      if (tile) tryPositionSkill({ x, y, z: tile.z });
       return;
     }
 
@@ -368,13 +411,14 @@ export function BattleScreen() {
   }, [hit, selected, aimed]);
 
   const hoverCell = useMemo(() => {
+    if (skillTargetPos) return skillTargetPos;
     if (!preview) return null;
     const [xs, ys] = preview.split(",");
     const x = Number(xs);
     const y = Number(ys);
     const tile = snapshot.grid.tiles.find((t) => t.x === x && t.y === y);
     return { x, y, z: tile?.z ?? 0 };
-  }, [preview, snapshot.grid]);
+  }, [preview, skillTargetPos, snapshot.grid]);
 
   useEffect(() => {
     rendererRef.current?.update({
@@ -411,6 +455,7 @@ export function BattleScreen() {
         if (next) {
           setSelectedId(next.id);
           setAction(null);
+          setSkillTargetPos(null);
           setAimId(null);
         }
         return;
@@ -418,6 +463,7 @@ export function BattleScreen() {
       if (event.key === "9" && selectedId !== null && selected && selected.ap > 0) {
         session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
         setAction(null);
+        setSkillTargetPos(null);
         setAimId(null);
         setPreview(null);
         return;
@@ -425,6 +471,7 @@ export function BattleScreen() {
       if (event.key === "0" && selectedId !== null && selected && selected.ap > 0) {
         session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
         setAction(null);
+        setSkillTargetPos(null);
         setAimId(null);
         setPreview(null);
         return;
@@ -438,6 +485,7 @@ export function BattleScreen() {
         } else {
           const active = action?.type === chosen.type && action.id === chosen.id;
           setAction(active ? null : chosen);
+          setSkillTargetPos(null);
           setAimId(null);
           setPreview(null);
         }
@@ -452,6 +500,7 @@ export function BattleScreen() {
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
       setAction(null);
+      setSkillTargetPos(null);
       setAimId(null);
       setPreview(null);
     };
@@ -531,6 +580,7 @@ export function BattleScreen() {
                     if (entity.dead) return;
                     setSelectedId(entity.id);
                     setAction(null);
+                    setSkillTargetPos(null);
                     setAimId(null);
                   }}
                 >
@@ -563,7 +613,7 @@ export function BattleScreen() {
                     ? hit.chance === undefined ? t("combat.available") : `${hit.chance}%`
                     : t("combat.unavailable")}
                 </span>
-                {hit.available ? (
+                {hit.available && hit.dmgMin !== undefined && hit.dmgMax !== undefined ? (
                   <span className="aim-dmg">
                     {t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}
                   </span>
@@ -676,6 +726,16 @@ export function BattleScreen() {
                       <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
                     ))}
                   </div>
+                  <div className="status-list" aria-label={t("battle.statuses")}>
+                    {selected.poison ? <span className="status-chip poison">{t("status.poison", { turns: selected.poison.turnsLeft })}</span> : null}
+                    {selected.panic ? <span className="status-chip panic">{t("status.panic")}</span> : null}
+                    {selected.immobileTurns ? <span className="status-chip immobile">{t("status.immobile")}</span> : null}
+                    {selected.hidden ? <span className="status-chip hidden">{t("status.hidden")}</span> : null}
+                    {selected.flying ? <span className="status-chip flying">{t("status.flying")}</span> : null}
+                    {selected.timedLife !== undefined ? <span className="status-chip timed">{t("status.timed", { turns: selected.timedLife })}</span> : null}
+                    {selected.defending ? <span className="status-chip defending">{t("status.defending")}</span> : null}
+                    {selected.overwatch ? <span className="status-chip overwatch">{t("status.overwatch")}</span> : null}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -694,6 +754,7 @@ export function BattleScreen() {
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
                   setAction(active ? null : { type: "weapon", id: weaponId });
+                  setSkillTargetPos(null);
                   setAimId(null);
                   setPreview(null);
                 }}
@@ -718,6 +779,7 @@ export function BattleScreen() {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
                       setAction(active ? null : { type: "skill", id: skillId });
+                      setSkillTargetPos(null);
                       setAimId(null);
                       setPreview(null);
                     }
@@ -739,6 +801,7 @@ export function BattleScreen() {
                 if (selectedId === null) return;
                 session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
                 setAction(null);
+                setSkillTargetPos(null);
                 setAimId(null);
                 setPreview(null);
               }}
@@ -757,6 +820,7 @@ export function BattleScreen() {
                 if (selectedId === null) return;
                 session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
                 setAction(null);
+                setSkillTargetPos(null);
                 setAimId(null);
                 setPreview(null);
               }}

@@ -77,7 +77,8 @@
     "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
     "debugMovement": "Movement cost",
     "defend": "Defensive stance",
-    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation."
+    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
+    "statuses": "Statuses"
   },
   "unit": {
     "bogatyr": {
@@ -97,6 +98,15 @@
     },
     "kikimora": {
       "name": "Kikimora"
+    },
+    "volkhv": {
+      "name": "Volkhv"
+    },
+    "forest_beast": {
+      "name": "Forest beast"
+    },
+    "illusion": {
+      "name": "Illusion"
     }
   },
   "weapon": {
@@ -120,6 +130,9 @@
     },
     "mace": {
       "name": "Mace"
+    },
+    "pishchal": {
+      "name": "Arquebus"
     }
   },
   "combat": {
@@ -179,6 +192,46 @@
     },
     "shield_bash": {
       "name": "Shield bash"
+    },
+    "heal": {
+      "name": "Healing"
+    },
+    "cleanse": {
+      "name": "Cleanse"
+    },
+    "summon_forest_beast": {
+      "name": "Summon beast"
+    },
+    "aimed_eye": {
+      "name": "Keen eye"
+    },
+    "roots": {
+      "name": "Roots"
+    },
+    "poison_needles": {
+      "name": "Poison needles"
+    },
+    "raise_skeleton": {
+      "name": "Raise skeleton"
+    },
+    "panic": {
+      "name": "Dread vision"
+    },
+    "create_illusion": {
+      "name": "Illusion"
+    },
+    "teleport_ally": {
+      "name": "Teleport ally"
     }
+  },
+  "status": {
+    "poison": "Poison · {turns}",
+    "panic": "Panic",
+    "immobile": "Rooted",
+    "hidden": "Hidden",
+    "flying": "Flying",
+    "timed": "Timed · {turns}",
+    "defending": "Defending",
+    "overwatch": "Overwatch"
   }
 }

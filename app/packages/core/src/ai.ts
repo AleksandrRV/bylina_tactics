@@ -14,6 +14,25 @@ function nearest(from: { x: number; y: number }, candidates: readonly EntityStat
   return ranked[0];
 }
 
+function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[], all: readonly EntityState[]): Command | null {
+  for (const skillId of actor.skillIds ?? []) {
+    if (skillId === "poison_needles") {
+      const target = foes.find((foe) => !foe.poison && kernel.getSkillPreview(actor.id, skillId, foe.id).available);
+      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
+    } else if (skillId === "roots") {
+      const target = foes.find((foe) => !foe.immobileTurns && kernel.getSkillPreview(actor.id, skillId, foe.id).available);
+      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
+    } else if (skillId === "raise_skeleton") {
+      const corpse = all
+        .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === "upyr")
+        .sort((a, b) => a.id - b.id)
+        .find((entity) => kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available);
+      if (corpse) return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
+    }
+  }
+  return null;
+}
+
 function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[]): Command | null {
   const hits: { foe: EntityState; dist: number }[] = [];
   for (const foe of foes) {
@@ -80,6 +99,8 @@ export function pickEnemyCommand(kernel: TacticsKernel): Command | null {
     .sort((a, b) => a.id - b.id);
   if (enemies.length === 0) return null;
   for (const actor of enemies) {
+    const skill = bestSkill(kernel, actor, foes, snap.entities);
+    if (skill) return skill;
     const attack = bestAttack(kernel, actor, foes);
     if (attack) return attack;
     const move = bestMove(kernel, actor, foes);

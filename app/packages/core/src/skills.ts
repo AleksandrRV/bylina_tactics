@@ -1,10 +1,12 @@
 import type { CellPos } from "./types.js";
 
+export type StatusId = "poison" | "panic" | "immobile" | "hidden" | "flying" | "timed";
+
 export type SkillEffect =
   | { type: "damage"; minDmg: number; maxDmg: number; crit?: number; critBonus?: number }
   | { type: "heal"; amount: number }
-  | { type: "applyStatus"; status: "poison" | "panic" | "immobile" | "hidden" | "flying" | "timed"; duration: number; magnitude?: number }
-  | { type: "removeStatus"; status: "poison" | "panic" | "immobile" | "hidden" | "flying" | "timed" }
+  | { type: "applyStatus"; status: StatusId; duration: number; magnitude?: number }
+  | { type: "removeStatus"; status: StatusId }
   | { type: "knockback" }
   | { type: "destroyCover" }
   | { type: "spawn"; unitId: string }

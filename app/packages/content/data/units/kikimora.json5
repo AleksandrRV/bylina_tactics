@@ -10,6 +10,6 @@
   will: 25,
   vision: 10,
   weapons: ["needle"],
-  skills: [],
+  skills: ["poison_needles", "raise_skeleton"],
   tags: [],
 }

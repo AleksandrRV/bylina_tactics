@@ -10,7 +10,7 @@ import type {
   TacticsKernel,
 } from "@bylina/core";
 
-export const APP_VERSION = "0.8.0";
+export const APP_VERSION = "0.9.0";
 
 export type AppScreen = "boot" | "menu" | "settings" | "battle" | "difficulty" | "result";
 

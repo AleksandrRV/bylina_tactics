@@ -9,7 +9,7 @@
   defense: 0,
   will: 30,
   vision: 14,
-  weapons: ["bow"],
-  skills: [],
+  weapons: ["bow", "pishchal"],
+  skills: ["aimed_eye"],
   tags: [],
 }

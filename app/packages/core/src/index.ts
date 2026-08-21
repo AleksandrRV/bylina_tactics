@@ -39,7 +39,7 @@ export { previewAttack, resolveAttack } from "./combat.js";
 export type { AttackOptions, AttackResolution, HitPreview } from "./combat.js";
 export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
-export type { SkillEffect, SkillPreview, SkillStats } from "./skills.js";
+export type { SkillEffect, SkillPreview, SkillStats, StatusId } from "./skills.js";
 export { clampChance, createMulberry32 } from "./rng.js";
 export {
   cellVisibility,

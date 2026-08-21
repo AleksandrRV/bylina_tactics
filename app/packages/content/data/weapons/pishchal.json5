@@ -1,0 +1,15 @@
+{
+  id: "pishchal",
+  category: "ranged",
+  apCost: 2,
+  endsTurn: true,
+  range: 10,
+  requiresLOS: true,
+  aimMod: 10,
+  minDmg: 6,
+  maxDmg: 8,
+  crit: 20,
+  critBonus: 3,
+  envDmg: 1,
+  closeRangePenalty: { distHLessThan: 4, penalty: 30 },
+}

@@ -260,6 +260,32 @@
   background: #8b1e1e;
 }
 
+.status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+  max-width: 230px;
+}
+
+.status-chip {
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 0.64rem;
+  line-height: 1.1;
+  background: rgba(10, 14, 13, 0.78);
+}
+
+.status-chip.poison { color: #8ee44f; }
+.status-chip.panic { color: #d278ff; }
+.status-chip.immobile { color: #a8c66c; }
+.status-chip.hidden { color: #8fd3bc; }
+.status-chip.flying { color: #9edfff; }
+.status-chip.timed { color: #67dce8; }
+.status-chip.defending { color: #78b8ff; }
+.status-chip.overwatch { color: #e8b64c; }
+
 .skill-row {
   display: flex;
   gap: 6px;

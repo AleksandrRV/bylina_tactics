@@ -23,7 +23,7 @@ interface UnitConfig {
   defense: number;
   will: number;              // ≥ 0
   vision: number;            // базовая дальность обзора, ≥ 0
-  weapons: string[];         // идентификаторы записей оружия
+  weapons: string[];         // идентификаторы записей оружия; может быть пустым у иллюзии
   skills: string[];          // идентификаторы умений
   tags: UnitTag[];
   fleeHp?: number;           // при здоровье ≤ значения сущность покидает поле

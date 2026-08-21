@@ -1,14 +1,16 @@
 import { previewAttack, resolveAttack, type AttackOptions, type HitPreview } from "./combat.js";
 import { isCoverCandidate, isCoverOnFireLine } from "./cover.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
+import type { SpawnUnitConfig } from "./defaults.js";
 import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
 import { distH, facingAfterStep, tileAt } from "./grid.js";
 import { effectiveCoverTier, hasLineOfSight } from "./los.js";
 import { edgeCost, edgeCoverBetween } from "./occupancy.js";
 import { apCostFor, findPath, listReachable } from "./pathfinding.js";
 import { inMeleeReach, inRangedReach } from "./range.js";
-import { createMulberry32, type Rng } from "./rng.js";
-import type { SkillPreview, SkillStats } from "./skills.js";
+import { createMulberry32, clampChance, type Rng } from "./rng.js";
+import { spawnUnitState } from "./match.js";
+import type { SkillEffect, SkillPreview, SkillStats, StatusId } from "./skills.js";
 import type {
   ApplyResult,
   CellPos,
@@ -20,12 +22,13 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.8.0";
+export const CORE_VERSION = "0.9.0";
 
 export interface KernelOptions {
   initial?: MatchState;
   weapons?: Record<string, WeaponStats>;
   skills?: Record<string, SkillStats>;
+  units?: SpawnUnitConfig[];
   seed?: number;
 }
 
@@ -58,6 +61,8 @@ function cloneState(state: MatchState): MatchState {
       ...entity,
       weaponIds: entity.weaponIds ? [...entity.weaponIds] : undefined,
       skillIds: entity.skillIds ? [...entity.skillIds] : undefined,
+      poison: entity.poison ? { ...entity.poison } : undefined,
+      panic: entity.panic ? { ...entity.panic } : undefined,
     })),
     rngSeed: state.rngSeed,
     rngState: state.rngState,
@@ -127,6 +132,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   let state = cloneState(options.initial ?? createDebugMatch());
   const weapons = { ...defaultWeapons(), ...options.weapons };
   const skills = { ...(options.skills ?? {}) };
+  const units = new Map((options.units ?? []).map((unit) => [unit.id, unit]));
+  let nextEntityId = Math.max(0, ...state.entities.map((entity) => entity.id)) + 1;
   const seed = options.seed ?? Number(state.rngState ?? state.rngSeed ?? 0x51a7);
   const rng: Rng = createMulberry32(seed);
   state.rngSeed ??= String((options.seed ?? seed) >>> 0);
@@ -218,7 +225,15 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     entity.defending = false;
     entity.hidden = false;
     entity.flying = false;
+    entity.poison = undefined;
+    entity.panic = undefined;
+    entity.immobileTurns = undefined;
     events.push({ type: "ENTITY_DIED", entityId: entity.id, causeOfDeath });
+  };
+
+  const removeEntity = (entity: EntityState, reason: "FLED" | "EXPIRED" | "EXTRACTED", events: GameEvent[]): void => {
+    state.entities = state.entities.filter((candidate) => candidate.id !== entity.id);
+    events.push({ type: "ENTITY_REMOVED", entityId: entity.id, reason });
   };
 
   const applyDamage = (target: EntityState, damage: number, events: GameEvent[], cause: "DAMAGE" | "POISON" = "DAMAGE"): void => {
@@ -226,6 +241,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const before = target.hp;
     target.hp = Math.max(0, target.hp - damage);
     events.push({ type: "STAT_CHANGED", entityId: target.id, stat: "HP", newValue: target.hp, delta: target.hp - before });
+    if (target.fleeHp !== undefined && target.hp <= target.fleeHp) {
+      removeEntity(target, "FLED", events);
+      return;
+    }
     if (target.hp <= 0) kill(target, cause, events);
   };
 
@@ -240,6 +259,119 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       gridPos: cellPos(cover),
       newStatus: cover.coverType === 0 ? "NONE" : "HALF",
     });
+  };
+
+  const clearStatus = (target: EntityState, status: StatusId, events: GameEvent[]): boolean => {
+    if (status === "poison" && target.poison) {
+      target.poison = undefined;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "POISON", applied: false });
+      return true;
+    }
+    if (status === "panic" && target.panic) {
+      target.panic = undefined;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "PANIC", applied: false });
+      return true;
+    }
+    if (status === "immobile" && target.immobileTurns) {
+      target.immobileTurns = undefined;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "IMMOBILE", applied: false });
+      return true;
+    }
+    if (status === "hidden" && target.hidden) {
+      reveal(target, events);
+      return true;
+    }
+    if (status === "flying" && target.flying) {
+      target.flying = false;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "FLYING", applied: false });
+      if (tileAt(state.grid, target.x, target.y)?.pit) {
+        const before = target.hp;
+        target.hp = 0;
+        events.push({ type: "STAT_CHANGED", entityId: target.id, stat: "HP", newValue: 0, delta: -before });
+        kill(target, "FALL_INTO_PIT", events);
+      }
+      return true;
+    }
+    if (status === "timed" && target.timedLife !== undefined) {
+      target.timedLife = undefined;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "TIMED", applied: false });
+      return true;
+    }
+    return false;
+  };
+
+  const applyStatus = (
+    source: EntityState,
+    target: EntityState,
+    effect: Extract<SkillEffect, { type: "applyStatus" }>,
+    events: GameEvent[],
+  ): boolean => {
+    const duration = effect.duration;
+    if (effect.status === "poison") {
+      target.poison = { damagePerTurn: Math.max(1, Math.round(effect.magnitude ?? 1)), turnsLeft: duration };
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "POISON", applied: true, duration, magnitude: target.poison.damagePerTurn, sourceId: source.id });
+      return true;
+    }
+    if (effect.status === "panic") {
+      target.panic = { sourceId: source.id, turnsLeft: duration };
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "PANIC", applied: true, duration, sourceId: source.id });
+      return true;
+    }
+    if (effect.status === "immobile") {
+      if (target.flying) return false;
+      target.immobileTurns = Math.max(target.immobileTurns ?? 0, duration);
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "IMMOBILE", applied: true, duration: target.immobileTurns, sourceId: source.id });
+      return true;
+    }
+    if (effect.status === "hidden") {
+      target.hidden = true;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "HIDDEN", applied: true, duration, sourceId: source.id });
+      return true;
+    }
+    if (effect.status === "flying") {
+      target.flying = true;
+      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "FLYING", applied: true, duration, sourceId: source.id });
+      return true;
+    }
+    target.timedLife = duration;
+    events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "TIMED", applied: true, duration, sourceId: source.id });
+    return true;
+  };
+
+  const spawnAt = (
+    source: EntityState,
+    unitId: string,
+    pos: CellPos,
+    cause: "SUMMON" | "ILLUSION" | "RESURRECTION",
+    events: GameEvent[],
+  ): EntityState | null => {
+    const config = units.get(unitId);
+    const tile = tileAt(state.grid, pos.x, pos.y);
+    if (!config || !tile || tile.blockLOS) return null;
+    const flying = config.tags?.includes("flying") ?? false;
+    if (tile.pit && !flying) return null;
+    if (state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === pos.x && entity.y === pos.y)) return null;
+    if (cause === "RESURRECTION") {
+      const corpse = state.entities.find((entity) => entity.dead && entity.configId === unitId && entity.x === pos.x && entity.y === pos.y);
+      if (!corpse) return null;
+      state.entities = state.entities.filter((entity) => entity.id !== corpse.id);
+    }
+    const spawned = spawnUnitState(nextEntityId++, config, source.owner, pos.x, pos.y, tile.z, source.dir);
+    spawned.countsForElimination = cause === "RESURRECTION";
+    state.entities.push(spawned);
+    events.push({
+      type: "ENTITY_SPAWNED",
+      entity: {
+        ...spawned,
+        weaponIds: spawned.weaponIds ? [...spawned.weaponIds] : undefined,
+        skillIds: spawned.skillIds ? [...spawned.skillIds] : undefined,
+      },
+      cause,
+    });
+    if (spawned.timedLife !== undefined) {
+      events.push({ type: "STATUS_CHANGED", entityId: spawned.id, status: "TIMED", applied: true, duration: spawned.timedLife, sourceId: source.id });
+    }
+    return spawned;
   };
 
   const coverOnFireLine = (attacker: EntityState, target: EntityState): EntityState | null => {
@@ -320,8 +452,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const appendOutcome = (events: GameEvent[]): void => {
     if (ended || !eliminationEnabled) return;
-    const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0);
-    const enemies = state.entities.some((entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0);
+    const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
+    const enemies = state.entities.some((entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
     if (players && enemies) return;
     ended = true;
     events.push({
@@ -419,8 +551,126 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     triggerOverwatch(target, events);
   };
 
+  const teleport = (target: EntityState, destination: CellPos, events: GameEvent[]): boolean => {
+    const tile = tileAt(state.grid, destination.x, destination.y);
+    if (!tile || tile.blockLOS || (tile.pit && !target.flying)) return false;
+    if (state.entities.some((entity) => entity.id !== target.id && !entity.dead && entity.obstacle && entity.x === destination.x && entity.y === destination.y)) return false;
+    const from = cellPos(target);
+    target.x = destination.x;
+    target.y = destination.y;
+    target.z = tile.z;
+    events.push({ type: "ENTITY_DISPLACED", entityId: target.id, from, to: cellPos(target), cause: "TELEPORT" });
+    refresh();
+    revealAdjacent(events);
+    triggerOverwatch(target, events);
+    return true;
+  };
+
+  const processPanic = (unit: EntityState, events: GameEvent[]): void => {
+    const panic = unit.panic;
+    if (!panic || unit.dead) return;
+    const source = actorOf(panic.sourceId);
+    if (source) {
+      const probe = { ...unit, ap: 1, movementSpent: 0, panic: undefined };
+      const candidates = listReachable(state.grid, state.entities, probe)
+        .filter((cell) => cell.apCost === 1 && distH(cell.x, cell.y, source.x, source.y) > distH(unit.x, unit.y, source.x, source.y))
+        .sort((a, b) => {
+          const distance = distH(b.x, b.y, source.x, source.y) - distH(a.x, a.y, source.x, source.y);
+          return distance || a.x - b.x || a.y - b.y;
+        });
+      const destination = candidates[0];
+      if (destination) {
+        const path = findPath(state.grid, state.entities, unit, destination.x, destination.y);
+        if (path) {
+          for (let index = 1; index < path.path.length; index += 1) {
+            const previous = path.path[index - 1]!;
+            const step = path.path[index]!;
+            unit.x = step.x;
+            unit.y = step.y;
+            unit.z = step.z;
+            unit.dir = facingAfterStep(previous.x, previous.y, step.x, step.y, unit.dir);
+            events.push({ type: "ENTITY_MOVED", entityId: unit.id, path: [previous, step], isDash: false, apSpent: index === 1 ? 1 : 0 });
+            refresh();
+            revealAdjacent(events);
+            if (triggerOverwatch(unit, events)) break;
+          }
+        }
+      }
+    }
+    if (!unit.dead && unit.ap !== 0) {
+      const before = unit.ap;
+      unit.ap = 0;
+      events.push({ type: "STAT_CHANGED", entityId: unit.id, stat: "AP", newValue: 0, delta: -before });
+    }
+    panic.turnsLeft -= 1;
+    if (panic.turnsLeft <= 0 || unit.dead) {
+      unit.panic = undefined;
+      if (!unit.dead) events.push({ type: "STATUS_CHANGED", entityId: unit.id, status: "PANIC", applied: false });
+    }
+  };
+
+  const applySkillEffects = (
+    source: EntityState,
+    skill: SkillStats,
+    target: EntityState | undefined,
+    targetPos: CellPos | undefined,
+    events: GameEvent[],
+  ): boolean => {
+    let changed = false;
+    const effectTarget = target ?? source;
+    for (const effect of skill.effects) {
+      if (effect.type === "damage" || effect.type === "knockback") continue;
+      if (effect.type === "heal") {
+        if (effectTarget.dead) continue;
+        const before = effectTarget.hp;
+        effectTarget.hp = Math.min(effectTarget.maxHp, effectTarget.hp + effect.amount);
+        if (effectTarget.hp !== before) {
+          events.push({ type: "STAT_CHANGED", entityId: effectTarget.id, stat: "HP", newValue: effectTarget.hp, delta: effectTarget.hp - before });
+          changed = true;
+        }
+      } else if (effect.type === "applyStatus") {
+        changed = applyStatus(source, effectTarget, effect, events) || changed;
+      } else if (effect.type === "removeStatus") {
+        changed = clearStatus(effectTarget, effect.status, events) || changed;
+      } else if (effect.type === "destroyCover") {
+        if (target?.coverType && skill.envDmg >= 1) {
+          damageCover(target, events);
+          changed = true;
+        } else if (target && skill.affectsEnvironment && skill.envDmg >= 1) {
+          const cover = coverOnFireLine(source, target);
+          if (cover) {
+            damageCover(cover, events);
+            changed = true;
+          }
+        }
+      } else if (effect.type === "spawn" && targetPos) {
+        const cause = effect.unitId === "illusion" ? "ILLUSION" : skill.id.includes("raise") ? "RESURRECTION" : "SUMMON";
+        changed = Boolean(spawnAt(source, effect.unitId, targetPos, cause, events)) || changed;
+      } else if (effect.type === "displace" && target && targetPos) {
+        changed = teleport(target, targetPos, events) || changed;
+      } else if (effect.type === "flee" && target) {
+        removeEntity(target, "FLED", events);
+        changed = true;
+      } else if (effect.type === "reveal") {
+        const wasHidden = Boolean(effectTarget.hidden);
+        reveal(effectTarget, events);
+        changed = wasHidden || changed;
+      }
+    }
+    return changed;
+  };
+
+  const areaTargets = (source: EntityState, skill: SkillStats, epicenter: CellPos): EntityState[] => state.entities
+    .filter((entity) => {
+      if (entity.dead || entity.coverType > 0 || distH(epicenter.x, epicenter.y, entity.x, entity.y) > (skill.radius ?? 0) || Math.abs(epicenter.z - entity.z) > 1) return false;
+      if (skill.filter === "enemies") return entity.owner > 0 && entity.owner !== source.owner;
+      if (skill.filter === "allies") return entity.owner === source.owner;
+      return skill.filter !== "cover";
+    })
+    .sort((a, b) => a.id - b.id);
+
   const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
-    if (actor.dead || actor.owner !== state.activeOwner || actor.decoy) return { available: false, reason: "ILLEGAL" };
+    if (actor.dead || actor.panic || actor.owner !== state.activeOwner || (actor.decoy && skill.resolution === "attack")) return { available: false, reason: "ILLEGAL" };
     if (actor.ap < skill.apCost) return { available: false, reason: "NO_AP" };
     if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
@@ -436,7 +686,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             : true;
       if (!matches) return { available: false, reason: "ILLEGAL" };
     }
-    const pos = target ? cellPos(target) : targetPos!;
+    const requestedTile = targetPos ? tileAt(state.grid, targetPos.x, targetPos.y) : undefined;
+    const normalizedTargetPos = targetPos && requestedTile ? { x: targetPos.x, y: targetPos.y, z: requestedTile.z } : targetPos;
+    const pos = target ? cellPos(target) : normalizedTargetPos!;
     const inReach = skill.category === "melee"
       ? inMeleeReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)
       : inRangedReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z, skill.range);
@@ -446,6 +698,44 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     }
     if (skill.requiresLOS && !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)) {
       return { available: false, reason: "NO_LOS" };
+    }
+    const spawnEffect = skill.effects.find((effect) => effect.type === "spawn");
+    if (spawnEffect?.type === "spawn") {
+      if (!targetPos || !units.has(spawnEffect.unitId)) return { available: false, reason: "NOT_FOUND" };
+      const spawnTile = tileAt(state.grid, targetPos.x, targetPos.y);
+      const spawnConfig = units.get(spawnEffect.unitId)!;
+      if (
+        !spawnTile ||
+        spawnTile.blockLOS ||
+        (spawnTile.pit && !spawnConfig.tags?.includes("flying")) ||
+        state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y)
+      ) return { available: false, reason: "ILLEGAL" };
+      if (skill.id.includes("raise") && !state.entities.some((entity) =>
+        entity.dead && entity.configId === spawnEffect.unitId && entity.x === targetPos.x && entity.y === targetPos.y
+      )) return { available: false, reason: "ILLEGAL" };
+    }
+    if (skill.effects.some((effect) => effect.type === "displace")) {
+      if (!target || !targetPos) return { available: false, reason: "NOT_FOUND" };
+      const destination = tileAt(state.grid, targetPos.x, targetPos.y);
+      if (
+        !destination ||
+        destination.blockLOS ||
+        (destination.pit && !target.flying) ||
+        state.entities.some((entity) => entity.id !== target.id && !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y)
+      ) return { available: false, reason: "ILLEGAL" };
+      if (!inRangedReach(actor.x, actor.y, actor.z, targetPos.x, targetPos.y, destination.z, skill.range)) {
+        return { available: false, reason: "OUT_OF_RANGE" };
+      }
+      if (skill.requiresLOS && !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, targetPos.x, targetPos.y, destination.z)) {
+        return { available: false, reason: "NO_LOS" };
+      }
+    }
+    if (target && skill.resolution === "will") {
+      return {
+        available: true,
+        targetPos: pos,
+        chance: clampChance((skill.willPower ?? 0) - (target.will ?? 0)),
+      };
     }
     if (target && target.coverType === 0 && skill.resolution === "attack") {
       const weapon = skillWeapon(skill);
@@ -471,7 +761,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         };
       }
     }
-    return { available: true, targetPos: pos };
+    return { available: true, targetPos: normalizedTargetPos ?? pos };
   };
 
   const resolveCombatAgainst = (
@@ -519,14 +809,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     },
     getReachable: (actorId) => {
       const actor = actorOf(actorId);
-      if (!actor || actor.dead || actor.owner !== state.activeOwner) return [];
+      if (!actor || actor.dead || actor.panic || actor.immobileTurns || actor.owner !== state.activeOwner) return [];
       const visible = fog[actor.owner]?.visible;
       return listReachable(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor)
         .filter((cell) => !visible || visible.has(`${cell.x},${cell.y}`));
     },
     getPath: (actorId, to) => {
       const actor = actorOf(actorId);
-      if (!actor || actor.dead || actor.owner !== state.activeOwner) return null;
+      if (!actor || actor.dead || actor.panic || actor.immobileTurns || actor.owner !== state.activeOwner) return null;
       const visible = fog[actor.owner]?.visible;
       if (visible && !visible.has(`${to.x},${to.y}`)) return null;
       const found = findPath(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor, to.x, to.y);
@@ -539,6 +829,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const actor = actorOf(actorId);
       const target = actorOf(targetId);
       if (!actor || !target) return { available: false, reason: "NOT_FOUND" };
+      if (actor.decoy || actor.panic) return { available: false, reason: "ILLEGAL" };
       const weapon = weaponOf(actor, weaponId);
       if (!weapon) return { available: false, reason: "ILLEGAL" };
       if (actor.owner !== state.activeOwner) return { available: false, reason: "ILLEGAL" };
@@ -573,6 +864,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const target = targetId === undefined ? undefined : actorOf(targetId);
       if (targetId !== undefined && !target) return { available: false, reason: "NOT_FOUND" };
       if (target && !visibleTo(actor.owner, target)) return { available: false };
+      if (targetPos && !(fog[actor.owner]?.visible.has(`${targetPos.x},${targetPos.y}`) ?? true)) return { available: false };
       return skillPreview(actor, skill, target, targetPos);
     },
     getVisibleCells: (owner) => new Set(fog[owner]?.visible ?? []),
@@ -583,14 +875,50 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (command.type === "END_TURN") {
         if (command.playerId !== String(state.activeOwner)) return { ok: false, reason: "NOT_YOUR_TURN" };
         const events: GameEvent[] = [];
-        for (const entity of state.entities) {
-          if (entity.dead || entity.owner !== state.activeOwner || entity.ap <= 0) continue;
-          const previous = entity.ap;
-          entity.ap = 0;
-          events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: 0, delta: -previous });
+        const endingOwner = state.activeOwner;
+        for (const entity of [...state.entities].sort((a, b) => a.id - b.id)) {
+          if (entity.dead || entity.owner !== endingOwner) continue;
+          if (entity.ap > 0) {
+            const previous = entity.ap;
+            entity.ap = 0;
+            events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: 0, delta: -previous });
+          }
+          if (entity.immobileTurns) {
+            entity.immobileTurns -= 1;
+            if (entity.immobileTurns <= 0) {
+              entity.immobileTurns = undefined;
+              events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "IMMOBILE", applied: false });
+            }
+          }
         }
-        const upcoming = nextOwner(state, state.activeOwner);
+
+        const upcoming = nextOwner(state, endingOwner);
         state.activeOwner = upcoming;
+
+        // §16.1: poison before every other beginning-of-turn system.
+        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && !candidate.dead).sort((a, b) => a.id - b.id)) {
+          if (!entity.poison) continue;
+          const poison = entity.poison;
+          applyDamage(entity, poison.damagePerTurn, events, "POISON");
+          if (entity.dead || !state.entities.some((candidate) => candidate.id === entity.id)) continue;
+          poison.turnsLeft -= 1;
+          if (poison.turnsLeft <= 0) {
+            entity.poison = undefined;
+            events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "POISON", applied: false });
+          }
+        }
+
+        // §16.2: limited life expires before AP refill.
+        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && !candidate.dead).sort((a, b) => a.id - b.id)) {
+          if (entity.timedLife === undefined) continue;
+          entity.timedLife -= 1;
+          if (entity.timedLife <= 0) {
+            events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "TIMED", applied: false });
+            removeEntity(entity, "EXPIRED", events);
+          }
+        }
+
+        // §16.3–4: clear defensive orders and refill AP.
         for (const entity of state.entities) {
           if (entity.owner !== upcoming) continue;
           if (entity.overwatch) {
@@ -602,23 +930,28 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "DEFENDING", applied: false });
           }
           entity.movementSpent = 0;
-        }
-        for (const entity of state.entities) {
-          if (entity.dead || entity.owner !== upcoming || entity.maxAp <= 0) continue;
+          if (entity.dead || entity.maxAp <= 0) continue;
           const delta = entity.maxAp - entity.ap;
           entity.ap = entity.maxAp;
           if (delta !== 0) events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: entity.ap, delta });
         }
+
+        // §16.5: panic performs its forced one-AP flight after refill.
+        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && candidate.panic).sort((a, b) => a.id - b.id)) {
+          processPanic(entity, events);
+        }
+
         state.turnNumber += 1;
         revealAdjacent(events);
         events.push({ type: "TURN_CHANGED", activePlayerId: String(upcoming), turnNumber: state.turnNumber });
+        appendOutcome(events);
         emit();
         return { ok: true, events };
       }
 
       const actor = actorOf(command.actorId);
       if (!actor) return { ok: false, reason: "NOT_FOUND" };
-      if (actor.dead || actor.decoy) return { ok: false, reason: "ILLEGAL" };
+      if (actor.dead || actor.panic) return { ok: false, reason: "ILLEGAL" };
       if (actor.owner !== state.activeOwner) return { ok: false, reason: "NOT_YOUR_TURN" };
 
       if (command.type === "OVERWATCH") {
@@ -649,6 +982,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
 
       if (command.type === "ATTACK") {
+        if (actor.decoy) return { ok: false, reason: "ILLEGAL" };
         const target = actorOf(command.targetId);
         if (!target) return { ok: false, reason: "NOT_FOUND" };
         if (target.dead || !visibleTo(actor.owner, target)) return { ok: false, reason: "ILLEGAL" };
@@ -691,9 +1025,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
       if (command.type === "USE_SKILL") {
         const skill = skillOf(actor, command.skillId);
-        if (!skill) return { ok: false, reason: "ILLEGAL" };
+        if (!skill || (actor.decoy && skill.resolution === "attack")) return { ok: false, reason: "ILLEGAL" };
         const target = command.targetId === undefined ? undefined : actorOf(command.targetId);
         if (command.targetId !== undefined && (!target || !visibleTo(actor.owner, target))) return { ok: false, reason: target ? "ILLEGAL" : "NOT_FOUND" };
+        if (command.targetPos && !(fog[actor.owner]?.visible.has(`${command.targetPos.x},${command.targetPos.y}`) ?? true)) return { ok: false, reason: "ILLEGAL" };
         const preview = skillPreview(actor, skill, target, command.targetPos);
         if (!preview.available) return { ok: false, reason: preview.reason ?? "ILLEGAL" };
         const events: GameEvent[] = [];
@@ -709,43 +1044,35 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             reveal(hidden, events);
             success = true;
           }
-        } else if (skill.category === "self" && (skill.radius ?? 0) > 0 && weapon) {
-          const targets = state.entities
-            .filter((entity) => !entity.dead && entity.coverType === 0 && entity.owner !== actor.owner && entity.owner > 0 &&
-              distH(actor.x, actor.y, entity.x, entity.y) <= (skill.radius ?? 0) && Math.abs(actor.z - entity.z) <= 1)
-            .sort((a, b) => a.id - b.id);
-          for (const areaTarget of targets) success = resolveCombatAgainst(actor, areaTarget, weapon, events) || success;
-        } else if (target?.coverType && skill.effects.some((effect) => effect.type === "destroyCover") && skill.envDmg >= 1) {
-          damageCover(target, events);
-          success = true;
-        } else if (target && weapon) {
-          success = resolveCombatAgainst(actor, target, weapon, events, currentEdgeOptions(actor, target, weapon));
-          if (success && skill.affectsEnvironment && skill.envDmg >= 1) {
-            const cover = coverOnFireLine(actor, target);
-            if (cover) damageCover(cover, events);
+        }
+
+        if (skill.resolution === "will" && target) {
+          const chance = clampChance((skill.willPower ?? 0) - (target.will ?? 0));
+          success = rng.nextInt(1, 100) <= chance;
+          if (success) applySkillEffects(actor, skill, target, command.targetPos, events);
+        } else if (skill.resolution === "attack" && skill.category === "self" && (skill.radius ?? 0) > 0 && weapon) {
+          for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
+            const hit = resolveCombatAgainst(actor, areaTarget, weapon, events);
+            if (!hit) continue;
+            success = true;
+            applySkillEffects(actor, skill, areaTarget, command.targetPos, events);
+            if (!areaTarget.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, areaTarget, events);
           }
-          if (success && !target.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, target, events);
+        } else if (skill.resolution === "attack" && target?.coverType && skill.effects.some((effect) => effect.type === "destroyCover") && skill.envDmg >= 1) {
+          success = applySkillEffects(actor, skill, target, command.targetPos, events);
+        } else if (skill.resolution === "attack" && target && weapon) {
+          success = resolveCombatAgainst(actor, target, weapon, events, currentEdgeOptions(actor, target, weapon));
+          if (success) {
+            applySkillEffects(actor, skill, target, command.targetPos, events);
+            if (!target.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, target, events);
+          }
         } else if (skill.resolution === "auto") {
-          const effectTarget = target ?? actor;
-          for (const effect of skill.effects) {
-            if (effect.type === "applyStatus" && effect.status === "flying") {
-              effectTarget.flying = true;
-              events.push({ type: "STATUS_CHANGED", entityId: effectTarget.id, status: "FLYING", applied: true });
-              success = true;
-            } else if (effect.type === "removeStatus" && effect.status === "flying") {
-              effectTarget.flying = false;
-              events.push({ type: "STATUS_CHANGED", entityId: effectTarget.id, status: "FLYING", applied: false });
-              success = true;
-              if (tileAt(state.grid, effectTarget.x, effectTarget.y)?.pit) {
-                const previousHp = effectTarget.hp;
-                effectTarget.hp = 0;
-                events.push({ type: "STAT_CHANGED", entityId: effectTarget.id, stat: "HP", newValue: 0, delta: -previousHp });
-                kill(effectTarget, "FALL_INTO_PIT", events);
-              }
-            } else if (effect.type === "reveal") {
-              reveal(effectTarget, events);
-              success = true;
+          if (skill.category === "self" && (skill.radius ?? 0) > 0) {
+            for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
+              success = applySkillEffects(actor, skill, areaTarget, command.targetPos, events) || success;
             }
+          } else {
+            success = applySkillEffects(actor, skill, target, command.targetPos, events) || success;
           }
         }
         events.unshift({
@@ -763,6 +1090,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
 
       if (command.type !== "MOVE") return { ok: false, reason: "ILLEGAL" };
+      if (actor.immobileTurns) return { ok: false, reason: "ILLEGAL" };
       const visible = fog[actor.owner]?.visible;
       if (visible && !visible.has(`${command.to.x},${command.to.y}`)) return { ok: false, reason: "ILLEGAL" };
       const tile = tileAt(state.grid, command.to.x, command.to.y);

@@ -168,6 +168,7 @@ type GameEventType =
   | "SKILL_RESOLVED"
   | "STAT_CHANGED"
   | "STATUS_CHANGED"
+  | "ENTITY_SPAWNED"
   | "COVER_DESTROYED"
   | "ENTITY_DIED"
   | "ENTITY_REMOVED"
@@ -231,8 +232,17 @@ interface EventStatChanged {
 interface EventStatusChanged {
   type: "STATUS_CHANGED";
   entityId: number;
-  status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+  status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED" | "CAMOUFLAGE";
   applied: boolean;
+  duration?: number;
+  magnitude?: number;
+  sourceId?: number;
+}
+
+interface EventEntitySpawned {
+  type: "ENTITY_SPAWNED";
+  entity: EntitySnapshot;
+  cause: "SUMMON" | "ILLUSION" | "RESURRECTION";
 }
 
 interface EventCoverDestroyed {
@@ -341,6 +351,14 @@ interface EntitySnapshot {
   coverType?: 1 | 2;
   coverEdge?: 0 | 1 | 2 | 3; // только для граневого укрытия
   tags: string[];
+  statusData?: {
+    poisonDamage?: number;
+    poisonTurns?: number;
+    panicSourceId?: number;
+    panicTurns?: number;
+    immobileTurns?: number;
+    timedLife?: number;
+  };
 }
 ```
 

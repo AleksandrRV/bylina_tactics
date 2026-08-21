@@ -10,6 +10,6 @@
   will: 55,
   vision: 12,
   weapons: ["sling"],
-  skills: [],
+  skills: ["heal", "cleanse", "summon_forest_beast"],
   tags: [],
 }

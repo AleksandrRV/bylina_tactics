@@ -1,0 +1,13 @@
+{
+  id: "aimed_eye",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "attack",
+  envDmg: 0,
+  ignoreHalfCover: true,
+  filter: "enemies",
+  effects: [{ type: "damage", minDmg: 3, maxDmg: 5, crit: 20, critBonus: 2 }],
+}

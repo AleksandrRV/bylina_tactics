@@ -29,10 +29,13 @@ describe("parseContent", () => {
     if (!result.ok) return;
     expect(result.data.units.map((unit) => unit.id).sort()).toEqual([
       "bogatyr",
+      "forest_beast",
+      "illusion",
       "kikimora",
       "leshy",
       "strelets",
       "upyr",
+      "volkhv",
       "znaharka",
     ]);
     expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual([
@@ -47,14 +50,25 @@ describe("parseContent", () => {
       "claws",
       "mace",
       "needle",
+      "pishchal",
       "sling",
       "sword",
       "sword_debug",
     ]);
     expect(result.data.skills.map((skill) => skill.id).sort()).toEqual([
+      "aimed_eye",
       "breach",
       "circular_sweep",
+      "cleanse",
+      "create_illusion",
+      "heal",
+      "panic",
+      "poison_needles",
+      "raise_skeleton",
+      "roots",
       "shield_bash",
+      "summon_forest_beast",
+      "teleport_ally",
     ]);
     expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);

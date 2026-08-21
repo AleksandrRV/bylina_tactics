@@ -114,7 +114,15 @@ export function previewAttack(
   const targetDefense = target.defense;
   const stanceDefense = target.defending ? 25 : 0;
   const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
-  const coverPenalty = options.coverPenaltyOverride ?? Math.max(cover.penalty, obstacles.obstaclePenalty);
+  const camouflage = !melee && Boolean(target.camouflageMinCover) && entities.some((entity) =>
+    !entity.dead &&
+    entity.id !== target.id &&
+    entity.owner === target.owner &&
+    entity.providesCamouflage &&
+    distH(target.x, target.y, entity.x, entity.y) === 1
+  );
+  const camouflagePenalty = camouflage && !weapon.ignoreHalfCover ? 25 : 0;
+  const coverPenalty = options.coverPenaltyOverride ?? Math.max(cover.penalty, obstacles.obstaclePenalty, camouflagePenalty);
 
   const chance = clampChance(
     baseAim + weaponMod + heightAim - targetDefense - stanceDefense - coverPenalty - rangePenalty,
@@ -137,9 +145,9 @@ export function previewAttack(
     chance,
     dmgMin: Math.max(0, weapon.minDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0)),
     dmgMax: Math.max(0, weapon.maxDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0)),
-    cover: options.coverTypeOverride ?? cover.coverType,
+    cover: options.coverTypeOverride ?? (camouflage && cover.coverType < 1 ? 1 : cover.coverType),
     heightMod,
-    flanked: options.flankedOverride ?? cover.flanked,
+    flanked: options.flankedOverride ?? (camouflage ? false : cover.flanked),
     actionType: melee ? "MELEE" : "RANGED",
     breakCell,
     breakdown,

@@ -16,7 +16,7 @@ function pickUnit(units: SpawnUnitConfig[] | undefined, id: string): SpawnUnitCo
   return fallback;
 }
 
-function spawn(id: number, config: SpawnUnitConfig, owner: number, x: number, y: number, z: number, dir: number): EntityState {
+export function spawnUnitState(id: number, config: SpawnUnitConfig, owner: number, x: number, y: number, z: number, dir: number): EntityState {
   const weaponIds = [...config.weapons];
   return {
     id,
@@ -43,6 +43,11 @@ function spawn(id: number, config: SpawnUnitConfig, owner: number, x: number, y:
     flying: config.tags?.includes("flying") ?? false,
     hidden: config.tags?.includes("hiddenStart") ?? false,
     decoy: config.decoy ?? false,
+    timedLife: config.timedLife,
+    countsForElimination: true,
+    fleeHp: config.fleeHp,
+    camouflageMinCover: config.camouflageMinCover ?? false,
+    providesCamouflage: config.providesCamouflage ?? false,
     coverType: 0,
     overwatch: false,
     defending: false,
@@ -85,14 +90,14 @@ export function createQuickMatch(options: QuickMatchOptions): MatchState {
   roster.forEach((config, index) => {
     const point = players[index] ?? players[0]!;
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawn(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
   });
 
   enemies.forEach((point, index) => {
     const type = pool[rng.nextInt(0, pool.length - 1)] ?? pool[0];
     const config = pickUnit(options.units, type);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawn(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
+    state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
   });
   state.rngState = String(rng.getState());
   return state;

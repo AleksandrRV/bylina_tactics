@@ -1,0 +1,12 @@
+{
+  id: "create_illusion",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "all",
+  effects: [{ type: "spawn", unitId: "illusion" }],
+}

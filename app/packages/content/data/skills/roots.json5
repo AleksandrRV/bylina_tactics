@@ -1,0 +1,12 @@
+{
+  id: "roots",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "enemies",
+  effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
+}

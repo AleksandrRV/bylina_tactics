@@ -10,6 +10,8 @@
   will: 35,
   vision: 12,
   weapons: ["branch"],
-  skills: [],
+  skills: ["roots"],
   tags: [],
+  camouflageMinCover: true,
+  providesCamouflage: true,
 }

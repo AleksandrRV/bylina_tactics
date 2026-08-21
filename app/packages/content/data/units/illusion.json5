@@ -1,0 +1,17 @@
+{
+  id: "illusion",
+  classId: "illusion",
+  side: "druzhina",
+  maxHealth: 1,
+  maxAP: 1,
+  mobility: 4,
+  aim: 0,
+  defense: 0,
+  will: 0,
+  vision: 0,
+  weapons: [],
+  skills: [],
+  tags: [],
+  decoy: true,
+  timedLife: 2,
+}

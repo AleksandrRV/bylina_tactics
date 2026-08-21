@@ -15,7 +15,7 @@ export const unitConfigSchema = z.object({
   defense: z.number(),
   will: z.number().min(0),
   vision: z.number().int().min(0),
-  weapons: z.array(id).min(1),
+  weapons: z.array(id),
   skills: z.array(id),
   tags: z.array(z.enum(["flying", "hiddenStart"])),
   fleeHp: z.number().int().optional(),

@@ -1,0 +1,16 @@
+{
+  id: "cleanse",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "allies",
+  effects: [
+    { type: "removeStatus", status: "poison" },
+    { type: "removeStatus", status: "panic" },
+    { type: "removeStatus", status: "immobile" },
+  ],
+}

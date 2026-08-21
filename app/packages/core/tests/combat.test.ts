@@ -133,6 +133,17 @@ describe("cover and flank", () => {
     expect((protectedPreview.chance ?? 0)).toBe((open.chance ?? 0) - 50);
   });
 
+  it("grants leshy at least half cover next to a camouflage provider", () => {
+    const grid = makeGrid(6, 3, 1);
+    const attacker = unit({ x: 0, y: 1, aim: 100 });
+    const target = unit({ id: 2, owner: 2, x: 4, y: 1, camouflageMinCover: true });
+    const provider = unit({ id: 3, owner: 2, x: 4, y: 2, providesCamouflage: true });
+    const open = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    const masked = previewAttack(grid, [attacker, target, provider], attacker, target, DEBUG_BOW);
+    expect(masked.cover).toBe(1);
+    expect(masked.chance).toBe((open.chance ?? 0) - 25);
+  });
+
   it("ignores cover penalty in melee but keeps flank for later crit", () => {
     const attacker = unit({ x: 1, y: 1 });
     const target = unit({ id: 2, owner: 2, x: 2, y: 1 });
@@ -178,6 +189,26 @@ describe("defensive stance", () => {
 });
 
 describe("kernel attack", () => {
+  it("charges two AP for the arquebus and applies its close-range penalty", () => {
+    const pishchal = {
+      ...DEBUG_BOW,
+      id: "pishchal",
+      apCost: 2,
+      range: 10,
+      closeRangePenalty: { distHLessThan: 4, penalty: 30 },
+    };
+    const grid = makeGrid(7, 1, 1);
+    const attacker = unit({ x: 0, y: 0, ap: 2, weaponId: pishchal.id, weaponIds: [pishchal.id] });
+    const close = unit({ id: 2, owner: 2, x: 2, y: 0 });
+    const far = unit({ id: 3, owner: 2, x: 5, y: 0 });
+    const closePreview = previewAttack(grid, [attacker, close, far], attacker, close, pishchal);
+    const farPreview = previewAttack(grid, [attacker, close, far], attacker, far, pishchal);
+    expect(closePreview.chance).toBe((farPreview.chance ?? 0) - 30);
+    const kernel = createTacticsKernel({ initial: { turnNumber: 1, activeOwner: 1, grid, entities: [attacker, close, far] }, weapons: { [pishchal.id]: pishchal }, seed: 2 });
+    expect(kernel.apply({ type: "ATTACK", actorId: 1, targetId: 3, weaponId: pishchal.id }).ok).toBe(true);
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === 1)?.ap).toBe(0);
+  });
+
   it("resolves a shot and can kill", () => {
     const kernel = createTacticsKernel({ seed: 1 });
     const preview = kernel.getHitPreview(1, 4);
