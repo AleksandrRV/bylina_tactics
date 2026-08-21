@@ -232,3 +232,62 @@ describe("0.9 will, panic, summons and displacement", () => {
     expect(livingSkeletons[0]?.hp).toBe(1);
   });
 });
+
+describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
+  const SWORD: WeaponStats = {
+    id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
+    requiresLOS: false, aimMod: 0, minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0, envDmg: 0,
+  };
+  const SWEEP: SkillStats = {
+    id: "circular_sweep", apCost: 1, endsTurn: true, range: 0, requiresLOS: false, category: "self",
+    resolution: "attack", envDmg: 0, radius: 1, filter: "enemies", cooldownTurns: 3,
+    effects: [{ type: "damage", minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0 }],
+  };
+
+  const coverEntity = (id: number, coverType: 1 | 2, edge: 0 | 1 | 2 | 3): EntityState => ({
+    ...fighter({ id, owner: 0, x: 3, y: 3 }),
+    configId: "cover", obstacle: false, coverType, edge, hp: 2, maxHp: 2,
+    aim: 0, defense: 0, vision: 0, weaponId: "", weaponIds: [], skillIds: [], ap: 0, maxAp: 0, mobility: 0,
+  });
+
+  const sweepKernel = (initial: MatchState) =>
+    createTacticsKernel({
+      initial,
+      weapons: { [SWORD.id]: SWORD },
+      skills: { [SWEEP.id]: SWEEP },
+      // Первое испытание генератора равно 100: на открытой местности (шанс 100)
+      // это попадание, а сквозь полугрань (шанс 75) — промах.
+      seed: 43,
+    });
+
+  it("does not damage a neighbour behind a full edge and keeps the cover intact", () => {
+    const sweeper = fighter({ id: 1, configId: "bogatyr", x: 3, y: 3, weaponIds: [SWORD.id], skillIds: [SWEEP.id] });
+    const behindFull = fighter({ id: 2, configId: "upyr", owner: 2, x: 4, y: 3, hp: 10 });
+    const fullEdge = coverEntity(3, 2, 1); // восточная грань клетки (3,3)
+    const game = sweepKernel(state(sweeper, behindFull, fullEdge));
+    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: SWEEP.id });
+    expect(result.ok).toBe(true);
+    const events = result.ok ? result.events : [];
+    expect(events.filter((event) => event.type === "COMBAT_RESOLVED" && event.targetId === 2)).toHaveLength(0);
+    expect(game.getSnapshot().entities.find((entity) => entity.id === 2)?.hp).toBe(10);
+    expect(game.getSnapshot().entities.find((entity) => entity.id === 3)?.coverType).toBe(2);
+  });
+
+  it("applies the half-edge −25 penalty to area melee attacks", () => {
+    const sweeper = fighter({ id: 1, configId: "bogatyr", x: 3, y: 3, weaponIds: [SWORD.id], skillIds: [SWEEP.id] });
+    const open = fighter({ id: 2, configId: "upyr", owner: 2, x: 4, y: 3, hp: 10 });
+    const halfEdge = coverEntity(3, 1, 1); // восточная грань клетки (3,3)
+
+    const control = sweepKernel(state(sweeper, open));
+    const withEdge = sweepKernel(state(sweeper, { ...open }, halfEdge));
+    const controlResult = control.apply({ type: "USE_SKILL", actorId: 1, skillId: SWEEP.id });
+    const edgedResult = withEdge.apply({ type: "USE_SKILL", actorId: 1, skillId: SWEEP.id });
+    expect(controlResult.ok && edgedResult.ok).toBe(true);
+    const controlHp = control.getSnapshot().entities.find((entity) => entity.id === 2)?.hp;
+    const edgedHp = withEdge.getSnapshot().entities.find((entity) => entity.id === 2)?.hp;
+    // Один и тот же первый бросок генератора: на открытой местности (шанс 100) — попадание,
+    // сквозь полугрань (шанс 75) — промах. Вычет полуукрытия реально меняет исход.
+    expect(controlHp).toBe(7);
+    expect(edgedHp).toBe(10);
+  });
+});

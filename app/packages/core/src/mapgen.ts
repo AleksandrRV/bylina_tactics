@@ -84,14 +84,16 @@ function reservedSet(players: SpawnPoint[], enemies: SpawnPoint[]): Set<string> 
 }
 
 export function playerSpawns(height: number): SpawnPoint[] {
+  // До пяти клеток высадки: кампания допускает отряд до deployMax = 5 (§3.1 base-design).
+  // Для любой карты высотой ≥ 8 (нижняя граница схемы) пять клеток помещаются в полосе 1 … height−2.
   const mid = Math.floor(height / 2);
-  const ys = [mid - 1, mid, mid + 1].map((y) => Math.max(1, Math.min(height - 2, y)));
+  const ys = [mid - 2, mid - 1, mid, mid + 1, mid + 2].map((y) => Math.max(1, Math.min(height - 2, y)));
   const unique = [...new Set(ys)];
-  while (unique.length < 3) {
+  while (unique.length < 5) {
     const next = unique[unique.length - 1]! + 1;
     unique.push(Math.min(height - 2, next));
   }
-  return unique.slice(0, 3).map((y) => ({ x: 1, y }));
+  return unique.slice(0, 5).map((y) => ({ x: 1, y }));
 }
 
 export function enemySpawns(count: number, width: number, height: number): SpawnPoint[] {

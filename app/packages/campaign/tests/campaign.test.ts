@@ -197,14 +197,14 @@ describe("createCampaign: druzhina", () => {
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
     const result = automaton.finishMission("clearing_1", "victory", [
-      { fighterId: fighters[0]!.id, survived: true, hp: 4 }, // 4/12 ≤ 0.3 → ранение
-      { fighterId: fighters[1]!.id, survived: true, hp: 3 }, // 3/8 = 0.375 > 0.3 → здоров
-      { fighterId: fighters[2]!.id, survived: true, hp: 2 }, // 2/7 ≈ 0.29 ≤ 0.3 → ранение
+      { fighterId: fighters[0]!.id, survived: true, hp: 4 }, // 4/12 = 0.333 > 0.3 → здоров (порог без округления)
+      { fighterId: fighters[1]!.id, survived: true, hp: 2 }, // 2/8 = 0.25 ≤ 0.3 → ранение
+      { fighterId: fighters[2]!.id, survived: true, hp: 2 }, // 2/7 ≈ 0.286 ≤ 0.3 → ранение
     ]);
-    expect(result?.wounded.sort()).toEqual([fighters[0]!.name, fighters[2]!.name].sort());
+    expect(result?.wounded.sort()).toEqual([fighters[1]!.name, fighters[2]!.name].sort());
     const state = automaton.getState();
-    expect(state.fighters.find((fighter) => fighter.id === fighters[0]!.id)?.wounded).toBe(true);
-    expect(state.fighters.find((fighter) => fighter.id === fighters[1]!.id)?.wounded).toBe(false);
+    expect(state.fighters.find((fighter) => fighter.id === fighters[0]!.id)?.wounded).toBe(false);
+    expect(state.fighters.find((fighter) => fighter.id === fighters[1]!.id)?.wounded).toBe(true);
     expect(state.fighters.find((fighter) => fighter.id === fighters[2]!.id)?.wounded).toBe(true);
     expect(state.fighters.find((fighter) => fighter.id === fighters[0]!.id)?.hp).toBe(4);
   });

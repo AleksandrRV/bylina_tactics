@@ -3,7 +3,9 @@ import { createQuickMatch } from "../src/match.js";
 import { createTacticsKernel } from "../src/kernel.js";
 import { defaultTrainingWeapons } from "../src/defaults.js";
 import { computeVisibleCells } from "../src/fog.js";
+import { makeGrid, tileAt } from "../src/grid.js";
 import { PLAYER_OWNER, ENEMY_OWNER } from "../src/debug-map.js";
+import type { EntityState } from "../src/types.js";
 
 describe("fog of war", () => {
   it("player sees cells around their units", () => {
@@ -19,22 +21,27 @@ describe("fog of war", () => {
   });
 
   it("height bonus extends vision range", () => {
-    const match = createQuickMatch({ enemyCount: 3, seed: 42 });
-    // Установить одного бойца на z=2.
-    const player = match.entities.find((e) => e.owner === PLAYER_OWNER && e.coverType === 0);
-    if (!player) return;
-    const tile = match.grid.tiles.find((t) => t.x === player.x && t.y === player.y);
-    if (!tile) return;
-    tile.z = 2;
-    player.z = 2;
-    const visibleHigh = computeVisibleCells(match, PLAYER_OWNER);
+    // Контролируемая сетка вместо сгенерированной: проверка не зависит от
+    // раскладки карты и позиций высадки. Юнит в углу (0,0), дальность 10.
+    const grid = makeGrid(20, 20, 1);
+    const unit: EntityState = {
+      id: 1, configId: "u", owner: 1, x: 0, y: 0, z: 1, dir: 0,
+      ap: 2, maxAp: 2, mobility: 5, hp: 10, maxHp: 10, aim: 70, defense: 0, vision: 10,
+      weaponId: "", weaponIds: [], skillIds: [], obstacle: true, dead: false, flying: false,
+      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+    };
+    const own = tileAt(grid, 0, 0)!;
 
-    // Опустить на z=0.
-    tile.z = 0;
-    player.z = 0;
-    const visibleLow = computeVisibleCells(match, PLAYER_OWNER);
+    // С высоты z=2 (поправка +1): клетка на расстоянии vision+1 = 11 видна.
+    own.z = 2;
+    const visibleHigh = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 2 }] }, PLAYER_OWNER);
 
-    // С высоты видно больше клеток.
+    // Снизу z=0 (поправка −1): та же клетка вне дальности (эффективная 9).
+    own.z = 0;
+    const visibleLow = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 0 }] }, PLAYER_OWNER);
+
+    expect(visibleHigh.has("11,0")).toBe(true);
+    expect(visibleLow.has("11,0")).toBe(false);
     expect(visibleHigh.size).toBeGreaterThan(visibleLow.size);
   });
 

@@ -278,7 +278,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
           continue;
         }
         fighter.hp = Math.max(1, Math.min(fighter.maxHp, participant.hp));
-        const woundedNow = fighter.hp <= Math.max(1, Math.round(fighter.maxHp * config.woundHpRatio));
+        // §4 content-schema: ранение при запасе здоровья не выше woundHpRatio × maxHealth.
+        // Порог не округляется: 4/12 > 0.3 не является ранением.
+        const woundedNow = fighter.hp <= fighter.maxHp * config.woundHpRatio;
         if (woundedNow && !fighter.wounded) wounded.push(fighter.name);
         fighter.wounded = fighter.wounded || woundedNow;
         if (outcome === "victory") {

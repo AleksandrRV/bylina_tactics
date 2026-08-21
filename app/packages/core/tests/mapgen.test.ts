@@ -44,3 +44,17 @@ describe("generateBattlefield", () => {
     }
   });
 });
+
+describe("playerSpawns", () => {
+  it("provides five distinct spawn cells for a five-fighter deployment", () => {
+    const players = playerSpawns(10);
+    expect(players).toHaveLength(5);
+    expect(new Set(players.map((point) => `${point.x},${point.y}`)).size).toBe(5);
+    for (const point of players) {
+      expect(point.x).toBeGreaterThanOrEqual(1);
+      expect(point.x).toBeLessThanOrEqual(QUICK_MATCH_MAP.width - 2);
+      expect(point.y).toBeGreaterThanOrEqual(1);
+      expect(point.y).toBeLessThanOrEqual(QUICK_MATCH_MAP.height - 2);
+    }
+  });
+});

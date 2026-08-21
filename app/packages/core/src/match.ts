@@ -127,7 +127,10 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
 
   roster.forEach((entry, index) => {
     const config = pickUnit(options.units, entry.unitId);
-    const point = players[index] ?? players[0]!;
+    const point = players[index];
+    if (!point) {
+      throw new Error(`Deployment of ${roster.length} fighters exceeds ${players.length} player spawn cells`);
+    }
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1);
     if (entry.mods.aimMod) spawned.aim += entry.mods.aimMod;
@@ -186,7 +189,10 @@ export function createQuickMatch(options: QuickMatchOptions): MatchState {
   };
 
   roster.forEach((config, index) => {
-    const point = players[index] ?? players[0]!;
+    const point = players[index];
+    if (!point) {
+      throw new Error(`Quick match roster of ${roster.length} exceeds ${players.length} player spawn cells`);
+    }
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
   });

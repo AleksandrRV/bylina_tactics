@@ -114,6 +114,9 @@
     },
     "illusion": {
       "name": "Illusion"
+    },
+    "recruit": {
+      "name": "Recruit"
     }
   },
   "weapon": {
@@ -236,6 +239,7 @@
     "panic": "Panic",
     "immobile": "Rooted",
     "hidden": "Hidden",
+    "camouflage": "Forest camouflage",
     "flying": "Flying",
     "timed": "Timed · {turns}",
     "defending": "Defending",

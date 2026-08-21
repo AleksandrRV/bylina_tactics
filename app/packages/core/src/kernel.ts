@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.9.0";
+export const CORE_VERSION = "0.12.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -1129,11 +1129,18 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           success = rng.nextInt(1, 100) <= chance;
           if (success) applySkillEffects(actor, skill, target, command.targetPos, events);
         } else if (skill.resolution === "attack" && skill.category === "self" && (skill.radius ?? 0) > 0 && weapon) {
+          // §9.5/§12.1: правила граневых укрытий действуют и для атак по области —
+          // полная грань запрещает обычную ближнюю атаку, неполная сохраняет свой
+          // вычет, разрушающее оружие ближнего боя пробивает грань, как при одиночном ударе.
           for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
-            const hit = resolveCombatAgainst(actor, areaTarget, weapon, events);
+            const breach = edgeBreach(actor, areaTarget, weapon);
+            if (weapon.category === "melee" && edgeCoverOnLine(actor, areaTarget)?.coverType === 2 && !breach) continue;
+            const edgeOptions = breach?.options ?? currentEdgeOptions(actor, areaTarget, weapon);
+            if (breach) damageCover(breach.cover, events);
+            const hit = resolveCombatAgainst(actor, areaTarget, weapon, events, edgeOptions);
             if (!hit) continue;
             success = true;
-            applySkillEffects(actor, skill, areaTarget, command.targetPos, events);
+            applySkillEffects(actor, skill, areaTarget, command.targetPos, events, Boolean(breach));
             if (!areaTarget.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, areaTarget, events);
           }
         } else if (skill.resolution === "attack" && target?.coverType && skill.effects.some((effect) => effect.type === "destroyCover") && skill.envDmg >= 1) {

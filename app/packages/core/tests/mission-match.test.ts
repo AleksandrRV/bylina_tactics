@@ -139,3 +139,19 @@ describe("createMissionMatch equipment", () => {
     expect(hero.weaponIds?.filter((id) => id === "bow")).toHaveLength(1);
   });
 });
+
+describe("createMissionMatch deployment size", () => {
+  it("deploys up to five fighters on distinct spawn cells", () => {
+    const match = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: ["bogatyr", "strelets", "znaharka", "bogatyr", "strelets"],
+      enemies: [{ unitId: "upyr", count: 3 }],
+      seed: 45,
+    });
+    const players = livingOf(match, PLAYER_OWNER);
+    expect(players).toHaveLength(5);
+    const cells = players.map((entity) => `${entity.x},${entity.y}`);
+    expect(new Set(cells).size).toBe(5);
+  });
+});

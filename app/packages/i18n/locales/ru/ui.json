@@ -114,6 +114,9 @@
     },
     "illusion": {
       "name": "Иллюзия"
+    },
+    "recruit": {
+      "name": "Рекрут"
     }
   },
   "weapon": {
@@ -236,6 +239,7 @@
     "panic": "Паника",
     "immobile": "Корни",
     "hidden": "Скрытность",
+    "camouflage": "Лесная маскировка",
     "flying": "Полёт",
     "timed": "Срок · {turns}",
     "defending": "Стойка",
