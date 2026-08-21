@@ -264,10 +264,52 @@
   display: flex;
   gap: 6px;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .skill-slot {
+  position: relative;
   min-width: 88px;
+  padding-left: 22px;
+  border-color: #46504d;
+  background: linear-gradient(180deg, #202724, #171d1a);
+  color: #bdb7aa;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+}
+
+.skill-slot::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #777b75;
+  border-radius: 50%;
+  background: #252c28;
+  transform: translateY(-50%);
+}
+
+.skill-slot.is-active,
+.skill-slot[aria-pressed="true"],
+.skill-slot:active:not(:disabled) {
+  border-color: #e0b34a;
+  background: linear-gradient(180deg, #4a3b1e, #2d2819);
+  color: #fff2c4;
+  box-shadow: 0 0 0 1px rgba(224, 179, 74, 0.25), 0 0 14px rgba(224, 179, 74, 0.2);
+}
+
+.skill-slot.is-active::before,
+.skill-slot[aria-pressed="true"]::before,
+.skill-slot:active:not(:disabled)::before {
+  border-color: #ffe49a;
+  background: #e0b34a;
+  box-shadow: 0 0 7px rgba(224, 179, 74, 0.8);
+}
+
+.skill-slot:disabled {
+  color: #77756d;
 }
 
 .skill-slot kbd {
@@ -275,6 +317,11 @@
   font-size: 0.68rem;
   color: #9a9384;
   margin-bottom: 2px;
+}
+
+.skill-slot.is-active kbd,
+.skill-slot[aria-pressed="true"] kbd {
+  color: #ffe49a;
 }
 
 .aim-card {

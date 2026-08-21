@@ -16,7 +16,8 @@ import {
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { interactiveEntityAt } from "./cell-interaction.js";
+import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
+import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -213,6 +214,7 @@ export function BattleScreen() {
       : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, skillId: action.id });
     if (!result.ok) return;
     announce(result.events);
+    setAction(null);
     setAimId(null);
     playThen(result.events);
   };
@@ -287,6 +289,15 @@ export function BattleScreen() {
       setPreview(null);
       return;
     }
+
+    const automaticAttack = primaryAttackForEnemy(selected, entity, PLAYER_OWNER, targeting);
+    if (automaticAttack) {
+      setAction(automaticAttack);
+      setAimId(entity?.id ?? null);
+      setPreview(null);
+      return;
+    }
+
     if (entity && selectedId !== null && targeting) {
       if (aimId === entity.id && hit?.available) {
         tryAttack(entity.id);
@@ -418,14 +429,9 @@ export function BattleScreen() {
         setPreview(null);
         return;
       }
-      if (/^[1-4]$/.test(event.key) && selected) {
+      if (ACTION_SHORTCUTS.includes(event.key as (typeof ACTION_SHORTCUTS)[number]) && selected) {
         const index = Number(event.key) - 1;
-        const weaponIds = selected.weaponIds ?? (selected.weaponId ? [selected.weaponId] : []);
-        const entries = [
-          ...weaponIds.map((id) => ({ type: "weapon" as const, id })),
-          ...(selected.skillIds ?? []).map((id) => ({ type: "skill" as const, id })),
-        ];
-        const chosen = entries[index];
+        const chosen = selectableActions(selected)[index];
         if (!chosen) return;
         if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
           useSelfSkill(chosen.id);
@@ -445,6 +451,7 @@ export function BattleScreen() {
     };
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
+      setAction(null);
       setAimId(null);
       setPreview(null);
     };
@@ -681,6 +688,8 @@ export function BattleScreen() {
                 key={`weapon-${weaponId}`}
                 type="button"
                 className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
+                aria-pressed={action?.type === "weapon" && action.id === weaponId}
+                data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
                 disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
@@ -689,28 +698,32 @@ export function BattleScreen() {
                   setPreview(null);
                 }}
               >
-                {index < 4 ? <kbd>{index + 1}</kbd> : null}
+                {ACTION_SHORTCUTS[index] ? <kbd>{ACTION_SHORTCUTS[index]}</kbd> : null}
                 {t(`weapon.${weaponId}.name`)}
               </button>
             ))}
-            {(selected?.skillIds ?? []).map((skillId, index) => {
+            {(selected?.skillIds ?? []).map((skillId) => {
               const skill = skills[skillId];
-              const shortcut = (selected?.weaponIds?.length ?? (selected?.weaponId ? 1 : 0)) + index + 1;
+              const active = action?.type === "skill" && action.id === skillId;
+              const shortcut = selected ? shortcutForAction(selected, "skill", skillId) : undefined;
               return (
                 <button
                   key={`skill-${skillId}`}
                   type="button"
-                  className={`hud-btn skill-slot${action?.type === "skill" && action.id === skillId ? " is-active" : ""}`}
+                  className={`hud-btn skill-slot${active ? " is-active" : ""}`}
+                  aria-pressed={active}
+                  data-action-state={active ? "active" : "inactive"}
                   disabled={!selected || selected.ap < (skill?.apCost ?? 1) || busy || snapshot.activeOwner !== PLAYER_OWNER}
                   onClick={() => {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
-                      setAction({ type: "skill", id: skillId });
+                      setAction(active ? null : { type: "skill", id: skillId });
                       setAimId(null);
+                      setPreview(null);
                     }
                   }}
                 >
-                  {shortcut <= 4 ? <kbd>{shortcut}</kbd> : null}
+                  {shortcut ? <kbd>{shortcut}</kbd> : null}
                   {t(`skill.${skillId}.name`)}
                 </button>
               );
@@ -718,6 +731,8 @@ export function BattleScreen() {
             <button
               type="button"
               className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
+              aria-pressed={Boolean(selected?.defending)}
+              data-action-state={selected?.defending ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
               title={t("battle.defendHint")}
               onClick={() => {
@@ -734,6 +749,8 @@ export function BattleScreen() {
             <button
               type="button"
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
+              aria-pressed={Boolean(selected?.overwatch)}
+              data-action-state={selected?.overwatch ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
               title={t("battle.overwatchHint")}
               onClick={() => {

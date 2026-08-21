@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { EntityState } from "@bylina/core";
-import { interactiveEntityAt } from "../src/cell-interaction.js";
+import { interactiveEntityAt, primaryAttackForEnemy } from "../src/cell-interaction.js";
 
 function entity(partial: Partial<EntityState>): EntityState {
   return {
@@ -49,5 +49,20 @@ describe("cell interaction priority", () => {
     const edgeCover = entity({ id: 2, edge: 3 });
     const unit = entity({ id: 3, owner: 2, coverType: 0, maxAp: 2, obstacle: true });
     expect(interactiveEntityAt([edgeCover, unit], 2, 2, true)?.id).toBe(unit.id);
+  });
+
+  it("selects an enemy with the primary weapon while movement mode is active", () => {
+    const selected = entity({
+      id: 10,
+      owner: 1,
+      coverType: 0,
+      weaponId: "sword",
+      weaponIds: ["sword", "mace"],
+      maxAp: 2,
+      obstacle: true,
+    });
+    const enemy = entity({ id: 11, owner: 2, coverType: 0, maxAp: 2, obstacle: true });
+    expect(primaryAttackForEnemy(selected, enemy, 1, false)).toEqual({ type: "weapon", id: "sword" });
+    expect(primaryAttackForEnemy(selected, enemy, 1, true)).toBeNull();
   });
 });
