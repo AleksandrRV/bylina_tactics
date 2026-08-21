@@ -72,7 +72,12 @@
     "hp": "Health {current} / {max}",
     "weapon": "Weapon",
     "empty": "None selected",
-    "apLeft": "AP"
+    "apLeft": "AP",
+    "defend": "Defend",
+    "defendHint": "Defensive stance: +25 dodge, −2 damage taken. Ends turn.",
+    "overwatch": "Overwatch",
+    "overwatchHint": "Enter overwatch: reaction shot when enemy moves. Ends turn.",
+    "debugMovement": "Movement cost"
   },
   "unit": {
     "bogatyr": { "name": "Bogatyr" },

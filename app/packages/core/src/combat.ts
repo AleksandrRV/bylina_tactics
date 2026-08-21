@@ -1,6 +1,6 @@
 import { evaluateCover, type CoverDetail } from "./cover.js";
 import { distH } from "./grid.js";
-import { hasLineOfSight } from "./los.js";
+import { evaluateObstacles, hasLineOfSight } from "./los.js";
 import { heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 import { clampChance, type Rng } from "./rng.js";
 import type { CellPos, EntityState, Grid } from "./types.js";
@@ -80,6 +80,9 @@ export function previewAttack(
 
   const los = hasLineOfSight(grid, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
   if (weapon.requiresLOS && !los) {
+    // Compute breakCell from obstacles for NO_LOS visualization.
+    const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
+    breakCell = obstacles.breakCell;
     return { available: false, reason: "NO_LOS", heightMod, breakCell };
   }
 
