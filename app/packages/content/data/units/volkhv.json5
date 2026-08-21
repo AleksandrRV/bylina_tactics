@@ -1,0 +1,15 @@
+{
+  id: "volkhv",
+  classId: "volkhv",
+  side: "druzhina",
+  maxHealth: 7,
+  maxAP: 2,
+  mobility: 5,
+  aim: 70,
+  defense: 0,
+  will: 70,
+  vision: 13,
+  weapons: ["sling"],
+  skills: ["panic", "create_illusion", "teleport_ally"],
+  tags: [],
+}

@@ -109,7 +109,6 @@ export function evaluateObstacles(
   let maxPenalty = 0;
   let breakCell: { x: number; y: number; z: number } | null = null;
 
-  const intermediateCovers: { entity: EntityState; type: IntersectionType; effectiveTier: 0 | 1 | 2 }[] = [];
   const glancingWalls: { x: number; y: number }[] = [];
 
   for (const cell of traced) {
@@ -124,7 +123,9 @@ export function evaluateObstacles(
       if (heightDiff > 1.01) {
         blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break;
       } else {
-        maxPenalty = Math.max(maxPenalty, cell.type === "full" ? 50 : 25);
+        let tier = tile.z - az >= 2 ? 2 : tile.z - az >= 1 ? 1 : 0;
+        if (cell.type === "glancing") tier = Math.max(0, tier - 1);
+        maxPenalty = Math.max(maxPenalty, tier === 2 ? 50 : tier === 1 ? 25 : 0);
       }
     }
 
@@ -133,16 +134,6 @@ export function evaluateObstacles(
       glancingWalls.push({ x: cell.x, y: cell.y });
     }
 
-    for (const entity of entities) {
-      if (!isAnyCover(entity) || entity.dead) continue;
-      if (entity.x !== cell.x || entity.y !== cell.y) continue;
-      const tileZ = tile.pit ? 0 : tile.z;
-      if (Math.abs(entity.z - tileZ) > 1) continue;
-      // Высота относительно защищаемого (цели bz) и атакующего (az).
-      const eTier = effectiveCoverTier(entity.coverType, false, az, bz, entity.z);
-      if (eTier === 0) continue;
-      intermediateCovers.push({ entity, type: cell.type, effectiveTier: eTier });
-    }
   }
 
   if (!blocked) {
@@ -159,56 +150,12 @@ export function evaluateObstacles(
     }
     if (!blocked) {
       if (glancingWalls.length > 0) maxPenalty = Math.max(maxPenalty, 50);
-      maxPenalty = Math.max(maxPenalty, computeObstaclePenalty(intermediateCovers, ax, ay));
     }
   }
 
   return { blocked, obstaclePenalty: maxPenalty, breakCell };
 }
 
-function computeObstaclePenalty(
-  covers: { entity: EntityState; type: IntersectionType; effectiveTier: 0 | 1 | 2 }[],
-  ax: number, ay: number,
-): number {
-  let penalty = 0;
-  const groups: { tier: 1 | 2; ids: Set<number> }[] = [];
-
-  for (const { entity, type, effectiveTier } of covers) {
-    if (effectiveTier === 0) continue;
-    const distToAttacker = Math.max(Math.abs(entity.x - ax), Math.abs(entity.y - ay));
-    const adjacent = distToAttacker <= 1;
-
-    if (type === "full") {
-      if (effectiveTier === 2) return 100;
-      penalty = Math.max(penalty, 50);
-    } else {
-      if (adjacent) continue;
-      let merged = false;
-      for (const group of groups) {
-        if (group.tier !== effectiveTier) continue;
-        for (const id of group.ids) {
-          const other = covers.find((c) => c.entity.id === id);
-          if (other && Math.max(Math.abs(entity.x - other.entity.x), Math.abs(entity.y - other.entity.y)) <= 1) {
-            group.ids.add(entity.id); merged = true; break;
-          }
-        }
-        if (merged) break;
-      }
-      if (!merged) groups.push({ tier: effectiveTier, ids: new Set([entity.id]) });
-    }
-  }
-
-  for (const group of groups) {
-    if (group.ids.size >= 2) {
-      if (group.tier === 2) return 100;
-      penalty = Math.max(penalty, 50);
-    } else {
-      penalty = Math.max(penalty, group.tier === 2 ? 50 : 25);
-    }
-  }
-
-  return penalty;
-}
 
 export function hasLineOfSight(
   grid: Grid,
@@ -228,7 +175,7 @@ export function hasLineOfSight(
     if (!tile) return false;
 
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
-    if (rz < tile.z) return false;
+    if (tile.z - rz > 1.01) return false;
 
     if (tile.blockLOS) {
       if (cell.type === "full") return false;
@@ -297,15 +244,16 @@ export function terrainCoverTier(
   defenderX: number,
   defenderY: number,
 ): 0 | 1 | 2 {
-  const cells = supercover(attackerX, attackerY, defenderX, defenderY);
+  const cells = traceRay(attackerX, attackerY, defenderX, defenderY);
   let best: 0 | 1 | 2 = 0;
   for (const cell of cells) {
     if ((cell.x === attackerX && cell.y === attackerY) || (cell.x === defenderX && cell.y === defenderY)) continue;
     const tile = tileAt(grid, cell.x, cell.y);
     if (!tile || tile.pit || tile.blockLOS) continue;
     const diff = tile.z - attackerZ;
-    if (diff >= 2 && best < 2) best = 2;
-    else if (diff === 1 && best < 1) best = 1;
+    let tier: 0 | 1 | 2 = diff >= 2 ? 2 : diff === 1 ? 1 : 0;
+    if (cell.type === "glancing") tier = Math.max(0, tier - 1) as 0 | 1 | 2;
+    if (tier > best) best = tier;
   }
   return best;
 }

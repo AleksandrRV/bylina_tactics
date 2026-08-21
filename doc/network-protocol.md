@@ -47,6 +47,8 @@ interface RejectPayload {
     | "OUT_OF_RANGE"
     | "NO_LOS"
     | "NO_AP"
+    | "ON_COOLDOWN"
+    | "NO_USES"
     | "NOT_YOUR_TURN"
     | "OCCUPIED"
     | "NOT_FOUND";
@@ -60,7 +62,7 @@ interface RejectPayload {
 ## 3. Команды
 
 ```typescript
-type CommandType = "MOVE" | "ATTACK" | "OVERWATCH" | "USE_SKILL" | "END_TURN";
+type CommandType = "MOVE" | "ATTACK" | "OVERWATCH" | "DEFEND" | "USE_SKILL" | "END_TURN";
 
 interface BaseCommand {
   type: CommandType;
@@ -88,6 +90,10 @@ interface CommandUseSkill extends BaseCommand {
 
 interface CommandOverwatch extends BaseCommand {
   type: "OVERWATCH";
+}
+
+interface CommandDefend extends BaseCommand {
+  type: "DEFEND";
 }
 
 interface CommandEndTurn {
@@ -162,8 +168,10 @@ type GameEventType =
   | "ENTITY_DISPLACED"
   | "COMBAT_RESOLVED"
   | "SKILL_RESOLVED"
+  | "SKILL_RESOURCE_CHANGED"
   | "STAT_CHANGED"
   | "STATUS_CHANGED"
+  | "ENTITY_SPAWNED"
   | "COVER_DESTROYED"
   | "ENTITY_DIED"
   | "ENTITY_REMOVED"
@@ -216,6 +224,15 @@ interface EventSkillResolved {
   success: boolean;
 }
 
+interface EventSkillResourceChanged {
+  type: "SKILL_RESOURCE_CHANGED";
+  entityId: number;
+  skillId: string;
+  cooldown: number;
+  uses: number;
+  usesLeft?: number;
+}
+
 interface EventStatChanged {
   type: "STAT_CHANGED";
   entityId: number;
@@ -227,8 +244,17 @@ interface EventStatChanged {
 interface EventStatusChanged {
   type: "STATUS_CHANGED";
   entityId: number;
-  status: "POISON" | "PANIC" | "OVERWATCH" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+  status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED" | "CAMOUFLAGE";
   applied: boolean;
+  duration?: number;
+  magnitude?: number;
+  sourceId?: number;
+}
+
+interface EventEntitySpawned {
+  type: "ENTITY_SPAWNED";
+  entity: EntitySnapshot;
+  cause: "SUMMON" | "ILLUSION" | "RESURRECTION";
 }
 
 interface EventCoverDestroyed {
@@ -279,6 +305,8 @@ interface EventMatchEnded {
 
 Гибель в яме: сначала `ENTITY_DISPLACED` с причиной `FALL`, затем `ENTITY_DIED` с причиной `FALL_INTO_PIT`.
 
+Удар разрушающим оружием ближнего боя через граневое укрытие: `COVER_DESTROYED` располагается до `COMBAT_RESOLVED`, потому что оставшаяся ступень входит в расчёт попадания. Значение `damageDealt` уже содержит вычет урона, принятого окружением.
+
 Набор, адресованный ведомому, не включает события о сущностях и клетках, которые его сторона не наблюдает, за исключением случая, когда результат изменяет уже известную местность (разрушение ранее наблюдавшегося укрытия).
 
 ---
@@ -293,6 +321,7 @@ interface SyncPayload {
     turnNumber: number;
     activePlayerId: string;
     rngSeed: string;
+    rngState: string; // текущее ui32-состояние Mulberry32 для продолжения снимка
   };
   grid: {
     width: number;
@@ -332,7 +361,18 @@ interface EntitySnapshot {
     maxAp: number;
   };
   coverType?: 1 | 2;
+  coverEdge?: 0 | 1 | 2 | 3; // только для граневого укрытия
   tags: string[];
+  statusData?: {
+    poisonDamage?: number;
+    poisonTurns?: number;
+    panicSourceId?: number;
+    panicTurns?: number;
+    immobileTurns?: number;
+    timedLife?: number;
+    skillCooldowns?: Record<string, number>;
+    skillUses?: Record<string, number>;
+  };
 }
 ```
 

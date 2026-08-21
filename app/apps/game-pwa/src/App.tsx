@@ -1,7 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { createTacticsKernel } from "@bylina/core";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
-import { createLocalTransport } from "@bylina/net";
 import { APP_VERSION, createSession } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
@@ -16,7 +14,6 @@ const localeModules = import.meta.glob("../../../packages/i18n/locales/*/*.json"
 export function App() {
   const install = useInstallPrompt();
   const content = useMemo(() => loadAppContent(), []);
-  const kernel = useMemo(() => createTacticsKernel(), []);
   const catalogs = useMemo(() => collectCatalogsFromModules(localeModules), []);
   const allowedLanguages = useMemo(
     () => manifest.languages.map((item) => item.code),
@@ -43,21 +40,7 @@ export function App() {
   );
 
   const session = useMemo(() => createSession("boot"), []);
-  const transport = useMemo(() => createLocalTransport(), []);
   const [, setLocaleTick] = useState(0);
-
-  useEffect(() => {
-    return transport.subscribe((message) => {
-      if (message.type !== "COMMAND") return;
-      const result = kernel.apply(message.payload as Parameters<typeof kernel.apply>[0]);
-      transport.send({
-        type: result.ok ? "EVENT_BATCH" : "REJECT",
-        senderId: "host",
-        timestamp: Date.now(),
-        payload: result,
-      });
-    });
-  }, [kernel, transport]);
 
   useEffect(() => {
     applyDocumentLocale(i18n);
@@ -87,7 +70,7 @@ export function App() {
 
   return (
     <ServicesProvider
-      value={{ i18n, settings, session, tactics: kernel, content: content.data, version: APP_VERSION, install }}
+      value={{ i18n, settings, session, content: content.data, version: APP_VERSION, install }}
     >
       <Shell />
     </ServicesProvider>

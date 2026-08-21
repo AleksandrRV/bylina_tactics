@@ -9,7 +9,7 @@
   defense: 10,
   will: 40,
   vision: 12,
-  weapons: ["sword"],
-  skills: [],
+  weapons: ["sword", "mace"],
+  skills: ["circular_sweep", "breach", "shield_bash"],
   tags: [],
 }

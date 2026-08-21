@@ -6,11 +6,21 @@ import { clampChance, type Rng } from "./rng.js";
 import type { CellPos, EntityState, Grid } from "./types.js";
 import type { WeaponStats } from "./weapons.js";
 
+export interface AttackOptions {
+  ignoreAp?: boolean;
+  coverPenaltyOverride?: number;
+  coverTypeOverride?: 0 | 1 | 2;
+  flankedOverride?: boolean;
+  coverDetailsOverride?: CoverDetail[];
+  damageReduction?: number;
+}
+
 export interface HitBreakdown {
   baseAim: number;
   weaponMod: number;
   heightAim: number;
   targetDefense: number;
+  stanceDefense: number;
   coverPenalty: number;
   rangePenalty: number;
   finalChance: number;
@@ -19,7 +29,7 @@ export interface HitBreakdown {
 
 export interface HitPreview {
   available: boolean;
-  reason?: "NO_LOS" | "OUT_OF_RANGE" | "NO_AP" | "ILLEGAL" | "NOT_FOUND";
+  reason?: "NO_LOS" | "OUT_OF_RANGE" | "NO_AP" | "ON_COOLDOWN" | "NO_USES" | "ILLEGAL" | "NOT_FOUND";
   chance?: number;
   dmgMin?: number;
   dmgMax?: number;
@@ -48,12 +58,13 @@ export function previewAttack(
   attacker: EntityState,
   target: EntityState,
   weapon: WeaponStats,
+  options: AttackOptions = {},
 ): HitPreview {
   if (attacker.dead || target.dead || target.coverType > 0) {
     return { available: false, reason: "ILLEGAL" };
   }
   if (attacker.owner === target.owner) return { available: false, reason: "ILLEGAL" };
-  if (attacker.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
+  if (!options.ignoreAp && attacker.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
 
   const melee = weapon.category === "melee";
   const heightMod = heightRangeMod(attacker.z, target.z);
@@ -101,11 +112,20 @@ export function previewAttack(
   const baseAim = attacker.aim;
   const weaponMod = weapon.aimMod;
   const targetDefense = target.defense;
-  const defendBonus = target.defending ? 25 : 0;
-  const coverPenalty = cover.penalty;
+  const stanceDefense = target.defending ? 25 : 0;
+  const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
+  const camouflage = !melee && Boolean(target.camouflageMinCover) && entities.some((entity) =>
+    !entity.dead &&
+    entity.id !== target.id &&
+    entity.owner === target.owner &&
+    entity.providesCamouflage &&
+    distH(target.x, target.y, entity.x, entity.y) === 1
+  );
+  const camouflagePenalty = camouflage && !weapon.ignoreHalfCover ? 25 : 0;
+  const coverPenalty = options.coverPenaltyOverride ?? Math.max(cover.penalty, obstacles.obstaclePenalty, camouflagePenalty);
 
   const chance = clampChance(
-    baseAim + weaponMod + heightAim - targetDefense - defendBonus - coverPenalty - rangePenalty,
+    baseAim + weaponMod + heightAim - targetDefense - stanceDefense - coverPenalty - rangePenalty,
   );
 
   const breakdown: HitBreakdown = {
@@ -113,20 +133,21 @@ export function previewAttack(
     weaponMod,
     heightAim,
     targetDefense,
+    stanceDefense,
     coverPenalty,
     rangePenalty,
     finalChance: chance,
-    coverDetails: cover.details,
+    coverDetails: options.coverDetailsOverride ?? cover.details,
   };
 
   return {
     available: true,
     chance,
-    dmgMin: weapon.minDmg,
-    dmgMax: weapon.maxDmg,
-    cover: cover.coverType,
+    dmgMin: Math.max(0, weapon.minDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0)),
+    dmgMax: Math.max(0, weapon.maxDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0)),
+    cover: options.coverTypeOverride ?? (camouflage && cover.coverType < 1 ? 1 : cover.coverType),
     heightMod,
-    flanked: cover.flanked,
+    flanked: options.flankedOverride ?? (camouflage ? false : cover.flanked),
     actionType: melee ? "MELEE" : "RANGED",
     breakCell,
     breakdown,
@@ -140,16 +161,12 @@ export function resolveAttack(
   target: EntityState,
   weapon: WeaponStats,
   rng: Rng,
+  options: AttackOptions = {},
 ): AttackResolution | null {
-  const preview = previewAttack(grid, entities, attacker, target, weapon);
+  const preview = previewAttack(grid, entities, attacker, target, weapon, options);
   if (!preview.available || preview.chance === undefined) return null;
 
-  const cover = evaluateCover(attacker, target, entities, grid, {
-    melee: weapon.category === "melee",
-    ignoreHalfCover: Boolean(weapon.ignoreHalfCover),
-    flyingTarget: target.flying,
-  });
-  const critChance = clampChance(weapon.crit + (cover.flanked ? 40 : 0));
+  const critChance = clampChance(weapon.crit + (preview.flanked ? 40 : 0));
   const hitRoll = rng.nextInt(1, 100);
   if (hitRoll > preview.chance) {
     return {
@@ -157,24 +174,25 @@ export function resolveAttack(
       damage: 0,
       chance: preview.chance,
       critChance,
-      flanked: cover.flanked,
+      flanked: preview.flanked ?? false,
       heightMod: preview.heightMod ?? 0,
-      cover: cover.coverType,
+      cover: preview.cover ?? 0,
       actionType: preview.actionType ?? "RANGED",
     };
   }
   const critRoll = rng.nextInt(1, 100);
   const crit = critRoll <= critChance;
   const base = rng.nextInt(weapon.minDmg, weapon.maxDmg);
-  const damage = base + (crit ? weapon.critBonus : 0);
+  const rawDamage = base + (crit ? weapon.critBonus : 0);
+  const damage = Math.max(0, rawDamage - (target.defending ? 2 : 0) - (options.damageReduction ?? 0));
   return {
     result: crit ? "CRIT" : "HIT",
     damage,
     chance: preview.chance,
     critChance,
-    flanked: cover.flanked,
+    flanked: preview.flanked ?? false,
     heightMod: preview.heightMod ?? 0,
-    cover: cover.coverType,
+    cover: preview.cover ?? 0,
     actionType: preview.actionType ?? "RANGED",
   };
 }

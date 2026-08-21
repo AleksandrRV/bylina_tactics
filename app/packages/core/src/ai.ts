@@ -14,6 +14,44 @@ function nearest(from: { x: number; y: number }, candidates: readonly EntityStat
   return ranked[0];
 }
 
+function hasStatus(entity: EntityState, status: string): boolean {
+  if (status === "poison") return Boolean(entity.poison);
+  if (status === "panic") return Boolean(entity.panic);
+  if (status === "immobile") return Boolean(entity.immobileTurns);
+  if (status === "hidden") return Boolean(entity.hidden);
+  if (status === "flying") return Boolean(entity.flying);
+  if (status === "timed") return entity.timedLife !== undefined;
+  return false;
+}
+
+function repeatsAppliedStatus(kernel: TacticsKernel, skillId: string, target: EntityState): boolean {
+  const skill = kernel.getSkillDefinition(skillId);
+  return Boolean(skill?.effects.some((effect) => effect.type === "applyStatus" && hasStatus(target, effect.status)));
+}
+
+function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[], all: readonly EntityState[]): Command | null {
+  for (const skillId of actor.skillIds ?? []) {
+    const skill = kernel.getSkillDefinition(skillId);
+    if (!skill) continue;
+    if (skill.effects.some((effect) => effect.type === "spawn")) {
+      if (skillId !== "raise_skeleton") continue;
+      const corpse = all
+        .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === "upyr")
+        .sort((a, b) => a.id - b.id)
+        .find((entity) => kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available);
+      if (corpse) return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
+      continue;
+    }
+    if (skill.filter === "enemies") {
+      const target = foes.find((foe) =>
+        !repeatsAppliedStatus(kernel, skillId, foe) && kernel.getSkillPreview(actor.id, skillId, foe.id).available
+      );
+      if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
+    }
+  }
+  return null;
+}
+
 function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[]): Command | null {
   const hits: { foe: EntityState; dist: number }[] = [];
   for (const foe of foes) {
@@ -30,7 +68,7 @@ function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly En
   });
   const chosen = hits[0];
   if (!chosen) return null;
-  return { type: "ATTACK", actorId: actor.id, targetId: chosen.foe.id };
+  return { type: "ATTACK", actorId: actor.id, targetId: chosen.foe.id, weaponId: actor.weaponId };
 }
 
 function scoreMove(actor: EntityState, cell: ReachableCell, foe: EntityState): number {
@@ -73,25 +111,23 @@ function bestMove(kernel: TacticsKernel, actor: EntityState, foes: readonly Enti
 export function pickEnemyCommand(kernel: TacticsKernel): Command | null {
   const snap = kernel.getSnapshot();
   if (snap.activeOwner !== ENEMY_OWNER) return null;
-  const foes = livingOf(snap, PLAYER_OWNER);
+  const visible = kernel.getVisibleCells(ENEMY_OWNER);
+  const foes = livingOf(snap, PLAYER_OWNER).filter((entity) => !entity.hidden && visible.has(`${entity.x},${entity.y}`));
   const enemies = livingOf(snap, ENEMY_OWNER)
     .filter((entity) => entity.ap > 0)
     .sort((a, b) => a.id - b.id);
-  if (foes.length === 0 || enemies.length === 0) return null;
+  if (enemies.length === 0) return null;
   for (const actor of enemies) {
+    const skill = bestSkill(kernel, actor, foes, snap.entities);
+    if (skill) return skill;
     const attack = bestAttack(kernel, actor, foes);
     if (attack) return attack;
     const move = bestMove(kernel, actor, foes);
     if (move) return move;
   }
-  // Если ни один враг не может атаковать или двигаться — ставим в защитную стойку
-  // тех, у кого ещё остались ОД (§16: неизрасходованные ОД сгорают).
-  for (const actor of enemies) {
-    if (actor.ap > 0 && !actor.defending) {
-      return { type: "DEFEND", actorId: actor.id };
-    }
-  }
-  return null;
+  // Если доступных целей нет, оставшийся юнит использует нормативный дозор.
+  const watcher = enemies.find((actor) => actor.ap > 0 && !actor.overwatch && actor.weaponId);
+  return watcher ? { type: "OVERWATCH", actorId: watcher.id } : null;
 }
 
 /** Исполняет ход Нави теми же командами, что и человек. */

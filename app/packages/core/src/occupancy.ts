@@ -35,7 +35,7 @@ export function isAlly(walker: EntityState, other: EntityState): boolean {
  * При переходе из (fx,fy) в (tx,ty) проверяем грань клетки (fx,fy)
  * в направлении движения и грань клетки (tx,ty) с противоположной стороны.
  */
-function findEdgeCover(
+export function edgeCoverBetween(
   entities: readonly EntityState[],
   fx: number,
   fy: number,
@@ -89,7 +89,7 @@ export function canTransit(
   }
   // Проверить граневое укрытие на грани перехода.
   if (fromX !== undefined && fromY !== undefined) {
-    const edgeCover = findEdgeCover(entities, fromX, fromY, x, y);
+    const edgeCover = edgeCoverBetween(entities, fromX, fromY, x, y);
     if (edgeCover && edgeCover.coverType === 2) return false; // полное граневое блокирует
   }
   return true;
@@ -157,7 +157,7 @@ export function edgeCost(
   if (dx !== 0 || dy !== 0) {
     // Для диагонального шага проверяем обе грани.
     const checkEdge = (fx: number, fy: number, tx: number, ty: number): number => {
-      const edgeCover = findEdgeCover(entities, fx, fy, tx, ty);
+      const edgeCover = edgeCoverBetween(entities, fx, fy, tx, ty);
       if (!edgeCover) return 0;
       if (edgeCover.coverType === 2) return Number.POSITIVE_INFINITY; // полное блокирует
       return 1; // полуукрытие: +1 МП

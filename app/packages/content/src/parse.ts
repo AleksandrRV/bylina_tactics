@@ -104,6 +104,44 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     else if (parsed.value) skills.push(parsed.value);
   }
 
+  const checkUnique = <T extends { id: string }>(kind: string, records: T[]): Set<string> => {
+    const ids = new Set<string>();
+    for (const record of records) {
+      if (ids.has(record.id)) issues.push({ file: kind, message: `duplicate id: ${record.id}` });
+      ids.add(record.id);
+    }
+    return ids;
+  };
+  const unitIds = checkUnique("units", units);
+  const weaponIds = checkUnique("weapons", weapons);
+  const skillIds = checkUnique("skills", skills);
+
+  for (const unit of units) {
+    for (const weaponId of unit.weapons) {
+      if (!weaponIds.has(weaponId)) issues.push({ file: `units/${unit.id}`, message: `unknown weapon: ${weaponId}` });
+    }
+    for (const skillId of unit.skills) {
+      if (!skillIds.has(skillId)) issues.push({ file: `units/${unit.id}`, message: `unknown skill: ${skillId}` });
+    }
+  }
+  for (const skill of skills) {
+    for (const effect of skill.effects) {
+      if (effect.type === "spawn" && !unitIds.has(effect.unitId)) {
+        issues.push({ file: `skills/${skill.id}`, message: `unknown spawned unit: ${effect.unitId}` });
+      }
+    }
+  }
+  if (quickMatch.value) {
+    for (const unitId of [...quickMatch.value.playerSlots, ...quickMatch.value.enemyPool]) {
+      if (!unitIds.has(unitId)) issues.push({ file: "quick-match.json5", message: `unknown unit: ${unitId}` });
+    }
+  }
+  if (pvp.value) {
+    for (const unitId of pvp.value.pool) {
+      if (!unitIds.has(unitId)) issues.push({ file: "pvp.json5", message: `unknown unit: ${unitId}` });
+    }
+  }
+
   if (issues.length > 0 || !campaign.value || !quickMatch.value || !pvp.value) {
     return { ok: false, issues };
   }

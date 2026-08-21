@@ -73,27 +73,71 @@
     "weapon": "Оружие",
     "empty": "Нет выбранного",
     "apLeft": "ОД",
-    "defend": "Защита",
-    "defendHint": "Защитная стойка: +25 к увороту, −2 к урону. Завершает ход.",
     "overwatch": "Дозор",
-    "overwatchHint": "Встать в дозор: ответный выстрел при движении врага. Завершает ход.",
-    "debugMovement": "Очки движения"
+    "overwatchHint": "Встать в дозор: ответный выстрел при движении врага. Завершает активацию.",
+    "debugMovement": "Очки движения",
+    "defend": "Защитная стойка",
+    "defendHint": "Защитная стойка: −25 к шансу попадания и −2 к урону от атак. Завершает активацию.",
+    "statuses": "Состояния",
+    "cooldownHint": "Перезарядка: {turns} ход.",
+    "noUsesHint": "Лимит применений в этом бою исчерпан.",
+    "cooldownShort": "КД {turns}",
+    "usesShort": "×{uses}"
   },
   "unit": {
-    "bogatyr": { "name": "Богатырь" },
-    "strelets": { "name": "Стрелец" },
-    "znaharka": { "name": "Знахарка" },
-    "upyr": { "name": "Упырь" },
-    "leshy": { "name": "Леший" },
-    "kikimora": { "name": "Кикимора" }
+    "bogatyr": {
+      "name": "Богатырь"
+    },
+    "strelets": {
+      "name": "Стрелец"
+    },
+    "znaharka": {
+      "name": "Знахарка"
+    },
+    "upyr": {
+      "name": "Упырь"
+    },
+    "leshy": {
+      "name": "Леший"
+    },
+    "kikimora": {
+      "name": "Кикимора"
+    },
+    "volkhv": {
+      "name": "Волхв"
+    },
+    "forest_beast": {
+      "name": "Лесной зверь"
+    },
+    "illusion": {
+      "name": "Иллюзия"
+    }
   },
   "weapon": {
-    "sword": { "name": "Меч" },
-    "bow": { "name": "Лук" },
-    "sling": { "name": "Праща" },
-    "claws": { "name": "Когти" },
-    "branch": { "name": "Ветвь" },
-    "needle": { "name": "Игла" }
+    "sword": {
+      "name": "Меч"
+    },
+    "bow": {
+      "name": "Лук"
+    },
+    "sling": {
+      "name": "Праща"
+    },
+    "claws": {
+      "name": "Когти"
+    },
+    "branch": {
+      "name": "Ветвь"
+    },
+    "needle": {
+      "name": "Игла"
+    },
+    "mace": {
+      "name": "Палица"
+    },
+    "pishchal": {
+      "name": "Пищаль"
+    }
   },
   "combat": {
     "preview": "Шанс {chance}% · урон {dmg} · укрытие {cover} · высота {height} · {flank}. Повтор — выстрел.",
@@ -124,7 +168,10 @@
     "bdCover": "Укрытие",
     "bdObstacles": "Препятствия",
     "bdRange": "Дальность",
-    "bdTotal": "Итого"
+    "bdTotal": "Итого",
+    "available": "Доступно",
+    "bdObstacleList": "Препятствия на линии",
+    "unavailable": "Недоступно"
   },
   "settings": {
     "title": "Настройки",
@@ -139,5 +186,56 @@
     "ok": "Понятно",
     "close": "Закрыть",
     "notReady": "Недоступно"
+  },
+  "skill": {
+    "circular_sweep": {
+      "name": "Круговой взмах"
+    },
+    "breach": {
+      "name": "Пролом"
+    },
+    "shield_bash": {
+      "name": "Удар щитом"
+    },
+    "heal": {
+      "name": "Лечение"
+    },
+    "cleanse": {
+      "name": "Очищение"
+    },
+    "summon_forest_beast": {
+      "name": "Призыв зверя"
+    },
+    "aimed_eye": {
+      "name": "Меткий глаз"
+    },
+    "roots": {
+      "name": "Корни"
+    },
+    "poison_needles": {
+      "name": "Ядовитые иглы"
+    },
+    "raise_skeleton": {
+      "name": "Поднять костяка"
+    },
+    "panic": {
+      "name": "Морок страха"
+    },
+    "create_illusion": {
+      "name": "Иллюзия"
+    },
+    "teleport_ally": {
+      "name": "Перенос"
+    }
+  },
+  "status": {
+    "poison": "Яд · {turns}",
+    "panic": "Паника",
+    "immobile": "Корни",
+    "hidden": "Скрытность",
+    "flying": "Полёт",
+    "timed": "Срок · {turns}",
+    "defending": "Стойка",
+    "overwatch": "Дозор"
   }
 }

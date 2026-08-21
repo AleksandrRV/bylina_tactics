@@ -1,0 +1,13 @@
+{
+  id: "raise_skeleton",
+  apCost: 1,
+  endsTurn: true,
+  range: 4,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "all",
+  maxUsesPerBattle: 1,
+  effects: [{ type: "spawn", unitId: "upyr" }],
+}

@@ -8,6 +8,9 @@ export interface MapGenConfig {
   height: number;
   pitChance: number;
   coverDensity: number;
+  wallDensity: number;
+  edgeCoverChance: number;
+  halfCoverChance: number;
   heightMix: { z0: number; z1: number; z2: number };
 }
 
@@ -16,6 +19,9 @@ export const QUICK_MATCH_MAP: MapGenConfig = {
   height: 10,
   pitChance: 0.05,
   coverDensity: 0.07,
+  wallDensity: 0.025,
+  edgeCoverChance: 0.4,
+  halfCoverChance: 0.55,
   heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
 };
 
@@ -29,10 +35,9 @@ function key(x: number, y: number): string {
 }
 
 function pickHeight(rng: Rng, mix: MapGenConfig["heightMix"]): 0 | 1 | 2 {
-  const total = mix.z0 + mix.z1 + mix.z2;
-  const roll = rng.nextInt(1, 1000) / 1000;
-  const p0 = mix.z0 / total;
-  const p1 = p0 + mix.z1 / total;
+  const roll = rng.nextInt(0, 999);
+  const p0 = Math.round(mix.z0 * 1000);
+  const p1 = p0 + Math.round(mix.z1 * 1000);
   if (roll < p0) return 0;
   if (roll < p1) return 1;
   return 2;
@@ -62,6 +67,7 @@ function probe(x: number, y: number, z: number): EntityState {
     coverType: 0,
     overwatch: false,
     defending: false,
+    movementSpent: 0,
   };
 }
 
@@ -152,10 +158,10 @@ export function generateBattlefield(
 
     for (const tile of grid.tiles) {
       if (reserved.has(key(tile.x, tile.y))) continue;
-      if (rng.nextInt(1, 1000) / 1000 < config.pitChance) tile.pit = true;
+      if (rng.nextInt(0, 999) < Math.round(config.pitChance * 1000)) tile.pit = true;
     }
 
-    const wallBudget = Math.max(2, Math.floor((config.width * config.height) / 40));
+    const wallBudget = Math.floor(config.width * config.height * config.wallDensity);
     let walls = 0;
     let guard = 0;
     while (walls < wallBudget && guard < 200) {
@@ -181,13 +187,9 @@ export function generateBattlefield(
       if (!tile || tile.pit || tile.blockLOS) continue;
       if (covers.some((cover) => cover.x === x && cover.y === y)) continue;
 
-      // 40% — граневое укрытие (edge-based), 60% — целоклеточное.
-      const isEdge = rng.nextInt(1, 100) <= 40;
+      const isEdge = rng.nextInt(0, 999) < Math.round(config.edgeCoverChance * 1000);
       const edge = isEdge ? (rng.nextInt(0, 3) as 0 | 1 | 2 | 3) : undefined;
-      // Граневые укрытия чаще полуукрытия.
-      const coverType = edge !== undefined
-        ? (rng.nextInt(1, 100) <= 60 ? 1 : 2) as 1 | 2
-        : rng.nextInt(1, 2) as 1 | 2;
+      const coverType = (rng.nextInt(0, 999) < Math.round(config.halfCoverChance * 1000) ? 1 : 2) as 1 | 2;
       // Граневые укрытия НЕ занимают клетку (obstacle: false).
       // Они влияют только на проход через конкретную грань.
       const occupiesCell = edge === undefined;
@@ -216,6 +218,7 @@ export function generateBattlefield(
         edge,
         overwatch: false,
         defending: false,
+        movementSpent: 0,
       });
     }
 

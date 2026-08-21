@@ -260,21 +260,122 @@
   background: #8b1e1e;
 }
 
+.status-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  margin-top: 5px;
+  max-width: 230px;
+}
+
+.status-chip {
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  font-size: 0.64rem;
+  line-height: 1.1;
+  background: rgba(10, 14, 13, 0.78);
+}
+
+.status-chip.poison { color: #8ee44f; }
+.status-chip.panic { color: #d278ff; }
+.status-chip.immobile { color: #a8c66c; }
+.status-chip.hidden { color: #8fd3bc; }
+.status-chip.flying { color: #9edfff; }
+.status-chip.timed { color: #67dce8; }
+.status-chip.defending { color: #78b8ff; }
+.status-chip.overwatch { color: #e8b64c; }
+
 .skill-row {
   display: flex;
   gap: 6px;
   align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
 }
 
 .skill-slot {
+  position: relative;
   min-width: 88px;
+  padding-left: 22px;
+  border-color: #46504d;
+  background: linear-gradient(180deg, #202724, #171d1a);
+  color: #bdb7aa;
+  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
+
+.skill-slot::before {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 50%;
+  width: 7px;
+  height: 7px;
+  border: 1px solid #777b75;
+  border-radius: 50%;
+  background: #252c28;
+  transform: translateY(-50%);
+}
+
+.skill-slot.is-active,
+.skill-slot[aria-pressed="true"],
+.skill-slot:active:not(:disabled) {
+  border-color: #e0b34a;
+  background: linear-gradient(180deg, #4a3b1e, #2d2819);
+  color: #fff2c4;
+  box-shadow: 0 0 0 1px rgba(224, 179, 74, 0.25), 0 0 14px rgba(224, 179, 74, 0.2);
+}
+
+.skill-slot.is-active::before,
+.skill-slot[aria-pressed="true"]::before,
+.skill-slot:active:not(:disabled)::before {
+  border-color: #ffe49a;
+  background: #e0b34a;
+  box-shadow: 0 0 7px rgba(224, 179, 74, 0.8);
+}
+
+.skill-slot:disabled {
+  color: #77756d;
+}
+
+.skill-slot.is-cooldown {
+  border-color: #65717d;
+  background: linear-gradient(180deg, #252b31, #171b20);
+}
+
+.skill-slot.is-cooldown::before {
+  border-color: #8fa5b8;
+  background: conic-gradient(#7295b3 0 65%, #252c28 65% 100%);
+}
+
+.skill-slot.is-exhausted {
+  border-color: #5b4747;
+  background: linear-gradient(180deg, #2a2020, #171414);
+  text-decoration: line-through;
+}
+
+.skill-resource {
+  display: block;
+  margin-top: 3px;
+  font-size: 0.62rem;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.skill-resource.cooldown { color: #9fc7e8; }
+.skill-resource.uses { color: #d7bd78; }
+.skill-slot.is-exhausted .skill-resource.uses { color: #b87878; }
 
 .skill-slot kbd {
   display: block;
   font-size: 0.68rem;
   color: #9a9384;
   margin-bottom: 2px;
+}
+
+.skill-slot.is-active kbd,
+.skill-slot[aria-pressed="true"] kbd {
+  color: #ffe49a;
 }
 
 .aim-card {

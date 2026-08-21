@@ -257,6 +257,32 @@ function drawKikimora({ g, cx, cy }: TokenCtx): void {
     .stroke({ width: 0.7, color: 0xb9c0c8 });
 }
 
+function drawVolkhv({ g, cx, cy }: TokenCtx): void {
+  g.ellipse(cx, cy + 6, 11, 7).fill(0x264f57);
+  g.poly([cx - 9, cy + 5, cx, cy - 12, cx + 9, cy + 5]).fill(0x357681);
+  g.circle(cx, cy - 2, 5).fill(0xd9c9a5);
+  g.circle(cx - 2, cy - 2, 0.8).fill(0x9ff3ff);
+  g.circle(cx + 2, cy - 2, 0.8).fill(0x9ff3ff);
+  g.moveTo(cx + 8, cy - 7).lineTo(cx + 12, cy + 11).stroke({ width: 2, color: 0x8b6a42 });
+  g.circle(cx + 8, cy - 8, 3).stroke({ width: 1.5, color: 0x75e0eb });
+}
+
+function drawForestBeast({ g, cx, cy }: TokenCtx): void {
+  g.ellipse(cx, cy + 3, 12, 8).fill(0x6f8d43);
+  g.circle(cx + 8, cy - 3, 6).fill(0x86a957);
+  g.poly([cx + 5, cy - 8, cx + 7, cy - 14, cx + 10, cy - 8]).fill(0x526d32);
+  g.poly([cx + 10, cy - 8, cx + 14, cy - 13, cx + 14, cy - 6]).fill(0x526d32);
+  g.circle(cx + 10, cy - 3, 0.9).fill(0xe9f5a1);
+  g.moveTo(cx - 10, cy + 1).quadraticCurveTo(cx - 18, cy - 7, cx - 13, cy - 12)
+    .stroke({ width: 2.5, color: 0x759a49 });
+}
+
+function drawIllusion({ g, cx, cy }: TokenCtx): void {
+  g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).fill({ color: 0x72dce8, alpha: 0.32 });
+  g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).stroke({ width: 1.5, color: 0xbdf8ff, alpha: 0.85 });
+  g.circle(cx, cy - 2, 4).fill({ color: 0xe8ffff, alpha: 0.6 });
+}
+
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   bogatyr: drawBogatyr,
   strelets: drawStrelets,
@@ -264,6 +290,9 @@ const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   upyr: drawUpyr,
   leshy: drawLeshy,
   kikimora: drawKikimora,
+  volkhv: drawVolkhv,
+  forest_beast: drawForestBeast,
+  illusion: drawIllusion,
 };
 
 const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: 0x6d9a3a };
@@ -475,7 +504,9 @@ type Fx =
   | { kind: "windup"; x: number; y: number; start: number; warm: boolean }
   | { kind: "flash"; x: number; y: number; start: number; crit: boolean; miss: boolean; angle: number }
   | { kind: "bolt"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; warm: boolean }
-  | { kind: "poof"; x: number; y: number; start: number };
+  | { kind: "poof"; x: number; y: number; start: number }
+  | { kind: "skill"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; style: string; success: boolean }
+  | { kind: "status"; x: number; y: number; start: number; status: string; applied: boolean };
 
 interface DisplayState {
   x: number;
@@ -927,6 +958,26 @@ export function createFieldRenderer(): FieldRenderer {
     const faction: FactionLook = entity.owner === 2 ? NAV : DRUZHINA;
     const flash = flashes.get(entity.id) ?? 0;
 
+    if (entity.overwatch) {
+      const angle = (-90 + entity.dir * 90) * (Math.PI / 180);
+      const forwardX = Math.cos(angle);
+      const forwardY = Math.sin(angle);
+      const sideX = -forwardY;
+      const sideY = forwardX;
+      const depth = CELL_SIZE * 7;
+      const width = CELL_SIZE * 6;
+      g.poly([
+        cx + sideX * width,
+        cy + sideY * width,
+        cx - sideX * width,
+        cy - sideY * width,
+        cx + forwardX * depth - sideX * width,
+        cy + forwardY * depth - sideY * width,
+        cx + forwardX * depth + sideX * width,
+        cy + forwardY * depth + sideY * width,
+      ]).fill({ color: 0xe8b64c, alpha: 0.08 });
+    }
+
     g.ellipse(cx, cy + 15, 15, 5).fill({ color: 0x000000, alpha: 0.32 * fade });
     g.circle(cx, cy, 17.5).fill(faction.ring);
     g.circle(cx, cy, 17.5).stroke({ width: 1, color: faction.ringDark });
@@ -935,6 +986,60 @@ export function createFieldRenderer(): FieldRenderer {
     const art = CLASS_ART[entity.configId];
     if (art) art({ g, cx, cy });
     else g.circle(cx, cy, 10).fill(FALLBACK_ART[entity.owner === 2 ? "nav" : "druzhina"]);
+
+    const statusTime = performance.now() * 0.004;
+    if (entity.poison) {
+      for (let i = 0; i < 4; i += 1) {
+        const angle = statusTime + (i * Math.PI * 2) / 4;
+        const radius = 20 + Math.sin(statusTime * 1.7 + i) * 2;
+        g.circle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius - 2, 2.2 + (i % 2) * 0.7)
+          .fill({ color: 0x78d83d, alpha: 0.8 });
+        g.circle(cx + Math.cos(angle) * radius - 0.6, cy + Math.sin(angle) * radius - 2.8, 0.7)
+          .fill({ color: 0xd7ff8a, alpha: 0.9 });
+      }
+    }
+    if (entity.panic) {
+      const pulse = 0.55 + Math.sin(statusTime * 2.4) * 0.25;
+      g.circle(cx, cy, 22 + pulse * 3).stroke({ width: 2, color: 0xb94cff, alpha: pulse });
+      g.poly([cx - 2, cy - 27, cx + 2, cy - 27, cx + 1, cy - 18, cx - 1, cy - 18]).fill(0xff5e7a);
+      g.circle(cx, cy - 14.5, 1.8).fill(0xff5e7a);
+    }
+    if (entity.immobileTurns) {
+      for (let i = 0; i < 5; i += 1) {
+        const angle = (i / 5) * Math.PI * 2;
+        const x0 = cx + Math.cos(angle) * 10;
+        const y0 = cy + Math.sin(angle) * 8 + 9;
+        g.moveTo(x0, y0)
+          .quadraticCurveTo(cx + Math.cos(angle + 0.5) * 19, cy + 14, cx + Math.cos(angle) * 24, cy + 12)
+          .stroke({ width: 2, color: 0x6f8f3d, alpha: 0.9 });
+      }
+    }
+    if (entity.hidden) {
+      g.circle(cx, cy, 24).stroke({ width: 1.5, color: 0x8fd3bc, alpha: 0.5 + Math.sin(statusTime) * 0.2 });
+    }
+    if (entity.flying) {
+      const wing = 7 + Math.sin(statusTime * 2) * 3;
+      g.moveTo(cx - 13, cy - 2).quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2)
+        .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+      g.moveTo(cx + 13, cy - 2).quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2)
+        .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+    }
+    if (entity.timedLife !== undefined) {
+      const dots = Math.max(1, Math.min(6, entity.timedLife));
+      for (let i = 0; i < dots; i += 1) {
+        const angle = -Math.PI / 2 + (i / Math.max(1, dots)) * Math.PI * 2;
+        g.circle(cx + Math.cos(angle) * 22, cy + Math.sin(angle) * 22, 1.8).fill(0x5fd6e8);
+      }
+    }
+    if (entity.camouflageMinCover && view?.snapshot.entities.some((other) =>
+      !other.dead && other.owner === entity.owner && other.id !== entity.id && other.providesCamouflage &&
+      Math.max(Math.abs(other.x - entity.x), Math.abs(other.y - entity.y)) <= 1
+    )) {
+      for (let i = 0; i < 3; i += 1) {
+        const angle = statusTime * 0.5 + (i * Math.PI * 2) / 3;
+        g.ellipse(cx + Math.cos(angle) * 21, cy + Math.sin(angle) * 14, 3.5, 1.8).fill({ color: 0x7fb84d, alpha: 0.75 });
+      }
+    }
 
     if (fade < 1) {
       // Угасание павшего: фигура темнеет к моменту смены на могильную отметину.
@@ -980,7 +1085,7 @@ export function createFieldRenderer(): FieldRenderer {
       );
     }
 
-    // Щит: защитная стойка.
+    // Защитная стойка: щит-индикатор.
     if (entity.defending) {
       const sx = cx + 16;
       const sy = cy - 18;
@@ -1055,6 +1160,72 @@ export function createFieldRenderer(): FieldRenderer {
           g.moveTo(fx.x + Math.cos(a) * r0, fx.y + Math.sin(a) * r0)
             .lineTo(fx.x + Math.cos(a) * r1, fx.y + Math.sin(a) * r1)
             .stroke({ width: 1.6, color, alpha: (1 - t) * 0.9 });
+        }
+      } else if (fx.kind === "skill") {
+        const t = (now - fx.start) / fx.dur;
+        if (t >= 1) {
+          fxs.splice(i, 1);
+          continue;
+        }
+        const palette: Record<string, [number, number]> = {
+          heal: [0x74e071, 0xd8ffd0],
+          cleanse: [0x55ddea, 0xe5ffff],
+          summon_forest_beast: [0x73b64b, 0xd8ef8a],
+          aimed_eye: [0xe8b64c, 0xfff0a0],
+          roots: [0x769845, 0x49351f],
+          poison_needles: [0x83d632, 0xd6ff62],
+          raise_skeleton: [0x66b849, 0xd9d5b5],
+          panic: [0xa648e8, 0xff5e7a],
+          create_illusion: [0x55d5e8, 0xc4f8ff],
+          teleport_ally: [0x5398ff, 0x9ee9ff],
+          circular_sweep: [0xe8b64c, 0xffe8a0],
+          breach: [0xd47b39, 0xf1d19a],
+          shield_bash: [0x78aee8, 0xe8f5ff],
+        };
+        let [primary, secondary] = palette[fx.style] ?? [0x9ad27a, 0xf3ecdc];
+        if (!fx.success) [primary, secondary] = [0x6f7470, 0xb0b4ae];
+        const px = fx.x0 + (fx.x1 - fx.x0) * easeOut(Math.min(1, t * 1.35));
+        const py = fx.y0 + (fx.y1 - fx.y0) * easeOut(Math.min(1, t * 1.35));
+        g.circle(px, py, 4 + Math.sin(t * Math.PI) * 8).stroke({ width: 2, color: primary, alpha: 1 - t * 0.5 });
+        const count = fx.style === "poison_needles" ? 7 : fx.style === "heal" || fx.style === "cleanse" ? 6 : 10;
+        for (let p = 0; p < count; p += 1) {
+          const angle = (p / count) * Math.PI * 2 + t * (fx.style === "panic" ? 7 : 3);
+          const radius = 5 + t * (fx.style === "roots" ? 25 : 18);
+          const sx = px + Math.cos(angle) * radius;
+          const sy = py + Math.sin(angle) * radius * 0.65;
+          if (fx.style === "heal" || fx.style === "cleanse") {
+            g.rect(sx - 1, sy - 4, 2, 8).fill({ color: secondary, alpha: 1 - t });
+            g.rect(sx - 4, sy - 1, 8, 2).fill({ color: secondary, alpha: 1 - t });
+          } else if (fx.style === "roots") {
+            g.moveTo(fx.x1, fx.y1 + 8).quadraticCurveTo(sx, sy, fx.x1 + Math.cos(angle) * 24, fx.y1 + 14)
+              .stroke({ width: 2, color: p % 2 ? primary : secondary, alpha: 1 - t * 0.7 });
+          } else {
+            g.circle(sx, sy, 1.5 + (p % 3) * 0.6).fill({ color: p % 2 ? primary : secondary, alpha: 1 - t });
+          }
+        }
+        if (fx.style === "aimed_eye") {
+          g.circle(fx.x1, fx.y1, 14 + t * 5).stroke({ width: 1.5, color: secondary, alpha: 1 - t });
+          g.moveTo(fx.x1 - 21, fx.y1).lineTo(fx.x1 + 21, fx.y1).stroke({ width: 1, color: primary, alpha: 1 - t });
+          g.moveTo(fx.x1, fx.y1 - 21).lineTo(fx.x1, fx.y1 + 21).stroke({ width: 1, color: primary, alpha: 1 - t });
+        }
+      } else if (fx.kind === "status") {
+        const t = (now - fx.start) / 520;
+        if (t >= 1) {
+          fxs.splice(i, 1);
+          continue;
+        }
+        const colors: Record<string, number> = {
+          POISON: 0x78d83d, PANIC: 0xb94cff, IMMOBILE: 0x709343, HIDDEN: 0x78c9b2,
+          FLYING: 0x9edfff, TIMED: 0x5fd6e8, DEFENDING: 0x68aee8, OVERWATCH: 0xe8b64c,
+        };
+        const color = colors[fx.status] ?? 0xf3ecdc;
+        const radius = 12 + t * 20;
+        g.circle(fx.x, fx.y, radius).stroke({ width: fx.applied ? 2.5 : 1.5, color, alpha: 1 - t });
+        for (let p = 0; p < 8; p += 1) {
+          const angle = (p / 8) * Math.PI * 2;
+          const direction = fx.applied ? 1 : -1;
+          g.circle(fx.x + Math.cos(angle) * radius, fx.y + Math.sin(angle) * radius, 2)
+            .fill({ color, alpha: (1 - t) * 0.8 * direction * direction });
         }
       } else if (fx.kind === "poof") {
         const t = (now - fx.start) / 430;
@@ -1365,7 +1536,52 @@ export function createFieldRenderer(): FieldRenderer {
     }
   };
 
+  const displayPixel = (entityId: number): { cx: number; cy: number } | null => {
+    const entity = entityById(entityId);
+    if (entity) return entityPixel(entity);
+    const shown = display.get(entityId);
+    return shown ? centerOf(shown.x, shown.y, shown.z) : null;
+  };
+
+  const playSkill = async (event: Extract<GameEvent, { type: "SKILL_RESOLVED" }>): Promise<void> => {
+    const from = displayPixel(event.sourceId);
+    if (!from) return;
+    const target = event.targetId !== undefined ? displayPixel(event.targetId) : null;
+    const targetPos = event.targetPos;
+    const to = targetPos ? centerOf(targetPos.x, targetPos.y, targetPos.z) : target ?? from;
+    await focusOn((from.cx + to.cx) / 2, (from.cy + to.cy) / 2);
+    fxs.push({ kind: "skill", x0: from.cx, y0: from.cy, x1: to.cx, y1: to.cy, start: performance.now(), dur: 560, style: event.skillId, success: event.success });
+    await wait(280);
+  };
+
   const playOne = async (event: GameEvent): Promise<void> => {
+    if (event.type === "SKILL_RESOLVED") {
+      await playSkill(event);
+      return;
+    }
+    if (event.type === "STATUS_CHANGED") {
+      const at = displayPixel(event.entityId);
+      if (at) {
+        fxs.push({ kind: "status", x: at.cx, y: at.cy, start: performance.now(), status: event.status, applied: event.applied });
+        await wait(140);
+      }
+      return;
+    }
+    if (event.type === "ENTITY_SPAWNED") {
+      const at = centerOf(event.entity.x, event.entity.y, event.entity.z);
+      fxs.push({ kind: "skill", x0: at.cx, y0: at.cy, x1: at.cx, y1: at.cy, start: performance.now(), dur: 520, style: event.cause === "ILLUSION" ? "create_illusion" : event.cause === "RESURRECTION" ? "raise_skeleton" : "summon_forest_beast", success: true });
+      await wait(260);
+      return;
+    }
+    if (event.type === "ENTITY_REMOVED") {
+      const at = displayPixel(event.entityId);
+      if (at) {
+        fxs.push({ kind: "poof", x: at.cx, y: at.cy, start: performance.now() });
+        await wait(260);
+      }
+      display.delete(event.entityId);
+      return;
+    }
     if (event.type === "ENTITY_MOVED") {
       const moved = event.path;
       if (moved.length === 0) return;
@@ -1400,6 +1616,20 @@ export function createFieldRenderer(): FieldRenderer {
         shown.x = last.x;
         shown.y = last.y;
         shown.z = last.z;
+      }
+      return;
+    }
+    if (event.type === "ENTITY_DISPLACED") {
+      const shown = display.get(event.entityId);
+      if (shown) {
+        shown.x = event.from.x;
+        shown.y = event.from.y;
+        shown.z = event.from.z;
+        await tween(150, (t) => {
+          shown.x = event.from.x + (event.to.x - event.from.x) * t;
+          shown.y = event.from.y + (event.to.y - event.from.y) * t;
+          shown.z = event.from.z + (event.to.z - event.from.z) * t;
+        });
       }
       return;
     }

@@ -7,8 +7,16 @@ export interface SpawnUnitConfig {
   mobility: number;
   aim: number;
   defense: number;
+  will?: number;
   vision: number;
   weapons: string[];
+  skills?: string[];
+  tags?: ("flying" | "hiddenStart")[];
+  decoy?: boolean;
+  timedLife?: number;
+  fleeHp?: number;
+  camouflageMinCover?: boolean;
+  providesCamouflage?: boolean;
 }
 
 export const SWORD: WeaponStats = {

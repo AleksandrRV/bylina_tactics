@@ -4,7 +4,6 @@ import {
   createQuickMatch,
   createTacticsKernel,
   defaultTrainingWeapons,
-  matchOutcome,
   pickEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
@@ -12,10 +11,13 @@ import {
   type GameEvent,
   type HitPreview,
   type ReachableCell,
+  type SkillStats,
   type WeaponStats,
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
+import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -78,6 +80,12 @@ export function BattleScreen() {
     return base;
   }, [content.weapons]);
 
+  const skills = useMemo(() => {
+    const result: Record<string, SkillStats> = {};
+    for (const record of content.skills) result[record.id] = record as SkillStats;
+    return result;
+  }, [content.skills]);
+
   const kernel = useMemo(() => {
     const count =
       content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
@@ -86,20 +94,21 @@ export function BattleScreen() {
     const initial = createQuickMatch({
       units: content.units,
       map: content.quickMatch.map,
+      playerSlots: content.quickMatch.playerSlots,
       enemyPool: content.quickMatch.enemyPool,
       enemyCount: count,
       seed: matchSeed || 1,
     });
-    return createTacticsKernel({
-      initial,
-      weapons,
-      seed: matchSeed || 1,
-    });
-  }, [content.quickMatch, content.units, difficulty, matchSeed, weapons]);
+    const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
+    session.bindTacticsHost(host);
+    return host;
+  }, [content.quickMatch, content.units, difficulty, matchSeed, session, skills, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
   const [aimId, setAimId] = useState<number | null>(null);
+  const [skillTargetPos, setSkillTargetPos] = useState<CellPos | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -107,21 +116,23 @@ export function BattleScreen() {
 
   useEffect(
     () =>
-      kernel.subscribe(() => {
+      session.subscribeBattle(() => {
         setTick((value) => value + 1);
       }),
     [kernel],
   );
 
-  const snapshot = kernel.getSnapshot();
+  const snapshot = session.getBattleSnapshot(PLAYER_OWNER);
 
-  const visibleCells = useMemo(() => kernel.getVisibleCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
-  const exploredCells = useMemo(() => kernel.getExploredCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const visibleCells = useMemo(() => session.getBattleVisible(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const exploredCells = useMemo(() => session.getBattleExplored(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
 
   useEffect(() => {
     const first = snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
+    setAction(null);
     setAimId(null);
+    setSkillTargetPos(null);
     setPreview(null);
   }, [snapshot.turnNumber]);
 
@@ -129,9 +140,9 @@ export function BattleScreen() {
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
 
   const reachable = useMemo(() => {
-    if (selectedId === null || paused || busy) return [] as ReachableCell[];
-    return kernel.getReachable(selectedId);
-  }, [kernel, selectedId, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
+    if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
+    return session.getBattleReachable(selectedId);
+  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -142,14 +153,29 @@ export function BattleScreen() {
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
     const [xs, ys] = preview.split(",");
-    const path = kernel.getPath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
+    const path = session.getBattlePath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
     return path?.path ?? [];
   }, [preview, selectedId, kernel, snapshot.turnNumber]);
 
   const hit: HitPreview | null = useMemo(() => {
-    if (selectedId === null || aimId === null) return null;
-    return kernel.getHitPreview(selectedId, aimId);
-  }, [kernel, selectedId, aimId, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+    if (selectedId === null || !action) return null;
+    if (action.type === "weapon") {
+      if (aimId === null) return null;
+      return session.getBattleHitPreview(selectedId, aimId, action.id);
+    }
+    if (aimId === null && !skillTargetPos) return null;
+    const result = session.getBattleSkillPreview(selectedId, action.id, aimId ?? undefined, skillTargetPos ?? undefined);
+    return {
+      available: result.available,
+      reason: result.reason,
+      chance: result.chance,
+      dmgMin: result.dmgMin,
+      dmgMax: result.dmgMax,
+      cover: result.cover,
+      heightMod: result.heightMod,
+      flanked: result.flanked,
+    };
+  }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -161,17 +187,17 @@ export function BattleScreen() {
     if (events.some((event) => event.type === "ENTITY_DIED")) setLog(t("combat.died"));
   };
 
-  const concludeIfNeeded = (): boolean => {
-    const outcome = matchOutcome(kernel.getSnapshot());
-    if (outcome === "ongoing") return false;
-    session.finishMatch(outcome);
-    return true;
+  const finishFromEvents = (events: GameEvent[]): void => {
+    const ended = events.find((event) => event.type === "MATCH_ENDED");
+    if (!ended || ended.type !== "MATCH_ENDED") return;
+    session.finishMatch(ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat");
   };
 
   const playThen = (events: GameEvent[], after?: () => void): void => {
     setBusy(true);
     void (rendererRef.current?.play(events) ?? Promise.resolve()).finally(() => {
       setBusy(false);
+      finishFromEvents(events);
       after?.();
     });
   };
@@ -179,7 +205,7 @@ export function BattleScreen() {
   const tryMove = (to: CellPos): void => {
     if (selectedId === null || paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "MOVE", actorId: selectedId, to });
+    const result = session.applyBattleCommand({ type: "MOVE", actorId: selectedId, to });
     if (!result.ok) return;
     setPreview(null);
     setAimId(null);
@@ -187,15 +213,49 @@ export function BattleScreen() {
   };
 
   const tryAttack = (targetId: number): void => {
-    if (selectedId === null || paused || busy) return;
+    if (selectedId === null || !action || paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "ATTACK", actorId: selectedId, targetId });
+    const result = action.type === "weapon"
+      ? session.applyBattleCommand({ type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id })
+      : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id });
+    if (!result.ok) return;
+    announce(result.events);
+    setAction(null);
+    setAimId(null);
+    setSkillTargetPos(null);
+    playThen(result.events);
+  };
+
+  const useSelfSkill = (skillId: string): void => {
+    if (selectedId === null || paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
+    const result = session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
     if (!result.ok) return;
     announce(result.events);
     setAimId(null);
-    playThen(result.events, () => {
-      concludeIfNeeded();
+    playThen(result.events);
+  };
+
+  const tryPositionSkill = (pos: CellPos): void => {
+    if (selectedId === null || action?.type !== "skill" || paused || busy) return;
+    const same = skillTargetPos?.x === pos.x && skillTargetPos.y === pos.y && skillTargetPos.z === pos.z;
+    if (!same) {
+      setSkillTargetPos(pos);
+      setPreview(null);
+      return;
+    }
+    const result = session.applyBattleCommand({
+      type: "USE_SKILL",
+      actorId: selectedId,
+      skillId: action.id,
+      targetId: aimId ?? undefined,
+      targetPos: pos,
     });
+    if (!result.ok) return;
+    announce(result.events);
+    setAction(null);
+    setAimId(null);
+    setSkillTargetPos(null);
+    playThen(result.events);
   };
 
   const runEnemyPhase = async (): Promise<void> => {
@@ -203,21 +263,22 @@ export function BattleScreen() {
     try {
       await sleep(430);
       for (let guard = 0; guard < 96; guard += 1) {
-        const snap = kernel.getSnapshot();
+        const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
-        if (matchOutcome(snap) !== "ongoing") break;
+        if (session.getBattleOutcome() !== "ongoing") break;
         const command = pickEnemyCommand(kernel);
         const applied = command
-          ? kernel.apply(command)
-          : kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+          ? session.applyBattleCommand(command)
+          : session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
         if (!applied.ok) {
-          kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+          session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
           break;
         }
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
+        finishFromEvents(applied.events);
         if (!command) break;
-        if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
+        if (session.getBattleOutcome() !== "ongoing") break;
         await sleep(190);
       }
     } finally {
@@ -228,7 +289,7 @@ export function BattleScreen() {
   const endTurn = (): void => {
     if (paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
+    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
     if (!result.ok) return;
     setPreview(null);
     setAimId(null);
@@ -237,50 +298,75 @@ export function BattleScreen() {
     void (async () => {
       try {
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
-        if (kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
+        finishFromEvents(result.events);
+        if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
         }
       } finally {
         setBusy(false);
-        concludeIfNeeded();
       }
     })();
   };
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
-    const occupant = snapshot.entities.find(
-      (entity) => !entity.dead && entity.x === x && entity.y === y && entity.coverType === 0,
-    );
-    if (occupant && occupant.owner === PLAYER_OWNER && occupant.maxAp > 0) {
-      setSelectedId(occupant.id);
+    const reach = byReach.get(cellKey(x, y));
+    const targeting = action !== null;
+    const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
+    const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
+    const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
+    const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
+    if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
+      setSelectedId(entity.id);
+      setAction(null);
+      setSkillTargetPos(null);
       setAimId(null);
       setPreview(null);
       return;
     }
-    if (occupant && selectedId !== null && occupant.owner !== PLAYER_OWNER) {
-      if (aimId === occupant.id && hit?.available) {
-        tryAttack(occupant.id);
+
+    const automaticAttack = primaryAttackForEnemy(selected, entity, PLAYER_OWNER, targeting);
+    if (automaticAttack) {
+      setAction(automaticAttack);
+      setAimId(entity?.id ?? null);
+      setPreview(null);
+      return;
+    }
+
+    if (entity && selectedId !== null && targeting) {
+      if (aimId === entity.id && hit?.available) {
+        tryAttack(entity.id);
         return;
       }
-      setAimId(occupant.id);
+      setAimId(entity.id);
+      if (!selectedSkill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
       setPreview(null);
       return;
     }
-    const reach = byReach.get(cellKey(x, y));
-    if (!reach) {
-      setPreview(null);
-      setAimId(null);
+
+    const needsPosition = selectedSkill?.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
+    if (needsPosition && action?.type === "skill") {
+      const tile = snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
+      if (tile) tryPositionSkill({ x, y, z: tile.z });
       return;
     }
-    const id = cellKey(x, y);
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    if (coarse && preview !== id) {
-      setPreview(id);
-      setAimId(null);
+
+    // В режиме перемещения проходимая клетка всегда означает движение.
+    // Граневое укрытие в ней не перехватывает выбор как цель атаки.
+    if (reach && !targeting) {
+      const id = cellKey(x, y);
+      const coarse = window.matchMedia("(pointer: coarse)").matches;
+      if (coarse && preview !== id) {
+        setPreview(id);
+        setAimId(null);
+        return;
+      }
+      tryMove({ x, y, z: reach.z });
       return;
     }
-    tryMove({ x, y, z: reach.z });
+
+    setPreview(null);
+    setAimId(null);
   };
 
   const onHover = (x: number, y: number): void => {
@@ -325,13 +411,14 @@ export function BattleScreen() {
   }, [hit, selected, aimed]);
 
   const hoverCell = useMemo(() => {
+    if (skillTargetPos) return skillTargetPos;
     if (!preview) return null;
     const [xs, ys] = preview.split(",");
     const x = Number(xs);
     const y = Number(ys);
     const tile = snapshot.grid.tiles.find((t) => t.x === x && t.y === y);
     return { x, y, z: tile?.z ?? 0 };
-  }, [preview, snapshot.grid]);
+  }, [preview, skillTargetPos, snapshot.grid]);
 
   useEffect(() => {
     rendererRef.current?.update({
@@ -367,20 +454,47 @@ export function BattleScreen() {
         const next = pool[(index + 1) % pool.length];
         if (next) {
           setSelectedId(next.id);
+          setAction(null);
+          setSkillTargetPos(null);
           setAimId(null);
         }
         return;
       }
-      if (event.key === "1" && aimId !== null && hit?.available) {
-        tryAttack(aimId);
+      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0) {
+        session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+        setAction(null);
+        setSkillTargetPos(null);
+        setAimId(null);
+        setPreview(null);
         return;
       }
-      if (event.key === "2" && selectedId !== null && selected && selected.ap > 0) {
-        kernel.apply({ type: "OVERWATCH", actorId: selectedId });
+      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0) {
+        session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+        setAction(null);
+        setSkillTargetPos(null);
+        setAimId(null);
+        setPreview(null);
         return;
       }
-      if (event.key === "3" && selectedId !== null && selected) {
-        kernel.apply({ type: "DEFEND", actorId: selectedId });
+      if (ACTION_SHORTCUTS.includes(event.key as (typeof ACTION_SHORTCUTS)[number]) && selected) {
+        const index = Number(event.key) - 1;
+        const chosen = selectableActions(selected)[index];
+        if (!chosen) return;
+        if (chosen.type === "skill") {
+          const skill = skills[chosen.id];
+          const cooldown = selected.skillCooldowns?.[chosen.id] ?? 0;
+          const uses = selected.skillUses?.[chosen.id] ?? 0;
+          if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
+        }
+        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
+          useSelfSkill(chosen.id);
+        } else {
+          const active = action?.type === chosen.type && action.id === chosen.id;
+          setAction(active ? null : chosen);
+          setSkillTargetPos(null);
+          setAimId(null);
+          setPreview(null);
+        }
         return;
       }
       const step = 28;
@@ -391,6 +505,8 @@ export function BattleScreen() {
     };
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
+      setAction(null);
+      setSkillTargetPos(null);
       setAimId(null);
       setPreview(null);
     };
@@ -400,10 +516,9 @@ export function BattleScreen() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, [paused, busy, snapshot, selectedId, aimId, hit, session]);
+  }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
-  const weaponName = selected?.weaponId ? t(`weapon.${selected.weaponId}.name`) : "";
   const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
 
   // Показывать портреты врагов только если они в зоне видимости (или уже мертвы и были видны).
@@ -470,6 +585,8 @@ export function BattleScreen() {
                   onClick={() => {
                     if (entity.dead) return;
                     setSelectedId(entity.id);
+                    setAction(null);
+                    setSkillTargetPos(null);
                     setAimId(null);
                   }}
                 >
@@ -499,10 +616,10 @@ export function BattleScreen() {
               <div className="aim-header">
                 <span className={`aim-chance${hit.available ? "" : " blocked"}`}>
                   {hit.available
-                    ? `${hit.chance ?? 0}%`
-                    : t(`combat.blocked.${hit.reason ?? "ILLEGAL"}`)}
+                    ? hit.chance === undefined ? t("combat.available") : `${hit.chance}%`
+                    : t("combat.unavailable")}
                 </span>
-                {hit.available ? (
+                {hit.available && hit.dmgMin !== undefined && hit.dmgMax !== undefined ? (
                   <span className="aim-dmg">
                     {t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}
                   </span>
@@ -520,6 +637,7 @@ export function BattleScreen() {
                         b.weaponMod !== 0 ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}` : null,
                         b.heightAim !== 0 ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}` : null,
                         b.targetDefense > 0 ? `${t("combat.bdDefense")}: −${b.targetDefense}` : null,
+                        b.stanceDefense > 0 ? `${t("combat.bdDefend")}: −${b.stanceDefense}` : null,
                         b.coverPenalty > 0 ? `${t("combat.bdCover")}: −${b.coverPenalty}` : null,
                         b.rangePenalty > 0 ? `${t("combat.bdRange")}: −${b.rangePenalty}` : null,
                         b.coverDetails.length > 0 ? "" : null,
@@ -554,6 +672,11 @@ export function BattleScreen() {
                   {hit.breakdown.targetDefense > 0 ? (
                     <span className="bd-item neg">
                       {t("combat.bdDefense")}: −{hit.breakdown.targetDefense}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.stanceDefense > 0 ? (
+                    <span className="bd-item neg">
+                      {t("combat.bdDefend")}: −{hit.breakdown.stanceDefense}
                     </span>
                   ) : null}
                   {hit.breakdown.coverPenalty > 0 ? (
@@ -609,6 +732,16 @@ export function BattleScreen() {
                       <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
                     ))}
                   </div>
+                  <div className="status-list" aria-label={t("battle.statuses")}>
+                    {selected.poison ? <span className="status-chip poison">{t("status.poison", { turns: selected.poison.turnsLeft })}</span> : null}
+                    {selected.panic ? <span className="status-chip panic">{t("status.panic")}</span> : null}
+                    {selected.immobileTurns ? <span className="status-chip immobile">{t("status.immobile")}</span> : null}
+                    {selected.hidden ? <span className="status-chip hidden">{t("status.hidden")}</span> : null}
+                    {selected.flying ? <span className="status-chip flying">{t("status.flying")}</span> : null}
+                    {selected.timedLife !== undefined ? <span className="status-chip timed">{t("status.timed", { turns: selected.timedLife })}</span> : null}
+                    {selected.defending ? <span className="status-chip defending">{t("status.defending")}</span> : null}
+                    {selected.overwatch ? <span className="status-chip overwatch">{t("status.overwatch")}</span> : null}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -616,42 +749,97 @@ export function BattleScreen() {
             )}
           </div>
           <div className="skill-row">
+            {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => (
+              <button
+                key={`weapon-${weaponId}`}
+                type="button"
+                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
+                aria-pressed={action?.type === "weapon" && action.id === weaponId}
+                data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                onClick={() => {
+                  const active = action?.type === "weapon" && action.id === weaponId;
+                  setAction(active ? null : { type: "weapon", id: weaponId });
+                  setSkillTargetPos(null);
+                  setAimId(null);
+                  setPreview(null);
+                }}
+              >
+                {ACTION_SHORTCUTS[index] ? <kbd>{ACTION_SHORTCUTS[index]}</kbd> : null}
+                {t(`weapon.${weaponId}.name`)}
+              </button>
+            ))}
+            {(selected?.skillIds ?? []).map((skillId) => {
+              const skill = skills[skillId];
+              const active = action?.type === "skill" && action.id === skillId;
+              const shortcut = selected ? shortcutForAction(selected, "skill", skillId) : undefined;
+              const cooldown = selected?.skillCooldowns?.[skillId] ?? 0;
+              const uses = selected?.skillUses?.[skillId] ?? 0;
+              const usesLeft = skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses);
+              const exhausted = usesLeft === 0;
+              return (
+                <button
+                  key={`skill-${skillId}`}
+                  type="button"
+                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}`}
+                  aria-pressed={active}
+                  data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
+                  title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                  onClick={() => {
+                    if (skill?.category === "self") useSelfSkill(skillId);
+                    else {
+                      setAction(active ? null : { type: "skill", id: skillId });
+                      setSkillTargetPos(null);
+                      setAimId(null);
+                      setPreview(null);
+                    }
+                  }}
+                >
+                  {shortcut ? <kbd>{shortcut}</kbd> : null}
+                  {t(`skill.${skillId}.name`)}
+                  {cooldown > 0 ? <span className="skill-resource cooldown">{t("battle.cooldownShort", { turns: cooldown })}</span> : null}
+                  {usesLeft !== undefined ? <span className="skill-resource uses">{t("battle.usesShort", { uses: usesLeft })}</span> : null}
+                </button>
+              );
+            })}
             <button
               type="button"
-              className="hud-btn skill-slot"
+              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
+              aria-pressed={Boolean(selected?.defending)}
+              data-action-state={selected?.defending ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              title={t("battle.defendHint")}
               onClick={() => {
-                if (aimId !== null && hit?.available) tryAttack(aimId);
+                if (selectedId === null) return;
+                session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+                setAction(null);
+                setSkillTargetPos(null);
+                setAimId(null);
+                setPreview(null);
               }}
             >
-              <kbd>1</kbd>
-              {weaponName || t("battle.weapon")}
+              <kbd>9</kbd>
+              {t("battle.defend")}
             </button>
             <button
               type="button"
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
+              aria-pressed={Boolean(selected?.overwatch)}
+              data-action-state={selected?.overwatch ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                kernel.apply({ type: "OVERWATCH", actorId: selectedId });
+                session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+                setAction(null);
+                setSkillTargetPos(null);
+                setAimId(null);
+                setPreview(null);
               }}
             >
-              <kbd>2</kbd>
+              <kbd>0</kbd>
               {t("battle.overwatch")}
-            </button>
-            <button
-              type="button"
-              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
-              disabled={!selected || busy || snapshot.activeOwner !== PLAYER_OWNER}
-              title={t("battle.defendHint")}
-              onClick={() => {
-                if (selectedId === null) return;
-                kernel.apply({ type: "DEFEND", actorId: selectedId });
-              }}
-            >
-              <kbd>3</kbd>
-              {t("battle.defend")}
             </button>
           </div>
           <button

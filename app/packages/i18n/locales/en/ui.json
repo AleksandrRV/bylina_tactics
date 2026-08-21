@@ -73,27 +73,71 @@
     "weapon": "Weapon",
     "empty": "None selected",
     "apLeft": "AP",
-    "defend": "Defend",
-    "defendHint": "Defensive stance: +25 dodge, −2 damage taken. Ends turn.",
     "overwatch": "Overwatch",
-    "overwatchHint": "Enter overwatch: reaction shot when enemy moves. Ends turn.",
-    "debugMovement": "Movement cost"
+    "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
+    "debugMovement": "Movement cost",
+    "defend": "Defensive stance",
+    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
+    "statuses": "Statuses",
+    "cooldownHint": "Cooldown: {turns} turn(s).",
+    "noUsesHint": "No uses remain in this battle.",
+    "cooldownShort": "CD {turns}",
+    "usesShort": "×{uses}"
   },
   "unit": {
-    "bogatyr": { "name": "Bogatyr" },
-    "strelets": { "name": "Strelets" },
-    "znaharka": { "name": "Znaharka" },
-    "upyr": { "name": "Upyr" },
-    "leshy": { "name": "Leshy" },
-    "kikimora": { "name": "Kikimora" }
+    "bogatyr": {
+      "name": "Bogatyr"
+    },
+    "strelets": {
+      "name": "Strelets"
+    },
+    "znaharka": {
+      "name": "Znaharka"
+    },
+    "upyr": {
+      "name": "Upyr"
+    },
+    "leshy": {
+      "name": "Leshy"
+    },
+    "kikimora": {
+      "name": "Kikimora"
+    },
+    "volkhv": {
+      "name": "Volkhv"
+    },
+    "forest_beast": {
+      "name": "Forest beast"
+    },
+    "illusion": {
+      "name": "Illusion"
+    }
   },
   "weapon": {
-    "sword": { "name": "Sword" },
-    "bow": { "name": "Bow" },
-    "sling": { "name": "Sling" },
-    "claws": { "name": "Claws" },
-    "branch": { "name": "Branch" },
-    "needle": { "name": "Needle" }
+    "sword": {
+      "name": "Sword"
+    },
+    "bow": {
+      "name": "Bow"
+    },
+    "sling": {
+      "name": "Sling"
+    },
+    "claws": {
+      "name": "Claws"
+    },
+    "branch": {
+      "name": "Branch"
+    },
+    "needle": {
+      "name": "Needle"
+    },
+    "mace": {
+      "name": "Mace"
+    },
+    "pishchal": {
+      "name": "Arquebus"
+    }
   },
   "combat": {
     "preview": "Hit {chance}% · dmg {dmg} · cover {cover} · height {height} · {flank}. Tap again to fire.",
@@ -124,7 +168,10 @@
     "bdCover": "Cover",
     "bdObstacles": "Obstacles",
     "bdRange": "Range",
-    "bdTotal": "Total"
+    "bdTotal": "Total",
+    "available": "Available",
+    "bdObstacleList": "Obstacles on line",
+    "unavailable": "Unavailable"
   },
   "settings": {
     "title": "Settings",
@@ -139,5 +186,56 @@
     "ok": "OK",
     "close": "Close",
     "notReady": "Unavailable"
+  },
+  "skill": {
+    "circular_sweep": {
+      "name": "Circular sweep"
+    },
+    "breach": {
+      "name": "Breach"
+    },
+    "shield_bash": {
+      "name": "Shield bash"
+    },
+    "heal": {
+      "name": "Healing"
+    },
+    "cleanse": {
+      "name": "Cleanse"
+    },
+    "summon_forest_beast": {
+      "name": "Summon beast"
+    },
+    "aimed_eye": {
+      "name": "Keen eye"
+    },
+    "roots": {
+      "name": "Roots"
+    },
+    "poison_needles": {
+      "name": "Poison needles"
+    },
+    "raise_skeleton": {
+      "name": "Raise skeleton"
+    },
+    "panic": {
+      "name": "Dread vision"
+    },
+    "create_illusion": {
+      "name": "Illusion"
+    },
+    "teleport_ally": {
+      "name": "Teleport ally"
+    }
+  },
+  "status": {
+    "poison": "Poison · {turns}",
+    "panic": "Panic",
+    "immobile": "Rooted",
+    "hidden": "Hidden",
+    "flying": "Flying",
+    "timed": "Timed · {turns}",
+    "defending": "Defending",
+    "overwatch": "Overwatch"
   }
 }
