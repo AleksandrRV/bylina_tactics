@@ -1,0 +1,704 @@
+/* ============================================================
+   Экран кампании: карта Летучего Корабля и итог миссии
+   Стиль: тёмное славянское фэнтези, плоские геометрические формы,
+   янтарные акценты, приоритет читаемости (ui-design §1–2).
+   ============================================================ */
+
+.campaign-screen {
+  max-width: 860px;
+}
+
+/* ---- Шапка корабля: Тьма и запасы --------------------------- */
+
+.campaign-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+.campaign-title-block {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.campaign-title-block .eyebrow {
+  margin-bottom: 2px;
+}
+
+.campaign-title-block h1 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: #f3ecdc;
+  letter-spacing: 0.05em;
+}
+
+.campaign-darkness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 300px;
+  min-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.campaign-darkness-name {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.campaign-darkness-value {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.95rem;
+  color: #f3ecdc;
+  white-space: nowrap;
+}
+
+.darkness-bar {
+  position: relative;
+  flex: 1 1 90px;
+  height: 10px;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.darkness-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6b2d3a, #a03a4e);
+  transition: width 0.6s ease;
+}
+
+/* Деления четвертей на шкале Тьмы */
+.darkness-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 24.5%,
+    rgba(213, 207, 192, 0.18) 24.5% 25.5%
+  );
+  pointer-events: none;
+}
+
+.campaign-resources {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.resource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist-dim);
+  font-size: 0.82rem;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.resource svg {
+  flex: none;
+}
+
+.resource.gold svg {
+  color: var(--amber);
+}
+
+.resource.herbs svg {
+  color: #7fa857;
+}
+
+.resource.artifacts svg {
+  color: #9b6bbf;
+}
+
+/* ---- Карта царства ------------------------------------------- */
+
+.campaign-map {
+  position: relative;
+  height: min(56vh, 420px);
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background:
+    radial-gradient(560px 260px at 28% 18%, rgba(224, 179, 74, 0.05), transparent 70%),
+    linear-gradient(160deg, #1a222b, #12161b 85%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Резкость краёв карты */
+.campaign-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 110% at 50% 40%, transparent 58%, rgba(10, 13, 16, 0.55) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.map-terrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* Медленно плывущий туман */
+.map-fog {
+  position: absolute;
+  inset: -20%;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 30% at 30% 40%, rgba(120, 140, 150, 0.07), transparent 70%),
+    radial-gradient(42% 34% at 72% 62%, rgba(120, 140, 150, 0.06), transparent 70%);
+  animation: map-fog-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes map-fog-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0);
+  }
+  to {
+    transform: translate3d(2.5%, 1.5%, 0);
+  }
+}
+
+/* ---- Отметки точек ------------------------------------------- */
+
+.map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.map-marker:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+.marker-medallion {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 7px auto 0;
+  border-radius: 50%;
+  border: 2px solid #5d6b76;
+  background: radial-gradient(circle at 32% 28%, #2a333c, #1b2229);
+  color: #8fa1ad;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+}
+
+.map-marker:hover .marker-medallion,
+.map-marker:focus-visible .marker-medallion {
+  transform: scale(1.12);
+}
+
+.map-marker.is-open .marker-medallion {
+  border-color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #3a3120, #241d12);
+  color: var(--amber);
+  box-shadow: 0 0 0 0 rgba(224, 179, 74, 0.4);
+  animation: marker-pulse 2.4s ease-out infinite;
+}
+
+.map-marker.is-selected .marker-medallion {
+  border-color: #f3ecdc;
+  outline: 3px solid rgba(224, 179, 74, 0.28);
+  outline-offset: 3px;
+}
+
+.map-marker.is-done .marker-medallion {
+  border-color: #5d6b76;
+  background: radial-gradient(circle at 32% 28%, #232b33, #181e24);
+  color: #8fa1ad;
+}
+
+.map-marker.is-locked {
+  cursor: default;
+}
+
+.map-marker.is-locked .marker-medallion {
+  border-color: #46525c;
+  background: #14191f;
+  color: #46525c;
+  filter: blur(0.4px);
+}
+
+.map-marker.is-locked:hover .marker-medallion {
+  transform: none;
+}
+
+.marker-label {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.map-marker.is-open .marker-label {
+  color: var(--amber);
+}
+
+.map-marker.is-locked .marker-label {
+  opacity: 0.3;
+}
+
+@keyframes marker-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(224, 179, 74, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 12px rgba(224, 179, 74, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(224, 179, 74, 0);
+  }
+}
+
+/* ---- Летучий Корабль ----------------------------------------- */
+
+.ship-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 6;
+  animation: ship-bob 3.6s ease-in-out infinite;
+}
+
+@keyframes ship-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-3px);
+  }
+}
+
+.ship-glyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #3d4752, #232b33);
+  border: 1px solid var(--mist-dim);
+  color: var(--mist);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.ship-glyph svg {
+  display: block;
+}
+
+/* Тень-«волна» под кораблём */
+.ship-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 22px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  filter: blur(1px);
+}
+
+/* ---- Панель миссии ------------------------------------------- */
+
+.mission-panel {
+  margin-top: 14px;
+}
+
+.mission-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  padding: 16px 18px 18px;
+  animation: rise 0.26s ease both;
+}
+
+.mission-card.is-done {
+  border-left-color: #5d6b76;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mission-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mission-type-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--amber-dim);
+  border-radius: 50%;
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.mission-title {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.35rem;
+  color: #f3ecdc;
+}
+
+.mission-id {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.mission-status.done {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 2px 8px;
+  border: 1px solid #5d6b76;
+  color: #8fa1ad;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mission-facts {
+  margin: 0 0 14px;
+}
+
+.fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 5px 0;
+}
+
+.fact-row dt {
+  color: var(--mist-dim);
+  min-width: 136px;
+  font-size: 0.88rem;
+}
+
+.fact-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.foe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 2px 9px;
+  font-size: 0.84rem;
+  color: #d8d2c2;
+}
+
+.foe-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7fa857; /* ядовито-зелёный Нави, ui-design §2 */
+}
+
+.foe-chip.upyr::before {
+  background: #9aa7b0;
+}
+
+.foe-chip.kikimora::before {
+  background: #6b9b7a;
+}
+
+.darkness-growth {
+  display: inline-flex;
+  gap: 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+.growth-victory {
+  color: #8fae6b;
+  border: 1px solid rgba(143, 174, 107, 0.35);
+  padding: 1px 8px;
+}
+
+.growth-defeat {
+  color: #e07a7a;
+  border: 1px solid rgba(224, 122, 122, 0.35);
+  padding: 1px 8px;
+}
+
+.mission-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.campaign-start-btn {
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+}
+
+.campaign-start-btn:hover,
+.campaign-start-btn:focus-visible {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.campaign-start-btn:active {
+  transform: translateY(1px);
+}
+
+.mission-empty {
+  border: 1px dashed var(--line);
+  background: var(--ink-2);
+  padding: 26px 20px;
+  text-align: center;
+  color: var(--mist-dim);
+}
+
+.mission-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--amber-dim);
+}
+
+/* ---- Вкладки служб корабля ----------------------------------- */
+
+.campaign-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.campaign-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  color: var(--mist-dim);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.campaign-tab svg {
+  color: var(--mist-dim);
+}
+
+.campaign-tab:hover:not(:disabled),
+.campaign-tab:focus-visible:not(:disabled) {
+  border-color: var(--amber-dim);
+  color: var(--mist);
+}
+
+.campaign-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tab-note {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5d6b76;
+}
+
+/* ---- Итог миссии ---------------------------------------------- */
+
+.mission-result-screen {
+  max-width: 480px;
+  align-items: center;
+  text-align: center;
+}
+
+.result-emblem {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.result-emblem.is-victory {
+  border: 2px solid var(--amber);
+  background: radial-gradient(circle at 34% 30%, #3a3120, #1d1a12);
+  color: var(--amber);
+  box-shadow: 0 0 34px rgba(224, 179, 74, 0.22);
+  animation: rise 0.3s ease both;
+}
+
+.result-emblem.is-defeat {
+  border: 2px solid #6b2d3a;
+  background: radial-gradient(circle at 34% 30%, #2a1d22, #171114);
+  color: #c96a7a;
+  box-shadow: 0 0 26px rgba(107, 45, 58, 0.25);
+  animation: rise 0.3s ease both;
+}
+
+.mission-result-screen .eyebrow {
+  margin-bottom: 4px;
+}
+
+.mission-result-screen .menu-brand {
+  margin-bottom: 0;
+}
+
+.mission-result-screen .display-title {
+  font-size: clamp(2rem, 8vw, 2.8rem);
+}
+
+.mission-result-screen .menu-nav {
+  width: 100%;
+  margin-top: 26px;
+}
+
+.darkness-summary {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  text-align: left;
+}
+
+.darkness-summary .summary-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: var(--mist-dim);
+  margin-bottom: 8px;
+}
+
+.darkness-summary .summary-line b {
+  color: #e07a7a;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-weight: 600;
+}
+
+.darkness-summary .darkness-bar {
+  display: block;
+  width: 100%;
+}
+
+.darkness-summary .darkness-bar i {
+  background: linear-gradient(90deg, #4a2530, #7a3242);
+}
+
+.darkness-summary .darkness-bar b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: linear-gradient(90deg, #a03a4e, #c14a60);
+  animation: gain-grow 0.7s ease both;
+}
+
+@keyframes gain-grow {
+  from {
+    width: 0;
+  }
+}
+
+.loss-banner {
+  margin-top: 16px;
+  border: 1px solid rgba(224, 122, 122, 0.5);
+  background: linear-gradient(180deg, rgba(107, 45, 58, 0.28), rgba(107, 45, 58, 0.12));
+  color: #e8b4bc;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+}
+
+/* ---- Модальное окно проигрыша кампании ------------------------ */
+
+.campaign-lost-card {
+  border: 1px solid rgba(224, 122, 122, 0.45);
+}
+
+.campaign-lost-card h2 {
+  color: #e8b4bc;
+}
+
+/* ---- Уменьшение движения -------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .map-fog,
+  .ship-marker,
+  .map-marker.is-open .marker-medallion,
+  .mission-card,
+  .result-emblem,
+  .darkness-summary .darkness-bar b {
+    animation: none !important;
+    transition: none !important;
+  }
+}

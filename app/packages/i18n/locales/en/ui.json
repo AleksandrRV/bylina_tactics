@@ -274,11 +274,15 @@
       "locked": "Point hidden",
       "done": "Mission {mission}: completed"
     },
-    "ship": "Flying Ship"
+    "ship": "Flying Ship",
+    "kingdom": "The Thrice-Ninth Kingdom",
+    "tabNoteSoon": "since {version}"
   },
   "missionResult": {
     "title": "Mission result",
     "darknessGained": "Darkness grew by {value}",
-    "toMap": "To the map"
+    "toMap": "To the map",
+    "victoryHint": "The druzhina prevailed — the Darkness receded.",
+    "defeatHint": "The druzhina retreated — the Darkness grows."
   }
 }

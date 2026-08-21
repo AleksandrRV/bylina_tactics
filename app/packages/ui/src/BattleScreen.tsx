@@ -572,9 +572,14 @@ export function BattleScreen() {
           </div>
           <div className="battle-objective">
             <p className="eyebrow">
-              {battleKind === "campaign"
-                ? `${t("campaign.mission")} · ${activeMissionId ?? ""}`
-                : t("menu.quickMatch")}
+              {battleKind === "campaign" ? (
+                <>
+                  <span className="mission-badge">{t("campaign.mission")}</span>
+                  {activeMissionId ?? ""}
+                </>
+              ) : (
+                t("menu.quickMatch")
+              )}
             </p>
             <p>{t("battle.objectiveQuick")}</p>
             <p className="muted">
