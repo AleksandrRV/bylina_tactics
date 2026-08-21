@@ -64,7 +64,6 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
       tmaxY += tdy;
       push(ix, iy, "full");
     } else {
-      // Проход через узел: обе клетки — касательные.
       push(ix + stepX, iy, "glancing");
       push(ix, iy + stepY, "glancing");
       ix += stepX;
@@ -83,14 +82,9 @@ export function supercover(ax: number, ay: number, bx: number, by: number): Cell
 }
 
 function rayZ(
-  x0: number,
-  y0: number,
-  z0: number,
-  x1: number,
-  y1: number,
-  z1: number,
-  cx: number,
-  cy: number,
+  x0: number, y0: number, z0: number,
+  x1: number, y1: number, z1: number,
+  cx: number, cy: number,
 ): number {
   const dx = x1 - x0;
   const dy = y1 - y0;
@@ -103,64 +97,82 @@ function rayZ(
   return z0 + t * (z1 - z0);
 }
 
-/** Является ли клетка полным укрытием (стена blockLOS ≡ coverType 2). Документ §7.2. */
-function isFullCover(entity: EntityState): boolean {
-  return entity.coverType === 2;
-}
-
-/** Является ли клетка укрытием (стена blockLOS ≡ coverType 2, либо coverType 1). */
 function isAnyCover(entity: EntityState): boolean {
   return entity.coverType > 0;
 }
 
+/**
+ * Эффективная ступень укрытия с учётом разницы высот между атакующим и укрытием.
+ *
+ * Правила:
+ * - Полуукрытие на 1 ниже атакующего → игнорируется (0).
+ * - Полное укрытие на 1 ниже → считается полуукрытием (1).
+ * - Стена (blockLOS) всегда остаётся стеной (2).
+ * - Полное укрытие на 2 ниже → игнорируется (0),
+ *   но если цель стоит за ним — считается полуукрытием (1).
+ * - Стена на 2 ниже → остаётся стеной (2).
+ *
+ * Возвращает эффективную ступень: 0 = нет, 1 = полу, 2 = полное.
+ */
+export function effectiveCoverTier(
+  coverType: 0 | 1 | 2,
+  isWall: boolean,
+  attackerZ: number,
+  coverZ: number,
+  targetZ?: number,
+): 0 | 1 | 2 {
+  if (coverType === 0 && !isWall) return 0;
+  const diff = attackerZ - coverZ; // положительное = укрытие ниже
+
+  // Стена (blockLOS) всегда полное укрытие.
+  if (isWall) return 2;
+
+  if (diff === 1) {
+    // Укрытие на 1 ниже атакующего.
+    if (coverType === 1) return 0; // полу → игнор
+    if (coverType === 2) return 1; // полное → полу
+  }
+  if (diff >= 2) {
+    // Укрытие на 2+ ниже.
+    if (coverType === 2) {
+      // Полное на 2 ниже: игнор, но если цель за ним — полу.
+      if (targetZ !== undefined && targetZ <= coverZ) return 1;
+      return 0;
+    }
+    if (coverType === 1) return 0; // полу на 2+ ниже → игнор
+  }
+  return coverType;
+}
+
 export interface ObstacleResult {
-  /** Линия наблюдения полностью заблокирована. */
   blocked: boolean;
-  /** Штраф от промежуточных препятствий (§9.3, §9.5). */
   obstaclePenalty: number;
-  /** Клетка, на которой луч прерывается (для визуализации). */
   breakCell: { x: number; y: number; z: number } | null;
 }
 
 /**
  * Оценка всех промежуточных препятствий на луче от атакующего к цели (§7, §9.3–9.5).
- *
- * Стена (blockLOS) и полное укрытие (coverType = 2) равнозначны.
- * Касательное пересечение = 50% эффективность.
- * Смежные с атакующим укрытия: полу игнорируются, полные при касательной тоже.
- * Группировка: смежные касательные одной ступени = одно полное.
  */
 export function evaluateObstacles(
   grid: Grid,
   entities: readonly EntityState[],
-  ax: number,
-  ay: number,
-  az: number,
-  bx: number,
-  by: number,
-  bz: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
 ): ObstacleResult {
   if (ax === bx && ay === by) return { blocked: false, obstaclePenalty: 0, breakCell: null };
 
   const traced = traceRay(ax, ay, bx, by);
-  const x0 = ax + 0.5;
-  const y0 = ay + 0.5;
-  const z0 = az + 0.5;
-  const x1 = bx + 0.5;
-  const y1 = by + 0.5;
-  const z1 = bz + 0.5;
+  const x0 = ax + 0.5, y0 = ay + 0.5, z0 = az + 0.5;
+  const x1 = bx + 0.5, y1 = by + 0.5, z1 = bz + 0.5;
 
   let blocked = false;
   let maxPenalty = 0;
   let breakCell: { x: number; y: number; z: number } | null = null;
 
-  // Собрать промежуточные укрытия-сущности для группировки.
-  const intermediateCovers: { entity: EntityState; type: IntersectionType }[] = [];
-  // Собрать касательные стены (blockLOS) для группировки.
+  const intermediateCovers: { entity: EntityState; type: IntersectionType; effectiveTier: 0 | 1 | 2 }[] = [];
   const glancingWalls: { x: number; y: number }[] = [];
 
   for (const cell of traced) {
-    // Пропустить клетки атакующего и цели.
     if ((cell.x === ax && cell.y === ay) || (cell.x === bx && cell.y === by)) continue;
 
     const tile = tileAt(grid, cell.x, cell.y);
@@ -170,49 +182,45 @@ export function evaluateObstacles(
       break;
     }
 
-    // Перепад высот: rz < tile.z → поверхность прерывает луч.
-    // Но если перепад ровно 1 ярус — считаем полуукрытием (§7.3).
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
     if (rz < tile.z) {
       const heightDiff = tile.z - rz;
       if (heightDiff > 1.01) {
-        // Перепад более 1 яруса — полная блокировка.
         blocked = true;
         breakCell = { x: cell.x, y: cell.y, z: tile.z };
         break;
       } else {
-        // Перепад ровно 1 ярус — полуукрытие (штраф −25).
-        // Учитываем как промежуточное укрытие.
         if (cell.type === "full") {
-          maxPenalty = Math.max(maxPenalty, 50); // полное пересечение полуукрытия = -50
+          maxPenalty = Math.max(maxPenalty, 50);
         } else {
-          maxPenalty = Math.max(maxPenalty, 25); // касательное полуукрытие = -25
+          maxPenalty = Math.max(maxPenalty, 25);
         }
       }
     }
 
-    // Стена (blockLOS) = полное укрытие (§7.2).
+    // Стена (blockLOS) — всегда полное укрытие, высота не влияет.
     if (tile.blockLOS) {
       if (cell.type === "full") {
         blocked = true;
         breakCell = { x: cell.x, y: cell.y, z: tile.z };
         break;
       }
-      // Касательная стена — собираем для группировки.
       glancingWalls.push({ x: cell.x, y: cell.y });
     }
 
-    // Сущности-укрытия в промежуточной клетке.
+    // Сущности-укрытия с учётом высоты.
     for (const entity of entities) {
       if (!isAnyCover(entity) || entity.dead) continue;
       if (entity.x !== cell.x || entity.y !== cell.y) continue;
-      if (Math.abs(entity.z - (tile.pit ? 0 : tile.z)) > 1) continue;
-      intermediateCovers.push({ entity, type: cell.type });
+      const tileZ = tile.pit ? 0 : tile.z;
+      if (Math.abs(entity.z - tileZ) > 1) continue;
+      const eTier = effectiveCoverTier(entity.coverType, false, az, entity.z, bz);
+      if (eTier === 0) continue; // игнорируется из-за высоты
+      intermediateCovers.push({ entity, type: cell.type, effectiveTier: eTier });
     }
   }
 
   if (!blocked) {
-    // Группировка касательных стен: 2+ смежных → блокировка (§7.3).
     if (glancingWalls.length >= 2) {
       for (let i = 0; i < glancingWalls.length && !blocked; i++) {
         for (let j = i + 1; j < glancingWalls.length; j++) {
@@ -227,53 +235,34 @@ export function evaluateObstacles(
       }
     }
     if (!blocked) {
-      // Одиночные касательные стены → штраф 50.
       if (glancingWalls.length > 0) maxPenalty = Math.max(maxPenalty, 50);
-      // Обработать промежуточные укрытия-сущности с группировкой (§9.3, §9.4).
-      maxPenalty = Math.max(maxPenalty, computeObstaclePenalty(intermediateCovers, ax, ay, az));
+      maxPenalty = Math.max(maxPenalty, computeObstaclePenalty(intermediateCovers, ax, ay));
     }
   }
 
   return { blocked, obstaclePenalty: maxPenalty, breakCell };
 }
 
-/**
- * Вычислить штраф от промежуточных укрытий-сущностей.
- * Смежные с атакующим (DistH ≤ 1): полу игнорируются, полные при касательной тоже.
- * Группировка смежных касательных одной ступени (§9.4).
- */
 function computeObstaclePenalty(
-  covers: { entity: EntityState; type: IntersectionType }[],
-  ax: number,
-  ay: number,
-  _az: number,
+  covers: { entity: EntityState; type: IntersectionType; effectiveTier: 0 | 1 | 2 }[],
+  ax: number, ay: number,
 ): number {
   let penalty = 0;
   const groups: { tier: 1 | 2; ids: Set<number> }[] = [];
 
-  for (const { entity, type } of covers) {
+  for (const { entity, type, effectiveTier } of covers) {
+    if (effectiveTier === 0) continue;
     const distToAttacker = Math.max(Math.abs(entity.x - ax), Math.abs(entity.y - ay));
     const adjacent = distToAttacker <= 1;
-    const tier: 1 | 2 = entity.coverType as 1 | 2;
 
     if (type === "full") {
-      // Полное пересечение: полное укрытие блокирует, полу = −50.
-      if (tier === 2) {
-        // Полное укрытие при полном пересечении = блокировка (обрабатывается как breakCell).
-        return 100; // сигнал блокировки
-      }
-      penalty = Math.max(penalty, 50);
+      if (effectiveTier === 2) return 100; // полное при полном = блокировка
+      penalty = Math.max(penalty, 50); // эффективное полу при полном = -50
     } else {
-      // Касательное пересечение.
-      if (adjacent) {
-        // Смежное с атакующим: полу игнорируется, полное при касательной тоже (§7.4).
-        continue;
-      }
-      // Группировка: собираем касательные укрытия для последующей проверки смежности.
+      if (adjacent) continue;
       let merged = false;
       for (const group of groups) {
-        if (group.tier !== tier) continue;
-        // Проверить смежность с любым членом группы.
+        if (group.tier !== effectiveTier) continue;
         for (const id of group.ids) {
           const other = covers.find((c) => c.entity.id === id);
           if (other && Math.max(Math.abs(entity.x - other.entity.x), Math.abs(entity.y - other.entity.y)) <= 1) {
@@ -285,18 +274,16 @@ function computeObstaclePenalty(
         if (merged) break;
       }
       if (!merged) {
-        groups.push({ tier, ids: new Set([entity.id]) });
+        groups.push({ tier: effectiveTier, ids: new Set([entity.id]) });
       }
     }
   }
 
-  // Группы из 2+ касательных одной ступени → одно полное пересечение.
   for (const group of groups) {
     if (group.ids.size >= 2) {
-      if (group.tier === 2) return 100; // группа полных → блокировка
-      penalty = Math.max(penalty, 50); // группа полу → как полное при полном
+      if (group.tier === 2) return 100;
+      penalty = Math.max(penalty, 50);
     } else {
-      // Одиночное касательное.
       const singlePenalty = group.tier === 2 ? 50 : 25;
       penalty = Math.max(penalty, singlePenalty);
     }
@@ -305,26 +292,17 @@ function computeObstaclePenalty(
   return penalty;
 }
 
-/** Документ математики, §7. Укрытия и юниты луч не прерывают (только стены и рельеф). */
+/** Документ математики, §7. */
 export function hasLineOfSight(
   grid: Grid,
-  ax: number,
-  ay: number,
-  az: number,
-  bx: number,
-  by: number,
-  bz: number,
+  ax: number, ay: number, az: number,
+  bx: number, by: number, bz: number,
 ): boolean {
   if (ax === bx && ay === by) return true;
   const traced = traceRay(ax, ay, bx, by);
-  const x0 = ax + 0.5;
-  const y0 = ay + 0.5;
-  const z0 = az + 0.5;
-  const x1 = bx + 0.5;
-  const y1 = by + 0.5;
-  const z1 = bz + 0.5;
+  const x0 = ax + 0.5, y0 = ay + 0.5, z0 = az + 0.5;
+  const x1 = bx + 0.5, y1 = by + 0.5, z1 = bz + 0.5;
 
-  // Собрать касательные полные укрытия для группировки.
   const glancingFull: Cell[] = [];
 
   for (const cell of traced) {
@@ -332,23 +310,15 @@ export function hasLineOfSight(
     const tile = tileAt(grid, cell.x, cell.y);
     if (!tile) return false;
 
-    // Перепад высот.
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
     if (rz < tile.z) return false;
 
-    // Стена = полное укрытие (§7.2).
     if (tile.blockLOS) {
       if (cell.type === "full") return false;
       glancingFull.push(cell);
     }
-
-    // Полные укрытия-сущности (coverType = 2) при полном пересечении блокируют.
-    // При касательном — собираем для группировки.
-    // (Укрытия-сущности проверяются отдельно в evaluateObstacles,
-    //  здесь учитываем только тайловые blockLOS для базовой LOS.)
   }
 
-  // Группировка касательных стен: 2+ смежных → блокировка.
   if (glancingFull.length >= 2) {
     for (let i = 0; i < glancingFull.length; i++) {
       for (let j = i + 1; j < glancingFull.length; j++) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { traceRay, hasLineOfSight, evaluateObstacles } from "../src/los.js";
+import { traceRay, hasLineOfSight, evaluateObstacles, effectiveCoverTier } from "../src/los.js";
 import { evaluateCover } from "../src/cover.js";
 import { makeGrid, tileAt } from "../src/grid.js";
 import { canFinish, canTransit, edgeCost } from "../src/occupancy.js";
@@ -143,6 +143,44 @@ describe("height elevation as half-cover", () => {
     expect(result.blocked).toBe(false);
     expect(result.obstaclePenalty).toBeGreaterThan(0);
     expect(result.obstaclePenalty).toBeLessThanOrEqual(50);
+  });
+});
+
+describe("height-based cover rules", () => {
+  it("half-cover 1 level below attacker is ignored", () => {
+    
+    expect(effectiveCoverTier(1, false, 2, 1)).toBe(0);
+  });
+
+  it("full cover 1 level below attacker becomes half", () => {
+    
+    expect(effectiveCoverTier(2, false, 2, 1)).toBe(1);
+  });
+
+  it("wall (blockLOS) is always full regardless of height", () => {
+    
+    expect(effectiveCoverTier(2, true, 2, 1)).toBe(2);
+    expect(effectiveCoverTier(2, true, 2, 0)).toBe(2);
+  });
+
+  it("full cover 2 levels below is ignored (no target behind)", () => {
+    
+    expect(effectiveCoverTier(2, false, 2, 0)).toBe(0);
+  });
+
+  it("full cover 2 levels below becomes half if target is behind it", () => {
+    
+    expect(effectiveCoverTier(2, false, 2, 0, 0)).toBe(1);
+  });
+
+  it("half cover at same level stays half", () => {
+    
+    expect(effectiveCoverTier(1, false, 1, 1)).toBe(1);
+  });
+
+  it("full cover at same level stays full", () => {
+    
+    expect(effectiveCoverTier(2, false, 1, 1)).toBe(2);
   });
 });
 

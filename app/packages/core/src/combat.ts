@@ -51,7 +51,23 @@ export function previewAttack(
   const inReach = melee
     ? inMeleeReach(attacker.x, attacker.y, attacker.z, target.x, target.y, target.z)
     : inRangedReach(attacker.x, attacker.y, attacker.z, target.x, target.y, target.z, weapon.range);
-  if (!inReach) return { available: false, reason: "OUT_OF_RANGE", heightMod };
+
+  // Вычислить breakCell для визуализации (нужен даже при OUT_OF_RANGE).
+  let breakCell: CellPos | null = null;
+  if (!inReach && !melee) {
+    // Цель вне дальности: breakCell на максимальной дальности.
+    const range = weapon.range + heightRangeMod(attacker.z, target.z);
+    const dx = target.x - attacker.x;
+    const dy = target.y - attacker.y;
+    const d = Math.max(1, Math.hypot(dx, dy));
+    breakCell = {
+      x: Math.round(attacker.x + (dx / d) * Math.max(1, range)),
+      y: Math.round(attacker.y + (dy / d) * Math.max(1, range)),
+      z: attacker.z,
+    };
+  }
+
+  if (!inReach) return { available: false, reason: "OUT_OF_RANGE", heightMod, breakCell };
 
   // §7, §9.3: оценка промежуточных препятствий.
   const obstacles = evaluateObstacles(
@@ -92,20 +108,8 @@ export function previewAttack(
     - obstaclePenalty - rangePenalty,
   );
 
-  // Вычислить breakCell для визуализации.
-  let breakCell: CellPos | null = obstacles.breakCell;
-  if (!breakCell && !obstacles.blocked && !inReach) {
-    // Цель вне дальности: breakCell на максимальной дальности.
-    const range = weapon.range;
-    const dx = target.x - attacker.x;
-    const dy = target.y - attacker.y;
-    const d = Math.max(1, Math.hypot(dx, dy));
-    breakCell = {
-      x: Math.round(attacker.x + (dx / d) * range),
-      y: Math.round(attacker.y + (dy / d) * range),
-      z: attacker.z,
-    };
-  }
+  // Обновить breakCell из препятствий (если есть).
+  if (obstacles.breakCell) breakCell = obstacles.breakCell;
 
   return {
     available: true,

@@ -385,25 +385,72 @@ function drawCover(
 }
 
 /**
- * Подсветка защищённой грани: рисуется на грани клетки, ближе к персонажу.
- * Полуукрытие — голубой, полное — янтарный.
+ * Иконка щита на грани клетки, ближе к центру (к персонажу).
+ * Полуукрытие: щит с нижней половиной закрашенной.
+ * Полное укрытие: щит полностью закрашенный.
+ * @param alpha — прозрачность (1 для активного, 0.35 для hover-клетки).
  */
-function drawProtectionEdge(
+function drawShieldIcon(
   g: Graphics,
   cx: number,
   cy: number,
   edge: 0 | 1 | 2 | 3,
   coverType: 1 | 2,
+  alpha: number,
 ): void {
+  const shieldW = 8;
+  const shieldH = 10;
+  // Позиция: на грани клетки, смещена к центру.
+  const inset = 4;
+  let sx: number, sy: number;
+  if (edge === 0) { sx = cx; sy = cy - HALF + inset + shieldH / 2; }
+  else if (edge === 2) { sx = cx; sy = cy + HALF - inset - shieldH / 2; }
+  else if (edge === 1) { sx = cx + HALF - inset - shieldW / 2; sy = cy; }
+  else { sx = cx - HALF + inset + shieldW / 2; sy = cy; }
+
+  const hw = shieldW / 2;
+  const hh = shieldH / 2;
   const color = coverType === 2 ? 0xe8b64c : 0x60c8ff;
-  const len = C - 8;
-  const thick = 3;
-  // Смещение ближе к центру клетки (к персонажу).
-  const inset = 6;
-  if (edge === 0) g.rect(cx - len / 2, cy - HALF + inset, len, thick).fill({ color, alpha: 0.55 });
-  if (edge === 2) g.rect(cx - len / 2, cy + HALF - inset - thick, len, thick).fill({ color, alpha: 0.55 });
-  if (edge === 1) g.rect(cx + HALF - inset - thick, cy - len / 2, thick, len).fill({ color, alpha: 0.55 });
-  if (edge === 3) g.rect(cx - HALF + inset, cy - len / 2, thick, len).fill({ color, alpha: 0.55 });
+  const darkColor = coverType === 2 ? 0x8a6a24 : 0x3080b0;
+
+  // Форма щита: верх — прямоугольник, низ — треугольник (заострение).
+  const top = sy - hh;
+  const mid = sy + hh * 0.2;
+  const bot = sy + hh;
+
+  // Контур щита.
+  g.moveTo(sx - hw, top)
+    .lineTo(sx + hw, top)
+    .lineTo(sx + hw, mid)
+    .lineTo(sx, bot)
+    .lineTo(sx - hw, mid)
+    .closePath()
+    .stroke({ width: 1.2, color: darkColor, alpha });
+
+  if (coverType === 2) {
+    // Полное укрытие: полностью закрашенный щит.
+    g.moveTo(sx - hw, top)
+      .lineTo(sx + hw, top)
+      .lineTo(sx + hw, mid)
+      .lineTo(sx, bot)
+      .lineTo(sx - hw, mid)
+      .closePath()
+      .fill({ color, alpha: alpha * 0.75 });
+  } else {
+    // Полуукрытие: нижняя половина закрашена.
+    const splitY = sy;
+    g.moveTo(sx - hw, splitY)
+      .lineTo(sx + hw, splitY)
+      .lineTo(sx + hw, mid)
+      .lineTo(sx, bot)
+      .lineTo(sx - hw, mid)
+      .closePath()
+      .fill({ color, alpha: alpha * 0.65 });
+  }
+
+  // Крест на щите.
+  g.moveTo(sx, top + 2).lineTo(sx, bot - 2).stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
+  g.moveTo(sx - hw + 2, sy - 1).lineTo(sx + hw - 2, sy - 1).stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
 }
 
 /** Могильная отметина павшего: камешки и череп. */
@@ -505,32 +552,40 @@ export function createFieldRenderer(): FieldRenderer {
    * Подсветка защищённых граней для сущности: проверяет соседние укрытия
    * и рисует цветную полоску на общей грани.
    */
-  const drawProtectionHighlights = (g: Graphics, entity: EntityState, v: FieldView): void => {
-    for (const cover of v.snapshot.entities) {
-      if (!cover || cover.dead || cover.coverType === 0 || cover.edge === undefined) continue;
-      const dx = cover.x - entity.x;
-      const dy = cover.y - entity.y;
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) continue;
-      if (dx === 0 && dy === 0) continue;
-      // Определить общую грань.
-      let sharedEdge: 0 | 1 | 2 | 3 | null = null;
-      if (dx === 0 && dy === -1) sharedEdge = 0; // cover is north
-      if (dx === 1 && dy === 0) sharedEdge = 1;  // cover is east
-      if (dx === 0 && dy === 1) sharedEdge = 2;  // cover is south
-      if (dx === -1 && dy === 0) sharedEdge = 3; // cover is west
-      if (sharedEdge === null) continue;
-      // Проверить, что укрытие на правильной грани (смотрит на entity).
-      const oppositeEdge = (sharedEdge + 2) % 4;
-      if (cover.edge !== oppositeEdge && cover.edge !== sharedEdge) continue;
-      // Если укрытие в соседней клетке и его edge = sharedEdge (грань смотрит ОТ entity),
-      // или укрытие в клетке entity и его edge = oppositeEdge — не подходит.
-      // Правильно: укрытие в соседней клетке, edge = oppositeEdge (грань смотрит НА entity).
-      // ИЛИ укрытие в клетке entity, edge = sharedEdge (грань смотрит на соседа).
-      const isAdjacentCover = (dx !== 0 || dy !== 0) && cover.edge === oppositeEdge;
-      const isSameCellCover = (dx === 0 && dy === 0);
-      if (!isAdjacentCover && !isSameCellCover) continue;
-      const { cx, cy } = centerOf(entity.x, entity.y, entity.z);
-      drawProtectionEdge(g, cx, cy, sharedEdge, cover.coverType as 1 | 2);
+  const drawProtectionHighlights = (g: Graphics, entity: EntityState, v: FieldView, alpha: number): void => {
+    // Проверить все 4 грани клетки entity на наличие укрытий.
+    const edges: { dx: number; dy: number; edge: 0 | 1 | 2 | 3 }[] = [
+      { dx: 0, dy: -1, edge: 0 }, // north
+      { dx: 1, dy: 0, edge: 1 },   // east
+      { dx: 0, dy: 1, edge: 2 },   // south
+      { dx: -1, dy: 0, edge: 3 },  // west
+    ];
+    for (const { dx, dy, edge } of edges) {
+      const nx = entity.x + dx;
+      const ny = entity.y + dy;
+      let bestTier: 0 | 1 | 2 = 0;
+      for (const cover of v.snapshot.entities) {
+        if (!cover || cover.dead || cover.coverType === 0) continue;
+        if (cover.x !== nx || cover.y !== ny) continue;
+        if (Math.abs(cover.z - entity.z) > 1) continue;
+        // Граневое укрытие: проверить, что грань смотрит на entity.
+        if (cover.edge !== undefined) {
+          const oppositeEdge = (edge + 2) % 4;
+          if (cover.edge !== oppositeEdge) continue;
+        }
+        if (cover.coverType > bestTier) bestTier = cover.coverType;
+      }
+      // Также проверить целоклеточные укрытия в самой клетке entity (edge-based).
+      for (const cover of v.snapshot.entities) {
+        if (!cover || cover.dead || cover.coverType === 0 || cover.edge === undefined) continue;
+        if (cover.x !== entity.x || cover.y !== entity.y) continue;
+        if (cover.edge !== edge) continue; // грань смотрит в направлении edge
+        if (cover.coverType > bestTier) bestTier = cover.coverType;
+      }
+      if (bestTier > 0) {
+        const { cx, cy } = centerOf(entity.x, entity.y, entity.z);
+        drawShieldIcon(g, cx, cy, edge, bestTier as 1 | 2, alpha);
+      }
     }
   };
 
@@ -1095,7 +1150,7 @@ export function createFieldRenderer(): FieldRenderer {
     if (view.selectedId !== null) {
       const sel = view.snapshot.entities.find((e) => e.id === view!.selectedId);
       if (sel && !sel.dead && sel.coverType === 0) {
-        drawProtectionHighlights(g, sel, view);
+        drawProtectionHighlights(g, sel, view, 1.0);
       }
     }
 
@@ -1106,7 +1161,7 @@ export function createFieldRenderer(): FieldRenderer {
       const hoverEntity: EntityState = {
         x: hx, y: hy, z: view.hoverCell.z,
       } as EntityState;
-      drawProtectionHighlights(g, hoverEntity, view);
+      drawProtectionHighlights(g, hoverEntity, view, 0.35);
     }
 
     // Маркеры пересечения луча прицеливания с укрытиями.

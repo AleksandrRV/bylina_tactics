@@ -1,4 +1,5 @@
 import { distH } from "./grid.js";
+import { effectiveCoverTier } from "./los.js";
 import { isCover } from "./occupancy.js";
 import type { EntityState } from "./types.js";
 
@@ -31,19 +32,15 @@ function onFireLine(sx: number, sy: number, dx: number, dy: number): boolean {
 
 /**
  * Проверить, пересекает ли луч грань укрытия (§9.7).
- * Если у укрытия задан edge, учитывается только при пересечении этой грани.
  */
 function edgeBlocksRay(cover: EntityState, attackerX: number, attackerY: number): boolean {
-  if (cover.edge === undefined) return true; // целоклеточное укрытие — всегда учитывается
-  // Определить направление от укрытия к атакующему.
+  if (cover.edge === undefined) return true;
   const dx = attackerX - cover.x;
   const dy = attackerY - cover.y;
-  // edge: 0=N, 1=E, 2=S, 3=W
-  // Луч пересекает грань, если атакующий находится со стороны этой грани.
-  if (cover.edge === 0 && dy < 0) return true; // N: атакующий севернее
-  if (cover.edge === 1 && dx > 0) return true; // E: атакующий восточнее
-  if (cover.edge === 2 && dy > 0) return true; // S: атакующий южнее
-  if (cover.edge === 3 && dx < 0) return true; // W: атакующий западнее
+  if (cover.edge === 0 && dy < 0) return true;
+  if (cover.edge === 1 && dx > 0) return true;
+  if (cover.edge === 2 && dy > 0) return true;
+  if (cover.edge === 3 && dx < 0) return true;
   return false;
 }
 
@@ -74,9 +71,11 @@ export function evaluateCover(
     const dx = cover.x - target.x;
     const dy = cover.y - target.y;
     if (!onFireLine(sx, sy, dx, dy)) continue;
-    // §9.7: граневое укрытие учитывается только при пересечении его грани.
     if (!edgeBlocksRay(cover, attacker.x, attacker.y)) continue;
-    if (cover.coverType > best) best = cover.coverType;
+    // Эффективная ступень с учётом высоты атакующего.
+    // Цель стоит за укрытием → targetZ = target.z для проверки "цель за укрытием".
+    const eTier = effectiveCoverTier(cover.coverType, false, attacker.z, cover.z, target.z);
+    if (eTier > best) best = eTier;
   }
 
   let penalty = best === 2 ? 50 : best === 1 ? 25 : 0;
@@ -86,13 +85,16 @@ export function evaluateCover(
   const flanked = candidates.length > 0 && best === 0;
 
   // §9.6: бонус смежных укрытий цели (защита от входящих атак).
+  // Также учитываем высоту: укрытие ниже атакующего может быть менее эффективным.
   let adjacentDefenseBonus = 0;
   for (const entity of entities) {
     if (!isCover(entity) || entity.dead) continue;
     if (distH(target.x, target.y, entity.x, entity.y) > 1) continue;
     if (Math.abs(target.z - entity.z) > 1) continue;
-    if (entity.coverType === 2) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 30);
-    else if (entity.coverType === 1) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 15);
+    // Эффективная ступень с учётом высоты атакующего.
+    const eTier = effectiveCoverTier(entity.coverType, false, attacker.z, entity.z, target.z);
+    if (eTier === 2) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 30);
+    else if (eTier === 1) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 15);
   }
 
   return { penalty, coverType: best, flanked, adjacentDefenseBonus };
