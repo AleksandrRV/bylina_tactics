@@ -927,6 +927,26 @@ export function createFieldRenderer(): FieldRenderer {
     const faction: FactionLook = entity.owner === 2 ? NAV : DRUZHINA;
     const flash = flashes.get(entity.id) ?? 0;
 
+    if (entity.overwatch) {
+      const angle = (-90 + entity.dir * 90) * (Math.PI / 180);
+      const forwardX = Math.cos(angle);
+      const forwardY = Math.sin(angle);
+      const sideX = -forwardY;
+      const sideY = forwardX;
+      const depth = CELL_SIZE * 7;
+      const width = CELL_SIZE * 6;
+      g.poly([
+        cx + sideX * width,
+        cy + sideY * width,
+        cx - sideX * width,
+        cy - sideY * width,
+        cx + forwardX * depth - sideX * width,
+        cy + forwardY * depth - sideY * width,
+        cx + forwardX * depth + sideX * width,
+        cy + forwardY * depth + sideY * width,
+      ]).fill({ color: 0xe8b64c, alpha: 0.08 });
+    }
+
     g.ellipse(cx, cy + 15, 15, 5).fill({ color: 0x000000, alpha: 0.32 * fade });
     g.circle(cx, cy, 17.5).fill(faction.ring);
     g.circle(cx, cy, 17.5).stroke({ width: 1, color: faction.ringDark });
@@ -978,16 +998,6 @@ export function createFieldRenderer(): FieldRenderer {
       g.poly([px0, cy + 21.5, px0 + 2.9, cy + 24.4, px0, cy + 27.3, px0 - 2.9, cy + 24.4]).fill(
         i < pips ? 0xe8b64c : 0x3a382e,
       );
-    }
-
-    // Щит: защитная стойка.
-    if (entity.defending) {
-      const sx = cx + 16;
-      const sy = cy - 18;
-      g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
-      g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
-      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
-      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
     }
 
     // Дозор: глаз-индикатор.
@@ -1400,6 +1410,20 @@ export function createFieldRenderer(): FieldRenderer {
         shown.x = last.x;
         shown.y = last.y;
         shown.z = last.z;
+      }
+      return;
+    }
+    if (event.type === "ENTITY_DISPLACED") {
+      const shown = display.get(event.entityId);
+      if (shown) {
+        shown.x = event.from.x;
+        shown.y = event.from.y;
+        shown.z = event.from.z;
+        await tween(150, (t) => {
+          shown.x = event.from.x + (event.to.x - event.from.x) * t;
+          shown.y = event.from.y + (event.to.y - event.from.y) * t;
+          shown.z = event.from.z + (event.to.z - event.from.z) * t;
+        });
       }
       return;
     }

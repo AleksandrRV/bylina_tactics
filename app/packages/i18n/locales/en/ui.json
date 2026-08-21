@@ -73,27 +73,52 @@
     "weapon": "Weapon",
     "empty": "None selected",
     "apLeft": "AP",
-    "defend": "Defend",
-    "defendHint": "Defensive stance: +25 dodge, −2 damage taken. Ends turn.",
     "overwatch": "Overwatch",
     "overwatchHint": "Enter overwatch: reaction shot when enemy moves. Ends turn.",
     "debugMovement": "Movement cost"
   },
   "unit": {
-    "bogatyr": { "name": "Bogatyr" },
-    "strelets": { "name": "Strelets" },
-    "znaharka": { "name": "Znaharka" },
-    "upyr": { "name": "Upyr" },
-    "leshy": { "name": "Leshy" },
-    "kikimora": { "name": "Kikimora" }
+    "bogatyr": {
+      "name": "Bogatyr"
+    },
+    "strelets": {
+      "name": "Strelets"
+    },
+    "znaharka": {
+      "name": "Znaharka"
+    },
+    "upyr": {
+      "name": "Upyr"
+    },
+    "leshy": {
+      "name": "Leshy"
+    },
+    "kikimora": {
+      "name": "Kikimora"
+    }
   },
   "weapon": {
-    "sword": { "name": "Sword" },
-    "bow": { "name": "Bow" },
-    "sling": { "name": "Sling" },
-    "claws": { "name": "Claws" },
-    "branch": { "name": "Branch" },
-    "needle": { "name": "Needle" }
+    "sword": {
+      "name": "Sword"
+    },
+    "bow": {
+      "name": "Bow"
+    },
+    "sling": {
+      "name": "Sling"
+    },
+    "claws": {
+      "name": "Claws"
+    },
+    "branch": {
+      "name": "Branch"
+    },
+    "needle": {
+      "name": "Needle"
+    },
+    "mace": {
+      "name": "Mace"
+    }
   },
   "combat": {
     "preview": "Hit {chance}% · dmg {dmg} · cover {cover} · height {height} · {flank}. Tap again to fire.",
@@ -124,7 +149,10 @@
     "bdCover": "Cover",
     "bdObstacles": "Obstacles",
     "bdRange": "Range",
-    "bdTotal": "Total"
+    "bdTotal": "Total",
+    "available": "Available",
+    "bdObstacleList": "Obstacles on line",
+    "unavailable": "Unavailable"
   },
   "settings": {
     "title": "Settings",
@@ -139,5 +167,13 @@
     "ok": "OK",
     "close": "Close",
     "notReady": "Unavailable"
+  },
+  "skill": {
+    "circular_sweep": {
+      "name": "Circular sweep"
+    },
+    "breach": {
+      "name": "Breach"
+    }
   }
 }

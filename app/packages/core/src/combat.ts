@@ -48,12 +48,13 @@ export function previewAttack(
   attacker: EntityState,
   target: EntityState,
   weapon: WeaponStats,
+  options: { ignoreAp?: boolean } = {},
 ): HitPreview {
   if (attacker.dead || target.dead || target.coverType > 0) {
     return { available: false, reason: "ILLEGAL" };
   }
   if (attacker.owner === target.owner) return { available: false, reason: "ILLEGAL" };
-  if (attacker.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
+  if (!options.ignoreAp && attacker.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
 
   const melee = weapon.category === "melee";
   const heightMod = heightRangeMod(attacker.z, target.z);
@@ -101,11 +102,11 @@ export function previewAttack(
   const baseAim = attacker.aim;
   const weaponMod = weapon.aimMod;
   const targetDefense = target.defense;
-  const defendBonus = target.defending ? 25 : 0;
-  const coverPenalty = cover.penalty;
+  const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
+  const coverPenalty = Math.max(cover.penalty, obstacles.obstaclePenalty);
 
   const chance = clampChance(
-    baseAim + weaponMod + heightAim - targetDefense - defendBonus - coverPenalty - rangePenalty,
+    baseAim + weaponMod + heightAim - targetDefense - coverPenalty - rangePenalty,
   );
 
   const breakdown: HitBreakdown = {
@@ -140,8 +141,9 @@ export function resolveAttack(
   target: EntityState,
   weapon: WeaponStats,
   rng: Rng,
+  options: { ignoreAp?: boolean } = {},
 ): AttackResolution | null {
-  const preview = previewAttack(grid, entities, attacker, target, weapon);
+  const preview = previewAttack(grid, entities, attacker, target, weapon, options);
   if (!preview.available || preview.chance === undefined) return null;
 
   const cover = evaluateCover(attacker, target, entities, grid, {

@@ -35,21 +35,31 @@ describe("parseContent", () => {
       "upyr",
       "znaharka",
     ]);
-    expect(result.data.units.every((unit) => unit.skills.length === 0)).toBe(true);
+    expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual(["circular_sweep", "breach"]);
     expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual([
       "bow",
       "bow_debug",
       "branch",
       "claws",
+      "mace",
       "needle",
       "sling",
       "sword",
       "sword_debug",
     ]);
-    expect(result.data.skills).toEqual([]);
+    expect(result.data.skills.map((skill) => skill.id).sort()).toEqual(["breach", "circular_sweep"]);
     expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");
+  });
+
+  it("rejects unknown fields and broken references", () => {
+    const files = readDataTree();
+    const swordKey = Object.keys(files).find((key) => key.endsWith("weapons/sword.json5"));
+    expect(swordKey).toBeDefined();
+    if (!swordKey) return;
+    files[swordKey] = files[swordKey]!.replace("envDmg: 0,", "envDmg: 0, unknownBalance: 99,");
+    expect(parseContent(files).ok).toBe(false);
   });
 
   it("rejects a broken campaign file", () => {

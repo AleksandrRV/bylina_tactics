@@ -1,4 +1,4 @@
-import { NEIGHBORS, distH, isCardinal, tileAt } from "./grid.js";
+import { NEIGHBORS, isCardinal, tileAt } from "./grid.js";
 import { canFinish, edgeCost } from "./occupancy.js";
 import type { CellPos, EntityState, Grid, ReachableCell } from "./types.js";
 
@@ -14,6 +14,11 @@ interface Node {
 
 function key(x: number, y: number): string {
   return `${x},${y}`;
+}
+
+/** Допустимая эвристика для восьмисвязной сетки с минимальной ценой ребра 1. */
+function pathHeuristic(ax: number, ay: number, bx: number, by: number): number {
+  return Math.max(Math.abs(bx - ax), Math.abs(by - ay));
 }
 
 function better(a: Node, b: Node): boolean {
@@ -106,7 +111,7 @@ export function findPath(
     x: walker.x,
     y: walker.y,
     g: 0,
-    f: distH(walker.x, walker.y, toX, toY),
+    f: pathHeuristic(walker.x, walker.y, toX, toY),
     px: walker.x,
     py: walker.y,
     cardinal: true,
@@ -139,7 +144,7 @@ export function findPath(
         x: nx,
         y: ny,
         g,
-        f: g + distH(nx, ny, toX, toY),
+        f: g + pathHeuristic(nx, ny, toX, toY),
         px: current.x,
         py: current.y,
         cardinal: isCardinal(dx, dy),
@@ -186,7 +191,9 @@ export function listReachable(
   entities: readonly EntityState[],
   walker: EntityState,
 ): ReachableCell[] {
-  const maxMp = walker.ap <= 0 ? 0 : walker.ap >= 2 ? walker.mobility * 2 : walker.mobility;
+  const actionBudget = walker.ap <= 0 ? 0 : walker.ap >= 2 ? walker.mobility * 2 : walker.mobility;
+  const turnBudget = Math.max(0, walker.mobility * 2 - (walker.movementSpent ?? 0));
+  const maxMp = Math.min(actionBudget, turnBudget);
   if (maxMp <= 0) return [];
 
   const best = new Map<string, number>();

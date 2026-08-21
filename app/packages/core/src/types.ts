@@ -18,6 +18,11 @@ export interface Grid {
   tiles: Tile[];
 }
 
+/**
+ * Исполнительное представление сущности тактического ядра.
+ * Необязательные поля добавлены с безопасными значениями по умолчанию, чтобы
+ * снимки предыдущих версий оставались читаемыми.
+ */
 export interface EntityState {
   id: number;
   configId: string;
@@ -34,17 +39,25 @@ export interface EntityState {
   aim: number;
   defense: number;
   vision: number;
+  will?: number;
+  /** Текущее оружие; сохраняется для совместимости снимков 0.7.x. */
   weaponId: string;
+  /** Все доступные юниту записи оружия. */
+  weaponIds?: string[];
+  /** Все доступные юниту активные умения. */
+  skillIds?: string[];
   obstacle: boolean;
   dead: boolean;
   flying: boolean;
+  hidden?: boolean;
+  decoy?: boolean;
   coverType: 0 | 1 | 2;
   /** Граневое укрытие: 0=N, 1=E, 2=S, 3=W. undefined = занимает всю клетку. */
   edge?: 0 | 1 | 2 | 3;
-  /** Признак дозора (§14). Снимается при ответном действии или в начале хода стороны. */
+  /** Признак дозора (§14). */
   overwatch: boolean;
-  /** Защитная стойка: бонус к увороту и снижение урона. Снимается в начале хода стороны. */
-  defending: boolean;
+  /** Суммарная стоимость добровольного перемещения в текущем ходу стороны. */
+  movementSpent?: number;
 }
 
 export interface MatchState {
@@ -52,6 +65,10 @@ export interface MatchState {
   activeOwner: number;
   grid: Grid;
   entities: EntityState[];
+  /** Исходное значение Mulberry32 в десятичном представлении. */
+  rngSeed?: string;
+  /** Текущее ui32-состояние Mulberry32 в десятичном представлении. */
+  rngState?: string;
 }
 
 export interface ReachableCell extends CellPos {
@@ -61,9 +78,9 @@ export interface ReachableCell extends CellPos {
 
 export type Command =
   | { type: "MOVE"; actorId: number; to: CellPos; path?: CellPos[] }
-  | { type: "ATTACK"; actorId: number; targetId: number; weaponId?: string }
+  | { type: "ATTACK"; actorId: number; targetId: number; weaponId: string }
   | { type: "OVERWATCH"; actorId: number }
-  | { type: "DEFEND"; actorId: number }
+  | { type: "USE_SKILL"; actorId: number; skillId: string; targetId?: number; targetPos?: CellPos }
   | { type: "END_TURN"; playerId: string };
 
 export type GameEvent =
@@ -75,25 +92,31 @@ export type GameEvent =
       isDash: boolean;
       apSpent: number;
     }
+  | { type: "ENTITY_DISPLACED"; entityId: number; from: CellPos; to: CellPos; cause: "KNOCKBACK" | "TELEPORT" | "FALL" }
   | { type: "STAT_CHANGED"; entityId: number; stat: "AP" | "HP"; newValue: number; delta: number }
   | {
       type: "COMBAT_RESOLVED";
       sourceId: number;
       targetId: number;
-      actionType: "MELEE" | "RANGED";
+      actionType: "MELEE" | "RANGED" | "MAGIC";
       result: "HIT" | "MISS" | "CRIT";
       damageDealt: number;
       isFlanked: boolean;
       heightMod: -1 | 0 | 1;
-      /** Установлено если это ответное действие дозора. */
-      overwatch?: boolean;
     }
-  | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" }
-  | { type: "OVERWATCH_SET"; entityId: number }
-  | { type: "OVERWATCH_CLEARED"; entityId: number }
-  | { type: "DEFEND_SET"; entityId: number }
-  | { type: "DEFEND_CLEARED"; entityId: number }
-  | { type: "COVER_DAMAGED"; entityId: number; newCoverType: 0 | 1 | 2 };
+  | { type: "SKILL_RESOLVED"; sourceId: number; skillId: string; targetId?: number; targetPos?: CellPos; success: boolean }
+  | {
+      type: "STATUS_CHANGED";
+      entityId: number;
+      status: "POISON" | "PANIC" | "OVERWATCH" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+      applied: boolean;
+    }
+  | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE" }
+  | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON" }
+  | { type: "ENTITY_REMOVED"; entityId: number; reason: "FLED" | "EXPIRED" | "EXTRACTED" }
+  | { type: "OVERWATCH_FIRED"; watcherId: number; triggerId: number; at: CellPos }
+  | { type: "REVEALED"; entityId: number; snapshot: EntityState }
+  | { type: "MATCH_ENDED"; winnerPlayerId: string | null; reason: "ELIMINATION" | "OBJECTIVE" | "SURRENDER" | "CAMPAIGN_RESULT" };
 
 export type RejectReason =
   | "ILLEGAL"

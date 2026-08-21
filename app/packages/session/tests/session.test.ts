@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { createTacticsKernel } from "@bylina/core";
 import { APP_VERSION, createSession } from "../src/index.js";
 
 describe("createSession", () => {
@@ -25,6 +26,17 @@ describe("createSession", () => {
     expect(session.get().unavailableMode).toBe("campaign");
     session.dismissUnavailable();
     expect(session.get().unavailableMode).toBeNull();
+  });
+
+  it("is the only UI gateway that applies battle commands", () => {
+    const session = createSession("menu");
+    const host = createTacticsKernel();
+    session.bindTacticsHost(host);
+    expect(session.applyBattleCommand({ type: "END_TURN", playerId: "1" }).ok).toBe(false);
+    session.openQuickMatch();
+    session.selectDifficulty("easy");
+    expect(session.applyBattleCommand({ type: "END_TURN", playerId: "1" }).ok).toBe(true);
+    expect(session.getBattleSnapshot(1).activeOwner).toBe(2);
   });
 
   it("opens quick match difficulty and starts a battle", () => {

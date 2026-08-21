@@ -1,6 +1,6 @@
 {
   "name": "@bylina/session",
-  "version": "0.5.0",
+  "version": "0.8.0",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -8,6 +8,9 @@
   "scripts": {
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@bylina/core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.6.3",

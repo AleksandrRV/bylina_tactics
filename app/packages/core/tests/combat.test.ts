@@ -36,7 +36,7 @@ function unit(partial: Partial<EntityState> = {}): EntityState {
     flying: false,
     coverType: 0,
     overwatch: false,
-    defending: false,
+    movementSpent: 0,
     ...partial,
   };
 }
@@ -65,6 +65,17 @@ describe("LOS", () => {
     if (wall) wall.blockLOS = true;
     expect(hasLineOfSight(grid, 0, 0, 1, 4, 0, 1)).toBe(false);
     expect(previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW).available).toBe(false);
+  });
+
+  it("keeps a single glancing wall shootable but applies full-cover penalty", () => {
+    const grid = makeGrid(5, 5, 1);
+    const attacker = unit({ x: 0, y: 0 });
+    const target = unit({ id: 2, owner: 2, x: 4, y: 4 });
+    const open = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    tileAt(grid, 1, 0)!.blockLOS = true;
+    const glancing = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    expect(glancing.available).toBe(true);
+    expect((glancing.chance ?? 0)).toBe((open.chance ?? 0) - 50);
   });
 
   it("is blocked by a hill that the ray hits", () => {
@@ -111,6 +122,16 @@ describe("cover and flank", () => {
     expect(flanked.flanked).toBe(true);
   });
 
+  it("applies a correctly oriented edge cover to hit chance", () => {
+    const grid = makeGrid(6, 5, 1);
+    const attacker = unit({ x: 0, y: 2 });
+    const target = unit({ id: 2, owner: 2, x: 4, y: 2 });
+    const edgeCover = unit({ id: 3, owner: 0, x: 3, y: 2, coverType: 2, edge: 1, obstacle: false, weaponId: "" });
+    const open = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    const protectedPreview = previewAttack(grid, [attacker, target, edgeCover], attacker, target, DEBUG_BOW);
+    expect((protectedPreview.chance ?? 0)).toBe((open.chance ?? 0) - 50);
+  });
+
   it("ignores cover penalty in melee but keeps flank for later crit", () => {
     const attacker = unit({ x: 1, y: 1 });
     const target = unit({ id: 2, owner: 2, x: 2, y: 1 });
@@ -130,7 +151,7 @@ describe("kernel attack", () => {
     const preview = kernel.getHitPreview(1, 4);
     expect(preview.available).toBe(true);
     expect(preview.chance).toBeGreaterThan(0);
-    const result = kernel.apply({ type: "ATTACK", actorId: 1, targetId: 4 });
+    const result = kernel.apply({ type: "ATTACK", actorId: 1, targetId: 4, weaponId: "bow_debug" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     const combat = result.events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -139,10 +160,24 @@ describe("kernel attack", () => {
     expect(actor?.ap).toBe(0);
   });
 
+  it("continues the exact RNG sequence after restoring a snapshot", () => {
+    const weapon = { ...DEBUG_BOW, id: "repeat_bow", endsTurn: false, minDmg: 1, maxDmg: 3 };
+    const initial = createTacticsKernel().getSnapshot();
+    const actor = initial.entities.find((entity) => entity.id === 1)!;
+    actor.weaponId = weapon.id;
+    actor.weaponIds = [weapon.id];
+    const first = createTacticsKernel({ initial, weapons: { [weapon.id]: weapon }, seed: 123 });
+    expect(first.apply({ type: "ATTACK", actorId: 1, targetId: 4, weaponId: weapon.id }).ok).toBe(true);
+    const restored = createTacticsKernel({ initial: first.getSnapshot(), weapons: { [weapon.id]: weapon } });
+    const nextA = first.apply({ type: "ATTACK", actorId: 1, targetId: 4, weaponId: weapon.id });
+    const nextB = restored.apply({ type: "ATTACK", actorId: 1, targetId: 4, weaponId: weapon.id });
+    expect(nextA).toEqual(nextB);
+  });
+
   it("rejects a melee weapon out of reach", () => {
     const kernel = createTacticsKernel();
     const preview = kernel.getHitPreview(1, 4, DEBUG_SWORD.id);
     expect(preview.available).toBe(false);
-    expect(preview.reason).toBe("OUT_OF_RANGE");
+    expect(preview.reason).toBe("ILLEGAL");
   });
 });

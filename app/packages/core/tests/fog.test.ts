@@ -98,21 +98,19 @@ describe("fog of war", () => {
     expect(afterExplored.size).toBeGreaterThanOrEqual(sizeBefore);
   });
 
-  it("enemies outside visible area are hidden from snapshot consumer", () => {
+  it("removes unseen and hidden enemies from the side snapshot and previews", () => {
     const match = createQuickMatch({ enemyCount: 3, seed: 55 });
-    const kernel = createTacticsKernel({
-      initial: match,
-      weapons: defaultTrainingWeapons(),
-      seed: 55,
-    });
-    const visible = kernel.getVisibleCells(PLAYER_OWNER);
-    const enemies = match.entities.filter((e) => e.owner === ENEMY_OWNER && e.coverType === 0);
-    // Хотя бы один враг вне зоны видимости на старте (маловероятно что все видны сразу).
-    const someHidden = enemies.some((e) => !visible.has(`${e.x},${e.y}`));
-    // На типичной карте с seed=55 это должно быть так.
-    // Если все видны — тест просто проверяет что API работает.
-    expect(visible.size).toBeGreaterThan(0);
-    expect(enemies.length).toBeGreaterThan(0);
-    void someHidden;
+    const player = match.entities.find((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0)!;
+    const enemy = match.entities.find((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0)!;
+    player.vision = 1;
+    enemy.x = match.grid.width - 2;
+    enemy.y = 1;
+    enemy.hidden = true;
+    const kernel = createTacticsKernel({ initial: match, weapons: defaultTrainingWeapons() });
+    const reduced = kernel.getSnapshotFor(PLAYER_OWNER);
+    expect(reduced.entities.some((entity) => entity.id === enemy.id)).toBe(false);
+    expect(kernel.getHitPreview(player.id, enemy.id, player.weaponId)).toEqual({ available: false });
+    const unknown = reduced.grid.tiles.find((tile) => tile.x === enemy.x && tile.y === enemy.y);
+    expect(unknown).toMatchObject({ z: 0, pit: false, blockLOS: false });
   });
 });

@@ -1,0 +1,15 @@
+{
+  id: "circular_sweep",
+  apCost: 1,
+  endsTurn: true,
+  range: 0,
+  requiresLOS: false,
+  category: "self",
+  resolution: "attack",
+  envDmg: 0,
+  radius: 1,
+  filter: "enemies",
+  effects: [
+    { type: "damage", minDmg: 3, maxDmg: 5, crit: 10, critBonus: 2 },
+  ],
+}

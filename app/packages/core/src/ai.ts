@@ -30,7 +30,7 @@ function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly En
   });
   const chosen = hits[0];
   if (!chosen) return null;
-  return { type: "ATTACK", actorId: actor.id, targetId: chosen.foe.id };
+  return { type: "ATTACK", actorId: actor.id, targetId: chosen.foe.id, weaponId: actor.weaponId };
 }
 
 function scoreMove(actor: EntityState, cell: ReachableCell, foe: EntityState): number {
@@ -73,25 +73,21 @@ function bestMove(kernel: TacticsKernel, actor: EntityState, foes: readonly Enti
 export function pickEnemyCommand(kernel: TacticsKernel): Command | null {
   const snap = kernel.getSnapshot();
   if (snap.activeOwner !== ENEMY_OWNER) return null;
-  const foes = livingOf(snap, PLAYER_OWNER);
+  const visible = kernel.getVisibleCells(ENEMY_OWNER);
+  const foes = livingOf(snap, PLAYER_OWNER).filter((entity) => !entity.hidden && visible.has(`${entity.x},${entity.y}`));
   const enemies = livingOf(snap, ENEMY_OWNER)
     .filter((entity) => entity.ap > 0)
     .sort((a, b) => a.id - b.id);
-  if (foes.length === 0 || enemies.length === 0) return null;
+  if (enemies.length === 0) return null;
   for (const actor of enemies) {
     const attack = bestAttack(kernel, actor, foes);
     if (attack) return attack;
     const move = bestMove(kernel, actor, foes);
     if (move) return move;
   }
-  // Если ни один враг не может атаковать или двигаться — ставим в защитную стойку
-  // тех, у кого ещё остались ОД (§16: неизрасходованные ОД сгорают).
-  for (const actor of enemies) {
-    if (actor.ap > 0 && !actor.defending) {
-      return { type: "DEFEND", actorId: actor.id };
-    }
-  }
-  return null;
+  // Если доступных целей нет, оставшийся юнит использует нормативный дозор.
+  const watcher = enemies.find((actor) => actor.ap > 0 && !actor.overwatch && actor.weaponId);
+  return watcher ? { type: "OVERWATCH", actorId: watcher.id } : null;
 }
 
 /** Исполняет ход Нави теми же командами, что и человек. */

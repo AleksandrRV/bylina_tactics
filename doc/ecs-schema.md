@@ -68,6 +68,10 @@ export const ActionPoints = defineComponent({
   max: Types.i8,
 });
 
+export const MovementTurn = defineComponent({
+  spent: Types.ui8, // накопленная стоимость добровольного движения; 0…2×mobility
+});
+
 export const CombatStats = defineComponent({
   mobility: Types.ui8,
   aim: Types.i8,
@@ -82,6 +86,7 @@ export const CombatStats = defineComponent({
 ```typescript
 export const Cover = defineComponent({
   type: Types.ui8, // 2 — полное, 1 — неполное
+  edge: Types.ui8, // 0=N, 1=E, 2=S, 3=W, 255 — целоклеточное
 });
 
 export const ObstacleTag = defineComponent();
@@ -118,12 +123,12 @@ export const PanicSource = defineComponent({
 ## 4. Архетипы
 
 **Боец стороны** (герой, рядовой противник, генерал, призванный зверь, иллюзия):  
-`Position`, `Orientation`, `ConfigReference`, `Owner`, `Health`, `ActionPoints`, `CombatStats`, `ObstacleTag`.  
+`Position`, `Orientation`, `ConfigReference`, `Owner`, `Health`, `ActionPoints`, `MovementTurn`, `CombatStats`, `ObstacleTag`.
 По записи конфигурации дополнительно: `FlyingTag`, `HiddenTag`, `TimedLife`.  
 Иллюзия получает `Health.max = 1` согласно записи.
 
 **Укрытие:**  
-`Position`, `ConfigReference`, `Cover`, `ObstacleTag`. Признак глухой стены на эту сущность не устанавливается.
+`Position`, `ConfigReference`, `Cover`; `ObstacleTag` устанавливается только целоклеточному укрытию. Граневое укрытие не занимает клетку: его полная ступень блокирует пересечение указанной грани, неполная увеличивает стоимость. Признак глухой стены на эту сущность не устанавливается.
 
 **Поле боя** как сущность не создаётся.
 
@@ -140,7 +145,7 @@ export const PanicSource = defineComponent({
 | PoisonSystem | `Health`, `Poisoned`, отсутствие `DeadTag` | `Health`, `Poisoned`, `DeadTag` |
 | TimedLifeSystem | `TimedLife`, `Owner` | снятие сущности |
 | OverwatchResetSystem | `OverwatchTag`, `Owner` | снятие `OverwatchTag` |
-| ActionRefillSystem | `ActionPoints`, отсутствие `DeadTag` | `ActionPoints.current` |
+| ActionRefillSystem | `ActionPoints`, `MovementTurn`, отсутствие `DeadTag` | `ActionPoints.current`, `MovementTurn.spent = 0` |
 | PanicSystem | `PanickedTag`, `PanicSource`, `Position` | `Position`, `ActionPoints` |
 | CommandSystem | команда, соответствующие компоненты | по виду команды |
 | ThresholdSystem | `Health`, запись `fleeHp` | удаление сущности |

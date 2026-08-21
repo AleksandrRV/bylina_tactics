@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  DEFAULT_TRAINING_UNITS,
   ENEMY_OWNER,
   PLAYER_OWNER,
   QUICK_MATCH_MAP,
@@ -22,6 +23,19 @@ describe("createQuickMatch", () => {
     expect(easy.entities.filter((entity) => entity.coverType === 0 && !entity.dead).every((entity) => entity.maxAp > 0)).toBe(
       true,
     );
+  });
+
+  it("uses configured player slots and unit tags", () => {
+    const units = Object.values(DEFAULT_TRAINING_UNITS).map((unit) => ({ ...unit, tags: unit.id === "upyr" ? ["flying" as const] : [] }));
+    const match = createQuickMatch({
+      enemyCount: 3,
+      seed: 17,
+      units,
+      playerSlots: ["upyr", "strelets", "znaharka"],
+    });
+    const first = livingOf(match, PLAYER_OWNER).find((entity) => entity.id === 1)!;
+    expect(first.configId).toBe("upyr");
+    expect(first.flying).toBe(true);
   });
 
   it("draws enemy types from the pool and may repeat", () => {
@@ -76,7 +90,7 @@ describe("enemy AI", () => {
     kernel.apply({ type: "END_TURN", playerId: "1" });
     expect(kernel.getSnapshot().activeOwner).toBe(ENEMY_OWNER);
     const command = pickEnemyCommand(kernel);
-    expect(command === null || command.type === "MOVE" || command.type === "ATTACK").toBe(true);
+    expect(command === null || command.type === "MOVE" || command.type === "ATTACK" || command.type === "OVERWATCH").toBe(true);
     const events = runEnemyTurn(kernel);
     expect(events.length).toBeGreaterThan(0);
     expect(kernel.getSnapshot().activeOwner).toBe(PLAYER_OWNER);

@@ -73,27 +73,52 @@
     "weapon": "Оружие",
     "empty": "Нет выбранного",
     "apLeft": "ОД",
-    "defend": "Защита",
-    "defendHint": "Защитная стойка: +25 к увороту, −2 к урону. Завершает ход.",
     "overwatch": "Дозор",
     "overwatchHint": "Встать в дозор: ответный выстрел при движении врага. Завершает ход.",
     "debugMovement": "Очки движения"
   },
   "unit": {
-    "bogatyr": { "name": "Богатырь" },
-    "strelets": { "name": "Стрелец" },
-    "znaharka": { "name": "Знахарка" },
-    "upyr": { "name": "Упырь" },
-    "leshy": { "name": "Леший" },
-    "kikimora": { "name": "Кикимора" }
+    "bogatyr": {
+      "name": "Богатырь"
+    },
+    "strelets": {
+      "name": "Стрелец"
+    },
+    "znaharka": {
+      "name": "Знахарка"
+    },
+    "upyr": {
+      "name": "Упырь"
+    },
+    "leshy": {
+      "name": "Леший"
+    },
+    "kikimora": {
+      "name": "Кикимора"
+    }
   },
   "weapon": {
-    "sword": { "name": "Меч" },
-    "bow": { "name": "Лук" },
-    "sling": { "name": "Праща" },
-    "claws": { "name": "Когти" },
-    "branch": { "name": "Ветвь" },
-    "needle": { "name": "Игла" }
+    "sword": {
+      "name": "Меч"
+    },
+    "bow": {
+      "name": "Лук"
+    },
+    "sling": {
+      "name": "Праща"
+    },
+    "claws": {
+      "name": "Когти"
+    },
+    "branch": {
+      "name": "Ветвь"
+    },
+    "needle": {
+      "name": "Игла"
+    },
+    "mace": {
+      "name": "Палица"
+    }
   },
   "combat": {
     "preview": "Шанс {chance}% · урон {dmg} · укрытие {cover} · высота {height} · {flank}. Повтор — выстрел.",
@@ -124,7 +149,10 @@
     "bdCover": "Укрытие",
     "bdObstacles": "Препятствия",
     "bdRange": "Дальность",
-    "bdTotal": "Итого"
+    "bdTotal": "Итого",
+    "available": "Доступно",
+    "bdObstacleList": "Препятствия на линии",
+    "unavailable": "Недоступно"
   },
   "settings": {
     "title": "Настройки",
@@ -139,5 +167,13 @@
     "ok": "Понятно",
     "close": "Закрыть",
     "notReady": "Недоступно"
+  },
+  "skill": {
+    "circular_sweep": {
+      "name": "Круговой взмах"
+    },
+    "breach": {
+      "name": "Пролом"
+    }
   }
 }

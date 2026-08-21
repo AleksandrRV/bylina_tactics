@@ -42,7 +42,7 @@ export function computeVisibleCells(state: MatchState, owner: number): Set<strin
 
   for (const tile of state.grid.tiles) {
     for (const unit of observers) {
-      if (isCellObservedByUnit(state.grid, unit, tile.x, tile.y, tile.pit ? 0 : tile.z)) {
+      if (isCellObservedByUnit(state.grid, unit, tile.x, tile.y, tile.z)) {
         visible.add(cellKey(tile.x, tile.y));
         break;
       }

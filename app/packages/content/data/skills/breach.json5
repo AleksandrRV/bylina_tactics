@@ -1,0 +1,17 @@
+{
+  id: "breach",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee",
+  resolution: "attack",
+  envDmg: 1,
+  affectsEnvironment: true,
+  filter: "all",
+  effects: [
+    { type: "damage", minDmg: 4, maxDmg: 6, crit: 10, critBonus: 2 },
+    { type: "destroyCover" },
+    { type: "knockback" },
+  ],
+}

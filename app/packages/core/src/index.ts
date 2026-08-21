@@ -29,7 +29,7 @@ export { isCombatant, livingOf, matchOutcome } from "./outcome.js";
 export type { MatchOutcome } from "./outcome.js";
 export { pickEnemyCommand, runEnemyTurn } from "./ai.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
-export { canFinish, canTransit, edgeCost } from "./occupancy.js";
+export { canFinish, canTransit, edgeCost, edgeCoverBetween } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";
 export { effectiveCoverTier, evaluateObstacles, hasLineOfSight, supercover, terrainCoverTier, traceRay } from "./los.js";
 export type { IntersectionType, ObstacleResult, TracedCell } from "./los.js";
@@ -39,6 +39,7 @@ export { previewAttack, resolveAttack } from "./combat.js";
 export type { AttackResolution, HitPreview } from "./combat.js";
 export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
+export type { SkillEffect, SkillPreview, SkillStats } from "./skills.js";
 export { clampChance, createMulberry32 } from "./rng.js";
 export {
   cellVisibility,

@@ -4,7 +4,6 @@ import {
   createQuickMatch,
   createTacticsKernel,
   defaultTrainingWeapons,
-  matchOutcome,
   pickEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
@@ -12,6 +11,7 @@ import {
   type GameEvent,
   type HitPreview,
   type ReachableCell,
+  type SkillStats,
   type WeaponStats,
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
@@ -78,6 +78,12 @@ export function BattleScreen() {
     return base;
   }, [content.weapons]);
 
+  const skills = useMemo(() => {
+    const result: Record<string, SkillStats> = {};
+    for (const record of content.skills) result[record.id] = record as SkillStats;
+    return result;
+  }, [content.skills]);
+
   const kernel = useMemo(() => {
     const count =
       content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
@@ -86,19 +92,19 @@ export function BattleScreen() {
     const initial = createQuickMatch({
       units: content.units,
       map: content.quickMatch.map,
+      playerSlots: content.quickMatch.playerSlots,
       enemyPool: content.quickMatch.enemyPool,
       enemyCount: count,
       seed: matchSeed || 1,
     });
-    return createTacticsKernel({
-      initial,
-      weapons,
-      seed: matchSeed || 1,
-    });
-  }, [content.quickMatch, content.units, difficulty, matchSeed, weapons]);
+    const host = createTacticsKernel({ initial, weapons, skills });
+    session.bindTacticsHost(host);
+    return host;
+  }, [content.quickMatch, content.units, difficulty, matchSeed, session, skills, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
   const [aimId, setAimId] = useState<number | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
@@ -107,20 +113,21 @@ export function BattleScreen() {
 
   useEffect(
     () =>
-      kernel.subscribe(() => {
+      session.subscribeBattle(() => {
         setTick((value) => value + 1);
       }),
     [kernel],
   );
 
-  const snapshot = kernel.getSnapshot();
+  const snapshot = session.getBattleSnapshot(PLAYER_OWNER);
 
-  const visibleCells = useMemo(() => kernel.getVisibleCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
-  const exploredCells = useMemo(() => kernel.getExploredCells(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const visibleCells = useMemo(() => session.getBattleVisible(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const exploredCells = useMemo(() => session.getBattleExplored(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
 
   useEffect(() => {
     const first = snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
+    setAction(first?.weaponId ? { type: "weapon", id: first.weaponId } : null);
     setAimId(null);
     setPreview(null);
   }, [snapshot.turnNumber]);
@@ -130,7 +137,7 @@ export function BattleScreen() {
 
   const reachable = useMemo(() => {
     if (selectedId === null || paused || busy) return [] as ReachableCell[];
-    return kernel.getReachable(selectedId);
+    return session.getBattleReachable(selectedId);
   }, [kernel, selectedId, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
 
   const byReach = useMemo(() => {
@@ -142,14 +149,25 @@ export function BattleScreen() {
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
     const [xs, ys] = preview.split(",");
-    const path = kernel.getPath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
+    const path = session.getBattlePath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
     return path?.path ?? [];
   }, [preview, selectedId, kernel, snapshot.turnNumber]);
 
   const hit: HitPreview | null = useMemo(() => {
-    if (selectedId === null || aimId === null) return null;
-    return kernel.getHitPreview(selectedId, aimId);
-  }, [kernel, selectedId, aimId, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+    if (selectedId === null || aimId === null || !action) return null;
+    if (action.type === "weapon") return session.getBattleHitPreview(selectedId, aimId, action.id);
+    const result = session.getBattleSkillPreview(selectedId, action.id, aimId);
+    return {
+      available: result.available,
+      reason: result.reason,
+      chance: result.chance,
+      dmgMin: result.dmgMin,
+      dmgMax: result.dmgMax,
+      cover: result.cover,
+      heightMod: result.heightMod,
+      flanked: result.flanked,
+    };
+  }, [kernel, selectedId, aimId, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -161,17 +179,17 @@ export function BattleScreen() {
     if (events.some((event) => event.type === "ENTITY_DIED")) setLog(t("combat.died"));
   };
 
-  const concludeIfNeeded = (): boolean => {
-    const outcome = matchOutcome(kernel.getSnapshot());
-    if (outcome === "ongoing") return false;
-    session.finishMatch(outcome);
-    return true;
+  const finishFromEvents = (events: GameEvent[]): void => {
+    const ended = events.find((event) => event.type === "MATCH_ENDED");
+    if (!ended || ended.type !== "MATCH_ENDED") return;
+    session.finishMatch(ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat");
   };
 
   const playThen = (events: GameEvent[], after?: () => void): void => {
     setBusy(true);
     void (rendererRef.current?.play(events) ?? Promise.resolve()).finally(() => {
       setBusy(false);
+      finishFromEvents(events);
       after?.();
     });
   };
@@ -179,7 +197,7 @@ export function BattleScreen() {
   const tryMove = (to: CellPos): void => {
     if (selectedId === null || paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "MOVE", actorId: selectedId, to });
+    const result = session.applyBattleCommand({ type: "MOVE", actorId: selectedId, to });
     if (!result.ok) return;
     setPreview(null);
     setAimId(null);
@@ -187,15 +205,24 @@ export function BattleScreen() {
   };
 
   const tryAttack = (targetId: number): void => {
-    if (selectedId === null || paused || busy) return;
+    if (selectedId === null || !action || paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "ATTACK", actorId: selectedId, targetId });
+    const result = action.type === "weapon"
+      ? session.applyBattleCommand({ type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id })
+      : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, skillId: action.id });
     if (!result.ok) return;
     announce(result.events);
     setAimId(null);
-    playThen(result.events, () => {
-      concludeIfNeeded();
-    });
+    playThen(result.events);
+  };
+
+  const useSelfSkill = (skillId: string): void => {
+    if (selectedId === null || paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
+    const result = session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
+    if (!result.ok) return;
+    announce(result.events);
+    setAimId(null);
+    playThen(result.events);
   };
 
   const runEnemyPhase = async (): Promise<void> => {
@@ -203,21 +230,22 @@ export function BattleScreen() {
     try {
       await sleep(430);
       for (let guard = 0; guard < 96; guard += 1) {
-        const snap = kernel.getSnapshot();
+        const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
-        if (matchOutcome(snap) !== "ongoing") break;
+        if (session.getBattleOutcome() !== "ongoing") break;
         const command = pickEnemyCommand(kernel);
         const applied = command
-          ? kernel.apply(command)
-          : kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+          ? session.applyBattleCommand(command)
+          : session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
         if (!applied.ok) {
-          kernel.apply({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+          session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
           break;
         }
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
+        finishFromEvents(applied.events);
         if (!command) break;
-        if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
+        if (session.getBattleOutcome() !== "ongoing") break;
         await sleep(190);
       }
     } finally {
@@ -228,7 +256,7 @@ export function BattleScreen() {
   const endTurn = (): void => {
     if (paused || busy) return;
     if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = kernel.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
+    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
     if (!result.ok) return;
     setPreview(null);
     setAimId(null);
@@ -237,12 +265,11 @@ export function BattleScreen() {
     void (async () => {
       try {
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
-        if (kernel.getSnapshot().activeOwner === ENEMY_OWNER) {
+        if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
         }
       } finally {
         setBusy(false);
-        concludeIfNeeded();
       }
     })();
   };
@@ -250,10 +277,11 @@ export function BattleScreen() {
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
     const occupant = snapshot.entities.find(
-      (entity) => !entity.dead && entity.x === x && entity.y === y && entity.coverType === 0,
+      (entity) => !entity.dead && entity.x === x && entity.y === y,
     );
     if (occupant && occupant.owner === PLAYER_OWNER && occupant.maxAp > 0) {
       setSelectedId(occupant.id);
+      setAction(occupant.weaponId ? { type: "weapon", id: occupant.weaponId } : null);
       setAimId(null);
       setPreview(null);
       return;
@@ -367,20 +395,22 @@ export function BattleScreen() {
         const next = pool[(index + 1) % pool.length];
         if (next) {
           setSelectedId(next.id);
+          setAction(next.weaponId ? { type: "weapon", id: next.weaponId } : null);
           setAimId(null);
         }
         return;
       }
-      if (event.key === "1" && aimId !== null && hit?.available) {
-        tryAttack(aimId);
-        return;
-      }
-      if (event.key === "2" && selectedId !== null && selected && selected.ap > 0) {
-        kernel.apply({ type: "OVERWATCH", actorId: selectedId });
-        return;
-      }
-      if (event.key === "3" && selectedId !== null && selected) {
-        kernel.apply({ type: "DEFEND", actorId: selectedId });
+      if (/^[1-4]$/.test(event.key) && selected) {
+        const index = Number(event.key) - 1;
+        const weaponIds = selected.weaponIds ?? (selected.weaponId ? [selected.weaponId] : []);
+        const entries = [
+          ...weaponIds.map((id) => ({ type: "weapon" as const, id })),
+          ...(selected.skillIds ?? []).map((id) => ({ type: "skill" as const, id })),
+        ];
+        const chosen = entries[index];
+        if (!chosen) return;
+        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") useSelfSkill(chosen.id);
+        else setAction(chosen);
         return;
       }
       const step = 28;
@@ -403,7 +433,6 @@ export function BattleScreen() {
   }, [paused, busy, snapshot, selectedId, aimId, hit, session]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
-  const weaponName = selected?.weaponId ? t(`weapon.${selected.weaponId}.name`) : "";
   const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
 
   // Показывать портреты врагов только если они в зоне видимости (или уже мертвы и были видны).
@@ -470,6 +499,7 @@ export function BattleScreen() {
                   onClick={() => {
                     if (entity.dead) return;
                     setSelectedId(entity.id);
+                    setAction(entity.weaponId ? { type: "weapon", id: entity.weaponId } : null);
                     setAimId(null);
                   }}
                 >
@@ -499,8 +529,8 @@ export function BattleScreen() {
               <div className="aim-header">
                 <span className={`aim-chance${hit.available ? "" : " blocked"}`}>
                   {hit.available
-                    ? `${hit.chance ?? 0}%`
-                    : t(`combat.blocked.${hit.reason ?? "ILLEGAL"}`)}
+                    ? hit.chance === undefined ? t("combat.available") : `${hit.chance}%`
+                    : t("combat.unavailable")}
                 </span>
                 {hit.available ? (
                   <span className="aim-dmg">
@@ -616,17 +646,43 @@ export function BattleScreen() {
             )}
           </div>
           <div className="skill-row">
-            <button
-              type="button"
-              className="hud-btn skill-slot"
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
-              onClick={() => {
-                if (aimId !== null && hit?.available) tryAttack(aimId);
-              }}
-            >
-              <kbd>1</kbd>
-              {weaponName || t("battle.weapon")}
-            </button>
+            {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => (
+              <button
+                key={`weapon-${weaponId}`}
+                type="button"
+                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                onClick={() => {
+                  setAction({ type: "weapon", id: weaponId });
+                  if (aimId !== null && action?.type === "weapon" && action.id === weaponId && hit?.available) tryAttack(aimId);
+                }}
+              >
+                {index < 4 ? <kbd>{index + 1}</kbd> : null}
+                {t(`weapon.${weaponId}.name`)}
+              </button>
+            ))}
+            {(selected?.skillIds ?? []).map((skillId, index) => {
+              const skill = skills[skillId];
+              const shortcut = (selected?.weaponIds?.length ?? (selected?.weaponId ? 1 : 0)) + index + 1;
+              return (
+                <button
+                  key={`skill-${skillId}`}
+                  type="button"
+                  className={`hud-btn skill-slot${action?.type === "skill" && action.id === skillId ? " is-active" : ""}`}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                  onClick={() => {
+                    if (skill?.category === "self") useSelfSkill(skillId);
+                    else {
+                      setAction({ type: "skill", id: skillId });
+                      setAimId(null);
+                    }
+                  }}
+                >
+                  {shortcut <= 4 ? <kbd>{shortcut}</kbd> : null}
+                  {t(`skill.${skillId}.name`)}
+                </button>
+              );
+            })}
             <button
               type="button"
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
@@ -634,24 +690,10 @@ export function BattleScreen() {
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                kernel.apply({ type: "OVERWATCH", actorId: selectedId });
+                session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
               }}
             >
-              <kbd>2</kbd>
               {t("battle.overwatch")}
-            </button>
-            <button
-              type="button"
-              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
-              disabled={!selected || busy || snapshot.activeOwner !== PLAYER_OWNER}
-              title={t("battle.defendHint")}
-              onClick={() => {
-                if (selectedId === null) return;
-                kernel.apply({ type: "DEFEND", actorId: selectedId });
-              }}
-            >
-              <kbd>3</kbd>
-              {t("battle.defend")}
             </button>
           </div>
           <button

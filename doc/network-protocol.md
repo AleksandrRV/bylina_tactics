@@ -293,6 +293,7 @@ interface SyncPayload {
     turnNumber: number;
     activePlayerId: string;
     rngSeed: string;
+    rngState: string; // текущее ui32-состояние Mulberry32 для продолжения снимка
   };
   grid: {
     width: number;
@@ -332,6 +333,7 @@ interface EntitySnapshot {
     maxAp: number;
   };
   coverType?: 1 | 2;
+  coverEdge?: 0 | 1 | 2 | 3; // только для граневого укрытия
   tags: string[];
 }
 ```

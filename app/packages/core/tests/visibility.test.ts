@@ -28,7 +28,7 @@ function emptyEntity(partial: Partial<EntityState> = {}): EntityState {
     flying: false,
     coverType: 0,
     overwatch: false,
-    defending: false,
+    movementSpent: 0,
     ...partial,
   };
 }
@@ -275,7 +275,7 @@ describe("evaluateCover with edge-based covers", () => {
       x: 3,
       y: 2,
       coverType: 2,
-      edge: 3, // west edge
+      edge: 1, // east edge: boundary between cover and target
     });
     const result = evaluateCover(attacker, target, [cover], makeGrid(10, 10, 1), {
       melee: false,

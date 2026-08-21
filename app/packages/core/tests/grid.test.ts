@@ -35,7 +35,7 @@ function walker(partial: Partial<EntityState> = {}): EntityState {
     flying: false,
     coverType: 0,
     overwatch: false,
-    defending: false,
+    movementSpent: 0,
     ...partial,
   };
 }
@@ -109,6 +109,30 @@ describe("edges and occupancy", () => {
   });
 });
 
+describe("path optimality", () => {
+  it("uses an admissible heuristic and returns the least MP cost", () => {
+    const rows = [
+      "11211110",
+      "2011#111",
+      "1111#21#",
+      "01011210",
+      "21112011",
+      "12210101",
+      "110#1010",
+      "011###11",
+    ];
+    const grid = makeGrid(8, 8, 1);
+    rows.forEach((row, y) => [...row].forEach((value, x) => {
+      const tile = tileAt(grid, x, y)!;
+      if (value === "#") tile.blockLOS = true;
+      else tile.z = Number(value);
+    }));
+    const self = walker({ x: 0, y: 0, z: 1, mobility: 20 });
+    const path = findPath(grid, [self], self, 7, 7);
+    expect(path?.mpCost).toBe(9);
+  });
+});
+
 describe("createTacticsKernel", () => {
   it("reports 0.8.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
@@ -163,6 +187,15 @@ describe("createTacticsKernel", () => {
     const actor = kernel.getSnapshot().entities.find((entity) => entity.id === 1);
     expect(actor?.ap).toBe(2);
     expect(kernel.getSnapshot().activeOwner).toBe(1);
+  });
+
+  it("never exceeds two mobility budgets even with maxAP greater than two", () => {
+    const grid = makeGrid(12, 1, 1);
+    const self = walker({ x: 0, y: 0, mobility: 3, ap: 3, maxAp: 3, vision: 20 });
+    const kernel = createTacticsKernel({ initial: { turnNumber: 1, activeOwner: 1, grid, entities: [self] } });
+    expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 3, y: 0, z: 1 } }).ok).toBe(true);
+    expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 6, y: 0, z: 1 } }).ok).toBe(true);
+    expect(kernel.apply({ type: "MOVE", actorId: 1, to: { x: 7, y: 0, z: 1 } }).ok).toBe(false);
   });
 
   it("uses a dash when the path exceeds one mobility budget", () => {
