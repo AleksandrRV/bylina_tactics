@@ -1,7 +1,7 @@
-import { distH } from "./grid.js";
-import { effectiveCoverTier } from "./los.js";
+import { distH, tileAt } from "./grid.js";
+import { effectiveCoverTier, terrainCoverTier } from "./los.js";
 import { isCover } from "./occupancy.js";
-import type { EntityState } from "./types.js";
+import type { EntityState, Grid } from "./types.js";
 
 export interface CoverEval {
   penalty: number;
@@ -44,12 +44,13 @@ function edgeBlocksRay(cover: EntityState, attackerX: number, attackerY: number)
   return false;
 }
 
-/** Документ математики, §9. Укрытие цели + бонус смежных укрытий. */
+/** Документ математики, §9. Укрытие цели + бонус смежных укрытий + перепад высот. */
 export function evaluateCover(
   attacker: EntityState,
   target: EntityState,
   entities: readonly EntityState[],
   options: { melee: boolean; ignoreHalfCover: boolean; flyingTarget: boolean },
+  grid?: Grid,
 ): CoverEval {
   if (options.flyingTarget) {
     return { penalty: 0, coverType: 0, flanked: false, adjacentDefenseBonus: 0 };
@@ -72,29 +73,44 @@ export function evaluateCover(
     const dy = cover.y - target.y;
     if (!onFireLine(sx, sy, dx, dy)) continue;
     if (!edgeBlocksRay(cover, attacker.x, attacker.y)) continue;
-    // Эффективная ступень с учётом высоты атакующего.
-    // Цель стоит за укрытием → targetZ = target.z для проверки "цель за укрытием".
-    const eTier = effectiveCoverTier(cover.coverType, false, attacker.z, cover.z, target.z);
+    // Эффективная ступень: высота относительно ЗАЩИЩАЕМОГО (target.z).
+    const eTier = effectiveCoverTier(cover.coverType, false, target.z, cover.z);
     if (eTier > best) best = eTier;
+  }
+
+  // Перепад высот местности как укрытие.
+  if (grid) {
+    const terrainTier = terrainCoverTier(
+      grid, attacker.x, attacker.y, target.x, target.y, target.z,
+    );
+    if (terrainTier > best) best = terrainTier;
   }
 
   let penalty = best === 2 ? 50 : best === 1 ? 25 : 0;
   if (options.ignoreHalfCover && penalty === 25) penalty = 0;
   if (options.melee) penalty = 0;
 
-  const flanked = candidates.length > 0 && best === 0;
+  const hasAnyCover = candidates.length > 0 || (grid ? terrainCoverTier(grid, attacker.x, attacker.y, target.x, target.y, target.z) > 0 : false);
+  const flanked = hasAnyCover && best === 0;
 
   // §9.6: бонус смежных укрытий цели (защита от входящих атак).
-  // Также учитываем высоту: укрытие ниже атакующего может быть менее эффективным.
+  // Высота относительно защищаемого (target.z).
   let adjacentDefenseBonus = 0;
   for (const entity of entities) {
     if (!isCover(entity) || entity.dead) continue;
     if (distH(target.x, target.y, entity.x, entity.y) > 1) continue;
     if (Math.abs(target.z - entity.z) > 1) continue;
-    // Эффективная ступень с учётом высоты атакующего.
-    const eTier = effectiveCoverTier(entity.coverType, false, attacker.z, entity.z, target.z);
+    const eTier = effectiveCoverTier(entity.coverType, false, target.z, entity.z);
     if (eTier === 2) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 30);
     else if (eTier === 1) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 15);
+  }
+  // Перепад высот тоже даёт бонус защиты.
+  if (grid) {
+    const terrainTier = terrainCoverTier(
+      grid, attacker.x, attacker.y, target.x, target.y, target.z,
+    );
+    if (terrainTier === 2) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 30);
+    else if (terrainTier === 1) adjacentDefenseBonus = Math.max(adjacentDefenseBonus, 15);
   }
 
   return { penalty, coverType: best, flanked, adjacentDefenseBonus };

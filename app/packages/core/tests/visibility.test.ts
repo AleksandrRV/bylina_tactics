@@ -168,9 +168,8 @@ describe("height-based cover rules", () => {
     expect(effectiveCoverTier(2, false, 2, 0)).toBe(0);
   });
 
-  it("full cover 2 levels below becomes half if target is behind it", () => {
-    
-    expect(effectiveCoverTier(2, false, 2, 0, 0)).toBe(1);
+  it("full cover 2 levels below defender is ignored", () => {
+    expect(effectiveCoverTier(2, false, 2, 0)).toBe(0);
   });
 
   it("half cover at same level stays half", () => {

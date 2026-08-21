@@ -9,15 +9,9 @@ interface Cell {
 export type IntersectionType = "full" | "glancing";
 
 export interface TracedCell extends Cell {
-  /** Тип пересечения луча с клеткой. */
   type: IntersectionType;
 }
 
-/**
- * Клетки, внутренность которых пересекает отрезок центров.
- * При проходе через узел сетки (tmaxX ≈ tmaxY) обе добавляемые одновременно
- * клетки помечаются как касательные (glancing). Документ математики, §7.1.
- */
 export function traceRay(ax: number, ay: number, bx: number, by: number): TracedCell[] {
   const x0 = ax + 0.5;
   const y0 = ay + 0.5;
@@ -34,14 +28,8 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
   const stepY = dy > 0 ? 1 : dy < 0 ? -1 : 0;
   const tdx = stepX === 0 ? Number.POSITIVE_INFINITY : 1 / Math.abs(dx);
   const tdy = stepY === 0 ? Number.POSITIVE_INFINITY : 1 / Math.abs(dy);
-  let tmaxX =
-    stepX === 0
-      ? Number.POSITIVE_INFINITY
-      : (stepX > 0 ? ix + 1 - x0 : x0 - ix) * tdx;
-  let tmaxY =
-    stepY === 0
-      ? Number.POSITIVE_INFINITY
-      : (stepY > 0 ? iy + 1 - y0 : y0 - iy) * tdy;
+  let tmaxX = stepX === 0 ? Number.POSITIVE_INFINITY : (stepX > 0 ? ix + 1 - x0 : x0 - ix) * tdx;
+  let tmaxY = stepY === 0 ? Number.POSITIVE_INFINITY : (stepY > 0 ? iy + 1 - y0 : y0 - iy) * tdy;
 
   const seen = new Set<string>();
   const push = (x: number, y: number, type: IntersectionType): void => {
@@ -56,36 +44,27 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
   while ((ix !== ixe || iy !== iye) && guard < 512) {
     guard += 1;
     if (tmaxX < tmaxY - 1e-12) {
-      ix += stepX;
-      tmaxX += tdx;
+      ix += stepX; tmaxX += tdx;
       push(ix, iy, "full");
     } else if (tmaxY < tmaxX - 1e-12) {
-      iy += stepY;
-      tmaxY += tdy;
+      iy += stepY; tmaxY += tdy;
       push(ix, iy, "full");
     } else {
       push(ix + stepX, iy, "glancing");
       push(ix, iy + stepY, "glancing");
-      ix += stepX;
-      iy += stepY;
-      tmaxX += tdx;
-      tmaxY += tdy;
+      ix += stepX; iy += stepY;
+      tmaxX += tdx; tmaxY += tdy;
       push(ix, iy, "full");
     }
   }
   return cells;
 }
 
-/** Совместимость: возвращает только координаты (без типа). */
 export function supercover(ax: number, ay: number, bx: number, by: number): Cell[] {
   return traceRay(ax, ay, bx, by);
 }
 
-function rayZ(
-  x0: number, y0: number, z0: number,
-  x1: number, y1: number, z1: number,
-  cx: number, cy: number,
-): number {
+function rayZ(x0: number, y0: number, z0: number, x1: number, y1: number, z1: number, cx: number, cy: number): number {
   const dx = x1 - x0;
   const dy = y1 - y0;
   const len2 = dx * dx + dy * dy;
@@ -101,47 +80,81 @@ function isAnyCover(entity: EntityState): boolean {
   return entity.coverType > 0;
 }
 
+function sgnDir(value: number): number {
+  if (value > 0) return 1;
+  if (value < 0) return -1;
+  return 0;
+}
+
 /**
- * Эффективная ступень укрытия с учётом разницы высот между атакующим и укрытием.
+ * Эффективная ступень укрытия с учётом высоты относительно защищаемого.
  *
- * Правила:
- * - Полуукрытие на 1 ниже атакующего → игнорируется (0).
- * - Полное укрытие на 1 ниже → считается полуукрытием (1).
- * - Стена (blockLOS) всегда остаётся стеной (2).
- * - Полное укрытие на 2 ниже → игнорируется (0),
- *   но если цель стоит за ним — считается полуукрытием (1).
- * - Стена на 2 ниже → остаётся стеной (2).
- *
- * Возвращает эффективную ступень: 0 = нет, 1 = полу, 2 = полное.
+ * diff = defenderZ − coverZ (положительное = укрытие ниже защищаемого).
+ * - diff ≤ 0: обычная эффективность.
+ * - diff = 1: полу → 0, полное → 1, стена → 2.
+ * - diff ≥ 2: полу → 0, полное → 0, стена → 2.
  */
 export function effectiveCoverTier(
   coverType: 0 | 1 | 2,
   isWall: boolean,
-  attackerZ: number,
+  defenderZ: number,
   coverZ: number,
-  targetZ?: number,
 ): 0 | 1 | 2 {
   if (coverType === 0 && !isWall) return 0;
-  const diff = attackerZ - coverZ; // положительное = укрытие ниже
-
-  // Стена (blockLOS) всегда полное укрытие.
   if (isWall) return 2;
 
+  const diff = defenderZ - coverZ;
+  if (diff <= 0) return coverType;
   if (diff === 1) {
-    // Укрытие на 1 ниже атакующего.
-    if (coverType === 1) return 0; // полу → игнор
-    if (coverType === 2) return 1; // полное → полу
+    if (coverType === 1) return 0;
+    if (coverType === 2) return 1;
   }
-  if (diff >= 2) {
-    // Укрытие на 2+ ниже.
-    if (coverType === 2) {
-      // Полное на 2 ниже: игнор, но если цель за ним — полу.
-      if (targetZ !== undefined && targetZ <= coverZ) return 1;
-      return 0;
-    }
-    if (coverType === 1) return 0; // полу на 2+ ниже → игнор
+  return 0;
+}
+
+/**
+ * Перепад высот местности как укрытие для защитника.
+ * Возвышение рядом с защитником на направлении от атакующего:
+ * - tile.z = defenderZ + 1 → полуукрытие (1).
+ * - tile.z = defenderZ + 2 → полное укрытие (2).
+ */
+export function terrainCoverTier(
+  grid: Grid,
+  attackerX: number,
+  attackerY: number,
+  defenderX: number,
+  defenderY: number,
+  defenderZ: number,
+): 0 | 1 | 2 {
+  const sdx = sgnDir(attackerX - defenderX);
+  const sdy = sgnDir(attackerY - defenderY);
+
+  let best: 0 | 1 | 2 = 0;
+
+  const candidates: [number, number][] = [];
+  if (sdx !== 0 && sdy !== 0) {
+    candidates.push([defenderX + sdx, defenderY]);
+    candidates.push([defenderX, defenderY + sdy]);
+    candidates.push([defenderX + sdx, defenderY + sdy]);
+  } else if (sdx !== 0) {
+    candidates.push([defenderX + sdx, defenderY]);
+    candidates.push([defenderX + sdx, defenderY + 1]);
+    candidates.push([defenderX + sdx, defenderY - 1]);
+  } else if (sdy !== 0) {
+    candidates.push([defenderX, defenderY + sdy]);
+    candidates.push([defenderX + 1, defenderY + sdy]);
+    candidates.push([defenderX - 1, defenderY + sdy]);
   }
-  return coverType;
+
+  for (const [cx, cy] of candidates) {
+    const tile = tileAt(grid, cx, cy);
+    if (!tile || tile.pit) continue;
+    const heightDiff = tile.z - defenderZ;
+    if (heightDiff >= 2) { best = 2; break; }
+    if (heightDiff === 1 && best < 1) best = 1;
+  }
+
+  return best;
 }
 
 export interface ObstacleResult {
@@ -150,9 +163,6 @@ export interface ObstacleResult {
   breakCell: { x: number; y: number; z: number } | null;
 }
 
-/**
- * Оценка всех промежуточных препятствий на луче от атакующего к цели (§7, §9.3–9.5).
- */
 export function evaluateObstacles(
   grid: Grid,
   entities: readonly EntityState[],
@@ -176,46 +186,31 @@ export function evaluateObstacles(
     if ((cell.x === ax && cell.y === ay) || (cell.x === bx && cell.y === by)) continue;
 
     const tile = tileAt(grid, cell.x, cell.y);
-    if (!tile) {
-      blocked = true;
-      breakCell = { x: cell.x, y: cell.y, z: 0 };
-      break;
-    }
+    if (!tile) { blocked = true; breakCell = { x: cell.x, y: cell.y, z: 0 }; break; }
 
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
     if (rz < tile.z) {
       const heightDiff = tile.z - rz;
       if (heightDiff > 1.01) {
-        blocked = true;
-        breakCell = { x: cell.x, y: cell.y, z: tile.z };
-        break;
+        blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break;
       } else {
-        if (cell.type === "full") {
-          maxPenalty = Math.max(maxPenalty, 50);
-        } else {
-          maxPenalty = Math.max(maxPenalty, 25);
-        }
+        maxPenalty = Math.max(maxPenalty, cell.type === "full" ? 50 : 25);
       }
     }
 
-    // Стена (blockLOS) — всегда полное укрытие, высота не влияет.
     if (tile.blockLOS) {
-      if (cell.type === "full") {
-        blocked = true;
-        breakCell = { x: cell.x, y: cell.y, z: tile.z };
-        break;
-      }
+      if (cell.type === "full") { blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break; }
       glancingWalls.push({ x: cell.x, y: cell.y });
     }
 
-    // Сущности-укрытия с учётом высоты.
     for (const entity of entities) {
       if (!isAnyCover(entity) || entity.dead) continue;
       if (entity.x !== cell.x || entity.y !== cell.y) continue;
       const tileZ = tile.pit ? 0 : tile.z;
       if (Math.abs(entity.z - tileZ) > 1) continue;
-      const eTier = effectiveCoverTier(entity.coverType, false, az, entity.z, bz);
-      if (eTier === 0) continue; // игнорируется из-за высоты
+      // Высота относительно защищаемого (цели bz).
+      const eTier = effectiveCoverTier(entity.coverType, false, bz, entity.z);
+      if (eTier === 0) continue;
       intermediateCovers.push({ entity, type: cell.type, effectiveTier: eTier });
     }
   }
@@ -227,9 +222,7 @@ export function evaluateObstacles(
           const a = glancingWalls[i]!;
           const b = glancingWalls[j]!;
           if (Math.max(Math.abs(a.x - b.x), Math.abs(a.y - b.y)) <= 1) {
-            blocked = true;
-            breakCell = { x: a.x, y: a.y, z: 0 };
-            break;
+            blocked = true; breakCell = { x: a.x, y: a.y, z: 0 }; break;
           }
         }
       }
@@ -256,8 +249,8 @@ function computeObstaclePenalty(
     const adjacent = distToAttacker <= 1;
 
     if (type === "full") {
-      if (effectiveTier === 2) return 100; // полное при полном = блокировка
-      penalty = Math.max(penalty, 50); // эффективное полу при полном = -50
+      if (effectiveTier === 2) return 100;
+      penalty = Math.max(penalty, 50);
     } else {
       if (adjacent) continue;
       let merged = false;
@@ -266,16 +259,12 @@ function computeObstaclePenalty(
         for (const id of group.ids) {
           const other = covers.find((c) => c.entity.id === id);
           if (other && Math.max(Math.abs(entity.x - other.entity.x), Math.abs(entity.y - other.entity.y)) <= 1) {
-            group.ids.add(entity.id);
-            merged = true;
-            break;
+            group.ids.add(entity.id); merged = true; break;
           }
         }
         if (merged) break;
       }
-      if (!merged) {
-        groups.push({ tier: effectiveTier, ids: new Set([entity.id]) });
-      }
+      if (!merged) groups.push({ tier: effectiveTier, ids: new Set([entity.id]) });
     }
   }
 
@@ -284,15 +273,13 @@ function computeObstaclePenalty(
       if (group.tier === 2) return 100;
       penalty = Math.max(penalty, 50);
     } else {
-      const singlePenalty = group.tier === 2 ? 50 : 25;
-      penalty = Math.max(penalty, singlePenalty);
+      penalty = Math.max(penalty, group.tier === 2 ? 50 : 25);
     }
   }
 
   return penalty;
 }
 
-/** Документ математики, §7. */
 export function hasLineOfSight(
   grid: Grid,
   ax: number, ay: number, az: number,

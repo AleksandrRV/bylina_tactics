@@ -89,7 +89,7 @@ export function previewAttack(
     melee,
     ignoreHalfCover: Boolean(weapon.ignoreHalfCover),
     flyingTarget: target.flying,
-  });
+  }, grid);
 
   let rangePenalty = 0;
   if (weapon.closeRangePenalty && distH(attacker.x, attacker.y, target.x, target.y) < weapon.closeRangePenalty.distHLessThan) {
@@ -140,7 +140,7 @@ export function resolveAttack(
     melee: weapon.category === "melee",
     ignoreHalfCover: Boolean(weapon.ignoreHalfCover),
     flyingTarget: target.flying,
-  });
+  }, grid);
   const critChance = clampChance(weapon.crit + (cover.flanked ? 40 : 0));
   const hitRoll = rng.nextInt(1, 100);
   if (hitRoll > preview.chance) {

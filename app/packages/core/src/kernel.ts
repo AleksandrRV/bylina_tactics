@@ -318,6 +318,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if (!actor) return { ok: false, reason: "NOT_FOUND" };
         if (actor.dead) return { ok: false, reason: "ILLEGAL" };
         if (actor.owner !== state.activeOwner) return { ok: false, reason: "NOT_YOUR_TURN" };
+        if (actor.ap <= 0) return { ok: false, reason: "NO_AP" };
         actor.defending = true;
         const prevAp = actor.ap;
         actor.ap = 0;
