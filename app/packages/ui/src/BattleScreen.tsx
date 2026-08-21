@@ -590,17 +590,8 @@ export function BattleScreen() {
                   {hit.breakdown.targetDefense > 0 ? (
                     <tr><td>{t("combat.bdDefense")}</td><td className="num neg">−{hit.breakdown.targetDefense}</td></tr>
                   ) : null}
-                  {hit.breakdown.defendBonus > 0 ? (
-                    <tr><td>{t("combat.bdDefend")}</td><td className="num neg">−{hit.breakdown.defendBonus}</td></tr>
-                  ) : null}
-                  {hit.breakdown.adjacentDefenseBonus > 0 ? (
-                    <tr><td>{t("combat.bdAdjDefense")}</td><td className="num neg">−{hit.breakdown.adjacentDefenseBonus}</td></tr>
-                  ) : null}
                   {hit.breakdown.coverPenalty > 0 ? (
                     <tr><td>{t("combat.bdCover")}</td><td className="num neg">−{hit.breakdown.coverPenalty}</td></tr>
-                  ) : null}
-                  {hit.breakdown.obstaclePenalty > 0 ? (
-                    <tr><td>{t("combat.bdObstacles")}</td><td className="num neg">−{hit.breakdown.obstaclePenalty}</td></tr>
                   ) : null}
                   {hit.breakdown.rangePenalty > 0 ? (
                     <tr><td>{t("combat.bdRange")}</td><td className="num neg">−{hit.breakdown.rangePenalty}</td></tr>
@@ -608,11 +599,11 @@ export function BattleScreen() {
                   <tr className="breakdown-total"><td>{t("combat.bdTotal")}</td><td className="num">{hit.breakdown.finalChance}%</td></tr>
                 </tbody>
               </table>
-              {hit.breakdown.obstacles.length > 0 ? (
+              {hit.breakdown.coverDetails.length > 0 ? (
                 <div className="breakdown-obstacles">
                   <p className="breakdown-sub">{t("combat.bdObstacleList")}</p>
-                  {hit.breakdown.obstacles.map((obs, i) => (
-                    <p key={i} className="breakdown-obs">{obs.label}</p>
+                  {hit.breakdown.coverDetails.map((d: any, i: number) => (
+                    <p key={i} className="breakdown-obs">{d.label}</p>
                   ))}
                 </div>
               ) : null}

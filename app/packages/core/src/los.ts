@@ -86,76 +86,6 @@ function sgnDir(value: number): number {
   return 0;
 }
 
-/**
- * Эффективная ступень укрытия с учётом высоты относительно защищаемого.
- *
- * diff = defenderZ − coverZ (положительное = укрытие ниже защищаемого).
- * - diff ≤ 0: обычная эффективность.
- * - diff = 1: полу → 0, полное → 1, стена → 2.
- * - diff ≥ 2: полу → 0, полное → 0, стена → 2.
- */
-export function effectiveCoverTier(
-  coverType: 0 | 1 | 2,
-  isWall: boolean,
-  defenderZ: number,
-  coverZ: number,
-): 0 | 1 | 2 {
-  if (coverType === 0 && !isWall) return 0;
-  if (isWall) return 2;
-
-  const diff = defenderZ - coverZ;
-  if (diff <= 0) return coverType;
-  if (diff === 1) {
-    if (coverType === 1) return 0;
-    if (coverType === 2) return 1;
-  }
-  return 0;
-}
-
-/**
- * Перепад высот местности как укрытие для защитника.
- * Возвышение рядом с защитником на направлении от атакующего:
- * - tile.z = defenderZ + 1 → полуукрытие (1).
- * - tile.z = defenderZ + 2 → полное укрытие (2).
- */
-export function terrainCoverTier(
-  grid: Grid,
-  attackerX: number,
-  attackerY: number,
-  defenderX: number,
-  defenderY: number,
-  defenderZ: number,
-): 0 | 1 | 2 {
-  const sdx = sgnDir(attackerX - defenderX);
-  const sdy = sgnDir(attackerY - defenderY);
-
-  let best: 0 | 1 | 2 = 0;
-
-  const candidates: [number, number][] = [];
-  if (sdx !== 0 && sdy !== 0) {
-    candidates.push([defenderX + sdx, defenderY]);
-    candidates.push([defenderX, defenderY + sdy]);
-    candidates.push([defenderX + sdx, defenderY + sdy]);
-  } else if (sdx !== 0) {
-    candidates.push([defenderX + sdx, defenderY]);
-    candidates.push([defenderX + sdx, defenderY + 1]);
-    candidates.push([defenderX + sdx, defenderY - 1]);
-  } else if (sdy !== 0) {
-    candidates.push([defenderX, defenderY + sdy]);
-    candidates.push([defenderX + 1, defenderY + sdy]);
-    candidates.push([defenderX - 1, defenderY + sdy]);
-  }
-
-  for (const [cx, cy] of candidates) {
-    const tile = tileAt(grid, cx, cy);
-    if (!tile || tile.pit) continue;
-    const heightDiff = tile.z - defenderZ;
-    if (heightDiff >= 2) { best = 2; break; }
-    if (heightDiff === 1 && best < 1) best = 1;
-  }
-
-  return best;
-}
 
 export interface ObstacleResult {
   blocked: boolean;
@@ -208,8 +138,8 @@ export function evaluateObstacles(
       if (entity.x !== cell.x || entity.y !== cell.y) continue;
       const tileZ = tile.pit ? 0 : tile.z;
       if (Math.abs(entity.z - tileZ) > 1) continue;
-      // Высота относительно защищаемого (цели bz).
-      const eTier = effectiveCoverTier(entity.coverType, false, bz, entity.z);
+      // Высота относительно защищаемого (цели bz) и атакующего (az).
+      const eTier = effectiveCoverTier(entity.coverType, false, az, bz, entity.z);
       if (eTier === 0) continue;
       intermediateCovers.push({ entity, type: cell.type, effectiveTier: eTier });
     }

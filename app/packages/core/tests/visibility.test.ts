@@ -147,39 +147,42 @@ describe("height elevation as half-cover", () => {
 });
 
 describe("height-based cover rules", () => {
-  it("half-cover 1 level below attacker is ignored", () => {
-    
-    expect(effectiveCoverTier(1, false, 2, 1)).toBe(0);
+  // effectiveCoverTier(coverType, isWall, attackerZ, defenderZ, coverZ)
+  it("half-cover 1 level below defender is ignored", () => {
+    expect(effectiveCoverTier(1, false, 1, 2, 1)).toBe(0);
   });
 
-  it("full cover 1 level below attacker becomes half", () => {
-    
-    expect(effectiveCoverTier(2, false, 2, 1)).toBe(1);
+  it("full cover 1 level below defender becomes half", () => {
+    expect(effectiveCoverTier(2, false, 1, 2, 1)).toBe(1);
   });
 
   it("wall (blockLOS) is always full regardless of height", () => {
-    
-    expect(effectiveCoverTier(2, true, 2, 1)).toBe(2);
-    expect(effectiveCoverTier(2, true, 2, 0)).toBe(2);
-  });
-
-  it("full cover 2 levels below is ignored (no target behind)", () => {
-    
-    expect(effectiveCoverTier(2, false, 2, 0)).toBe(0);
+    expect(effectiveCoverTier(2, true, 1, 2, 1)).toBe(2);
+    expect(effectiveCoverTier(2, true, 1, 2, 0)).toBe(2);
   });
 
   it("full cover 2 levels below defender is ignored", () => {
-    expect(effectiveCoverTier(2, false, 2, 0)).toBe(0);
+    expect(effectiveCoverTier(2, false, 1, 2, 0)).toBe(0);
   });
 
   it("half cover at same level stays half", () => {
-    
-    expect(effectiveCoverTier(1, false, 1, 1)).toBe(1);
+    expect(effectiveCoverTier(1, false, 1, 1, 1)).toBe(1);
   });
 
   it("full cover at same level stays full", () => {
-    
-    expect(effectiveCoverTier(2, false, 1, 1)).toBe(2);
+    expect(effectiveCoverTier(2, false, 1, 1, 1)).toBe(2);
+  });
+
+  it("attacker 1 above cover: full becomes half", () => {
+    expect(effectiveCoverTier(2, false, 2, 1, 1)).toBe(1);
+  });
+
+  it("attacker 2 above cover: full is ignored", () => {
+    expect(effectiveCoverTier(2, false, 3, 1, 1)).toBe(0);
+  });
+
+  it("attacker 1 above cover: half is ignored", () => {
+    expect(effectiveCoverTier(1, false, 2, 1, 1)).toBe(0);
   });
 });
 
@@ -253,7 +256,7 @@ describe("evaluateCover with edge-based covers", () => {
       coverType: 2,
       edge: 1, // east edge
     });
-    const result = evaluateCover(attacker, target, [cover], {
+    const result = evaluateCover(attacker, target, [cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
@@ -274,7 +277,7 @@ describe("evaluateCover with edge-based covers", () => {
       coverType: 2,
       edge: 3, // west edge
     });
-    const result = evaluateCover(attacker, target, [cover], {
+    const result = evaluateCover(attacker, target, [cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
@@ -292,12 +295,12 @@ describe("evaluateCover with edge-based covers", () => {
       y: 2,
       coverType: 1,
     });
-    const result = evaluateCover(attacker, target, [cover], {
+    const result = evaluateCover(attacker, target, [cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
     });
-    expect(result.adjacentDefenseBonus).toBe(15);
+    expect(result.penalty).toBe(25);
   });
 
   it("adjacent defense bonus for full cover near target", () => {
@@ -310,11 +313,11 @@ describe("evaluateCover with edge-based covers", () => {
       y: 2,
       coverType: 2,
     });
-    const result = evaluateCover(attacker, target, [cover], {
+    const result = evaluateCover(attacker, target, [cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
     });
-    expect(result.adjacentDefenseBonus).toBe(30);
+    expect(result.penalty).toBe(50);
   });
 });

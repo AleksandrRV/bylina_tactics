@@ -3,7 +3,7 @@ import { distH } from "./grid.js";
 import { hasLineOfSight } from "./los.js";
 import { heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 import { clampChance, type Rng } from "./rng.js";
-import type { EntityState, Grid } from "./types.js";
+import type { CellPos, EntityState, Grid } from "./types.js";
 import type { WeaponStats } from "./weapons.js";
 
 export interface HitBreakdown {
@@ -27,6 +27,7 @@ export interface HitPreview {
   heightMod?: -1 | 0 | 1;
   flanked?: boolean;
   actionType?: "MELEE" | "RANGED";
+  breakCell?: CellPos | null;
   breakdown?: HitBreakdown;
 }
 
@@ -59,11 +60,27 @@ export function previewAttack(
   const inReach = melee
     ? inMeleeReach(attacker.x, attacker.y, attacker.z, target.x, target.y, target.z)
     : inRangedReach(attacker.x, attacker.y, attacker.z, target.x, target.y, target.z, weapon.range);
-  if (!inReach) return { available: false, reason: "OUT_OF_RANGE", heightMod };
+
+  let breakCell: CellPos | null = null;
+  if (!inReach) {
+    // Compute breakCell for aim line visualization (ranged only).
+    if (!melee) {
+      const range = weapon.range + heightRangeMod(attacker.z, target.z);
+      const dx = target.x - attacker.x;
+      const dy = target.y - attacker.y;
+      const d = Math.max(1, Math.hypot(dx, dy));
+      breakCell = {
+        x: Math.round(attacker.x + (dx / d) * Math.max(1, range)),
+        y: Math.round(attacker.y + (dy / d) * Math.max(1, range)),
+        z: attacker.z,
+      };
+    }
+    return { available: false, reason: "OUT_OF_RANGE", heightMod, breakCell };
+  }
 
   const los = hasLineOfSight(grid, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
   if (weapon.requiresLOS && !los) {
-    return { available: false, reason: "NO_LOS", heightMod };
+    return { available: false, reason: "NO_LOS", heightMod, breakCell };
   }
 
   const cover = evaluateCover(attacker, target, entities, grid, {
@@ -81,10 +98,11 @@ export function previewAttack(
   const baseAim = attacker.aim;
   const weaponMod = weapon.aimMod;
   const targetDefense = target.defense;
+  const defendBonus = target.defending ? 25 : 0;
   const coverPenalty = cover.penalty;
 
   const chance = clampChance(
-    baseAim + weaponMod + heightAim - targetDefense - coverPenalty - rangePenalty,
+    baseAim + weaponMod + heightAim - targetDefense - defendBonus - coverPenalty - rangePenalty,
   );
 
   const breakdown: HitBreakdown = {
@@ -107,6 +125,7 @@ export function previewAttack(
     heightMod,
     flanked: cover.flanked,
     actionType: melee ? "MELEE" : "RANGED",
+    breakCell,
     breakdown,
   };
 }

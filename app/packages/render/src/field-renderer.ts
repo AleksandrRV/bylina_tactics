@@ -580,7 +580,7 @@ export function createFieldRenderer(): FieldRenderer {
           if (cover.edge !== oppositeEdge) continue;
         }
         // Эффективная ступень с учётом высоты защитника.
-        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, cover.z);
+        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, entity.z, cover.z);
         if (eTier > bestTier) bestTier = eTier;
       }
 
@@ -589,14 +589,14 @@ export function createFieldRenderer(): FieldRenderer {
         if (!cover || cover.dead || cover.coverType === 0 || cover.edge === undefined) continue;
         if (cover.x !== entity.x || cover.y !== entity.y) continue;
         if (cover.edge !== edge) continue;
-        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, cover.z);
+        const eTier = effectiveCoverTier(cover.coverType, false, entity.z, entity.z, cover.z);
         if (eTier > bestTier) bestTier = eTier;
       }
 
       // Проверить стены (blockLOS) в соседней клетке.
       const neighborTile = tileAt(v.snapshot.grid, nx, ny);
       if (neighborTile && neighborTile.blockLOS) {
-        const eTier = effectiveCoverTier(0, true, entity.z, neighborTile.z);
+        const eTier = effectiveCoverTier(0, true, entity.z, entity.z, neighborTile.z);
         if (eTier > bestTier) bestTier = eTier;
       }
 
