@@ -9,9 +9,9 @@ import type {
   SkillPreview,
   TacticsKernel,
 } from "@bylina/core";
-import type { CampaignApi, MissionOutcome } from "@bylina/campaign";
+import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
 
-export const APP_VERSION = "0.10.0";
+export const APP_VERSION = "0.11.0";
 
 export type AppScreen =
   | "boot"
@@ -21,7 +21,8 @@ export type AppScreen =
   | "difficulty"
   | "result"
   | "campaign"
-  | "missionResult";
+  | "missionResult"
+  | "deployment";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
@@ -40,6 +41,10 @@ export const MODE_OPENS_IN: Record<GameMode, string> = {
 export interface CampaignFinishInfo {
   darknessGained: number;
   campaignLost: boolean;
+  fallen: string[];
+  wounded: string[];
+  leveledUp: string[];
+  newRecruit: string | null;
 }
 
 export interface SessionState {
@@ -50,6 +55,8 @@ export interface SessionState {
   difficulty: DifficultyId | null;
   /** Идентификатор активной миссии кампании. */
   activeMissionId: string | null;
+  /** Состав высадки: идентификаторы бойцов дружины. */
+  deployment: number[];
   matchSeed: number;
   outcome: MatchOutcome | null;
 }
@@ -68,10 +75,12 @@ export interface SessionApi {
   bindCampaign(campaign: CampaignApi): void;
   /** Открыть карту корабля (ветка «Новая былина»). */
   openCampaign(): void;
-  /** Начать доступную миссию и перейти в сражение. */
+  /** Начать доступную миссию и открыть формирование высадки. */
   startCampaignMission(missionId: string): boolean;
-  /** Завершить активную миссию исходом: применить прирост Тьмы, открыть следующую точку. */
-  finishCampaignMission(outcome: MissionOutcome): CampaignFinishInfo | null;
+  /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
+  confirmDeployment(fighterIds: number[]): boolean;
+  /** Завершить активную миссию исходом и исходом участников высадки. */
+  finishCampaignMission(outcome: MissionOutcome, participants: MissionParticipant[]): CampaignFinishInfo | null;
   /** Покинуть начатую миссию без последствий и вернуться на карту. */
   leaveCampaignMission(): void;
   /** Вернуться на карту корабля с экрана итога миссии. */
@@ -99,6 +108,7 @@ const idle: Omit<SessionState, "screen"> = {
   battleKind: null,
   difficulty: null,
   activeMissionId: null,
+  deployment: [],
   matchSeed: 0,
   outcome: null,
 };
@@ -174,17 +184,28 @@ export function createSession(initial: AppScreen = "boot"): SessionApi {
       if (!ok) return false;
       emit({
         ...idle,
-        screen: "battle",
+        screen: "deployment",
         battleKind: "campaign",
         activeMissionId: missionId,
         matchSeed: Date.now() >>> 0,
       });
       return true;
     },
-    finishCampaignMission: (outcome) => {
+    confirmDeployment: (fighterIds) => {
+      if (state.screen !== "deployment" || state.activeMissionId === null) return false;
+      const fighters = requireCampaign().getState().fighters;
+      const alive = fighterIds.every((fighterId) => {
+        const fighter = fighters.find((candidate) => candidate.id === fighterId);
+        return Boolean(fighter?.alive);
+      });
+      if (!alive || fighterIds.length < 1 || fighterIds.length > 5) return false;
+      emit({ ...state, screen: "battle", deployment: [...fighterIds] });
+      return true;
+    },
+    finishCampaignMission: (outcome, participants) => {
       const active = state.activeMissionId;
       if (state.battleKind !== "campaign" || active === null) return null;
-      const result = requireCampaign().finishMission(active, outcome);
+      const result = requireCampaign().finishMission(active, outcome, participants);
       if (!result) return null;
       emit({ ...state, screen: "missionResult", paused: false, outcome });
       return result;

@@ -27,6 +27,9 @@ const CAMPAIGN_CONFIG: CampaignConfig = {
   woundHpRatio: 0.3,
   darknessMax: 20,
   needleMissionId: "needle",
+  recruitUnitId: "recruit",
+  initialRoster: ["bogatyr", "strelets", "znaharka"],
+  woundPenalty: { aim: -15, defense: -10, mobility: -1 },
   missions: [
     {
       id: "clearing_1",
@@ -47,13 +50,24 @@ const CAMPAIGN_CONFIG: CampaignConfig = {
   ],
 };
 
+const UNIT_STATS = {
+  bogatyr: { maxHealth: 12 },
+  strelets: { maxHealth: 8 },
+  znaharka: { maxHealth: 7 },
+  recruit: { maxHealth: 6 },
+};
+
+function campaign(config: CampaignConfig = CAMPAIGN_CONFIG) {
+  return createCampaign(config, { unitStats: UNIT_STATS });
+}
+
 describe("createSession", () => {
   it("starts on the boot screen", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.10.0", () => {
-    expect(APP_VERSION).toBe("0.10.0");
+  it("reports version 0.11.0", () => {
+    expect(APP_VERSION).toBe("0.11.0");
   });
 
   it("moves between menu and settings", () => {
@@ -101,33 +115,36 @@ describe("createSession", () => {
 
   it("opens the campaign map from the menu", () => {
     const session = createSession("menu");
-    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+    session.bindCampaign(campaign());
     session.openCampaign();
     expect(session.get().screen).toBe("campaign");
   });
 
-  it("starts a campaign mission into battle and finishes it with darkness growth", () => {
+  it("starts a mission into deployment and confirms a squad", () => {
     const session = createSession("menu");
-    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+    session.bindCampaign(campaign());
     session.openCampaign();
     expect(session.startCampaignMission("clearing_1")).toBe(true);
-    expect(session.get().screen).toBe("battle");
+    expect(session.get().screen).toBe("deployment");
     expect(session.get().battleKind).toBe("campaign");
     expect(session.get().activeMissionId).toBe("clearing_1");
-    const result = session.finishCampaignMission("victory");
-    expect(result).toEqual({ darknessGained: 2, campaignLost: false });
-    expect(session.get().screen).toBe("missionResult");
-    expect(session.get().outcome).toBe("victory");
-    const campaign = session.getCampaign();
-    expect(campaign.getState().darkness).toBe(2);
-    expect(campaign.getState().missions[1]?.status).toBe("open");
-    session.backToCampaign();
-    expect(session.get().screen).toBe("campaign");
+
+    const fighters = session.getCampaign().getState().fighters;
+    const ids = fighters.map((fighter) => fighter.id);
+    expect(session.confirmDeployment(ids)).toBe(true);
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().deployment).toEqual(ids);
+
+    // Нельзя подтвердить высадку с погибшим или пустую.
+    session.leaveCampaignMission();
+    session.startCampaignMission("clearing_1");
+    expect(session.confirmDeployment([])).toBe(false);
+    expect(session.confirmDeployment([999])).toBe(false);
   });
 
   it("rejects starting a locked mission", () => {
     const session = createSession("menu");
-    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+    session.bindCampaign(campaign());
     session.openCampaign();
     expect(session.startCampaignMission("clearing_2")).toBe(false);
     expect(session.get().screen).toBe("campaign");
@@ -135,7 +152,7 @@ describe("createSession", () => {
 
   it("abandoning a mission returns to the map without consequences", () => {
     const session = createSession("menu");
-    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+    session.bindCampaign(campaign());
     session.openCampaign();
     session.startCampaignMission("clearing_1");
     session.leaveCampaignMission();
@@ -144,24 +161,14 @@ describe("createSession", () => {
     expect(session.getCampaign().getState().missions[0]?.status).toBe("open");
   });
 
-  it("loses the campaign when darkness reaches the maximum", () => {
+  it("finishes a mission with participants and grows darkness", () => {
     const session = createSession("menu");
-    session.bindCampaign(createCampaign({ ...CAMPAIGN_CONFIG, darknessMax: 4 }));
+    session.bindCampaign(campaign());
     session.openCampaign();
     session.startCampaignMission("clearing_1");
-    expect(session.finishCampaignMission("defeat")).toEqual({ darknessGained: 4, campaignLost: true });
-    expect(session.getCampaign().getState().phase).toBe("lost");
-    expect(session.startCampaignMission("clearing_2")).toBe(false);
-  });
+    const fighters = session.getCampaign().getState().fighters;
+    session.confirmDeployment(fighters.map((fighter) => fighter.id));
 
-  it("plays a purge mission end to end and returns to the map with the next point open", () => {
-    const session = createSession("menu");
-    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
-    session.openCampaign();
-    expect(session.startCampaignMission("clearing_1")).toBe(true);
-
-    // Сражение: фиксированный отладочный бой с летальным луком — один
-    // выстрел уничтожает противника, ядро фиксирует победу.
     const host = createTacticsKernel({
       weapons: {
         [DEBUG_BOW.id]: { ...DEBUG_BOW, minDmg: 20, maxDmg: 20, aimMod: 100, crit: 0, critBonus: 0 },
@@ -176,11 +183,28 @@ describe("createSession", () => {
     expect(attack.ok && attack.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
     expect(session.getBattleOutcome()).toBe("victory");
 
-    // Итог миссии: Тьма возросла, следующая точка открыта.
-    expect(session.finishCampaignMission("victory")).toEqual({ darknessGained: 2, campaignLost: false });
+    const result = session.finishCampaignMission(
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
+    expect(result).toMatchObject({ darknessGained: 2, campaignLost: false });
     expect(session.get().screen).toBe("missionResult");
     expect(session.getCampaign().getState().missions.map((point) => point.status)).toEqual(["done", "open"]);
     session.backToCampaign();
     expect(session.get().screen).toBe("campaign");
+  });
+
+  it("loses the campaign when darkness reaches the maximum", () => {
+    const session = createSession("menu");
+    session.bindCampaign(campaign({ ...CAMPAIGN_CONFIG, darknessMax: 4 }));
+    session.openCampaign();
+    session.startCampaignMission("clearing_1");
+    const fighters = session.getCampaign().getState().fighters;
+    session.confirmDeployment(fighters.map((fighter) => fighter.id));
+    expect(
+      session.finishCampaignMission("defeat", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 5 }))),
+    ).toMatchObject({ darknessGained: 4, campaignLost: true });
+    expect(session.getCampaign().getState().phase).toBe("lost");
+    expect(session.startCampaignMission("clearing_2")).toBe(false);
   });
 });

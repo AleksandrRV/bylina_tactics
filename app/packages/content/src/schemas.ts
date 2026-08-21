@@ -156,6 +156,12 @@ export const missionConfigSchema = z.object({
   }
 });
 
+export const woundPenaltySchema = z.object({
+  aim: z.number().int(),
+  defense: z.number().int(),
+  mobility: z.number().int(),
+}).strict();
+
 export const campaignConfigSchema = z.object({
   rosterCap: z.number().int().min(5),
   deployMin: z.number().int().min(1).max(5),
@@ -164,6 +170,12 @@ export const campaignConfigSchema = z.object({
   woundHpRatio: z.number().gt(0).max(1),
   darknessMax: z.number().int().min(1),
   needleMissionId: id,
+  /** Запись юнита-рекрута без класса. */
+  recruitUnitId: id,
+  /** Стартовый состав дружины (записи классов). */
+  initialRoster: z.array(id).min(1),
+  /** Штрафы ранения, действующие до лечения в Горнице. */
+  woundPenalty: woundPenaltySchema,
   missions: z.array(missionConfigSchema).min(1),
 }).strict().refine((value) => value.deployMin <= value.deployMax, {
   path: ["deployMax"],
@@ -209,3 +221,4 @@ export type MissionConfig = z.infer<typeof missionConfigSchema>;
 export type MapGenConfig = z.infer<typeof mapGenConfigSchema>;
 export type QuickMatchConfig = z.infer<typeof quickMatchConfigSchema>;
 export type PvpConfig = z.infer<typeof pvpConfigSchema>;
+export type WoundPenaltyConfig = z.infer<typeof woundPenaltySchema>;

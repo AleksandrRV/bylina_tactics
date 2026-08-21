@@ -276,13 +276,45 @@
     },
     "ship": "Flying Ship",
     "kingdom": "The Thrice-Ninth Kingdom",
-    "tabNoteSoon": "since {version}"
+    "tabNoteSoon": "since {version}",
+    "tabMap": "Map",
+    "lostRosterBody": "The druzhina has fallen: no fighter survived. The campaign is over."
   },
   "missionResult": {
-    "title": "Mission result",
-    "darknessGained": "Darkness grew by {value}",
-    "toMap": "To the map",
-    "victoryHint": "The druzhina prevailed — the Darkness receded.",
-    "defeatHint": "The druzhina retreated — the Darkness grows."
+    "rosterOutcomes": "Druzhina outcomes",
+    "fallen": "Fallen in battle",
+    "wounded": "Wounded",
+    "leveledUp": "Gained a level",
+    "newRecruit": "New recruit"
+  },
+  "deployment": {
+    "title": "Deployment",
+    "hint": "Choose from {min} to {max} fighters",
+    "listLabel": "Druzhina fighters",
+    "count": "{current} of {max} chosen",
+    "confirm": "To battle",
+    "back": "Back to the map",
+    "wounded": "Wounded",
+    "woundedHint": "Wound: aim {aim}, defense {defense}, mobility {mobility}"
+  },
+  "roster": {
+    "count": "Druzhina {current} of {max}",
+    "recruit": "Recruit",
+    "fallen": "Fallen",
+    "fallenHp": "—",
+    "level": "Level {level}",
+    "train": "Train",
+    "trainTitle": "Choose a class: {name}",
+    "trainHint": "The recruit is ready to learn. Choose a druzhina class.",
+    "wounded": "Wounded",
+    "woundedHint": "Wound: aim {aim}, defense {defense}, mobility {mobility}",
+    "ready": "Ready for deployment"
+  },
+  "chamber": {
+    "count": "Wounded: {current}",
+    "empty": "Everyone is healthy",
+    "emptyBody": "The chamber is quiet: no wounded.",
+    "heal": "Heal",
+    "healAll": "Heal all"
   }
 }

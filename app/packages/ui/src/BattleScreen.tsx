@@ -60,7 +60,7 @@ export function BattleScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
-  const { paused, difficulty, battleKind, activeMissionId, matchSeed } = useSessionState();
+  const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -90,15 +90,25 @@ export function BattleScreen() {
 
   const kernel = useMemo(() => {
     // Миссия кампании: карта и состав противников из записи точки; высадка —
-    // фиксированный отряд тех же трёх ролей, что в быстром матче.
+    // выбранные бойцы дружины с учётом ранений и сохранённого здоровья.
     let initial: MatchState;
     if (battleKind === "campaign" && activeMissionId) {
       const mission = session.getCampaign().getMission(activeMissionId);
       if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
+      const penalty = content.campaign.woundPenalty;
+      const fighters = session.getCampaign().getState().fighters;
+      const playerSlots = deployment.map((fighterId) => {
+        const fighter = fighters.find((candidate) => candidate.id === fighterId);
+        if (!fighter || !fighter.alive) throw new Error(`Unknown fighter in deployment: ${fighterId}`);
+        const mods = fighter.wounded
+          ? { aimMod: penalty.aim, defenseMod: penalty.defense, mobilityMod: penalty.mobility }
+          : {};
+        return { unitId: fighter.unitId, hp: fighter.hp, ...mods };
+      });
       initial = createMissionMatch({
         units: content.units,
         map: mission.map,
-        playerSlots: content.quickMatch.playerSlots,
+        playerSlots,
         enemies: mission.enemies,
         seed: matchSeed || 1,
       });
@@ -119,7 +129,7 @@ export function BattleScreen() {
     const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
     session.bindTacticsHost(host);
     return host;
-  }, [content.quickMatch, content.units, difficulty, battleKind, activeMissionId, matchSeed, session, skills, weapons]);
+  }, [content.quickMatch, content.units, content.campaign, difficulty, battleKind, activeMissionId, deployment, matchSeed, session, skills, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -209,7 +219,20 @@ export function BattleScreen() {
     if (!ended || ended.type !== "MATCH_ENDED") return;
     const outcome = ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
     if (battleKind === "campaign") {
-      session.finishCampaignMission(outcome);
+      // Исходы бойцов высадки: сопоставление по порядку сущностей игрока.
+      const final = session.getBattleSnapshot(PLAYER_OWNER);
+      const squad = final.entities
+        .filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0 && !entity.decoy)
+        .sort((a, b) => a.id - b.id);
+      const participants = deployment.map((fighterId, index) => {
+        const entity = squad[index];
+        return {
+          fighterId,
+          survived: Boolean(entity && !entity.dead),
+          hp: entity?.hp ?? 0,
+        };
+      });
+      session.finishCampaignMission(outcome, participants);
       return;
     }
     session.finishMatch(outcome);

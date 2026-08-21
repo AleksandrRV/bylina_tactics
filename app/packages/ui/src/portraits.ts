@@ -4,6 +4,8 @@ const PORTRAIT_FILES: Record<string, string> = {
   bogatyr: "bogatyr.jpg",
   strelets: "strelets.jpg",
   znaharka: "znaharka.jpg",
+  volkhv: "volkhv.jpg",
+  recruit: "recruit.jpg",
   upyr: "upyr.jpg",
   leshy: "leshy.jpg",
   kikimora: "kikimora.jpg",

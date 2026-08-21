@@ -1,5 +1,5 @@
 {
-  // Кампания выпуска 0.10.0: Летучий Корабль и зачистки.
+  // Кампания выпуска 0.11.0: Летучий Корабль, дружина и зачистки.
   // Точки открываются по порядку; финальная миссия «Игла» появится на этапе 5.
   rosterCap: 8,
   deployMin: 1,
@@ -8,6 +8,9 @@
   woundHpRatio: 0.3,
   darknessMax: 20,
   needleMissionId: "needle",
+  recruitUnitId: "recruit",
+  initialRoster: ["bogatyr", "strelets", "znaharka"],
+  woundPenalty: { aim: -15, defense: -10, mobility: -1 },
   missions: [
     {
       id: "clearing_1",

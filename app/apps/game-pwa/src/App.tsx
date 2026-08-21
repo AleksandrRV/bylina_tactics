@@ -52,10 +52,12 @@ export function App() {
     });
   }, [i18n, settings]);
 
-  const campaign = useMemo(
-    () => (content.ok ? createCampaign(content.data.campaign) : null),
-    [content],
-  );
+  const campaign = useMemo(() => {
+    if (!content.ok) return null;
+    const unitStats: Record<string, { maxHealth: number }> = {};
+    for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
+    return createCampaign(content.data.campaign, { unitStats });
+  }, [content]);
 
   useEffect(() => {
     if (campaign) session.bindCampaign(campaign);
