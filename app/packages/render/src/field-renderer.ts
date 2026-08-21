@@ -1000,6 +1000,16 @@ export function createFieldRenderer(): FieldRenderer {
       );
     }
 
+    // Защитная стойка: щит-индикатор.
+    if (entity.defending) {
+      const sx = cx + 16;
+      const sy = cy - 18;
+      g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
+      g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
+      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
+      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
+    }
+
     // Дозор: глаз-индикатор.
     if (entity.overwatch) {
       const ox = cx - 16;

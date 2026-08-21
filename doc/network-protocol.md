@@ -60,7 +60,7 @@ interface RejectPayload {
 ## 3. Команды
 
 ```typescript
-type CommandType = "MOVE" | "ATTACK" | "OVERWATCH" | "USE_SKILL" | "END_TURN";
+type CommandType = "MOVE" | "ATTACK" | "OVERWATCH" | "DEFEND" | "USE_SKILL" | "END_TURN";
 
 interface BaseCommand {
   type: CommandType;
@@ -88,6 +88,10 @@ interface CommandUseSkill extends BaseCommand {
 
 interface CommandOverwatch extends BaseCommand {
   type: "OVERWATCH";
+}
+
+interface CommandDefend extends BaseCommand {
+  type: "DEFEND";
 }
 
 interface CommandEndTurn {
@@ -227,7 +231,7 @@ interface EventStatChanged {
 interface EventStatusChanged {
   type: "STATUS_CHANGED";
   entityId: number;
-  status: "POISON" | "PANIC" | "OVERWATCH" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+  status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
   applied: boolean;
 }
 

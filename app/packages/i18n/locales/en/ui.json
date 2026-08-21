@@ -74,8 +74,10 @@
     "empty": "None selected",
     "apLeft": "AP",
     "overwatch": "Overwatch",
-    "overwatchHint": "Enter overwatch: reaction shot when enemy moves. Ends turn.",
-    "debugMovement": "Movement cost"
+    "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
+    "debugMovement": "Movement cost",
+    "defend": "Defensive stance",
+    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation."
   },
   "unit": {
     "bogatyr": {

@@ -16,6 +16,7 @@ import {
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { interactiveEntityAt } from "./cell-interaction.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -276,39 +277,41 @@ export function BattleScreen() {
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
-    const occupant = snapshot.entities.find(
-      (entity) => !entity.dead && entity.x === x && entity.y === y,
-    );
-    if (occupant && occupant.owner === PLAYER_OWNER && occupant.maxAp > 0) {
-      setSelectedId(occupant.id);
-      setAction(occupant.weaponId ? { type: "weapon", id: occupant.weaponId } : null);
+    const reach = byReach.get(cellKey(x, y));
+    const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach));
+    if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0) {
+      setSelectedId(entity.id);
+      setAction(entity.weaponId ? { type: "weapon", id: entity.weaponId } : null);
       setAimId(null);
       setPreview(null);
       return;
     }
-    if (occupant && selectedId !== null && occupant.owner !== PLAYER_OWNER) {
-      if (aimId === occupant.id && hit?.available) {
-        tryAttack(occupant.id);
+    if (entity && selectedId !== null) {
+      if (aimId === entity.id && hit?.available) {
+        tryAttack(entity.id);
         return;
       }
-      setAimId(occupant.id);
+      setAimId(entity.id);
       setPreview(null);
       return;
     }
-    const reach = byReach.get(cellKey(x, y));
-    if (!reach) {
-      setPreview(null);
-      setAimId(null);
+
+    // Проходимая клетка всегда означает перемещение. Граневое укрытие в ней
+    // не перехватывает выбор как цель атаки.
+    if (reach) {
+      const id = cellKey(x, y);
+      const coarse = window.matchMedia("(pointer: coarse)").matches;
+      if (coarse && preview !== id) {
+        setPreview(id);
+        setAimId(null);
+        return;
+      }
+      tryMove({ x, y, z: reach.z });
       return;
     }
-    const id = cellKey(x, y);
-    const coarse = window.matchMedia("(pointer: coarse)").matches;
-    if (coarse && preview !== id) {
-      setPreview(id);
-      setAimId(null);
-      return;
-    }
-    tryMove({ x, y, z: reach.z });
+
+    setPreview(null);
+    setAimId(null);
   };
 
   const onHover = (x: number, y: number): void => {
@@ -398,6 +401,18 @@ export function BattleScreen() {
           setAction(next.weaponId ? { type: "weapon", id: next.weaponId } : null);
           setAimId(null);
         }
+        return;
+      }
+      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0) {
+        session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+        setAimId(null);
+        setPreview(null);
+        return;
+      }
+      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0) {
+        session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+        setAimId(null);
+        setPreview(null);
         return;
       }
       if (/^[1-4]$/.test(event.key) && selected) {
@@ -550,6 +565,7 @@ export function BattleScreen() {
                         b.weaponMod !== 0 ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}` : null,
                         b.heightAim !== 0 ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}` : null,
                         b.targetDefense > 0 ? `${t("combat.bdDefense")}: −${b.targetDefense}` : null,
+                        b.stanceDefense > 0 ? `${t("combat.bdDefend")}: −${b.stanceDefense}` : null,
                         b.coverPenalty > 0 ? `${t("combat.bdCover")}: −${b.coverPenalty}` : null,
                         b.rangePenalty > 0 ? `${t("combat.bdRange")}: −${b.rangePenalty}` : null,
                         b.coverDetails.length > 0 ? "" : null,
@@ -584,6 +600,11 @@ export function BattleScreen() {
                   {hit.breakdown.targetDefense > 0 ? (
                     <span className="bd-item neg">
                       {t("combat.bdDefense")}: −{hit.breakdown.targetDefense}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.stanceDefense > 0 ? (
+                    <span className="bd-item neg">
+                      {t("combat.bdDefend")}: −{hit.breakdown.stanceDefense}
                     </span>
                   ) : null}
                   {hit.breakdown.coverPenalty > 0 ? (
@@ -685,14 +706,32 @@ export function BattleScreen() {
             })}
             <button
               type="button"
+              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              title={t("battle.defendHint")}
+              onClick={() => {
+                if (selectedId === null) return;
+                session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+                setAimId(null);
+                setPreview(null);
+              }}
+            >
+              <kbd>9</kbd>
+              {t("battle.defend")}
+            </button>
+            <button
+              type="button"
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
                 session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+                setAimId(null);
+                setPreview(null);
               }}
             >
+              <kbd>0</kbd>
               {t("battle.overwatch")}
             </button>
           </div>

@@ -56,6 +56,8 @@ export interface EntityState {
   edge?: 0 | 1 | 2 | 3;
   /** Признак дозора (§14). */
   overwatch: boolean;
+  /** Защитная стойка: +25 к уклонению и −2 к урону атак. */
+  defending?: boolean;
   /** Суммарная стоимость добровольного перемещения в текущем ходу стороны. */
   movementSpent?: number;
 }
@@ -80,6 +82,7 @@ export type Command =
   | { type: "MOVE"; actorId: number; to: CellPos; path?: CellPos[] }
   | { type: "ATTACK"; actorId: number; targetId: number; weaponId: string }
   | { type: "OVERWATCH"; actorId: number }
+  | { type: "DEFEND"; actorId: number }
   | { type: "USE_SKILL"; actorId: number; skillId: string; targetId?: number; targetPos?: CellPos }
   | { type: "END_TURN"; playerId: string };
 
@@ -108,7 +111,7 @@ export type GameEvent =
   | {
       type: "STATUS_CHANGED";
       entityId: number;
-      status: "POISON" | "PANIC" | "OVERWATCH" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
+      status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED";
       applied: boolean;
     }
   | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE" }

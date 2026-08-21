@@ -66,6 +66,7 @@ function probe(x: number, y: number, z: number): EntityState {
     flying: false,
     coverType: 0,
     overwatch: false,
+    defending: false,
     movementSpent: 0,
   };
 }
@@ -216,6 +217,7 @@ export function generateBattlefield(
         coverType,
         edge,
         overwatch: false,
+        defending: false,
         movementSpent: 0,
       });
     }

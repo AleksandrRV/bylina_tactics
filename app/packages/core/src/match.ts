@@ -45,6 +45,7 @@ function spawn(id: number, config: SpawnUnitConfig, owner: number, x: number, y:
     decoy: config.decoy ?? false,
     coverType: 0,
     overwatch: false,
+    defending: false,
     movementSpent: 0,
   };
 }

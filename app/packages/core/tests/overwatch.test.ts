@@ -69,6 +69,23 @@ describe("overwatch (§14)", () => {
     expect(after.ap).toBe(after.maxAp);
   });
 
+  it("sets defensive stance for the enemy turn and clears it on the next owner turn", () => {
+    const { state, watcher } = scenario();
+    watcher.ap = 1;
+    const kernel = createTacticsKernel({ initial: state, weapons: { [DEBUG_BOW.id]: DEBUG_BOW } });
+    const defended = kernel.apply({ type: "DEFEND", actorId: watcher.id });
+    expect(defended.ok).toBe(true);
+    if (!defended.ok) return;
+    expect(defended.events).toContainEqual({ type: "STAT_CHANGED", entityId: watcher.id, stat: "AP", newValue: 0, delta: -1 });
+    expect(defended.events).toContainEqual({ type: "STATUS_CHANGED", entityId: watcher.id, status: "DEFENDING", applied: true });
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === watcher.id)?.defending).toBe(true);
+    kernel.apply({ type: "END_TURN", playerId: "2" });
+    const after = kernel.getSnapshot().entities.find((entity) => entity.id === watcher.id)!;
+    expect(after.defending).toBe(false);
+    expect(after.ap).toBe(after.maxAp);
+  });
+
   it("rejects an END_TURN command from the wrong side", () => {
     const { state } = scenario();
     const kernel = createTacticsKernel({ initial: state, weapons: { [DEBUG_BOW.id]: DEBUG_BOW } });

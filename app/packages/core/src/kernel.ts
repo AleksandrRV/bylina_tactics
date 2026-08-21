@@ -215,6 +215,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     entity.obstacle = false;
     entity.ap = 0;
     entity.overwatch = false;
+    entity.defending = false;
     entity.hidden = false;
     entity.flying = false;
     events.push({ type: "ENTITY_DIED", entityId: entity.id, causeOfDeath });
@@ -494,6 +495,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             entity.overwatch = false;
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "OVERWATCH", applied: false });
           }
+          if (entity.defending) {
+            entity.defending = false;
+            events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "DEFENDING", applied: false });
+          }
           entity.movementSpent = 0;
         }
         for (const entity of state.entities) {
@@ -523,6 +528,19 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const events: GameEvent[] = [
           { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -previous },
           { type: "STATUS_CHANGED", entityId: actor.id, status: "OVERWATCH", applied: true },
+        ];
+        emit();
+        return { ok: true, events };
+      }
+
+      if (command.type === "DEFEND") {
+        if (actor.ap <= 0) return { ok: false, reason: "NO_AP" };
+        const previous = actor.ap;
+        actor.ap = 0;
+        actor.defending = true;
+        const events: GameEvent[] = [
+          { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -previous },
+          { type: "STATUS_CHANGED", entityId: actor.id, status: "DEFENDING", applied: true },
         ];
         emit();
         return { ok: true, events };

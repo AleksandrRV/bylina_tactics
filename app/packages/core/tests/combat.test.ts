@@ -9,6 +9,7 @@ import {
   inRangedReach,
   makeGrid,
   previewAttack,
+  resolveAttack,
   tileAt,
   type EntityState,
 } from "../src/index.js";
@@ -142,6 +143,37 @@ describe("cover and flank", () => {
       flyingTarget: false,
     });
     expect(melee.penalty).toBe(0);
+  });
+});
+
+describe("defensive stance", () => {
+  it("reduces hit chance by 25 and previewed damage by 2", () => {
+    const grid = makeGrid(5, 1, 1);
+    const attacker = unit({ x: 0, y: 0, aim: 100 });
+    const target = unit({ id: 2, owner: 2, x: 4, y: 0 });
+    const normal = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    target.defending = true;
+    const defended = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
+    expect(defended.chance).toBe((normal.chance ?? 0) - 25);
+    expect(defended.dmgMin).toBe(Math.max(0, DEBUG_BOW.minDmg - 2));
+    expect(defended.dmgMax).toBe(Math.max(0, DEBUG_BOW.maxDmg - 2));
+    expect(defended.breakdown?.stanceDefense).toBe(25);
+  });
+
+  it("reduces resolved attack damage by exactly 2, down to zero", () => {
+    const grid = makeGrid(2, 1, 1);
+    const attacker = unit({ x: 0, y: 0, aim: 100 });
+    const normalTarget = unit({ id: 2, owner: 2, x: 1, y: 0 });
+    const defendedTarget = unit({ ...normalTarget, defending: true });
+    const rolls = () => {
+      const values = [1, 100, 3];
+      return { nextInt: () => values.shift() ?? 1, getState: () => 0 };
+    };
+    const weapon = { ...DEBUG_BOW, minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0 };
+    const normal = resolveAttack(grid, [attacker, normalTarget], attacker, normalTarget, weapon, rolls());
+    const defended = resolveAttack(grid, [attacker, defendedTarget], attacker, defendedTarget, weapon, rolls());
+    expect(normal?.damage).toBe(3);
+    expect(defended?.damage).toBe(1);
   });
 });
 

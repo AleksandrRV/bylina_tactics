@@ -99,6 +99,7 @@ export const ObstacleTag = defineComponent();
 ```typescript
 export const DeadTag = defineComponent();
 export const OverwatchTag = defineComponent();
+export const DefendingTag = defineComponent();
 export const FlyingTag = defineComponent();
 export const HiddenTag = defineComponent();
 export const PanickedTag = defineComponent();
@@ -124,7 +125,7 @@ export const PanicSource = defineComponent({
 
 **Боец стороны** (герой, рядовой противник, генерал, призванный зверь, иллюзия):  
 `Position`, `Orientation`, `ConfigReference`, `Owner`, `Health`, `ActionPoints`, `MovementTurn`, `CombatStats`, `ObstacleTag`.
-По записи конфигурации дополнительно: `FlyingTag`, `HiddenTag`, `TimedLife`.  
+По записи конфигурации дополнительно: `FlyingTag`, `HiddenTag`, `TimedLife`. Команды и системы во время боя временно добавляют `OverwatchTag` и `DefendingTag`.
 Иллюзия получает `Health.max = 1` согласно записи.
 
 **Укрытие:**  
@@ -145,6 +146,7 @@ export const PanicSource = defineComponent({
 | PoisonSystem | `Health`, `Poisoned`, отсутствие `DeadTag` | `Health`, `Poisoned`, `DeadTag` |
 | TimedLifeSystem | `TimedLife`, `Owner` | снятие сущности |
 | OverwatchResetSystem | `OverwatchTag`, `Owner` | снятие `OverwatchTag` |
+| DefendingResetSystem | `DefendingTag`, `Owner` | снятие `DefendingTag` |
 | ActionRefillSystem | `ActionPoints`, `MovementTurn`, отсутствие `DeadTag` | `ActionPoints.current`, `MovementTurn.spent = 0` |
 | PanicSystem | `PanickedTag`, `PanicSource`, `Position` | `Position`, `ActionPoints` |
 | CommandSystem | команда, соответствующие компоненты | по виду команды |

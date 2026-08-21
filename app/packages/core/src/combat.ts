@@ -11,6 +11,7 @@ export interface HitBreakdown {
   weaponMod: number;
   heightAim: number;
   targetDefense: number;
+  stanceDefense: number;
   coverPenalty: number;
   rangePenalty: number;
   finalChance: number;
@@ -102,11 +103,12 @@ export function previewAttack(
   const baseAim = attacker.aim;
   const weaponMod = weapon.aimMod;
   const targetDefense = target.defense;
+  const stanceDefense = target.defending ? 25 : 0;
   const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
   const coverPenalty = Math.max(cover.penalty, obstacles.obstaclePenalty);
 
   const chance = clampChance(
-    baseAim + weaponMod + heightAim - targetDefense - coverPenalty - rangePenalty,
+    baseAim + weaponMod + heightAim - targetDefense - stanceDefense - coverPenalty - rangePenalty,
   );
 
   const breakdown: HitBreakdown = {
@@ -114,6 +116,7 @@ export function previewAttack(
     weaponMod,
     heightAim,
     targetDefense,
+    stanceDefense,
     coverPenalty,
     rangePenalty,
     finalChance: chance,
@@ -123,8 +126,8 @@ export function previewAttack(
   return {
     available: true,
     chance,
-    dmgMin: weapon.minDmg,
-    dmgMax: weapon.maxDmg,
+    dmgMin: Math.max(0, weapon.minDmg - (target.defending ? 2 : 0)),
+    dmgMax: Math.max(0, weapon.maxDmg - (target.defending ? 2 : 0)),
     cover: cover.coverType,
     heightMod,
     flanked: cover.flanked,
@@ -168,7 +171,8 @@ export function resolveAttack(
   const critRoll = rng.nextInt(1, 100);
   const crit = critRoll <= critChance;
   const base = rng.nextInt(weapon.minDmg, weapon.maxDmg);
-  const damage = base + (crit ? weapon.critBonus : 0);
+  const rawDamage = base + (crit ? weapon.critBonus : 0);
+  const damage = Math.max(0, rawDamage - (target.defending ? 2 : 0));
   return {
     result: crit ? "CRIT" : "HIT",
     damage,
