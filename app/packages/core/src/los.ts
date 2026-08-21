@@ -318,3 +318,64 @@ export function hasLineOfSight(
 
   return true;
 }
+
+/**
+ * Эффективная ступень укрытия с учётом высоты атакующего и защищающегося.
+ *
+ * Правила:
+ * 1. Стена (blockLOS) всегда полное укрытие (2).
+ * 2. Со стороны защищающегося: если укрытие ниже защищающегося на 1 → полу; на 2+ → игнор.
+ * 3. Со стороны атакующего: если атакующий выше укрытия на 1 → полное→полу, полу→игнор; на 2+ → игнор.
+ * 4. Итог: минимум из двух перспектив.
+ */
+export function effectiveCoverTier(
+  coverType: 0 | 1 | 2,
+  isWall: boolean,
+  attackerZ: number,
+  defenderZ: number,
+  coverZ: number,
+): 0 | 1 | 2 {
+  if (coverType === 0 && !isWall) return 0;
+  if (isWall) return 2;
+
+  // Перспектива защищающегося: укрытие ниже защищающегося менее эффективно.
+  let defenderTier = coverType;
+  const defDiff = defenderZ - coverZ;
+  if (defDiff >= 2) defenderTier = 0;
+  else if (defDiff === 1) defenderTier = coverType === 2 ? 1 : 0;
+
+  // Перспектива атакующего: атакующий выше укрытия видит поверх него.
+  let attackerTier = coverType;
+  const atkDiff = attackerZ - coverZ;
+  if (atkDiff >= 2) attackerTier = 0;
+  else if (atkDiff === 1) attackerTier = coverType === 2 ? 1 : 0;
+
+  return Math.min(defenderTier, attackerTier) as 0 | 1 | 2;
+}
+
+/**
+ * Перепад высот как укрытие. Возвышение между атакующим и защищающимся:
+ * - Высота +1 над атакующим → полуукрытие (1).
+ * - Высота +2 над атакующим → полное укрытие (2).
+ * Учитывается только если возвышение на линии огня.
+ */
+export function terrainCoverTier(
+  grid: Grid,
+  attackerX: number,
+  attackerY: number,
+  attackerZ: number,
+  defenderX: number,
+  defenderY: number,
+): 0 | 1 | 2 {
+  const cells = supercover(attackerX, attackerY, defenderX, defenderY);
+  let best: 0 | 1 | 2 = 0;
+  for (const cell of cells) {
+    if ((cell.x === attackerX && cell.y === attackerY) || (cell.x === defenderX && cell.y === defenderY)) continue;
+    const tile = tileAt(grid, cell.x, cell.y);
+    if (!tile || tile.pit || tile.blockLOS) continue;
+    const diff = tile.z - attackerZ;
+    if (diff >= 2 && best < 2) best = 2;
+    else if (diff === 1 && best < 1) best = 1;
+  }
+  return best;
+}

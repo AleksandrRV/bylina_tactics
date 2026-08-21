@@ -495,22 +495,85 @@ export function BattleScreen() {
             </p>
           ) : null}
           {hit ? (
-            <p className="aim-card">
-              {hit.available
-                ? t("combat.preview", {
-                    chance: hit.chance ?? 0,
-                    dmg: `${hit.dmgMin}-${hit.dmgMax}`,
-                    cover:
-                      hit.cover === 2
-                        ? t("combat.fullCover")
-                        : hit.cover === 1
-                          ? t("combat.halfCover")
-                          : t("combat.noCover"),
-                    height: hit.heightMod === 1 ? "+1" : hit.heightMod === -1 ? "−1" : "0",
-                    flank: hit.flanked ? t("combat.flanked") : t("combat.notFlanked"),
-                  })
-                : t(`combat.blocked.${hit.reason ?? "ILLEGAL"}`)}
-            </p>
+            <div className="aim-card">
+              <div className="aim-header">
+                <span className="aim-chance">
+                  {hit.available
+                    ? `${hit.chance ?? 0}%`
+                    : t(`combat.blocked.${hit.reason ?? "ILLEGAL"}`)}
+                </span>
+                {hit.available ? (
+                  <span className="aim-dmg">
+                    {t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}
+                  </span>
+                ) : null}
+                <button
+                  type="button"
+                  className="aim-copy-btn"
+                  title={t("combat.copyBreakdown")}
+                  onClick={() => {
+                    if (!hit.breakdown) return;
+                    const b = hit.breakdown;
+                    const lines = [
+                      `${t("combat.bdBaseAim")}: +${b.baseAim}`,
+                      b.weaponMod !== 0 ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}` : null,
+                      b.heightAim !== 0 ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}` : null,
+                      b.targetDefense > 0 ? `${t("combat.bdDefense")}: −${b.targetDefense}` : null,
+                      b.coverPenalty > 0 ? `${t("combat.bdCover")}: −${b.coverPenalty}` : null,
+                      b.rangePenalty > 0 ? `${t("combat.bdRange")}: −${b.rangePenalty}` : null,
+                      "",
+                      `${t("combat.bdTotal")}: ${b.finalChance}%`,
+                      "",
+                      ...b.coverDetails.map((d) => d.label),
+                    ].filter(Boolean);
+                    navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
+                  }}
+                >
+                  📋
+                </button>
+              </div>
+              {hit.breakdown ? (
+                <div className="breakdown-detail">
+                  <span className={`bd-item${hit.breakdown.baseAim > 0 ? " pos" : ""}`}>
+                    {t("combat.bdBaseAim")}: +{hit.breakdown.baseAim}
+                  </span>
+                  {hit.breakdown.weaponMod !== 0 ? (
+                    <span className={`bd-item${hit.breakdown.weaponMod > 0 ? " pos" : " neg"}`}>
+                      {t("combat.bdWeaponMod")}: {hit.breakdown.weaponMod > 0 ? "+" : ""}{hit.breakdown.weaponMod}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.heightAim !== 0 ? (
+                    <span className={`bd-item${hit.breakdown.heightAim > 0 ? " pos" : " neg"}`}>
+                      {t("combat.bdHeight")}: {hit.breakdown.heightAim > 0 ? "+" : ""}{hit.breakdown.heightAim}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.targetDefense > 0 ? (
+                    <span className="bd-item neg">
+                      {t("combat.bdDefense")}: −{hit.breakdown.targetDefense}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.coverPenalty > 0 ? (
+                    <span className="bd-item neg">
+                      {t("combat.bdCover")}: −{hit.breakdown.coverPenalty}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.rangePenalty > 0 ? (
+                    <span className="bd-item neg">
+                      {t("combat.bdRange")}: −{hit.breakdown.rangePenalty}
+                    </span>
+                  ) : null}
+                  {hit.breakdown.coverDetails.length > 0 ? (
+                    <div className="bd-details">
+                      {hit.breakdown.coverDetails.map((d, i) => (
+                        <span key={i} className="bd-obs">
+                          {d.label}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
           ) : null}
           {hit?.breakdown ? (
             <div className="breakdown-panel">

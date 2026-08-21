@@ -844,7 +844,9 @@ export function createFieldRenderer(): FieldRenderer {
     }
 
     g.position.set(PAD + tile.x * CELL_SIZE, fy);
-    g.zIndex = tile.y * 100 + z * 10;
+    // Pits are holes in the ground — draw them below non-pit tiles at same Y.
+    const zIdx = tile.pit ? tile.y * 100 - 5 : tile.y * 100 + z * 10;
+    g.zIndex = zIdx;
     return g;
   };
 

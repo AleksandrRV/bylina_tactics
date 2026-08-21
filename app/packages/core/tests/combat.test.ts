@@ -80,7 +80,7 @@ describe("cover and flank", () => {
     const grid = makeGrid(4, 1, 1);
     const attacker = unit({ x: 0, y: 0 });
     const target = unit({ id: 2, owner: 2, x: 3, y: 0 });
-    const evaled = evaluateCover(attacker, target, [attacker, target], {
+    const evaled = evaluateCover(attacker, target, [attacker, target], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
@@ -93,7 +93,7 @@ describe("cover and flank", () => {
     const attacker = unit({ x: 0, y: 1 });
     const target = unit({ id: 2, owner: 2, x: 2, y: 1 });
     const cover = unit({ id: 3, owner: 0, x: 1, y: 1, coverType: 2, weaponId: "" });
-    const onLine = evaluateCover(attacker, target, [attacker, target, cover], {
+    const onLine = evaluateCover(attacker, target, [attacker, target, cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
@@ -102,7 +102,7 @@ describe("cover and flank", () => {
     expect(onLine.flanked).toBe(false);
 
     const fromSouth = unit({ x: 2, y: 3 });
-    const flanked = evaluateCover(fromSouth, target, [fromSouth, target, cover], {
+    const flanked = evaluateCover(fromSouth, target, [fromSouth, target, cover], makeGrid(10, 10, 1), {
       melee: false,
       ignoreHalfCover: false,
       flyingTarget: false,
@@ -115,7 +115,7 @@ describe("cover and flank", () => {
     const attacker = unit({ x: 1, y: 1 });
     const target = unit({ id: 2, owner: 2, x: 2, y: 1 });
     const cover = unit({ id: 3, owner: 0, x: 1, y: 1, coverType: 2, weaponId: "" });
-    const melee = evaluateCover(attacker, target, [attacker, target, cover], {
+    const melee = evaluateCover(attacker, target, [attacker, target, cover], makeGrid(10, 10, 1), {
       melee: true,
       ignoreHalfCover: false,
       flyingTarget: false,
