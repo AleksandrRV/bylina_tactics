@@ -13,12 +13,15 @@ const MAP = {
   heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
 };
 
-function purge(id: string, darknessOnVictory: number, darknessOnDefeat: number, count = 3) {
+function purge(id: string, darknessOnVictory: number, darknessOnDefeat: number, count = 3, x = 20, y = 50) {
   return {
     id,
     type: "purge" as const,
     darknessOnVictory,
     darknessOnDefeat,
+    x,
+    y,
+    rewards: { gold: 10, herbs: 3, artifacts: 1 },
     map: MAP,
     enemies: [{ unitId: "upyr", count }],
   };
@@ -35,8 +38,19 @@ const CONFIG: CampaignConfig = {
   recruitUnitId: "recruit",
   initialRoster: ["bogatyr", "strelets", "znaharka"],
   woundPenalty: { aim: -15, defense: -10, mobility: -1 },
-  missions: [purge("clearing_1", 2, 4), purge("clearing_2", 2, 4), purge("clearing_3", 2, 4)],
+  startingResources: { gold: 6, herbs: 3, artifacts: 0 },
+  scan: { radius: 40, cost: { gold: 0, herbs: 1, artifacts: 0 } },
+  missions: [
+    purge("clearing_1", 2, 4, 3, 20, 50),
+    purge("clearing_2", 2, 4, 3, 60, 50),
+    purge("clearing_3", 2, 4, 3, 90, 50),
+  ],
 };
+
+const ITEMS = [
+  { id: "mace_of_trail", weaponId: "mace", cost: { gold: 12, herbs: 2, artifacts: 0 } },
+  { id: "aim_charm", aimMod: 15, cost: { gold: 8, herbs: 3, artifacts: 0 } },
+];
 
 const UNIT_STATS = {
   bogatyr: { maxHealth: 12 },
@@ -47,7 +61,7 @@ const UNIT_STATS = {
 };
 
 function campaign(config: CampaignConfig = CONFIG) {
-  return createCampaign(config, { unitStats: UNIT_STATS });
+  return createCampaign(config, { unitStats: UNIT_STATS, items: ITEMS });
 }
 
 describe("createCampaign: points and darkness", () => {
@@ -83,7 +97,15 @@ describe("createCampaign: points and darkness", () => {
     expect(result).toMatchObject({ darknessGained: 2, campaignLost: false, fallen: [], wounded: [] });
     const state = automaton.getState();
     expect(state.darkness).toBe(2);
+    // Точки открываются сканированием: clearing_2 в радиусе 40 от (20,50).
     expect(state.missions.map((mission) => [mission.id, mission.status])).toEqual([
+      ["clearing_1", "done"],
+      ["clearing_2", "locked"],
+      ["clearing_3", "locked"],
+    ]);
+    const scan = automaton.scan();
+    expect(scan?.opened).toEqual(["clearing_2"]);
+    expect(automaton.getState().missions.map((mission) => [mission.id, mission.status])).toEqual([
       ["clearing_1", "done"],
       ["clearing_2", "open"],
       ["clearing_3", "locked"],
@@ -196,6 +218,7 @@ describe("createCampaign: druzhina", () => {
     const ids = new Set(fighters.map((fighter) => fighter.id));
     expect(automaton.getState().fighters.filter((fighter) => ids.has(fighter.id)).every((fighter) => fighter.level === CONFIG.classUnlockLevel + 1)).toBe(true);
 
+    automaton.scan();
     automaton.startMission("clearing_2");
     automaton.finishMission("clearing_2", "defeat", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
     // Уровни не растут при поражении.
@@ -259,6 +282,7 @@ describe("createCampaign: druzhina", () => {
 
     // Проводим рекрута через ещё одну победу (уровень 2).
     const ids = automaton.getState().fighters.map((fighter) => fighter.id);
+    automaton.scan();
     automaton.startMission("clearing_2");
     automaton.finishMission("clearing_2", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
     const trained = automaton.getState().fighters.find((fighter) => fighter.id === recruit.id)!;
@@ -299,5 +323,100 @@ describe("createCampaign: druzhina", () => {
     expect(automaton.getMissions().map((mission) => mission.id)).toEqual(["clearing_1", "clearing_2", "clearing_3"]);
     expect(automaton.getMission("clearing_2")?.type).toBe("purge");
     expect(automaton.getMission("missing")).toBeUndefined();
+  });
+});
+
+describe("createCampaign: хозяйство 0.12", () => {
+  it("grants mission rewards on victory and none on defeat", () => {
+    const automaton = campaign();
+    const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
+    automaton.startMission("clearing_1");
+    const result = automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    expect(result?.rewards).toEqual({ gold: 10, herbs: 3, artifacts: 1 });
+    expect(automaton.getState().resources).toEqual({ gold: 16, herbs: 6, artifacts: 1 });
+
+    // Сканирование расходует 1 траву: 3 + 3 − 1 = 5.
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    const lost = automaton.finishMission("clearing_2", "defeat", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    expect(lost?.rewards).toEqual({ gold: 0, herbs: 0, artifacts: 0 });
+    expect(automaton.getState().resources).toEqual({ gold: 16, herbs: 5, artifacts: 1 });
+  });
+
+  it("moves the ship to the finished mission point", () => {
+    const automaton = campaign();
+    expect(automaton.getState().shipPosition).toEqual({ x: 20, y: 50 });
+    const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    expect(automaton.getState().shipPosition).toEqual({ x: 20, y: 50 });
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    automaton.finishMission("clearing_2", "victory", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    expect(automaton.getState().shipPosition).toEqual({ x: 60, y: 50 });
+  });
+
+  it("scan opens only points within the configured radius and charges the cost", () => {
+    const automaton = campaign();
+    // До сканирования запасы { gold 6, herbs 3 }; стоимость — 1 трава.
+    const scan = automaton.scan();
+    expect(scan).toEqual({ cost: { gold: 0, herbs: 1, artifacts: 0 }, opened: ["clearing_2"] });
+    expect(automaton.getState().resources.herbs).toBe(2);
+    // clearing_3 (90,50) вне радиуса 40 от (20,50).
+    expect(automaton.getState().missions[2]?.status).toBe("locked");
+    // Сканирование недопустимо при нехватке трав.
+    const poor = campaign({ ...CONFIG, startingResources: { gold: 6, herbs: 0, artifacts: 0 } });
+    expect(poor.scan()).toBeNull();
+  });
+
+  it("crafts items from configuration once, consuming resources", () => {
+    const automaton = campaign();
+    // Запасы { gold 6, herbs 3 }: оберег меткости стоит 8/3 — не хватает золота.
+    expect(automaton.craftItem("aim_charm")).toBe(false);
+    const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    // Запасы { gold 16, herbs 6, artifacts 1 }.
+    expect(automaton.craftItem("aim_charm")).toBe(true);
+    expect(automaton.getState().resources).toEqual({ gold: 8, herbs: 3, artifacts: 1 });
+    expect(automaton.getState().inventory).toEqual(["aim_charm"]);
+    // Повторная ковка невозможна.
+    expect(automaton.craftItem("aim_charm")).toBe(false);
+    // Неизвестный предмет.
+    expect(automaton.craftItem("missing_item")).toBe(false);
+    // Палица тракта стоит 12 золота — после оберега (16 − 8 = 8) не хватает.
+    expect(automaton.craftItem("mace_of_trail")).toBe(false);
+    // Вторая победа: +10 золота, −1 трава за сканирование.
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    automaton.finishMission("clearing_2", "victory", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    expect(automaton.craftItem("mace_of_trail")).toBe(true);
+    expect(automaton.getState().inventory).toEqual(["aim_charm", "mace_of_trail"]);
+  });
+
+  it("equips and unequips a crafted item on a fighter", () => {
+    const automaton = campaign();
+    const fighters = automaton.getState().fighters;
+    const bogatyr = fighters[0]!;
+    // Нельзя надеть несуществующий предмет.
+    expect(automaton.equipItem(bogatyr.id, "aim_charm")).toBe(false);
+    const ids = fighters.map((fighter) => fighter.id);
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.craftItem("aim_charm");
+    expect(automaton.equipItem(bogatyr.id, "aim_charm")).toBe(true);
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === bogatyr.id)?.equippedItemId).toBe("aim_charm");
+    // Предмет единственный: второй боец надеть не может.
+    expect(automaton.equipItem(fighters[1]!.id, "aim_charm")).toBe(false);
+    // Снятие.
+    expect(automaton.equipItem(bogatyr.id, null)).toBe(true);
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === bogatyr.id)?.equippedItemId).toBeNull();
+    // Снятие без предмета отклоняется.
+    expect(automaton.equipItem(bogatyr.id, null)).toBe(false);
+  });
+
+  it("exposes craftable items in configuration order", () => {
+    const automaton = campaign();
+    expect(automaton.getItems().map((item) => item.id)).toEqual(["mace_of_trail", "aim_charm"]);
   });
 });

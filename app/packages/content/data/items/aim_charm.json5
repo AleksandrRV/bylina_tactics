@@ -1,0 +1,6 @@
+{
+  // Оберег меткости.
+  id: "aim_charm",
+  aimMod: 15,
+  cost: { gold: 8, herbs: 3, artifacts: 0 },
+}

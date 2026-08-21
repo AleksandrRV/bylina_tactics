@@ -1,0 +1,6 @@
+{
+  // Трактовая палица: тяжёлое оружие Богатыря из записей оружия.
+  id: "mace_of_trail",
+  weaponId: "mace",
+  cost: { gold: 12, herbs: 2, artifacts: 0 },
+}

@@ -70,6 +70,10 @@ export type RosterMods = {
   aimMod?: number;
   defenseMod?: number;
   mobilityMod?: number;
+  /** Изменение максимума здоровья высадки (снаряжение). */
+  maxHpMod?: number;
+  /** Дополнительное оружие из снаряжения. */
+  extraWeaponIds?: readonly string[];
   /** Начальный запас здоровья высадки (сохранённый после прошлой миссии). */
   hp?: number;
 };
@@ -129,6 +133,21 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     if (entry.mods.aimMod) spawned.aim += entry.mods.aimMod;
     if (entry.mods.defenseMod) spawned.defense += entry.mods.defenseMod;
     if (entry.mods.mobilityMod) spawned.mobility = Math.max(1, spawned.mobility + entry.mods.mobilityMod);
+    if (entry.mods.maxHpMod) {
+      spawned.maxHp = Math.max(1, spawned.maxHp + entry.mods.maxHpMod);
+      if (spawned.hp > spawned.maxHp) spawned.hp = spawned.maxHp;
+    }
+    if (entry.mods.extraWeaponIds) {
+      const owned = new Set(spawned.weaponIds);
+      const extra: string[] = [];
+      for (const weaponId of entry.mods.extraWeaponIds) {
+        if (owned.has(weaponId)) continue;
+        owned.add(weaponId);
+        extra.push(weaponId);
+      }
+      spawned.weaponIds = [...(spawned.weaponIds ?? []), ...extra];
+      if (spawned.weaponId === "" && extra.length > 0) spawned.weaponId = extra[0]!;
+    }
     if (entry.mods.hp !== undefined) spawned.hp = Math.max(1, Math.min(spawned.maxHp, entry.mods.hp));
     state.entities.push(spawned);
   });

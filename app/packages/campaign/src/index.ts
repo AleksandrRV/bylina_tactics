@@ -1,26 +1,28 @@
-import type { CampaignConfig, MissionConfig } from "@bylina/content";
+import type { CampaignConfig, ItemConfig, MissionConfig } from "@bylina/content";
 
 /**
  * Автомат Летучего Корабля (module-core-campaign).
  *
- * Выпуск 0.11.0 добавляет постоянную дружину (base-design §3.1):
- * - реестр бойцов: рекруты без класса и бойцы классов;
- * - высадка от deployMin до deployMax живых бойцов;
- * - окончательная гибель: погибший в миссии исключается навсегда;
- * - ранение: выживший с запасом здоровья не выше `woundHpRatio × maxHealth`
- *   получает ранение со штрафами конфигурации до лечения в Горнице;
- * - уровень: выжившие после победы получают уровень; рекрут, достигший
- *   `classUnlockLevel`, получает класс по выбору игрока;
- * - пополнение: после победы в дружину вступает новый рекрут, пока
- *   численность меньше `rosterCap`;
- * - поражение кампании: счётчик Тьмы достиг максимума либо не осталось
- *   живых бойцов.
+ * Выпуск 0.12.0 замыкает цикл запасов (base-design §3.1, roadmap §5.3):
+ * - награды миссий: золото, травы, артефакты — зачисляются при успехе;
+ * - Кузня: изготовление предметов по записям конфигурации за запасы;
+ * - снаряжение бойца перед высадкой: один предмет на бойца, влияет на
+ *   следующее сражение (оружие либо модификаторы характеристик);
+ * - открытие участков карты сканированием: корабль сканирует окрестность
+ *   своего положения, открывая точки в радиусе; правила — в конфигурации
+ *   кампании (поле `scan`).
  */
 
 export type MissionOutcome = "victory" | "defeat";
 export type CampaignPhase = "active" | "lost";
 
 export type MissionPointStatus = "open" | "done" | "locked";
+
+export interface Resources {
+  gold: number;
+  herbs: number;
+  artifacts: number;
+}
 
 export interface MissionPointState {
   id: string;
@@ -38,6 +40,8 @@ export interface FighterState {
   /** Признак ранения: штрафы действуют до лечения в Горнице. */
   wounded: boolean;
   alive: boolean;
+  /** Предмет из запасов корабля, надетый на бойца. */
+  equippedItemId: string | null;
 }
 
 export interface MissionParticipant {
@@ -50,6 +54,8 @@ export interface MissionParticipant {
 export interface MissionFinishResult {
   /** Прирост Тьмы, применённый после миссии. */
   darknessGained: number;
+  /** Награда миссии (при успехе; при поражении — нули). */
+  rewards: Resources;
   /** Кампания завершена: Тьма заполнена либо дружина пуста. */
   campaignLost: boolean;
   /** Причина завершения, если кампания проиграна. */
@@ -64,10 +70,23 @@ export interface MissionFinishResult {
   newRecruit: string | null;
 }
 
+export interface ScanResult {
+  /** Затраченные на сканирование запасы. */
+  cost: Resources;
+  /** Открытые сканированием точки. */
+  opened: string[];
+}
+
 export interface CampaignState {
   darkness: number;
   darknessMax: number;
   phase: CampaignPhase;
+  /** Запасы корабля. */
+  resources: Resources;
+  /** Изготовленные предметы (записи `items`). */
+  inventory: string[];
+  /** Положение Летучего Корабля на карте царства. */
+  shipPosition: { x: number; y: number };
   /** Точки в порядке конфигурации. */
   missions: MissionPointState[];
   /** Реестр дружины. */
@@ -78,6 +97,7 @@ export interface CampaignState {
     missionId: string;
     outcome: MissionOutcome;
     darknessGained: number;
+    rewards: Resources;
     fallen: string[];
     wounded: string[];
     leveledUp: string[];
@@ -90,16 +110,24 @@ export interface CampaignApi {
   /** Записи точек в порядке конфигурации. */
   getMissions(): MissionConfig[];
   getMission(id: string): MissionConfig | undefined;
+  /** Записи предметов Кузни. */
+  getItems(): ItemConfig[];
   /** Начать доступную миссию; возвращает false, если миссия недоступна. */
   startMission(id: string): boolean;
   /**
    * Завершить начатую миссию исходом и составом участников. Применяет
-   * прирост Тьмы, исходы бойцов (гибель, ранение, уровень), пополнение,
-   * открывает следующую точку. Возвращает null, если команда недопустима.
+   * прирост Тьмы, награду, исходы бойцов, пополнение; корабль перелетает
+   * к точке миссии. Возвращает null, если команда недопустима.
    */
   finishMission(id: string, outcome: MissionOutcome, participants: MissionParticipant[]): MissionFinishResult | null;
   /** Покинуть начатую миссию без последствий (возврат на карту). */
   abandonMission(): void;
+  /** Сканирование окрестности корабля: открывает точки в радиусе за стоимость. */
+  scan(): ScanResult | null;
+  /** Изготовить предмет в Кузне (один экземпляр каждой записи). */
+  craftItem(itemId: string): boolean;
+  /** Надеть предмет на бойца; `null` снимает снаряжение. */
+  equipItem(fighterId: number, itemId: string | null): boolean;
   /** Лечение раненого в Горнице: здоровье восстанавливается, ранение снимается. */
   healFighter(fighterId: number): boolean;
   /** Назначить класс рекруту, достигшему `classUnlockLevel`. */
@@ -121,13 +149,18 @@ const RECRUIT_NAMES: readonly string[] = [
   "Всеслав",
 ];
 
+const ZERO_RESOURCES: Resources = { gold: 0, herbs: 0, artifacts: 0 };
+
 export interface CampaignOptions {
   /** Запас здоровья записей юнитов дружины (из модуля содержания). */
   unitStats?: Record<string, { maxHealth: number }>;
+  /** Записи предметов Кузни (из модуля содержания). */
+  items?: ItemConfig[];
 }
 
 export function createCampaign(config: CampaignConfig, options: CampaignOptions = {}): CampaignApi {
   const hpOf = (unitId: string): number => options.unitStats?.[unitId]?.maxHealth ?? 6;
+  const items = options.items ?? [];
   const missions = config.missions;
   const initialRoster = config.initialRoster.length > 0
     ? config.initialRoster
@@ -146,16 +179,21 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       maxHp,
       wounded: false,
       alive: true,
+      equippedItemId: null,
     };
     nextFighterId += 1;
     nameCursor += 1;
     return fighter;
   };
 
+  const firstMission = missions[0];
   const state: CampaignState = {
     darkness: 0,
     darknessMax: config.darknessMax,
     phase: "active",
+    resources: { ...config.startingResources },
+    inventory: [],
+    shipPosition: firstMission ? { x: firstMission.x, y: firstMission.y } : { x: 50, y: 50 },
     missions: missions.map((mission, index) => ({
       id: mission.id,
       status: index === 0 ? "open" : "locked",
@@ -175,19 +213,35 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
   const livingCount = (): number => state.fighters.filter((fighter) => fighter.alive).length;
 
-  const openNext = (): void => {
-    const next = state.missions.find((mission) => mission.status !== "done");
-    if (next && next.status === "locked") next.status = "open";
+  const canPay = (cost: Resources): boolean =>
+    state.resources.gold >= cost.gold
+    && state.resources.herbs >= cost.herbs
+    && state.resources.artifacts >= cost.artifacts;
+
+  const pay = (cost: Resources): void => {
+    state.resources.gold -= cost.gold;
+    state.resources.herbs -= cost.herbs;
+    state.resources.artifacts -= cost.artifacts;
+  };
+
+  const gain = (reward: Resources): void => {
+    state.resources.gold += reward.gold;
+    state.resources.herbs += reward.herbs;
+    state.resources.artifacts += reward.artifacts;
   };
 
   return {
     getState: () => ({
       ...state,
+      resources: { ...state.resources },
+      inventory: [...state.inventory],
+      shipPosition: { ...state.shipPosition },
       missions: state.missions.map((mission) => ({ ...mission })),
       fighters: state.fighters.map((fighter) => ({ ...fighter })),
     }),
     getMissions: () => missions.map((mission) => ({ ...mission })),
     getMission: (id) => missions.find((mission) => mission.id === id),
+    getItems: () => items.map((item) => ({ ...item, cost: { ...item.cost } })),
     startMission: (id) => {
       if (state.phase !== "active" || state.activeMissionId !== null) return false;
       const point = findMission(id);
@@ -204,6 +258,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
       const darknessGained = outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat;
       state.darkness = Math.min(state.darknessMax, state.darkness + darknessGained);
+
+      const rewards: Resources = outcome === "victory" ? { ...mission.rewards } : { ...ZERO_RESOURCES };
+      if (outcome === "victory") gain(rewards);
 
       const fallen: string[] = [];
       const wounded: string[] = [];
@@ -230,6 +287,8 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
       point.status = "done";
       state.activeMissionId = null;
+      // Корабль перелетает к завершённой точке; дальнейшие точки открываются сканированием.
+      state.shipPosition = { x: mission.x, y: mission.y };
 
       let newRecruit: string | null = null;
       if (outcome === "victory" && livingCount() > 0 && state.fighters.length < config.rosterCap) {
@@ -244,19 +303,65 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         : livingCount() === 0
           ? "roster"
           : undefined;
-      state.lastResult = { missionId: id, outcome, darknessGained, fallen, wounded, leveledUp, newRecruit };
+      state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit };
       if (campaignLost) {
         state.phase = "lost";
-      } else {
-        openNext();
       }
       emit();
-      return { darknessGained, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit };
+      return { darknessGained, rewards, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit };
     },
     abandonMission: () => {
       if (state.activeMissionId === null) return;
       state.activeMissionId = null;
       emit();
+    },
+    scan: () => {
+      if (state.phase !== "active" || state.activeMissionId !== null) return null;
+      const cost = { ...config.scan.cost };
+      if (!canPay(cost)) return null;
+      pay(cost);
+      const opened: string[] = [];
+      for (const point of state.missions) {
+        if (point.status !== "locked") continue;
+        const mission = missions.find((entry) => entry.id === point.id);
+        if (!mission) continue;
+        const distance = Math.hypot(mission.x - state.shipPosition.x, mission.y - state.shipPosition.y);
+        if (distance <= config.scan.radius) {
+          point.status = "open";
+          opened.push(point.id);
+        }
+      }
+      emit();
+      return { cost, opened };
+    },
+    craftItem: (itemId) => {
+      if (state.phase !== "active") return false;
+      const item = items.find((entry) => entry.id === itemId);
+      if (!item) return false;
+      if (state.inventory.includes(itemId)) return false;
+      if (!canPay(item.cost)) return false;
+      pay(item.cost);
+      state.inventory.push(itemId);
+      emit();
+      return true;
+    },
+    equipItem: (fighterId, itemId) => {
+      if (state.phase !== "active") return false;
+      const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
+      if (!fighter || !fighter.alive) return false;
+      if (itemId === null) {
+        if (fighter.equippedItemId === null) return false;
+        fighter.equippedItemId = null;
+        emit();
+        return true;
+      }
+      if (!state.inventory.includes(itemId)) return false;
+      if (fighter.equippedItemId === itemId) return false;
+      // Предмет единственный: не может быть надет на двух бойцов сразу.
+      if (state.fighters.some((candidate) => candidate.alive && candidate.equippedItemId === itemId)) return false;
+      fighter.equippedItemId = itemId;
+      emit();
+      return true;
     },
     healFighter: (fighterId) => {
       const fighter = state.fighters.find((candidate) => candidate.id === fighterId);

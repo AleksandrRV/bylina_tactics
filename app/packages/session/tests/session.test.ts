@@ -30,12 +30,17 @@ const CAMPAIGN_CONFIG: CampaignConfig = {
   recruitUnitId: "recruit",
   initialRoster: ["bogatyr", "strelets", "znaharka"],
   woundPenalty: { aim: -15, defense: -10, mobility: -1 },
+  startingResources: { gold: 6, herbs: 3, artifacts: 0 },
+  scan: { radius: 40, cost: { gold: 0, herbs: 1, artifacts: 0 } },
   missions: [
     {
       id: "clearing_1",
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 20,
+      y: 50,
+      rewards: { gold: 10, herbs: 3, artifacts: 0 },
       map: MAP,
       enemies: [{ unitId: "upyr", count: 3 }],
     },
@@ -44,6 +49,9 @@ const CAMPAIGN_CONFIG: CampaignConfig = {
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 60,
+      y: 50,
+      rewards: { gold: 10, herbs: 3, artifacts: 0 },
       map: MAP,
       enemies: [{ unitId: "upyr", count: 3 }],
     },
@@ -189,7 +197,10 @@ describe("createSession", () => {
     );
     expect(result).toMatchObject({ darknessGained: 2, campaignLost: false });
     expect(session.get().screen).toBe("missionResult");
-    expect(session.getCampaign().getState().missions.map((point) => point.status)).toEqual(["done", "open"]);
+    // Следующая точка открывается сканированием корабля.
+    expect(session.getCampaign().getState().missions.map((point) => point.status)).toEqual(["done", "locked"]);
+    const scan = session.getCampaign().scan();
+    expect(scan?.opened).toEqual(["clearing_2"]);
     session.backToCampaign();
     expect(session.get().screen).toBe("campaign");
   });

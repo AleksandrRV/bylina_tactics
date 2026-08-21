@@ -1,6 +1,7 @@
 {
-  // Кампания выпуска 0.11.0: Летучий Корабль, дружина и зачистки.
-  // Точки открываются по порядку; финальная миссия «Игла» появится на этапе 5.
+  // Кампания выпуска 0.12.0: Летучий Корабль, дружина, хозяйство.
+  // Точки открываются сканированием (правила — поле scan); финальная миссия
+  // «Игла» появится на этапе 5.
   rosterCap: 8,
   deployMin: 1,
   deployMax: 5,
@@ -11,12 +12,20 @@
   recruitUnitId: "recruit",
   initialRoster: ["bogatyr", "strelets", "znaharka"],
   woundPenalty: { aim: -15, defense: -10, mobility: -1 },
+  startingResources: { gold: 6, herbs: 3, artifacts: 0 },
+  scan: {
+    radius: 55,
+    cost: { gold: 0, herbs: 1, artifacts: 0 },
+  },
   missions: [
     {
       id: "clearing_1",
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 13,
+      y: 64,
+      rewards: { gold: 10, herbs: 3, artifacts: 0 },
       map: {
         width: 12,
         height: 10,
@@ -34,6 +43,9 @@
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 31,
+      y: 42,
+      rewards: { gold: 12, herbs: 3, artifacts: 0 },
       map: {
         width: 12,
         height: 10,
@@ -54,6 +66,9 @@
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 49,
+      y: 62,
+      rewards: { gold: 14, herbs: 4, artifacts: 1 },
       map: {
         width: 14,
         height: 10,
@@ -74,6 +89,9 @@
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 65,
+      y: 36,
+      rewards: { gold: 16, herbs: 4, artifacts: 1 },
       map: {
         width: 14,
         height: 10,
@@ -95,6 +113,9 @@
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
+      x: 82,
+      y: 55,
+      rewards: { gold: 18, herbs: 5, artifacts: 2 },
       map: {
         width: 14,
         height: 10,

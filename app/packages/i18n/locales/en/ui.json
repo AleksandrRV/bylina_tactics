@@ -285,7 +285,8 @@
     "fallen": "Fallen in battle",
     "wounded": "Wounded",
     "leveledUp": "Gained a level",
-    "newRecruit": "New recruit"
+    "newRecruit": "New recruit",
+    "rewards": "Reward"
   },
   "deployment": {
     "title": "Deployment",
@@ -295,7 +296,14 @@
     "confirm": "To battle",
     "back": "Back to the map",
     "wounded": "Wounded",
-    "woundedHint": "Wound: aim {aim}, defense {defense}, mobility {mobility}"
+    "woundedHint": "Wound: aim {aim}, defense {defense}, mobility {mobility}",
+    "equip": "Equipment",
+    "equipFor": "Equipment: {name}",
+    "equipHint": "Pick an item from the ship's supplies.",
+    "equipEmpty": "No items in supply. Craft them in the Forge.",
+    "equipPut": "Equip",
+    "equipOn": "Equipped",
+    "equipTaken": "Worn by another"
   },
   "roster": {
     "count": "Druzhina {current} of {max}",
@@ -316,5 +324,43 @@
     "emptyBody": "The chamber is quiet: no wounded.",
     "heal": "Heal",
     "healAll": "Heal all"
+  },
+  "scan": {
+    "action": "Scan",
+    "hint": "The ship opens points within {radius} units",
+    "cost": "Cost: gold {gold}, herbs {herbs}, artifacts {artifacts}",
+    "allOpen": "All map regions are open"
+  },
+  "forge": {
+    "inventory": "Crafted: {current}",
+    "craft": "Craft",
+    "crafted": "Crafted",
+    "cost": "Cost",
+    "equipHint": "Crafted items are equipped when forming the deployment."
+  },
+  "item": {
+    "aim": "aim",
+    "defense": "defense",
+    "mobility": "mobility",
+    "maxHp": "health",
+    "weapon": "weapon",
+    "aim_charm": {
+      "name": "Charm of Aim"
+    },
+    "guard_charm": {
+      "name": "Charm of Guard"
+    },
+    "swift_boots": {
+      "name": "Swift Boots"
+    },
+    "vital_amulet": {
+      "name": "Vital Amulet"
+    },
+    "mace_of_trail": {
+      "name": "Trail Mace"
+    },
+    "pishchal_gun": {
+      "name": "Pishchal"
+    }
   }
 }

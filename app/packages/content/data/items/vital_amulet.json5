@@ -1,0 +1,6 @@
+{
+  // Живой амулет: запас здоровья.
+  id: "vital_amulet",
+  maxHpMod: 3,
+  cost: { gold: 12, herbs: 2, artifacts: 1 },
+}

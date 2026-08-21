@@ -2,12 +2,14 @@ import JSON5 from "json5";
 import { z } from "zod";
 import {
   campaignConfigSchema,
+  itemConfigSchema,
   pvpConfigSchema,
   quickMatchConfigSchema,
   skillConfigSchema,
   unitConfigSchema,
   weaponConfigSchema,
   type CampaignConfig,
+  type ItemConfig,
   type PvpConfig,
   type QuickMatchConfig,
   type SkillConfig,
@@ -22,6 +24,7 @@ export interface ContentBundle {
   units: UnitConfig[];
   weapons: WeaponConfig[];
   skills: SkillConfig[];
+  items: ItemConfig[];
 }
 
 export interface ContentIssue {
@@ -104,6 +107,13 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     else if (parsed.value) skills.push(parsed.value);
   }
 
+  const items: ItemConfig[] = [];
+  for (const [file, raw] of collect(files, "items")) {
+    const parsed = parseFile(file, raw, itemConfigSchema);
+    if (parsed.issue) issues.push(parsed.issue);
+    else if (parsed.value) items.push(parsed.value);
+  }
+
   const checkUnique = <T extends { id: string }>(kind: string, records: T[]): Set<string> => {
     const ids = new Set<string>();
     for (const record of records) {
@@ -115,6 +125,7 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
   const unitIds = checkUnique("units", units);
   const weaponIds = checkUnique("weapons", weapons);
   const skillIds = checkUnique("skills", skills);
+  const itemIds = checkUnique("items", items);
 
   for (const unit of units) {
     for (const weaponId of unit.weapons) {
@@ -129,6 +140,11 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       if (effect.type === "spawn" && !unitIds.has(effect.unitId)) {
         issues.push({ file: `skills/${skill.id}`, message: `unknown spawned unit: ${effect.unitId}` });
       }
+    }
+  }
+  for (const item of items) {
+    if (item.weaponId && !weaponIds.has(item.weaponId)) {
+      issues.push({ file: `items/${item.id}`, message: `unknown weapon: ${item.weaponId}` });
     }
   }
   if (quickMatch.value) {
@@ -174,6 +190,7 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       units,
       weapons,
       skills,
+      items,
     },
   };
 }

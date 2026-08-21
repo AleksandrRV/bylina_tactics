@@ -108,3 +108,34 @@ describe("createMissionMatch roster modifiers", () => {
     expect(strelets.hp).toBe(DEFAULT_TRAINING_UNITS.strelets!.maxHealth);
   });
 });
+
+describe("createMissionMatch equipment", () => {
+  it("adds equipment weapon and stat/maxHp modifiers to a deployed fighter", () => {
+    const match = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: [
+        { unitId: "bogatyr", extraWeaponIds: ["bow"], aimMod: 15, maxHpMod: 3, hp: 10 },
+        "strelets",
+      ],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      seed: 61,
+    });
+    const bogatyr = livingOf(match, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
+    expect(bogatyr.weaponIds).toContain("bow");
+    expect(bogatyr.maxHp).toBe(DEFAULT_TRAINING_UNITS.bogatyr!.maxHealth + 3);
+    // Снаряжение не лечит: сохранённое здоровье переносится как есть.
+    expect(bogatyr.hp).toBe(10);
+    expect(bogatyr.aim).toBe(DEFAULT_TRAINING_UNITS.bogatyr!.aim + 15);
+    // Уникальность: повторный id не дублируется.
+    const match2 = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: [{ unitId: "bogatyr", extraWeaponIds: ["bow", "bow"] }],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      seed: 62,
+    });
+    const hero = livingOf(match2, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
+    expect(hero.weaponIds?.filter((id) => id === "bow")).toHaveLength(1);
+  });
+});

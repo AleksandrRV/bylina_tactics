@@ -13,6 +13,7 @@ import {
   type HitPreview,
   type MatchState,
   type ReachableCell,
+  type RosterMods,
   type SkillStats,
   type WeaponStats,
 } from "@bylina/core";
@@ -97,12 +98,22 @@ export function BattleScreen() {
       if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
       const penalty = content.campaign.woundPenalty;
       const fighters = session.getCampaign().getState().fighters;
+      const items = session.getCampaign().getItems();
       const playerSlots = deployment.map((fighterId) => {
         const fighter = fighters.find((candidate) => candidate.id === fighterId);
         if (!fighter || !fighter.alive) throw new Error(`Unknown fighter in deployment: ${fighterId}`);
-        const mods = fighter.wounded
+        const mods: RosterMods = fighter.wounded
           ? { aimMod: penalty.aim, defenseMod: penalty.defense, mobilityMod: penalty.mobility }
           : {};
+        // Снаряжение: оружие и модификаторы предмета добавляются к высадке.
+        const item = fighter.equippedItemId ? items.find((entry) => entry.id === fighter.equippedItemId) : undefined;
+        if (item) {
+          mods.aimMod = (mods.aimMod ?? 0) + (item.aimMod ?? 0);
+          mods.defenseMod = (mods.defenseMod ?? 0) + (item.defenseMod ?? 0);
+          mods.mobilityMod = (mods.mobilityMod ?? 0) + (item.mobilityMod ?? 0);
+          if (item.maxHpMod) mods.maxHpMod = (mods.maxHpMod ?? 0) + item.maxHpMod;
+          if (item.weaponId) mods.extraWeaponIds = [item.weaponId];
+        }
         return { unitId: fighter.unitId, hp: fighter.hp, ...mods };
       });
       initial = createMissionMatch({

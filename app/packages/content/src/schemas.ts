@@ -133,11 +133,29 @@ export const mapGenConfigSchema = z.object({
   }).strict().refine((mix) => Math.abs(mix.z0 + mix.z1 + mix.z2 - 1) < 1e-9, "heightMix values must sum to 1"),
 }).strict();
 
+export const resourcesSchema = z.object({
+  gold: z.number().int().min(0),
+  herbs: z.number().int().min(0),
+  artifacts: z.number().int().min(0),
+}).strict();
+
+export const scanConfigSchema = z.object({
+  /** Радиус открытия точек на карте царства (единицы карты, 0…100). */
+  radius: z.number().int().min(1).max(100),
+  /** Стоимость одного сканирования. */
+  cost: resourcesSchema,
+}).strict();
+
 export const missionConfigSchema = z.object({
   id,
   type: z.enum(["purge", "destroy", "rescue", "recon", "needle"]),
   darknessOnVictory: z.number().int().min(0),
   darknessOnDefeat: z.number().int().min(0),
+  /** Положение точки на карте царства (0…100 по каждой оси). */
+  x: z.number().min(0).max(100),
+  y: z.number().min(0).max(100),
+  /** Награда миссии при успехе: золото, травы, артефакты. */
+  rewards: resourcesSchema,
   map: mapGenConfigSchema,
   enemies: z.array(z.object({
     unitId: id,
@@ -176,10 +194,48 @@ export const campaignConfigSchema = z.object({
   initialRoster: z.array(id).min(1),
   /** Штрафы ранения, действующие до лечения в Горнице. */
   woundPenalty: woundPenaltySchema,
+  /** Начальные запасы корабля. */
+  startingResources: resourcesSchema,
+  /** Правила открытия участков карты сканированием. */
+  scan: scanConfigSchema,
   missions: z.array(missionConfigSchema).min(1),
 }).strict().refine((value) => value.deployMin <= value.deployMax, {
   path: ["deployMax"],
   message: "deployMax must be >= deployMin",
+});
+
+export const itemConfigSchema = z.object({
+  id,
+  /** Оружие из записей `weapons`: добавляется бойцу в сражении. */
+  weaponId: id.optional(),
+  /** Модификаторы характеристик бойца в сражении. */
+  aimMod: z.number().int().optional(),
+  defenseMod: z.number().int().optional(),
+  mobilityMod: z.number().int().optional(),
+  maxHpMod: z.number().int().optional(),
+  /** Стоимость изготовления в Кузне. */
+  cost: resourcesSchema,
+}).strict().superRefine((value, context) => {
+  const hasEffect = value.weaponId !== undefined
+    || value.aimMod !== undefined
+    || value.defenseMod !== undefined
+    || value.mobilityMod !== undefined
+    || value.maxHpMod !== undefined;
+  if (!hasEffect) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["weaponId"],
+      message: "item must provide a weapon or at least one stat modifier",
+    });
+  }
+  const total = value.cost.gold + value.cost.herbs + value.cost.artifacts;
+  if (total <= 0) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["cost"],
+      message: "item cost must be positive",
+    });
+  }
 });
 
 export const quickMatchConfigSchema = z.object({
@@ -222,3 +278,6 @@ export type MapGenConfig = z.infer<typeof mapGenConfigSchema>;
 export type QuickMatchConfig = z.infer<typeof quickMatchConfigSchema>;
 export type PvpConfig = z.infer<typeof pvpConfigSchema>;
 export type WoundPenaltyConfig = z.infer<typeof woundPenaltySchema>;
+export type ItemConfig = z.infer<typeof itemConfigSchema>;
+export type ResourcesConfig = z.infer<typeof resourcesSchema>;
+export type ScanConfig = z.infer<typeof scanConfigSchema>;
