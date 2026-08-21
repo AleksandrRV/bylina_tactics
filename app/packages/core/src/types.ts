@@ -10,6 +10,8 @@ export interface Tile {
   z: number;
   pit: boolean;
   blockLOS: boolean;
+  /** Признак зоны эвакуации: юнит, находящийся в клетке, может выполнить умение с признаком извлечения (§6 math). */
+  extract?: boolean;
 }
 
 export interface Grid {

@@ -9,7 +9,12 @@ export type SkillEffect =
   | { type: "removeStatus"; status: StatusId }
   | { type: "knockback" }
   | { type: "destroyCover" }
-  | { type: "spawn"; unitId: string }
+  | {
+      type: "spawn";
+      unitId: string;
+      /** Явная причина появления: призыв, иллюзия или воскрешение. Без поля — прежняя эвристика. */
+      spawnKind?: "summon" | "illusion" | "resurrection";
+    }
   | { type: "displace" }
   | { type: "flee" }
   | { type: "reveal" };
@@ -49,4 +54,28 @@ export interface SkillPreview {
   cover?: 0 | 1 | 2;
   heightMod?: -1 | 0 | 1;
   flanked?: boolean;
+}
+
+export type SpawnEffect = Extract<SkillEffect, { type: "spawn" }>;
+
+export type SpawnCause = "SUMMON" | "ILLUSION" | "RESURRECTION";
+
+/**
+ * Причина появления сущности эффектом `spawn`. Явное поле `spawnKind` в
+ * конфигурации имеет приоритет; при его отсутствии применяется прежняя
+ * эвристика (иллюзия по записи, воскрешение по имени умения) для
+ * совместимости с существующими записями.
+ */
+export function spawnCause(effect: SpawnEffect, skillId: string): SpawnCause {
+  if (effect.spawnKind === "illusion") return "ILLUSION";
+  if (effect.spawnKind === "resurrection") return "RESURRECTION";
+  if (effect.spawnKind === "summon") return "SUMMON";
+  if (effect.unitId === "illusion") return "ILLUSION";
+  if (skillId.includes("raise")) return "RESURRECTION";
+  return "SUMMON";
+}
+
+/** Является ли эффект появления воскрешением (по явному признаку либо эвристике). */
+export function isResurrectionSpawn(effect: SpawnEffect, skillId: string): boolean {
+  return spawnCause(effect, skillId) === "RESURRECTION";
 }

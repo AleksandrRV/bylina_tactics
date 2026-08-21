@@ -9,5 +9,5 @@
   envDmg: 0,
   filter: "all",
   maxUsesPerBattle: 1,
-  effects: [{ type: "spawn", unitId: "forest_beast" }],
+  effects: [{ type: "spawn", unitId: "forest_beast", spawnKind: "summon" }],
 }

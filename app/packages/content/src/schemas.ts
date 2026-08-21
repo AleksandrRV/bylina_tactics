@@ -67,7 +67,12 @@ export const skillEffectSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("removeStatus"), status: statusId }).strict(),
   z.object({ type: z.literal("knockback") }).strict(),
   z.object({ type: z.literal("destroyCover") }).strict(),
-  z.object({ type: z.literal("spawn"), unitId: id }).strict(),
+  z.object({
+    type: z.literal("spawn"),
+    unitId: id,
+    /** Явная причина появления: призыв, иллюзия или воскрешение. Без поля — прежняя эвристика по записи умения. */
+    spawnKind: z.enum(["summon", "illusion", "resurrection"]).optional(),
+  }).strict(),
   z.object({ type: z.literal("displace") }).strict(),
   z.object({ type: z.literal("flee") }).strict(),
   z.object({ type: z.literal("reveal") }).strict(),
@@ -92,13 +97,18 @@ export const skillConfigSchema = z.object({
   affectsFlying: z.boolean().optional(),
   cooldownTurns: z.number().int().min(1).max(5).optional(),
   maxUsesPerBattle: z.number().int().min(1).optional(),
-  effects: z.array(skillEffectSchema).min(1),
+  effects: z.array(skillEffectSchema),
 }).strict().superRefine((value, context) => {
   if (value.category === "self" && value.range !== 0) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["range"], message: "self skill range must be 0" });
   }
   if (value.resolution === "will" && value.willPower === undefined) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["willPower"], message: "willPower is required for will resolution" });
+  }
+  // Умение обязано иметь следствия, кроме умения с признаком извлечения:
+  // эвакуация сама по себе является следствием (удаление с поля, §6 math).
+  if (value.effects.length === 0 && !value.extract) {
+    context.addIssue({ code: z.ZodIssueCode.custom, path: ["effects"], message: "effects must not be empty for non-extract skills" });
   }
   const hasSpawn = value.effects.some((effect) => effect.type === "spawn");
   if (hasSpawn && value.maxUsesPerBattle !== 1) {
@@ -131,6 +141,8 @@ export const mapGenConfigSchema = z.object({
     z1: z.number().min(0).max(1),
     z2: z.number().min(0).max(1),
   }).strict().refine((mix) => Math.abs(mix.z0 + mix.z1 + mix.z2 - 1) < 1e-9, "heightMix values must sum to 1"),
+  /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки). */
+  extract: z.boolean().optional(),
 }).strict();
 
 export const resourcesSchema = z.object({
@@ -140,7 +152,7 @@ export const resourcesSchema = z.object({
 }).strict();
 
 export const scanConfigSchema = z.object({
-  /** Радиус открытия точек на карте царства (единицы карты, 0…100). */
+  /** Радиус открытия точек на карте царства (единицы карты, 1…100). */
   radius: z.number().int().min(1).max(100),
   /** Стоимость одного сканирования. */
   cost: resourcesSchema,

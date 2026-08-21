@@ -81,14 +81,14 @@ interface SkillConfig {
   ignoreHalfCover?: boolean;
   detectsHidden?: boolean;
   affectsEnvironment?: boolean;
-  extract?: boolean;         // извлечение из зоны эвакуации
+  extract?: boolean;         // извлечение из зоны эвакуации (§6 «Игровой математики»)
   radius?: number;           // область; 0 или отсутствие — одна клетка
   willPower?: number;        // для resolution = "will"
   filter?: "enemies" | "allies" | "all" | "cover";
   affectsFlying?: boolean;   // обездвиживание действует и на летающих; по умолчанию полёт отменяет его (§15.4)
   cooldownTurns?: number;    // 1…5 собственных ходов; обязательно для непризывных умений
   maxUsesPerBattle?: number; // предел применений; для любого spawn обязан быть равен 1
-  effects: SkillEffect[];
+  effects: SkillEffect[];    // минимум одно следствие; пустой список допустим только у умений с extract
 }
 
 type SkillEffect =
@@ -98,10 +98,12 @@ type SkillEffect =
   | { type: "removeStatus"; status: StatusId }
   | { type: "knockback" }
   | { type: "destroyCover" }
-  | { type: "spawn"; unitId: string }
+  | { type: "spawn"; unitId: string; spawnKind?: "summon" | "illusion" | "resurrection" }
   | { type: "displace" }     // телепортация союзника в targetPos
   | { type: "flee" }
   | { type: "reveal" };
+
+Признак `extract` делает умение действием эвакуации: оно допустимо только в клетке поля с признаком зоны эвакуации и удаляет юнита с поля (событие `ENTITY_REMOVED` с причиной `EXTRACTED`). Поле `spawnKind` эффекта `spawn` задаёт причину появления явно: `summon` — призыв, `illusion` — иллюзия, `resurrection` — воскрешение (тело погибшего юнита указанной записи в целевой клетке, запас здоровья 1). При отсутствии `spawnKind` применяется прежняя эвристика (иллюзия по записи, воскрешение по имени умения) для совместимости с существующими записями.
 
 type StatusId = "poison" | "panic" | "immobile" | "hidden" | "flying" | "timed";
 ```
@@ -166,6 +168,7 @@ interface MapGenConfig {
   edgeCoverChance: number;    // 0…1, доля граневых среди создаваемых укрытий
   halfCoverChance: number;    // 0…1, доля неполных среди создаваемых укрытий
   heightMix: { z0: number; z1: number; z2: number }; // доли, сумма 1
+  extract?: boolean;          // карта содержит зону эвакуации у края поля (миссии спасения и разведки)
 }
 ```
 

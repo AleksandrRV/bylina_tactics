@@ -18,9 +18,12 @@ function isCellObservedByUnit(
   tileY: number,
   tileZ: number,
 ): boolean {
-  if (unit.dead || unit.coverType > 0 || unit.vision <= 0) return false;
+  if (unit.dead || unit.coverType > 0) return false;
+  // Собственная клетка наблюдается всегда: DistH = 0 ≤ effectiveRange для любой
+  // дальности обзора, включая vision = 0 (§8.1 math: InRange(U, T, vision)).
   const d = distH(unit.x, unit.y, tileX, tileY);
   if (d === 0) return true;
+  if (unit.vision <= 0) return false;
   const maxRange = effectiveRange(unit.z, tileZ, unit.vision);
   if (d > maxRange) return false;
   return hasLineOfSight(grid, unit.x, unit.y, unit.z, tileX, tileY, tileZ);
@@ -35,8 +38,10 @@ function cellKey(x: number, y: number): string {
  */
 export function computeVisibleCells(state: MatchState, owner: number): Set<string> {
   const visible = new Set<string>();
+  // Фильтр не исключает юнитов с vision = 0: собственная клетка наблюдается
+  // при любой дальности обзора (§8.1), остальные клетки отсеет isCellObservedByUnit.
   const observers = state.entities.filter(
-    (entity) => !entity.dead && entity.coverType === 0 && entity.owner === owner && entity.vision > 0,
+    (entity) => !entity.dead && entity.coverType === 0 && entity.owner === owner,
   );
   if (observers.length === 0) return visible;
 

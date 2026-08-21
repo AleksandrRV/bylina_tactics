@@ -79,6 +79,11 @@ describe("parseContent", () => {
       "summon_forest_beast",
       "teleport_ally",
     ]);
+    const spawnKinds = result.data.skills
+      .flatMap((skill) => skill.effects.filter((effect) => effect.type === "spawn"))
+      .map((effect) => (effect.type === "spawn" ? effect.spawnKind : undefined))
+      .sort();
+    expect(spawnKinds).toEqual(["illusion", "resurrection", "summon"]);
     expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");
@@ -117,6 +122,37 @@ describe("parseContent", () => {
     files[campaignKey] = "{ rosterCap: -1 }";
     const result = parseContent(files);
     expect(result.ok).toBe(false);
+  });
+
+  it("accepts empty effects only for extract skills", () => {
+    const files = readDataTree();
+    const rootsKey = Object.keys(files).find((key) => key.endsWith("skills/roots.json5"));
+    expect(rootsKey).toBeDefined();
+    if (!rootsKey) return;
+
+    // Обычное умение без следствий — отклоняется.
+    const emptyRegular = { ...files };
+    emptyRegular[rootsKey!] = files[rootsKey]!.replace(
+      "effects: [{ type: \"applyStatus\", status: \"immobile\", duration: 1 }],",
+      "effects: [],",
+    );
+    expect(parseContent(emptyRegular).ok).toBe(false);
+
+    // Умение извлечения без следствий — допустимо (само извлечение и есть следствие).
+    const extractSkill = { ...files, "skills/evacuate.json5": `{
+      id: "evacuate",
+      apCost: 1,
+      endsTurn: true,
+      range: 0,
+      requiresLOS: false,
+      category: "self",
+      resolution: "auto",
+      envDmg: 0,
+      extract: true,
+      cooldownTurns: 1,
+      effects: [],
+    }` };
+    expect(parseContent(extractSkill).ok).toBe(true);
   });
 
   it("rejects unknown recruit and initial roster units", () => {

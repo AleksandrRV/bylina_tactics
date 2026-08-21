@@ -12,6 +12,8 @@ export interface MapGenConfig {
   edgeCoverChance: number;
   halfCoverChance: number;
   heightMix: { z0: number; z1: number; z2: number };
+  /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки, §3.2 base-design). */
+  extract?: boolean;
 }
 
 export const QUICK_MATCH_MAP: MapGenConfig = {
@@ -150,6 +152,12 @@ export function generateBattlefield(
   enemies: SpawnPoint[],
 ): { grid: Grid; covers: EntityState[] } {
   const reserved = reservedSet(players, enemies);
+  // Зона эвакуации — колонка у западного края поля (base-design §3.2: «у края карты»).
+  // Клетки зоны не получают ям и стен; укрытия ставятся только в x ∈ [2, width−3].
+  const extractZone = new Set<string>();
+  if (config.extract) {
+    for (let y = 1; y <= config.height - 2; y += 1) extractZone.add(key(0, y));
+  }
 
   const attempt = (): { grid: Grid; covers: EntityState[] } => {
     const grid = makeGrid(config.width, config.height, 1);
@@ -160,6 +168,7 @@ export function generateBattlefield(
 
     for (const tile of grid.tiles) {
       if (reserved.has(key(tile.x, tile.y))) continue;
+      if (extractZone.has(key(tile.x, tile.y))) continue;
       if (rng.nextInt(0, 999) < Math.round(config.pitChance * 1000)) tile.pit = true;
     }
 
@@ -171,6 +180,7 @@ export function generateBattlefield(
       const x = rng.nextInt(2, config.width - 3);
       const y = rng.nextInt(1, config.height - 2);
       if (reserved.has(key(x, y))) continue;
+      if (extractZone.has(key(x, y))) continue;
       const tile = tileAt(grid, x, y);
       if (!tile || tile.pit || tile.blockLOS) continue;
       tile.blockLOS = true;
@@ -222,6 +232,14 @@ export function generateBattlefield(
         defending: false,
         movementSpent: 0,
       });
+    }
+
+    // Признак зоны эвакуации проставляется после генерации рельефа:
+    // клетки зоны гарантированно без ям и стен (исключены выше).
+    if (config.extract) {
+      for (const tile of grid.tiles) {
+        if (extractZone.has(key(tile.x, tile.y))) tile.extract = true;
+      }
     }
 
     return { grid, covers };

@@ -10,7 +10,7 @@ import { apCostFor, findPath, listReachable } from "./pathfinding.js";
 import { inMeleeReach, inRangedReach } from "./range.js";
 import { createMulberry32, clampChance, type Rng } from "./rng.js";
 import { spawnUnitState } from "./match.js";
-import type { SkillEffect, SkillPreview, SkillStats, StatusId } from "./skills.js";
+import { isResurrectionSpawn, spawnCause, type SkillEffect, type SkillPreview, type SkillStats, type SpawnCause, type StatusId } from "./skills.js";
 import type {
   ApplyResult,
   CellPos,
@@ -79,10 +79,13 @@ function cloneState(state: MatchState): MatchState {
 }
 
 function nextOwner(state: MatchState, current: number): number {
+  // Порядок хода строится по фактическим владельцам живых юнитов, а не по
+  // фиксированной паре сторон: состязательный режим допускает произвольное
+  // число участников (base-design §7).
   const living = new Set(
     state.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.maxAp > 0).map((entity) => entity.owner),
   );
-  const order = [PLAYER_OWNER, ENEMY_OWNER].filter((owner) => living.has(owner));
+  const order = [...living].sort((a, b) => a - b);
   if (order.length === 0) return current;
   const index = order.indexOf(current);
   if (index === -1) return order[0] ?? current;
@@ -679,7 +682,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           }
         }
       } else if (effect.type === "spawn" && targetPos) {
-        const cause = effect.unitId === "illusion" ? "ILLUSION" : skill.id.includes("raise") ? "RESURRECTION" : "SUMMON";
+        // Причина появления берётся из явного признака spawnKind записи;
+        // эвристика по имени умения остаётся только для записей без признака.
+        const cause: SpawnCause = spawnCause(effect, skill.id);
         changed = Boolean(spawnAt(source, effect.unitId, targetPos, cause, events)) || changed;
       } else if (effect.type === "displace" && target && targetPos) {
         changed = teleport(target, targetPos, events) || changed;
@@ -710,6 +715,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if ((actor.skillCooldowns?.[skill.id] ?? 0) > 0) return { available: false, reason: "ON_COOLDOWN" };
     if (skill.maxUsesPerBattle !== undefined && (actor.skillUses?.[skill.id] ?? 0) >= skill.maxUsesPerBattle) {
       return { available: false, reason: "NO_USES" };
+    }
+    // §6 math: умение с признаком извлечения допустимо только в клетке зоны эвакуации.
+    if (skill.extract) {
+      const tile = tileAt(state.grid, actor.x, actor.y);
+      if (!tile?.extract) return { available: false, reason: "ILLEGAL" };
+      return { available: true, targetPos: cellPos(actor) };
     }
     if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
@@ -760,7 +771,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         (spawnTile.pit && !spawnConfig.tags?.includes("flying")) ||
         state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y)
       ) return { available: false, reason: "ILLEGAL" };
-      if (skill.id.includes("raise") && !state.entities.some((entity) =>
+      if (isResurrectionSpawn(spawnEffect, skill.id) && !state.entities.some((entity) =>
         entity.dead && entity.configId === spawnEffect.unitId && entity.x === targetPos.x && entity.y === targetPos.y
       )) return { available: false, reason: "ILLEGAL" };
     }
@@ -1114,7 +1125,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         let success = false;
         const weapon = skillWeapon(skill);
 
-        if (skill.detectsHidden && preview.targetPos) {
+        // §6 math: извлечение — умение с признаком extract; юнит покидает поле
+        // из клетки зоны эвакуации. Событие ENTITY_REMOVED (EXTRACTED).
+        // Эвакуация не запускает исход по уничтожению: завершение миссии
+        // (успех спасения/разведки) определяется слоем кампании.
+        if (skill.extract) {
+          const tile = tileAt(state.grid, actor.x, actor.y);
+          if (!tile?.extract) return { ok: false, reason: "ILLEGAL" };
+          removeEntity(actor, "EXTRACTED", events);
+          success = true;
+        } else if (skill.detectsHidden && preview.targetPos) {
           const radius = skill.radius ?? 0;
           for (const hidden of state.entities
             .filter((entity) => entity.hidden && !entity.dead && distH(preview.targetPos!.x, preview.targetPos!.y, entity.x, entity.y) <= radius)
@@ -1187,7 +1207,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
         });
         spendAction(actor, skill.apCost, skill.endsTurn, events);
-        appendOutcome(events);
+        if (!skill.extract) appendOutcome(events);
         emit();
         return { ok: true, events };
       }

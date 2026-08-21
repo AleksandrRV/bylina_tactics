@@ -45,6 +45,19 @@ describe("fog of war", () => {
     expect(visibleHigh.size).toBeGreaterThan(visibleLow.size);
   });
 
+  it("observes the own cell even with zero vision (§8.1)", () => {
+    const grid = makeGrid(5, 5, 1);
+    const unit: EntityState = {
+      id: 1, configId: "u", owner: 1, x: 2, y: 2, z: 1, dir: 0,
+      ap: 1, maxAp: 1, mobility: 4, hp: 1, maxHp: 1, aim: 0, defense: 0, vision: 0,
+      weaponId: "", weaponIds: [], skillIds: [], obstacle: true, dead: false, flying: false,
+      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+    };
+    const visible = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [unit] }, PLAYER_OWNER);
+    expect(visible.has("2,2")).toBe(true);
+    expect(visible.has("3,2")).toBe(false);
+  });
+
   it("walls block vision", () => {
     const match = createQuickMatch({ enemyCount: 3, seed: 1 });
     const player = match.entities.find((e) => e.owner === PLAYER_OWNER && e.coverType === 0);

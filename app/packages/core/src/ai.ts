@@ -1,6 +1,7 @@
 import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import { distH } from "./grid.js";
 import { livingOf, matchOutcome } from "./outcome.js";
+import { isResurrectionSpawn } from "./skills.js";
 import type { TacticsKernel } from "./kernel.js";
 import type { Command, EntityState, GameEvent, ReachableCell } from "./types.js";
 
@@ -33,10 +34,20 @@ function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly Ent
   for (const skillId of actor.skillIds ?? []) {
     const skill = kernel.getSkillDefinition(skillId);
     if (!skill) continue;
-    if (skill.effects.some((effect) => effect.type === "spawn")) {
-      if (skillId !== "raise_skeleton") continue;
+    // Извлечение: юнит в зоне эвакуации покидает поле (§6 math).
+    if (skill.extract) {
+      if (kernel.getSkillPreview(actor.id, skillId).available) {
+        return { type: "USE_SKILL", actorId: actor.id, skillId };
+      }
+      continue;
+    }
+    const spawnEffect = skill.effects.find((effect) => effect.type === "spawn");
+    if (spawnEffect?.type === "spawn") {
+      // Воскрешение требует тело погибшего юнита указанной записи в целевой
+      // клетке; причина определяется признаком spawnKind (либо эвристикой).
+      if (!isResurrectionSpawn(spawnEffect, skillId)) continue;
       const corpse = all
-        .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === "upyr")
+        .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === spawnEffect.unitId)
         .sort((a, b) => a.id - b.id)
         .find((entity) => kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available);
       if (corpse) return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };

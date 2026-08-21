@@ -82,6 +82,19 @@ function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
 
+/**
+ * Локальный шум для визуальных эффектов (тряска камеры). Начальное значение
+ * зависит от времени запуска, поэтому эффект не повторяется кадр в кадр,
+ * но не использует стандартный генератор среды (§1 math: источник случайности
+ * тактического слоя — только Mulberry32; средство отображения состояния не меняет).
+ */
+let shakeSeed = (Date.now() >>> 0) || 0x9e3779b9;
+
+function shakeNoise(): number {
+  shakeSeed = (Math.imul(shakeSeed, 1664525) + 1013904223) >>> 0;
+  return shakeSeed / 4294967296;
+}
+
 /* ---------- рельеф ---------- */
 
 /** Верхние грани по уровням: низ — холодный мох, земля — луг, верх — светлая выжженная трава. */
@@ -1459,8 +1472,10 @@ export function createFieldRenderer(): FieldRenderer {
     const oy = world.y;
     await tween(150, (t) => {
       const amp = (1 - t) * strength;
-      world.x = ox + (Math.random() * 2 - 1) * amp;
-      world.y = oy + (Math.random() * 2 - 1) * amp;
+      // Локальный шум тряски камеры: визуальный эффект не использует
+      // стандартный генератор среды и не влияет на тактическое состояние.
+      world.x = ox + (shakeNoise() * 2 - 1) * amp;
+      world.y = oy + (shakeNoise() * 2 - 1) * amp;
     });
     world.x = ox;
     world.y = oy;

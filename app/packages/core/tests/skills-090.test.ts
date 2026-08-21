@@ -291,3 +291,43 @@ describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
     expect(edgedHp).toBe(10);
   });
 });
+
+describe("spawnKind controls the spawn cause (§2.9 review)", () => {
+  const RAISE_NAMED_SUMMON: SkillStats = {
+    ...SUMMON,
+    // Имя содержит «raise», но явный признак эффекта — обычный призыв: эвристика не применяется.
+    id: "raise_not_really",
+    effects: [{ type: "spawn", unitId: "upyr", spawnKind: "summon" }],
+  };
+  const CUSTOM_RAISE: SkillStats = {
+    ...RAISE,
+    id: "custom_raise",
+    effects: [{ type: "spawn", unitId: "upyr", spawnKind: "resurrection" }],
+  };
+
+  it("treats a spawn with spawnKind=summon as SUMMON even if the id contains raise", () => {
+    const source = fighter({ id: 1, owner: 1, skillIds: [RAISE_NAMED_SUMMON.id] });
+    const enemy = fighter({ id: 2, owner: 2, x: 6 });
+    const game = kernel(state(source, enemy), [RAISE_NAMED_SUMMON], [UPYR]);
+    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: RAISE_NAMED_SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON")).toBe(true);
+    const spawned = game.getSnapshot().entities.find((entity) => entity.configId === "upyr" && !entity.dead);
+    // Обычный призыв появляется с полным запасом здоровья записи, а не с 1,
+    // и не заменяет основного бойца при проверке поражения стороны (§5 base-design).
+    expect(spawned?.hp).toBe(UPYR.maxHealth);
+    expect(spawned?.countsForElimination).toBe(false);
+  });
+
+  it("treats a spawn with spawnKind=resurrection as RESURRECTION with 1 hp", () => {
+    const caster = fighter({ id: 1, owner: 1, skillIds: [CUSTOM_RAISE.id] });
+    const corpse = fighter({ id: 4, owner: 1, configId: "upyr", x: 3, y: 2, dead: true, obstacle: false, hp: 0 });
+    const enemy = fighter({ id: 2, owner: 2, x: 7, y: 4 });
+    const game = kernel(state(caster, corpse, enemy), [CUSTOM_RAISE], [UPYR]);
+    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: CUSTOM_RAISE.id, targetPos: { x: 3, y: 2, z: 1 } });
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1)).toBe(true);
+  });
+});
