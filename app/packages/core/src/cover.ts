@@ -151,7 +151,7 @@ export function evaluateCover(
   }
 
   if (!options.melee) {
-    const terrainTier = terrainCoverTier(grid, attacker.x, attacker.y, attacker.z, target.x, target.y);
+    const terrainTier = terrainCoverTier(grid, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
     if (terrainTier > 0) {
       details.push({
         x: -1,

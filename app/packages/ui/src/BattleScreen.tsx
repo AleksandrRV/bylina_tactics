@@ -1,6 +1,7 @@
 import {
   ENEMY_OWNER,
   PLAYER_OWNER,
+  createMissionMatch,
   createQuickMatch,
   createTacticsKernel,
   defaultTrainingWeapons,
@@ -10,6 +11,7 @@ import {
   type EntityState,
   type GameEvent,
   type HitPreview,
+  type MatchState,
   type ReachableCell,
   type SkillStats,
   type WeaponStats,
@@ -58,7 +60,7 @@ export function BattleScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
-  const { paused, difficulty, matchSeed } = useSessionState();
+  const { paused, difficulty, battleKind, activeMissionId, matchSeed } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -87,22 +89,37 @@ export function BattleScreen() {
   }, [content.skills]);
 
   const kernel = useMemo(() => {
-    const count =
-      content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
-      content.quickMatch.difficulties[0]?.enemyCount ??
-      3;
-    const initial = createQuickMatch({
-      units: content.units,
-      map: content.quickMatch.map,
-      playerSlots: content.quickMatch.playerSlots,
-      enemyPool: content.quickMatch.enemyPool,
-      enemyCount: count,
-      seed: matchSeed || 1,
-    });
+    // Миссия кампании: карта и состав противников из записи точки; высадка —
+    // фиксированный отряд тех же трёх ролей, что в быстром матче.
+    let initial: MatchState;
+    if (battleKind === "campaign" && activeMissionId) {
+      const mission = session.getCampaign().getMission(activeMissionId);
+      if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
+      initial = createMissionMatch({
+        units: content.units,
+        map: mission.map,
+        playerSlots: content.quickMatch.playerSlots,
+        enemies: mission.enemies,
+        seed: matchSeed || 1,
+      });
+    } else {
+      const count =
+        content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
+        content.quickMatch.difficulties[0]?.enemyCount ??
+        3;
+      initial = createQuickMatch({
+        units: content.units,
+        map: content.quickMatch.map,
+        playerSlots: content.quickMatch.playerSlots,
+        enemyPool: content.quickMatch.enemyPool,
+        enemyCount: count,
+        seed: matchSeed || 1,
+      });
+    }
     const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
     session.bindTacticsHost(host);
     return host;
-  }, [content.quickMatch, content.units, difficulty, matchSeed, session, skills, weapons]);
+  }, [content.quickMatch, content.units, difficulty, battleKind, activeMissionId, matchSeed, session, skills, weapons]);
 
   const [, setTick] = useState(0);
   const [selectedId, setSelectedId] = useState<number | null>(null);
@@ -190,7 +207,12 @@ export function BattleScreen() {
   const finishFromEvents = (events: GameEvent[]): void => {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
-    session.finishMatch(ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat");
+    const outcome = ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
+    if (battleKind === "campaign") {
+      session.finishCampaignMission(outcome);
+      return;
+    }
+    session.finishMatch(outcome);
   };
 
   const playThen = (events: GameEvent[], after?: () => void): void => {
@@ -549,7 +571,16 @@ export function BattleScreen() {
             </button>
           </div>
           <div className="battle-objective">
-            <p className="eyebrow">{t("menu.quickMatch")}</p>
+            <p className="eyebrow">
+              {battleKind === "campaign" ? (
+                <>
+                  <span className="mission-badge">{t("campaign.mission")}</span>
+                  {activeMissionId ?? ""}
+                </>
+              ) : (
+                t("menu.quickMatch")
+              )}
+            </p>
             <p>{t("battle.objectiveQuick")}</p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
@@ -866,6 +897,11 @@ export function BattleScreen() {
             <button type="button" className="hud-btn hud-btn-primary" onClick={() => session.setPaused(false)}>
               {t("battle.resume")}
             </button>
+            {battleKind === "campaign" ? (
+              <button type="button" className="hud-btn" onClick={() => session.leaveCampaignMission()}>
+                {t("battle.toCampaignMap")}
+              </button>
+            ) : null}
             <button type="button" className="hud-btn" onClick={() => session.goTo("menu")}>
               {t("battle.toMenu")}
             </button>

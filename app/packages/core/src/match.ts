@@ -66,6 +66,60 @@ export interface QuickMatchOptions {
   seed: number;
 }
 
+export interface MissionMatchOptions {
+  units: SpawnUnitConfig[];
+  map: MapGenConfig;
+  /** Высадка: идентификаторы записей бойцов, до пяти. */
+  playerSlots: readonly string[];
+  /** Состав противников миссии: тип и число. */
+  enemies: readonly { unitId: string; count: number }[];
+  seed: number;
+}
+
+/**
+ * Сражение миссии кампании: карта из конфигурации миссии и явный состав
+ * противников. Состав появления противников детерминирован порядком записей.
+ */
+export function createMissionMatch(options: MissionMatchOptions): MatchState {
+  const rng = createMulberry32(options.seed);
+  const map = options.map;
+  const players = playerSpawns(map.height);
+  const expanded: string[] = [];
+  for (const entry of options.enemies) {
+    for (let index = 0; index < entry.count; index += 1) expanded.push(entry.unitId);
+  }
+  const enemies = enemySpawns(expanded.length, map.width, map.height);
+  if (enemies.length !== expanded.length) {
+    throw new Error(`Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${expanded.length}`);
+  }
+  const generated = generateBattlefield(map, rng, players, enemies);
+  const roster = options.playerSlots.map((id) => pickUnit(options.units, id));
+
+  const state: MatchState = {
+    turnNumber: 1,
+    activeOwner: PLAYER_OWNER,
+    grid: generated.grid,
+    entities: [...generated.covers],
+    rngSeed: String(options.seed >>> 0),
+    rngState: String(rng.getState()),
+  };
+
+  roster.forEach((config, index) => {
+    const point = players[index] ?? players[0]!;
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+  });
+
+  enemies.forEach((point, index) => {
+    const type = expanded[index]!;
+    const config = pickUnit(options.units, type);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
+  });
+  state.rngState = String(rng.getState());
+  return state;
+}
+
 /** Случайная карта и случайный состав Нави. Численность задаётся трудностью. */
 export function createQuickMatch(options: QuickMatchOptions): MatchState {
   const rng = createMulberry32(options.seed);

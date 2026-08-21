@@ -537,3 +537,17 @@
     min-width: 110px;
   }
 }
+
+/* Бейдж миссии в заголовке тактического сражения */
+.mission-badge {
+  display: inline-block;
+  margin-right: 8px;
+  padding: 1px 8px;
+  border: 1px solid var(--amber-dim, #8a6a24);
+  border-radius: 2px;
+  color: var(--amber, #e0b34a);
+  font-size: 0.68rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}

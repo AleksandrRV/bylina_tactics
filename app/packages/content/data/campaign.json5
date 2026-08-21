@@ -1,5 +1,6 @@
 {
-  // Пустая, но допустимая запись кампании. Содержание появится на этапе 3.
+  // Кампания выпуска 0.10.0: Летучий Корабль и зачистки.
+  // Точки открываются по порядку; финальная миссия «Игла» появится на этапе 5.
   rosterCap: 8,
   deployMin: 1,
   deployMax: 5,
@@ -7,4 +8,104 @@
   woundHpRatio: 0.3,
   darknessMax: 20,
   needleMissionId: "needle",
+  missions: [
+    {
+      id: "clearing_1",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      map: {
+        width: 12,
+        height: 10,
+        pitChance: 0.04,
+        coverDensity: 0.06,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.4,
+        halfCoverChance: 0.55,
+        heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+      },
+      enemies: [{ unitId: "upyr", count: 3 }],
+    },
+    {
+      id: "clearing_2",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      map: {
+        width: 12,
+        height: 10,
+        pitChance: 0.05,
+        coverDensity: 0.08,
+        wallDensity: 0.03,
+        edgeCoverChance: 0.45,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 2 },
+        { unitId: "leshy", count: 2 },
+      ],
+    },
+    {
+      id: "clearing_3",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.05,
+        coverDensity: 0.08,
+        wallDensity: 0.03,
+        edgeCoverChance: 0.45,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 3 },
+        { unitId: "kikimora", count: 1 },
+      ],
+    },
+    {
+      id: "clearing_4",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.06,
+        coverDensity: 0.09,
+        wallDensity: 0.035,
+        edgeCoverChance: 0.5,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 2 },
+        { unitId: "leshy", count: 2 },
+        { unitId: "kikimora", count: 1 },
+      ],
+    },
+    {
+      id: "clearing_5",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.06,
+        coverDensity: 0.09,
+        wallDensity: 0.04,
+        edgeCoverChance: 0.5,
+        halfCoverChance: 0.45,
+        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 4 },
+        { unitId: "leshy", count: 2 },
+      ],
+    },
+  ],
 }

@@ -89,6 +89,7 @@ export const skillConfigSchema = z.object({
   radius: z.number().int().min(0).optional(),
   willPower: z.number().optional(),
   filter: z.enum(["enemies", "allies", "all", "cover"]).optional(),
+  affectsFlying: z.boolean().optional(),
   cooldownTurns: z.number().int().min(1).max(5).optional(),
   maxUsesPerBattle: z.number().int().min(1).optional(),
   effects: z.array(skillEffectSchema).min(1),
@@ -132,6 +133,29 @@ export const mapGenConfigSchema = z.object({
   }).strict().refine((mix) => Math.abs(mix.z0 + mix.z1 + mix.z2 - 1) < 1e-9, "heightMix values must sum to 1"),
 }).strict();
 
+export const missionConfigSchema = z.object({
+  id,
+  type: z.enum(["purge", "destroy", "rescue", "recon", "needle"]),
+  darknessOnVictory: z.number().int().min(0),
+  darknessOnDefeat: z.number().int().min(0),
+  map: mapGenConfigSchema,
+  enemies: z.array(z.object({
+    unitId: id,
+    count: z.number().int().min(1),
+  }).strict()).min(1),
+  generals: z.array(id).optional(),
+}).strict().superRefine((value, context) => {
+  const capacity = Math.max(0, 2 * (value.map.height - 2));
+  const total = value.enemies.reduce((sum, entry) => sum + entry.count, 0);
+  if (total > capacity) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["enemies"],
+      message: `total enemy count ${total} exceeds map spawn capacity ${capacity}`,
+    });
+  }
+});
+
 export const campaignConfigSchema = z.object({
   rosterCap: z.number().int().min(5),
   deployMin: z.number().int().min(1).max(5),
@@ -140,6 +164,7 @@ export const campaignConfigSchema = z.object({
   woundHpRatio: z.number().gt(0).max(1),
   darknessMax: z.number().int().min(1),
   needleMissionId: id,
+  missions: z.array(missionConfigSchema).min(1),
 }).strict().refine((value) => value.deployMin <= value.deployMax, {
   path: ["deployMax"],
   message: "deployMax must be >= deployMin",
@@ -180,6 +205,7 @@ export type UnitConfig = z.infer<typeof unitConfigSchema>;
 export type WeaponConfig = z.infer<typeof weaponConfigSchema>;
 export type SkillConfig = z.infer<typeof skillConfigSchema>;
 export type CampaignConfig = z.infer<typeof campaignConfigSchema>;
+export type MissionConfig = z.infer<typeof missionConfigSchema>;
 export type MapGenConfig = z.infer<typeof mapGenConfigSchema>;
 export type QuickMatchConfig = z.infer<typeof quickMatchConfigSchema>;
 export type PvpConfig = z.infer<typeof pvpConfigSchema>;

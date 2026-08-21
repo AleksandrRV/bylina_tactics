@@ -85,6 +85,7 @@ interface SkillConfig {
   radius?: number;           // область; 0 или отсутствие — одна клетка
   willPower?: number;        // для resolution = "will"
   filter?: "enemies" | "allies" | "all" | "cover";
+  affectsFlying?: boolean;   // обездвиживание действует и на летающих; по умолчанию полёт отменяет его (§15.4)
   cooldownTurns?: number;    // 1…5 собственных ходов; обязательно для непризывных умений
   maxUsesPerBattle?: number; // предел применений; для любого spawn обязан быть равен 1
   effects: SkillEffect[];
@@ -118,6 +119,7 @@ interface CampaignConfig {
   woundHpRatio: number;          // (0, 1]; рекомендуемое значение 0.3
   darknessMax: number;
   needleMissionId: string;
+  missions: MissionConfig[];     // перечень точек, ≥ 1
 }
 
 interface MissionConfig {
@@ -129,6 +131,8 @@ interface MissionConfig {
   enemies: { unitId: string; count: number }[];
   generals?: string[];
 }
+
+Точки открываются по порядку записей: первая доступна сразу, следующая открывается после завершения предыдущей (независимо от исхода). После завершения миссии счётчик Тьмы увеличивается на `darknessOnVictory` при успехе либо на `darknessOnDefeat` при поражении; при достижении `darknessMax` кампания проиграна. Суммарная численность `enemies` миссии не должна превышать вместимость клеток появления карты (`2 × (height − 2)`).
 
 interface MapGenConfig {
   width: number;             // 8…64

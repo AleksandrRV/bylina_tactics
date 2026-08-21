@@ -30,6 +30,8 @@ export interface SkillStats {
   radius?: number;
   willPower?: number;
   filter?: "enemies" | "allies" | "all" | "cover";
+  /** Обездвиживание действует и на летающих (§15.4); по умолчанию полёт отменяет его. */
+  affectsFlying?: boolean;
   /** Число собственных ходов между применениями; обязательно для непризывных умений. */
   cooldownTurns?: number;
   /** Жёсткий предел применений одной сущностью за бой. */
