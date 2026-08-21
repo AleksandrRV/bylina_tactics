@@ -12,11 +12,13 @@
     "quickMatch": "Быстрый матч",
     "campaign": "Новая былина",
     "pvp": "Потешные бои",
+    "debugField": "Испытание сетки",
+    "training": "Служебная стычка",
     "settings": "Настройки",
     "install": "Установить игру",
     "unavailableTitle": "Режим ещё не открыт",
     "unavailableBody": "Этот режим будет доступен в версии {version}.",
-    "unavailableHint": "Доступны быстрый матч и настройки."
+    "unavailableHint": "Доступны быстрый матч, служебная стычка, испытание сетки и настройки."
   },
   "difficulty": {
     "title": "Трудность",
@@ -38,14 +40,30 @@
     "toMenu": "В меню"
   },
   "field": {
+    "title": "Испытание сетки",
+    "back": "В меню",
     "endTurn": "Завершить ход",
     "turn": "Ход {turn}",
     "ap": "ОД {current} / {max}",
+    "height": "Ярус {z}",
+    "pit": "Яма",
+    "wall": "Стена",
+    "cover": "Укрытие",
+    "legendLow": "Низ",
+    "legendMid": "Земля",
+    "legendHigh": "Верх",
+    "legendWalk": "Шаг",
+    "legendDash": "Рывок",
+    "legendPit": "Яма",
+    "legendWall": "Стена",
+    "legendCover": "Укрытие",
+    "legendEnemy": "Противник",
     "sidePlayer": "Дружина",
     "sideEnemy": "Навь"
   },
   "battle": {
-    "title": "Быстрый матч",
+    "title": "Служебная стычка",
+    "objective": "Уничтожьте мишени",
     "objectiveQuick": "Уничтожьте всех противников",
     "enemyTurn": "Ход Нави",
     "pause": "Пауза",
@@ -55,13 +73,11 @@
     "weapon": "Оружие",
     "empty": "Нет выбранного",
     "apLeft": "ОД",
-    "debugMovement": "Очки движения",
-    "debugMovementHint": "Показана стоимость клеток в ОД",
-    "fogUnknown": "Не разведано",
-    "overwatch": "Дозор",
-    "overwatchHint": "Встать в дозор: ответный выстрел по противнику в секторе. Завершает ход персонажа.",
     "defend": "Защита",
-    "defendHint": "Защитная стойка: +25 к увороту, −2 к получаемому урону. Завершает ход персонажа."
+    "defendHint": "Защитная стойка: +25 к увороту, −2 к урону. Завершает ход.",
+    "overwatch": "Дозор",
+    "overwatchHint": "Встать в дозор: ответный выстрел при движении врага. Завершает ход.",
+    "debugMovement": "Очки движения"
   },
   "unit": {
     "bogatyr": { "name": "Богатырь" },
@@ -96,7 +112,19 @@
       "NO_AP": "Нет очков действия",
       "ILLEGAL": "Нельзя",
       "NOT_FOUND": "Нет цели"
-    }
+    },
+    "dmg": "урон {dmg}",
+    "copyBreakdown": "Скопировать расчёт",
+    "bdBaseAim": "Меткость",
+    "bdWeaponMod": "Оружие",
+    "bdHeight": "Высота",
+    "bdDefense": "Защита",
+    "bdDefend": "Стойка",
+    "bdAdjDefense": "Смежные",
+    "bdCover": "Укрытие",
+    "bdObstacles": "Препятствия",
+    "bdRange": "Дальность",
+    "bdTotal": "Итого"
   },
   "settings": {
     "title": "Настройки",

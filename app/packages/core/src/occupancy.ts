@@ -29,6 +29,43 @@ export function isAlly(walker: EntityState, other: EntityState): boolean {
   );
 }
 
+/**
+ * Найти граневое укрытие на грани между двумя клетками.
+ * edge: 0=N, 1=E, 2=S, 3=W.
+ * При переходе из (fx,fy) в (tx,ty) проверяем грань клетки (fx,fy)
+ * в направлении движения и грань клетки (tx,ty) с противоположной стороны.
+ */
+function findEdgeCover(
+  entities: readonly EntityState[],
+  fx: number,
+  fy: number,
+  tx: number,
+  ty: number,
+): EntityState | null {
+  const dx = tx - fx;
+  const dy = ty - fy;
+  // Грань клетки (fx,fy) в направлении движения.
+  let fromEdge: number;
+  let toEdge: number;
+  if (dx === 1) { fromEdge = 1; toEdge = 3; } // east
+  else if (dx === -1) { fromEdge = 3; toEdge = 1; } // west
+  else if (dy === 1) { fromEdge = 2; toEdge = 0; } // south
+  else if (dy === -1) { fromEdge = 0; toEdge = 2; } // north
+  else return null;
+
+  // Ищем укрытие на грани fromEdge клетки (fx,fy).
+  for (const entity of entities) {
+    if (!isCover(entity) || entity.dead || entity.edge === undefined) continue;
+    if (entity.x === fx && entity.y === fy && entity.edge === fromEdge) return entity;
+  }
+  // Ищем укрытие на грани toEdge клетки (tx,ty).
+  for (const entity of entities) {
+    if (!isCover(entity) || entity.dead || entity.edge === undefined) continue;
+    if (entity.x === tx && entity.y === ty && entity.edge === toEdge) return entity;
+  }
+  return null;
+}
+
 /** Проход сквозь клетку. Документ математики, §4. */
 export function canTransit(
   grid: Grid,
@@ -36,6 +73,8 @@ export function canTransit(
   walker: EntityState,
   x: number,
   y: number,
+  fromX?: number,
+  fromY?: number,
 ): boolean {
   const tile = tileAt(grid, x, y);
   if (!tile) return false;
@@ -43,8 +82,15 @@ export function canTransit(
   if (tile.pit && !walker.flying) return false;
   for (const occupant of livingAt(entities, x, y)) {
     if (occupant.id === walker.id) continue;
+    // Граневые укрытия (edge !== undefined) не занимают клетку.
+    if (occupant.edge !== undefined) continue;
     if (isCover(occupant) || isFoe(walker, occupant)) return false;
     if (occupant.obstacle && occupant.owner === 0 && !isCover(occupant)) return false;
+  }
+  // Проверить граневое укрытие на грани перехода.
+  if (fromX !== undefined && fromY !== undefined) {
+    const edgeCover = findEdgeCover(entities, fromX, fromY, x, y);
+    if (edgeCover && edgeCover.coverType === 2) return false; // полное граневое блокирует
   }
   return true;
 }
@@ -63,6 +109,8 @@ export function canFinish(
   if (tile.pit && !walker.flying) return false;
   for (const occupant of livingAt(entities, x, y)) {
     if (occupant.id === walker.id) continue;
+    // Граневые укрытия не занимают клетку — можно встать.
+    if (occupant.edge !== undefined) continue;
     if (occupant.obstacle) return false;
   }
   return true;
@@ -89,8 +137,8 @@ export function edgeCost(
   const dx = toX - fromX;
   const dy = toY - fromY;
   if (dx !== 0 && dy !== 0) {
-    if (!canTransit(grid, entities, walker, toX, fromY)) return Number.POSITIVE_INFINITY;
-    if (!canTransit(grid, entities, walker, fromX, toY)) return Number.POSITIVE_INFINITY;
+    if (!canTransit(grid, entities, walker, toX, fromY, fromX, fromY)) return Number.POSITIVE_INFINITY;
+    if (!canTransit(grid, entities, walker, fromX, toY, fromX, fromY)) return Number.POSITIVE_INFINITY;
   }
 
   if (to.blockLOS) return Number.POSITIVE_INFINITY;
@@ -98,13 +146,37 @@ export function edgeCost(
 
   for (const occupant of livingAt(entities, toX, toY)) {
     if (occupant.id === walker.id) continue;
+    // Граневые укрытия не занимают клетку.
+    if (occupant.edge !== undefined) continue;
     if (isCover(occupant) || isFoe(walker, occupant)) return Number.POSITIVE_INFINITY;
     if (occupant.obstacle && occupant.owner === 0 && !isCover(occupant)) return Number.POSITIVE_INFINITY;
   }
 
+  // Проверить граневое укрытие на грани перехода.
+  let edgeCoverCost = 0;
+  if (dx !== 0 || dy !== 0) {
+    // Для диагонального шага проверяем обе грани.
+    const checkEdge = (fx: number, fy: number, tx: number, ty: number): number => {
+      const edgeCover = findEdgeCover(entities, fx, fy, tx, ty);
+      if (!edgeCover) return 0;
+      if (edgeCover.coverType === 2) return Number.POSITIVE_INFINITY; // полное блокирует
+      return 1; // полуукрытие: +1 МП
+    };
+    if (dx !== 0 && dy !== 0) {
+      // Диагональ: проверяем обе оси.
+      const costX = checkEdge(fromX, fromY, fromX + dx, fromY);
+      const costY = checkEdge(fromX, fromY, fromX, fromY + dy);
+      if (costX === Number.POSITIVE_INFINITY || costY === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
+      edgeCoverCost = Math.max(costX, costY);
+    } else {
+      edgeCoverCost = checkEdge(fromX, fromY, toX, toY);
+      if (edgeCoverCost === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
+    }
+  }
+
   const dz = to.z - from.z;
   if (Math.abs(dz) === 2 && !walker.flying) return Number.POSITIVE_INFINITY;
-  if (walker.flying) return 1;
-  if (dz === 1) return 2;
-  return 1;
+  if (walker.flying) return 1 + edgeCoverCost;
+  if (dz === 1) return 2 + edgeCoverCost;
+  return 1 + edgeCoverCost;
 }

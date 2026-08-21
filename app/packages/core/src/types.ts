@@ -39,6 +39,8 @@ export interface EntityState {
   dead: boolean;
   flying: boolean;
   coverType: 0 | 1 | 2;
+  /** Граневое укрытие: 0=N, 1=E, 2=S, 3=W. undefined = занимает всю клетку. */
+  edge?: 0 | 1 | 2 | 3;
   /** Признак дозора (§14). Снимается при ответном действии или в начале хода стороны. */
   overwatch: boolean;
   /** Защитная стойка: бонус к увороту и снижение урона. Снимается в начале хода стороны. */
@@ -90,7 +92,8 @@ export type GameEvent =
   | { type: "OVERWATCH_SET"; entityId: number }
   | { type: "OVERWATCH_CLEARED"; entityId: number }
   | { type: "DEFEND_SET"; entityId: number }
-  | { type: "DEFEND_CLEARED"; entityId: number };
+  | { type: "DEFEND_CLEARED"; entityId: number }
+  | { type: "COVER_DAMAGED"; entityId: number; newCoverType: 0 | 1 | 2 };
 
 export type RejectReason =
   | "ILLEGAL"

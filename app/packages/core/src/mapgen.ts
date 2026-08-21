@@ -180,6 +180,18 @@ export function generateBattlefield(
       const tile = tileAt(grid, x, y);
       if (!tile || tile.pit || tile.blockLOS) continue;
       if (covers.some((cover) => cover.x === x && cover.y === y)) continue;
+
+      // 40% — граневое укрытие (edge-based), 60% — целоклеточное.
+      const isEdge = rng.nextInt(1, 100) <= 40;
+      const edge = isEdge ? (rng.nextInt(0, 3) as 0 | 1 | 2 | 3) : undefined;
+      // Граневые укрытия чаще полуукрытия.
+      const coverType = edge !== undefined
+        ? (rng.nextInt(1, 100) <= 60 ? 1 : 2) as 1 | 2
+        : rng.nextInt(1, 2) as 1 | 2;
+      // Граневые укрытия НЕ занимают клетку (obstacle: false).
+      // Они влияют только на проход через конкретную грань.
+      const occupiesCell = edge === undefined;
+
       covers.push({
         id: 200 + covers.length,
         configId: "cover",
@@ -197,10 +209,11 @@ export function generateBattlefield(
         defense: 0,
         vision: 0,
         weaponId: "",
-        obstacle: true,
+        obstacle: occupiesCell,
         dead: false,
         flying: false,
-        coverType: rng.nextInt(1, 2) as 1 | 2,
+        coverType,
+        edge,
         overwatch: false,
         defending: false,
       });

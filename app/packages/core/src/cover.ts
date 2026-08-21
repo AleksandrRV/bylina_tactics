@@ -1,11 +1,24 @@
 import { distH } from "./grid.js";
+import { effectiveCoverTier, terrainCoverTier } from "./los.js";
 import { isCover } from "./occupancy.js";
-import type { EntityState } from "./types.js";
+import type { EntityState, Grid } from "./types.js";
 
 export interface CoverEval {
   penalty: number;
   coverType: 0 | 1 | 2;
   flanked: boolean;
+  details: CoverDetail[];
+}
+
+export interface CoverDetail {
+  x: number;
+  y: number;
+  z: number;
+  type: "full_cover" | "half_cover" | "terrain_full" | "terrain_half";
+  rawTier: 0 | 1 | 2;
+  effectiveTier: 0 | 1 | 2;
+  heightDiff: number;
+  label: string;
 }
 
 function sgn(value: number): number {
@@ -32,12 +45,16 @@ export function evaluateCover(
   attacker: EntityState,
   target: EntityState,
   entities: readonly EntityState[],
+  grid: Grid,
   options: { melee: boolean; ignoreHalfCover: boolean; flyingTarget: boolean },
 ): CoverEval {
   if (options.flyingTarget) {
-    return { penalty: 0, coverType: 0, flanked: false };
+    return { penalty: 0, coverType: 0, flanked: false, details: [] };
   }
 
+  const details: CoverDetail[] = [];
+
+  // Entity-based covers adjacent to target.
   const candidates = entities.filter(
     (entity) =>
       isCover(entity) &&
@@ -53,13 +70,44 @@ export function evaluateCover(
     const dx = cover.x - target.x;
     const dy = cover.y - target.y;
     if (!onFireLine(sx, sy, dx, dy)) continue;
-    if (cover.coverType > best) best = cover.coverType;
+    const eTier = effectiveCoverTier(cover.coverType, false, attacker.z, target.z, cover.z);
+    const heightDiff = cover.z - attacker.z;
+    details.push({
+      x: cover.x,
+      y: cover.y,
+      z: cover.z,
+      type: cover.coverType === 2 ? "full_cover" : "half_cover",
+      rawTier: cover.coverType,
+      effectiveTier: eTier,
+      heightDiff,
+      label: `${cover.coverType === 2 ? "Полное укрытие" : "Полуукрытие"} (${cover.x},${cover.y}) z=${cover.z} h=${heightDiff >= 0 ? "+" : ""}${heightDiff} → ${eTier === 0 ? "игнор" : eTier === 1 ? "−25" : "−50"}`,
+    });
+    if (eTier > best) best = eTier;
+  }
+
+  // Terrain cover (elevation between attacker and target).
+  if (!options.melee) {
+    const terrainTier = terrainCoverTier(grid, attacker.x, attacker.y, attacker.z, target.x, target.y);
+    if (terrainTier > 0) {
+      details.push({
+        x: -1,
+        y: -1,
+        z: attacker.z + terrainTier,
+        type: terrainTier === 2 ? "terrain_full" : "terrain_half",
+        rawTier: terrainTier,
+        effectiveTier: terrainTier,
+        heightDiff: terrainTier,
+        label: `Перепад высот +${terrainTier} → ${terrainTier === 1 ? "−25" : "−50"}`,
+      });
+      if (terrainTier > best) best = terrainTier;
+    }
   }
 
   let penalty = best === 2 ? 50 : best === 1 ? 25 : 0;
   if (options.ignoreHalfCover && penalty === 25) penalty = 0;
   if (options.melee) penalty = 0;
 
-  const flanked = candidates.length > 0 && best === 0;
-  return { penalty, coverType: best, flanked };
+  const hasAnyCover = candidates.length > 0 || details.some((d) => d.type.startsWith("terrain"));
+  const flanked = hasAnyCover && best === 0;
+  return { penalty, coverType: best, flanked, details };
 }

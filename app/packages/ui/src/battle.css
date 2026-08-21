@@ -277,13 +277,108 @@
   margin-bottom: 2px;
 }
 
-.skill-slot.is-active {
-  border-color: #e0b34a;
-  color: #f3ecdc;
-  background: #2a332c;
+.aim-card {
+  margin: 0 8px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  background: rgba(28, 35, 32, 0.94);
+  border: 1px solid #3a4550;
+  pointer-events: auto;
+  max-width: 360px;
 }
 
-.aim-card,
+.aim-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.aim-chance {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f3ecdc;
+}
+
+.aim-chance.blocked {
+  color: #e08080;
+  font-size: 0.9rem;
+}
+
+.aim-dmg {
+  font-size: 0.78rem;
+  color: #9a9384;
+}
+
+.aim-copy-btn {
+  margin-left: auto;
+  background: rgba(58, 69, 80, 0.4);
+  border: 1px solid #3a4550;
+  border-radius: 4px;
+  padding: 4px 6px;
+  cursor: pointer;
+  color: #9a9384;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.aim-copy-btn:hover {
+  border-color: #e0b34a;
+  color: #e0b34a;
+  background: rgba(224, 179, 74, 0.1);
+}
+
+.aim-copy-btn svg {
+  display: block;
+}
+
+.breakdown-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  font-size: 0.72rem;
+}
+
+.bd-item {
+  color: #9a9384;
+}
+
+.bd-item.pos {
+  color: #8fd0ff;
+}
+
+.bd-item.neg {
+  color: #e08080;
+}
+
+.bd-details {
+  width: 100%;
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(58, 69, 80, 0.6);
+}
+
+.bd-details-title {
+  display: block;
+  font-size: 0.68rem;
+  color: #9a9384;
+  margin-bottom: 2px;
+  font-weight: 600;
+}
+
+.bd-obs {
+  display: block;
+  font-size: 0.68rem;
+  color: #c0b898;
+  line-height: 1.3;
+  padding-left: 6px;
+  border-left: 2px solid #3a4550;
+  margin-bottom: 2px;
+}
+
 .battle-log {
   margin: 0 8px;
   padding: 6px 10px;
@@ -292,9 +387,6 @@
   background: rgba(28, 35, 32, 0.92);
   border: 1px solid #3a4550;
   pointer-events: none;
-}
-
-.battle-log {
   color: #e0b34a;
 }
 
@@ -333,48 +425,6 @@
 .pause-card .hud-btn {
   width: 100%;
   margin-top: 10px;
-}
-
-.top-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.hud-icon-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px;
-  min-height: 36px;
-  min-width: 36px;
-  color: #9a9384;
-}
-
-.hud-icon-btn:hover,
-.hud-icon-btn:focus-visible {
-  color: #d5cfc0;
-}
-
-.hud-icon-btn.is-on {
-  color: #e0b34a;
-  border-color: #e0b34a;
-  background: #2a332c;
-}
-
-.debug-toggle {
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
-  border-color: #3a4550;
-  color: #9a9384;
-}
-
-.debug-toggle.is-on {
-  border-color: #e0b34a;
-  color: #f3ecdc;
-  background: #2a332c;
-  box-shadow: inset 0 0 0 1px rgba(224, 179, 74, 0.4);
 }
 
 @media (min-width: 880px) {

@@ -183,6 +183,7 @@ export function weaponStatsFromRecord(record: {
   critBonus: number;
   ignoreHalfCover?: boolean;
   closeRangePenalty?: { distHLessThan: number; penalty: number };
+  envDmg?: number;
 }): WeaponStats {
   return {
     id: record.id,
@@ -198,5 +199,6 @@ export function weaponStatsFromRecord(record: {
     critBonus: record.critBonus,
     ignoreHalfCover: record.ignoreHalfCover,
     closeRangePenalty: record.closeRangePenalty,
+    envDmg: record.envDmg,
   };
 }
