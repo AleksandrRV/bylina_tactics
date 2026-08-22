@@ -1148,6 +1148,9 @@
   font-size: 0.75rem;
   cursor: pointer;
   transition: border-color 160ms ease, color 160ms ease;
+  /* Баннер подсказки не перехватывает клики по полю (0.19.2), но кнопка
+     «Пропустить» должна оставаться кликабельной (0.20.1). */
+  pointer-events: auto;
 }
 
 .training-skip:hover,
