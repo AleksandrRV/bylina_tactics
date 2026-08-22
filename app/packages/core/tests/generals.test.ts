@@ -118,3 +118,20 @@ describe("generals (0.18.0)", () => {
     expect(after.entities.find((entity) => entity.id === placedYaga.id)?.dead).toBe(true);
   });
 });
+
+describe("general death accounting (QA 0.18.0)", () => {
+  it("the full host snapshot reports a general dead even outside the player's view", () => {
+    const match = mission({ generals: ["baba_yaga"] });
+    // Ограничиваем зрение игрока: Яга у восточного края вне обзора.
+    for (const entity of match.entities) {
+      if (entity.owner === PLAYER_OWNER) entity.vision = 3;
+    }
+    const kernel = createTacticsKernel({ initial: match, weapons: { sword: SWORD }, skills: {}, seed: 45 });
+    // Сокращённый снимок игрока не содержит Яги (вне обзора)...
+    const playerSnap = kernel.getSnapshotFor(PLAYER_OWNER);
+    expect(playerSnap.entities.some((entity) => entity.configId === "baba_yaga")).toBe(false);
+    // ...но полный снимок ведущего содержит её (BattleScreen берёт его
+    // для учёта окончательной гибели генерала).
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "baba_yaga")).toBe(true);
+  });
+});

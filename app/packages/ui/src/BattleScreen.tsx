@@ -418,10 +418,17 @@ export function BattleScreen() {
       // Исходы бойцов высадки: сопоставление по явной метке rosterIndex,
       // а не по порядку идентификаторов. Метка не зависит от призывов,
       // иллюзий и удалённых с поля сущностей.
+      // Полный снимок ведущего: гибель генерала фиксируется даже вне обзора
+      // стороны игрока (сокращённый снимок не содержит чужих сущностей вне
+      // поля зрения — иначе окончательная гибель не была бы учтена).
+      const full = session.getBattleFullSnapshot();
       const final = session.getBattleSnapshot(PLAYER_OWNER);
-      // Генералы, погибшие в миссии: окончательная гибель (0.18.0).
       const generalDeaths = (mission?.generals ?? []).filter((generalId) => {
-        const general = final.entities.find((entity) => entity.configId === generalId && entity.owner === ENEMY_OWNER);
+        // Генералы спавнятся ядром с id ≥ 500 (match.ts): гибель рядового
+        // с тем же configId не засчитывается генералу.
+        const general = full?.entities.find(
+          (entity) => entity.configId === generalId && entity.owner === ENEMY_OWNER && entity.id >= 500,
+        );
         return general?.dead === true;
       });
       const participants = deployment.map((fighterId, index) => {
