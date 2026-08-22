@@ -25,6 +25,6 @@ export function Shell() {
   if (screen === "pvpRoom") return <PvpRoomScreen />;
   if (screen === "replays") return <ReplayScreen />;
   if (screen === "training") return <TrainingScreen />;
-  if (screen === "battle") return <BattleScreen />;
+  if (screen === "trainingBattle" || screen === "battle") return <BattleScreen />;
   return <MenuScreen />;
 }

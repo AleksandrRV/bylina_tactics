@@ -311,4 +311,19 @@ describe("training config (0.19.0)", () => {
     expect(result.ok).toBe(false);
     expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown player unit"))).toBe(true);
   });
+
+  it("rejects training hints whose steps are not a unique sequence 1..N", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("training.json5"))!;
+    // Шаг 2 переименован в 3: последовательность 1..N нарушена. Интерфейс
+    // исполняет подсказки по полю step (0.19.1), поэтому шаги обязаны
+    // образовывать полную уникальную последовательность.
+    files[key] = files[key]!.replace(
+      "step: 2,\n          textKey: \"training.combat.hint2\",",
+      "step: 3,\n          textKey: \"training.combat.hint2\",",
+    );
+    const result = parseContent(files);
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("hint steps"))).toBe(true);
+  });
 });

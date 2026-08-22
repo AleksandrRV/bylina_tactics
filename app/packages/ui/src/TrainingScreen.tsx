@@ -1,5 +1,6 @@
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
+import { unitPortrait } from "./portraits.js";
 
 function unitName(unitId: string): string {
   return `unit.${unitId}.name`;
@@ -64,7 +65,14 @@ export function TrainingScreen() {
       <header className="menu-brand">
         <p className="eyebrow">{t("app.subtitle")}</p>
         <h1 className="display-title">{t("training.title")}</h1>
-        <p className="muted">{t("training.hint")}</p>
+        <div className="training-mentor-row" role="status">
+          {unitPortrait("chronicler") ? (
+            <img className="training-mentor-face" src={unitPortrait("chronicler")} alt="" draggable={false} />
+          ) : null}
+          <span className="training-mentor-line">
+            <b>{t("training.mentor")}:</b> {t("training.hint")}
+          </span>
+        </div>
       </header>
 
       <div className="training-grid">

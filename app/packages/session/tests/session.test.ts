@@ -75,7 +75,7 @@ describe("createSession", () => {
   });
 
   it("reports version 0.19.0", () => {
-    expect(APP_VERSION).toBe("0.19.0");
+    expect(APP_VERSION).toBe("0.19.1");
   });
 
   it("moves between menu and settings", () => {
@@ -372,5 +372,23 @@ describe("createSession training hints (0.19.0)", () => {
     session.completeTrainingMission("skills");
     session.completeTrainingMission("skills");
     expect(session.get().trainingDone).toEqual(["skills"]);
+  });
+
+  it("keeps training progress across navigation (0.19.1)", () => {
+    // Регрессия: переходы между экранами не должны сбрасывать пройденные
+    // миссии — раньше goTo() затирал trainingDone через фоновое состояние.
+    const session = createSession("menu");
+    session.openTraining();
+    session.startTrainingMission("movement");
+    session.completeTrainingMission("movement");
+    session.goTo("training");
+    expect(session.get().trainingDone).toContain("movement");
+    session.goTo("menu");
+    expect(session.get().trainingDone).toContain("movement");
+    session.openTraining();
+    session.startTrainingMission("combat");
+    session.completeTrainingMission("combat");
+    session.goTo("training");
+    expect(session.get().trainingDone).toEqual(["movement", "combat"]);
   });
 });

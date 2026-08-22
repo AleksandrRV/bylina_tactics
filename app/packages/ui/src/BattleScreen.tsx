@@ -252,12 +252,18 @@ export function BattleScreen() {
   );
 
   // Режим обучения (0.19.0): активный шаг подсказки; отслеживание событий
-  // для перехода к следующему шагу.
+  // для перехода к следующему шагу. Шаги выполняются по порядку поля step
+  // конфигурации (0.19.1): порядок массива hints значения не имеет.
   const [hintStep, setHintStep] = useState(0);
-  const trainingHints = isTraining && trainingMission ? trainingMission.hints : [];
+  const trainingHints = isTraining && trainingMission
+    ? [...trainingMission.hints].sort((a, b) => a.step - b.step)
+    : [];
   const activeHint = trainingHints[hintStep] ?? null;
 
-  // Обновление шага по совершённым действиям.
+  // Обновление шага по событиям действий ИГРОКА (0.19.1): подсказка
+  // завершается только действием игрока — события хода Нави подсказки
+  // не продвигают (иначе шаг «атакуйте» засчитывался бы атакой противника,
+  // а шаг «примените умение» не завершался бы вовсе).
   const advanceTraining = (events: GameEvent[]): void => {
     if (!isTraining || !activeHint) return;
     const done = events.some((event) => {
@@ -342,30 +348,23 @@ export function BattleScreen() {
     ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
     : session.getBattleSnapshot(viewOwner);
 
-  // Подсветка обучающей подсказки: клетка или сущность.
-  const trainingHighlight = (() => {
-    if (!activeHint) return null;
-    if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
-      if (activeHint.cell) return { kind: "cell" as const, x: activeHint.cell.x, y: activeHint.cell.y };
-      return null;
-    }
-    if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
-      const entity = snapshot.entities.find((candidate) => candidate.configId === activeHint.targetUnitId);
-      if (entity) return { kind: "entity" as const, x: entity.x, y: entity.y };
-    }
-    return null;
-  })();
+  // Завершение миссии обучения: итоговая плашка вместо мгновенного возврата
+  // (ui-design §3: «…→ итог → экран обучения»). Пройденной считается только
+  // победа (0.19.1). Подсветка обучающей подсказки вычисляется ниже, после
+  // зоны достижимости: шагу «клетка» без координат нужен список достижимых.
+  const [trainingOver, setTrainingOver] = useState<"victory" | "defeat" | null>(null);
 
-  // Завершение миссии обучения: отметка пройденной и возврат на экран.
-  // Зависимость включает snapshot.entities: исход атакой (без смены хода)
-  // меняет сущностей, но не turnNumber — без этого эффект не перезапустится.
+  // Завершение миссии обучения: итоговая плашка; отметка «пройдена» — только
+  // при победе. Зависимость включает snapshot.entities: исход атакой (без
+  // смены хода) меняет сущностей, но не turnNumber — без этого эффект не
+  // перезапустится. Ожидается окончание воспроизведения событий (busy).
   useEffect(() => {
-    if (!isTraining) return;
-    const ended = snapshot.turnNumber > 0 && session.getBattleOutcome() !== "ongoing";
-    if (!ended) return;
-    if (trainingMission) session.completeTrainingMission(trainingMission.id);
-    session.goTo("training");
-  }, [snapshot.turnNumber, snapshot.entities]);
+    if (!isTraining || busy) return;
+    const outcome = session.getBattleOutcome();
+    if (outcome === "ongoing") return;
+    if (outcome === "victory" && trainingMission) session.completeTrainingMission(trainingMission.id);
+    setTrainingOver(outcome);
+  }, [snapshot.turnNumber, snapshot.entities, busy]);
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -452,6 +451,34 @@ export function BattleScreen() {
     for (const cell of reachable) map.set(cellKey(cell.x, cell.y), cell);
     return map;
   }, [reachable]);
+
+  // Подсветка обучающей подсказки: клетка, сущность либо элемент панели.
+  // Шаг «клетка/зона» без координат (карты миссий обучения случайны, поэтому
+  // фиксированная клетка в конфигурации неприменима) подсвечивает самую
+  // дальнюю достижимую клетку выбранного бойца (0.19.1).
+  const trainingHighlight = (() => {
+    if (!activeHint) return null;
+    if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
+      if (activeHint.cell) return { kind: "cell" as const, x: activeHint.cell.x, y: activeHint.cell.y };
+      const pick = reachable.reduce<ReachableCell | null>(
+        (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
+        null,
+      );
+      if (pick) return { kind: "cell" as const, x: pick.x, y: pick.y };
+      return null;
+    }
+    if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
+      const entity = snapshot.entities.find((candidate) => candidate.configId === activeHint.targetUnitId);
+      if (entity) return { kind: "entity" as const, x: entity.x, y: entity.y };
+    }
+    return null;
+  })();
+
+  // Ключ подсвечиваемого элемента панели/кнопки (highlight "panel"/"button",
+  // ui-design §4.5): "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
+  const hintPanelKey = activeHint && (activeHint.highlight === "panel" || activeHint.highlight === "button")
+    ? (activeHint.panelKey ?? null)
+    : null;
 
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
@@ -579,6 +606,8 @@ export function BattleScreen() {
     const result = session.applyBattleCommand(command);
     if (!result.ok) return;
     announce(result.events);
+    // Подсказка обучения продвигается событиями действия самого игрока (0.19.1).
+    advanceTraining(result.events);
     setAction(null);
     setAimId(null);
     setSkillTargetPos(null);
@@ -642,7 +671,6 @@ export function BattleScreen() {
         }
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
-        advanceTraining(applied.events);
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
@@ -695,6 +723,26 @@ export function BattleScreen() {
       }
     })();
   };
+
+  // Конец хода стороны наступает сам, когда ни один боец стороны не имеет
+  // допустимых действий (math §16.7): при нулевых запасах ОД всех живых
+  // бойцов активной стороны ход передаётся следующей стороне без команды.
+  // В обучении автозавершение отключается на шаге «завершите ход» — этот
+  // шаг учит нажимать кнопку. Повторы и наблюдатель ход не завершают.
+  useEffect(() => {
+    if (paused || busy || enemyPhase) return;
+    if (isReplay || isSpectator) return;
+    if (snapshot.activeOwner !== viewOwner) return;
+    if (isTraining && activeHint?.until === "end_turn") return;
+    const ownUnits = snapshot.entities.filter(
+      (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
+    );
+    if (ownUnits.length === 0) return;
+    if (ownUnits.some((entity) => entity.ap > 0)) return;
+    if (!isNetGuest && session.getBattleOutcome() !== "ongoing") return;
+    endTurn();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint]);
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== viewOwner) return;
@@ -932,6 +980,17 @@ export function BattleScreen() {
     <div className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}`}>
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
+        {isTraining && trainingMission ? (
+          <div className="training-mentor" role="status">
+            {unitPortrait("chronicler") ? (
+              <img className="training-mentor-face" src={unitPortrait("chronicler")} alt="" draggable={false} />
+            ) : null}
+            <div className="training-mentor-meta">
+              <span className="training-mentor-name">{t("training.mentor")}</span>
+              <span className="training-mentor-line">{t(`training.${trainingMission.id}.intro`)}</span>
+            </div>
+          </div>
+        ) : null}
         {isTraining && activeHint ? (
           <div className="training-hint" role="status" aria-live="polite">
             <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
@@ -1232,7 +1291,7 @@ export function BattleScreen() {
                       <i key={index} className={index < selected.hp ? "on" : ""} />
                     ))}
                   </div>
-                  <div className="diamonds" aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}>
+                  <div className={`diamonds${hintPanelKey === "ap" ? " hint-pulse" : ""}`} aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}>
                     {Array.from({ length: selected.maxAp }, (_, index) => (
                       <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
                     ))}
@@ -1258,7 +1317,7 @@ export function BattleScreen() {
               <button
                 key={`weapon-${weaponId}`}
                 type="button"
-                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
+                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && index === 0 ? " hint-pulse" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
                 disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
@@ -1286,7 +1345,7 @@ export function BattleScreen() {
                 <button
                   key={`skill-${skillId}`}
                   type="button"
-                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}`}
+                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}${hintPanelKey === "skill" && (selected?.skillIds?.[0] ?? "") === skillId ? " hint-pulse" : ""}`}
                   aria-pressed={active}
                   data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
@@ -1310,14 +1369,15 @@ export function BattleScreen() {
             })}
             <button
               type="button"
-              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
+              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}${hintPanelKey === "defend" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.defending)}
               data-action-state={selected?.defending ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
               title={t("battle.defendHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+                const result = session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+                if (result.ok) advanceTraining(result.events);
                 setAction(null);
                 setSkillTargetPos(null);
                 setAimId(null);
@@ -1329,14 +1389,15 @@ export function BattleScreen() {
             </button>
             <button
               type="button"
-              className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
+              className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}${hintPanelKey === "overwatch" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.overwatch)}
               data-action-state={selected?.overwatch ? "active" : "inactive"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+                const result = session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+                if (result.ok) advanceTraining(result.events);
                 setAction(null);
                 setSkillTargetPos(null);
                 setAimId(null);
@@ -1349,7 +1410,7 @@ export function BattleScreen() {
           </div>
           <button
             type="button"
-            className="hud-btn hud-btn-primary"
+            className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
             disabled={busy || snapshot.activeOwner !== viewOwner}
             onClick={() => endTurn()}
           >
@@ -1437,6 +1498,23 @@ export function BattleScreen() {
                 {t("net.leaveRoom")}
               </button>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isTraining && trainingOver ? (
+        <div className="pause-root" role="presentation">
+          <div className="pause-card training-over-card" role="dialog" aria-modal="true" aria-labelledby="training-over-title">
+            <p className="eyebrow">{trainingMission ? t(trainingMission.titleKey) : t("training.title")}</p>
+            <h2 id="training-over-title">
+              {trainingOver === "victory" ? t("training.over.victory") : t("training.over.defeat")}
+            </h2>
+            <p className="muted">
+              {trainingOver === "victory" ? t("training.over.victoryBody") : t("training.over.defeatBody")}
+            </p>
+            <button type="button" className="hud-btn hud-btn-primary" onClick={() => session.goTo("training")}>
+              {t("training.over.back")}
+            </button>
           </div>
         </div>
       ) : null}

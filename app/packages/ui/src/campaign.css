@@ -2697,6 +2697,40 @@
   gap: 18px;
 }
 
+/* Наставник-летописец на экране обучения (0.19.1) */
+.training-mentor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  max-width: 560px;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  border-radius: 10px;
+  background: rgba(12, 16, 12, 0.55);
+  text-align: left;
+}
+
+.training-mentor-row .training-mentor-face {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  object-fit: cover;
+  flex: none;
+}
+
+.training-mentor-row .training-mentor-line {
+  color: #d8d2c2;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.training-mentor-row b {
+  color: var(--amber, #e0b34a);
+  font-weight: 600;
+}
+
 .training-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));

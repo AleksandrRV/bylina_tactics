@@ -18,6 +18,8 @@ const PORTRAIT_FILES: Record<string, string> = {
   // Генералы (0.18.0).
   baba_yaga: "baba_yaga.jpg",
   solovey: "solovey.jpg",
+  // Наставник-летописец (нарративная рамка обучения, roadmap 0.19.0).
+  chronicler: "chronicler.jpg",
 };
 
 /** Абсолютный URL от baseURI документа — устойчиво к нестандартному base приложения. */

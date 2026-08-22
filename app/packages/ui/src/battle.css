@@ -843,10 +843,83 @@
   justify-content: center;
 }
 
+/* Нарративная рамка обучения: наставник-летописец (0.19.1) */
+.training-mentor {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 560px;
+  padding: 8px 16px 8px 10px;
+  background: rgba(16, 22, 16, 0.92);
+  border: 1px solid rgba(224, 179, 74, 0.4);
+  border-radius: 8px;
+  color: #f3ecdc;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 69;
+}
+
+.training-mentor-face {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  object-fit: cover;
+  flex: none;
+}
+
+.training-mentor-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.training-mentor-name {
+  color: var(--amber, #e0b34a);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.training-mentor-line {
+  font-size: 0.88rem;
+  line-height: 1.35;
+}
+
+/* Пульсирующая подсветка элемента панели/кнопки для подсказок (0.19.1) */
+.hint-pulse {
+  outline: 2px solid rgba(224, 179, 74, 0.9);
+  outline-offset: 2px;
+  animation: hint-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes hint-pulse {
+  0%,
+  100% {
+    outline-color: rgba(224, 179, 74, 0.35);
+  }
+  50% {
+    outline-color: rgba(224, 179, 74, 0.95);
+  }
+}
+
+/* Итоговая плашка миссии обучения (0.19.1, ui-design §3) */
+.training-over-card {
+  text-align: center;
+}
+
+.training-over-card h2 {
+  margin: 6px 0;
+}
+
 /* Баннер подсказки обучения (0.19.0) */
 .training-hint {
   position: absolute;
-  top: 64px;
+  top: 128px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

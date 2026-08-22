@@ -327,7 +327,20 @@ export const trainingMissionSchema = z.object({
   playerSlots: z.array(id).min(1).max(5),
   enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(1),
   hints: z.array(trainingHintSchema).min(1),
-}).strict();
+}).strict().superRefine((value, context) => {
+  // Поле step задаёт порядок шагов (content-schema §8): шаги обязаны
+  // образовывать последовательность 1..N ровно по одному разу — интерфейс
+  // выполняет подсказки по step, а не по порядку массива.
+  const steps = value.hints.map((hint) => hint.step).sort((a, b) => a - b);
+  const expected = Array.from({ length: value.hints.length }, (_, index) => index + 1);
+  if (steps.join(",") !== expected.join(",")) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["hints"],
+      message: `hint steps must form a unique sequence 1..${value.hints.length}`,
+    });
+  }
+});
 
 /** Режим обучения (0.19.0): ровно три миссии. */
 export const trainingConfigSchema = z.object({

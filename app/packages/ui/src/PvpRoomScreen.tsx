@@ -73,6 +73,7 @@ export function PvpRoomScreen() {
       ) : tab === "local" ? (
         <LocalSetup
           pool={pool}
+          nMin={content.pvp.nMin}
           onStart={(side1, side2, objective) => session.startPvpBattle(side1, side2, Date.now() >>> 0, { objective })}
         />
       ) : (
@@ -152,15 +153,20 @@ function Draft({
 
 function LocalSetup({
   pool,
+  nMin,
   onStart,
 }: {
   pool: string[];
+  nMin: number;
   onStart: (side1: string[], side2: string[], objective: Objective) => void;
 }) {
   const t = useT();
+  // Число мест N ограничено сверху вместимостью набора, снизу — полем
+  // nMin конфигурации (content-schema §6, base-design §7).
   const maxN = Math.min(5, Math.floor(pool.length / 2));
+  const minN = Math.max(1, Math.min(nMin, maxN));
   const [objective, setObjective] = useState<Objective>("elimination");
-  const [n, setN] = useState<number>(Math.min(3, maxN));
+  const [n, setN] = useState<number>(Math.max(minN, Math.min(3, maxN)));
   const [starter] = useState<1 | 2>(() => (Math.random() < 0.5 ? 1 : 2));
   const [picks, setPicks] = useState<{ 1: string[]; 2: string[] }>({ 1: [], 2: [] });
   const [current, setCurrent] = useState<1 | 2 | null>(starter);
@@ -182,7 +188,7 @@ function LocalSetup({
     setCurrent(starter);
   };
 
-  const ready = current === null && picks[1].length === n && picks[2].length === n && n >= 1;
+  const ready = current === null && picks[1].length === n && picks[2].length === n && n >= minN;
 
   return (
     <>
@@ -199,7 +205,7 @@ function LocalSetup({
         <div className="pvp-option-group">
           <span className="pvp-option-title">{t("pvp.nLabel")}</span>
           <div className="pvp-n-select">
-            {Array.from({ length: maxN }, (_, i) => i + 1).map((value) => (
+            {Array.from({ length: maxN - minN + 1 }, (_, i) => i + minN).map((value) => (
               <button key={value} type="button" className={`pvp-n-btn${n === value ? " is-on" : ""}`} onClick={() => { setN(value); reset(); }}>
                 {value}
               </button>

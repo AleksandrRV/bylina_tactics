@@ -5,7 +5,7 @@ import type { WeaponStats } from "../src/weapons.js";
 
 describe("package version", () => {
   it("is 0.19.0", () => {
-    expect(CORE_VERSION).toBe("0.19.0");
+    expect(CORE_VERSION).toBe("0.19.1");
   });
 });
 

@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.19.0";
+export const APP_VERSION = "0.19.1";
 
 export type AppScreen =
   | "boot"
@@ -217,7 +217,12 @@ export interface SessionApi {
   subscribe(listener: (state: SessionState) => void): () => void;
 }
 
-const idle: Omit<SessionState, "screen"> = {
+/**
+ * Фоновое состояние переходов между экранами. `trainingDone` в нём намеренно
+ * отсутствует (0.19.1): прогресс обучения постоянен — переходы между экранами
+ * не должны его сбрасывать, а `emit` сохраняет значение из текущего состояния.
+ */
+const idle: Omit<SessionState, "screen" | "trainingDone"> = {
   unavailableMode: null,
   paused: false,
   battleKind: null,
@@ -237,14 +242,13 @@ const idle: Omit<SessionState, "screen"> = {
   replayJournal: null,
   replayDraft: null,
   trainingMissionId: null,
-  trainingDone: [],
 };
 
 export function createSession(
   initial: AppScreen = "boot",
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
-  let state: SessionState = { screen: initial, ...idle, ...(restored ?? {}) };
+  let state: SessionState = { screen: initial, trainingDone: [], ...idle, ...(restored ?? {}) };
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -277,7 +281,10 @@ export function createSession(
   };
 
   const emit = (next: SessionState): void => {
-    state = next;
+    // Прогресс обучения постоянен: если очередное состояние не несёт явного
+    // значения trainingDone (переходы навигации через idle), сохраняется
+    // текущее — отметки «Пройдена» не теряются между экранами (0.19.1).
+    state = { ...next, trainingDone: next.trainingDone ?? state.trainingDone ?? [] };
     for (const listener of listeners) listener(state);
   };
 

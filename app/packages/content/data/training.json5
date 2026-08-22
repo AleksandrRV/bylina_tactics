@@ -76,6 +76,10 @@
       ],
     },
     {
+      // «Умения и состояния» (0.19.1): кикимора вводит отравление и
+      // воскрешение костяка, знахарка — лечение, очищение и призыв зверя;
+      // дозор и туман войны действуют как обычно. Состав соответствует
+      // описанию миссии (base-design §3.5).
       id: "skills",
       titleKey: "training.skills.title",
       descriptionKey: "training.skills.description",
@@ -90,7 +94,10 @@
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
       },
       playerSlots: ["bogatyr", "znaharka"],
-      enemies: [{ unitId: "upyr", count: 2 }],
+      enemies: [
+        { unitId: "upyr", count: 1 },
+        { unitId: "kikimora", count: 1 },
+      ],
       hints: [
         {
           step: 1,
@@ -105,6 +112,13 @@
           highlight: "panel",
           panelKey: "defend",
           until: "defend",
+        },
+        {
+          step: 3,
+          textKey: "training.skills.hint3",
+          highlight: "button",
+          panelKey: "overwatch",
+          until: "overwatch",
         },
       ],
     },

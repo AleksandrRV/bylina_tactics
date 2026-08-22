@@ -136,6 +136,15 @@
     },
     "solovey": {
       "name": "Solovey the Brigand"
+    },
+    "upyr_pvp": {
+      "name": "Upyr warrior"
+    },
+    "leshy_pvp": {
+      "name": "Leshy guard"
+    },
+    "kikimora_pvp": {
+      "name": "Kikimora warrior"
     }
   },
   "weapon": {
@@ -162,6 +171,12 @@
     },
     "pishchal": {
       "name": "Arquebus"
+    },
+    "sword_debug": {
+      "name": "Sword (debug)"
+    },
+    "bow_debug": {
+      "name": "Bow (debug)"
     }
   },
   "combat": {
@@ -487,6 +502,7 @@
   "training": {
     "title": "Training",
     "hint": "Three missions teach the basics. Go in order or pick any.",
+    "mentor": "Chronicler",
     "mission": "Mission {number}",
     "completed": "Completed",
     "start": "Start",
@@ -494,6 +510,7 @@
     "movement": {
       "title": "First steps",
       "description": "Grid, levels, pits, action points, movement and dash.",
+      "intro": "The training deck of the Flying Ship. Let us start with the basics: the grid, the levels and action points.",
       "hint1": "Each fighter has action points. A move costs one, a dash costs two.",
       "hint2": "Approach the highlighted cell: click it.",
       "hint3": "End your turn with the button on the right."
@@ -501,14 +518,24 @@
     "combat": {
       "title": "Combat",
       "description": "Attack, cover, height, hit chance and damage.",
+      "intro": "Against Nav bravery alone is not enough: height, cover and a careful aim decide the outcome.",
       "hint1": "Pick a weapon and attack the enemy.",
       "hint2": "The enemy is in cover: move closer to improve your chance."
     },
     "skills": {
       "title": "Skills & statuses",
-      "description": "Class skills, overwatch, statuses, fog of war.",
+      "description": "Class skills, overwatch, poison and resurrection, summons, fog of war.",
+      "intro": "The Znaharka and the hero's skills: heal, cleanse and stand watch to the last.",
       "hint1": "Use the selected fighter's skill.",
-      "hint2": "Use the defensive stance (key 9)."
+      "hint2": "Use the defensive stance (key 9).",
+      "hint3": "Put a fighter on overwatch (key 0)."
+    },
+    "over": {
+      "victory": "Mission completed",
+      "victoryBody": "The Chronicler writes the deed into the ship's chronicle.",
+      "defeat": "Mission failed",
+      "defeatBody": "Try again — the chronicle awaits its next chapter.",
+      "back": "Back to training"
     }
   }
 }
