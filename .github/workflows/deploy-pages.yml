@@ -1,0 +1,73 @@
+# Публикация PWA на GitHub Pages.
+# Запускается при каждом push в main и вручную (workflow_dispatch).
+# Итог: игра доступна по адресу https://<владелец>.github.io/<репозиторий>/
+# и устанавливается на телефон как автономное приложение.
+
+name: Deploy PWA to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          package_json_file: app/package.json
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: app/pnpm-lock.yaml
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run tests
+        run: pnpm test
+
+      - name: Build PWA
+        env:
+          # Базовый путь = имя репозитория: https://<владелец>.github.io/<репозиторий>/
+          BASE_PATH: /${{ github.event.repository.name }}/
+        run: pnpm build
+
+      - name: SPA fallback (404.html)
+        run: cp apps/game-pwa/dist/index.html apps/game-pwa/dist/404.html
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app/apps/game-pwa/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
