@@ -5,6 +5,7 @@ import { DeploymentScreen } from "./DeploymentScreen.js";
 import { DifficultyScreen } from "./DifficultyScreen.js";
 import { MenuScreen } from "./MenuScreen.js";
 import { MissionResultScreen } from "./MissionResultScreen.js";
+import { PvpRoomScreen } from "./PvpRoomScreen.js";
 import { ResultScreen } from "./ResultScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { useSessionState } from "./hooks.js";
@@ -19,6 +20,7 @@ export function Shell() {
   if (screen === "deployment") return <DeploymentScreen />;
   if (screen === "campaign") return <CampaignScreen />;
   if (screen === "missionResult") return <MissionResultScreen />;
+  if (screen === "pvpRoom") return <PvpRoomScreen />;
   if (screen === "battle") return <BattleScreen />;
   return <MenuScreen />;
 }

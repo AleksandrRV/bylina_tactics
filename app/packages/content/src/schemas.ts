@@ -305,6 +305,8 @@ export const pvpConfigSchema = z.object({
   pool: z.array(id),
   nMin: z.number().int().min(1),
   objective: z.enum(["elimination", "apple", "choice"]),
+  /** Заготовка поля режима (roadmap 0.14.0: «Комната сбора без сети»). */
+  map: mapGenConfigSchema.optional(),
 }).strict();
 
 export type UnitConfig = z.infer<typeof unitConfigSchema>;

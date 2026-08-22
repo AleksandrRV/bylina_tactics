@@ -2,12 +2,14 @@ import {
   ENEMY_OWNER,
   PLAYER_OWNER,
   createMissionMatch,
+  createPvpMatch,
   createQuickMatch,
   createTacticsKernel,
   defaultTrainingWeapons,
   pickEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
+  type Command,
   type EntityState,
   type GameEvent,
   type HitPreview,
@@ -35,10 +37,6 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
     window.setTimeout(resolve, ms);
   });
-}
-
-function isOwn(entity: EntityState): boolean {
-  return !entity.dead && entity.coverType === 0 && entity.owner === PLAYER_OWNER && entity.maxAp > 0;
 }
 
 function unitNameKey(configId: string): string {
@@ -115,10 +113,19 @@ export function BattleScreen() {
       session.bindTacticsHost(host);
       return host;
     }
-    // Миссия кампании: карта и состав противников из записи точки; высадка —
-    // выбранные бойцы дружины с учётом ранений и сохранённого здоровья.
+    // Поочерёдная игра: составы сторон из комнаты сбора, поле режима (0.14.0).
     let initial: MatchState;
-    if (battleKind === "campaign" && activeMissionId) {
+    if (battleKind === "pvp") {
+      const sides = session.getPvpSides();
+      if (!sides) throw new Error("PvP sides are missing");
+      initial = createPvpMatch({
+        units: content.units,
+        map: content.pvp.map ?? content.quickMatch.map,
+        side1: sides.side1,
+        side2: sides.side2,
+        seed: matchSeed || 1,
+      });
+    } else if (battleKind === "campaign" && activeMissionId) {
       const mission = session.getCampaign().getMission(activeMissionId);
       if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
       const penalty = content.campaign.woundPenalty;
@@ -192,10 +199,42 @@ export function BattleScreen() {
     [kernel],
   );
 
-  const snapshot = session.getBattleSnapshot(PLAYER_OWNER);
+  // Поочерёдная игра: каждый рендер показывает сторону, чей сейчас ход
+  // (сокрытие панели чужой стороны и туман стороны при передаче устройства).
+  const pvpActive = battleKind === "pvp" ? (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER) : null;
+  const viewOwner = pvpActive ?? PLAYER_OWNER;
+  const enemyOwner = viewOwner === ENEMY_OWNER ? PLAYER_OWNER : ENEMY_OWNER;
 
-  const visibleCells = useMemo(() => session.getBattleVisible(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
-  const exploredCells = useMemo(() => session.getBattleExplored(PLAYER_OWNER), [kernel, snapshot.turnNumber, snapshot.entities]);
+  const snapshot = session.getBattleSnapshot(viewOwner);
+
+  const visibleCells = useMemo(() => session.getBattleVisible(viewOwner), [kernel, snapshot.turnNumber, snapshot.entities, viewOwner]);
+  const exploredCells = useMemo(() => session.getBattleExplored(viewOwner), [kernel, snapshot.turnNumber, snapshot.entities, viewOwner]);
+
+  const isOwn = (entity: EntityState): boolean =>
+    !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+
+  // События поочерёдного боя приходят через локальный транспорт (0.14.0).
+  useEffect(() => {
+    if (battleKind !== "pvp") return;
+    const unlisten = session.subscribePvpEvents((events) => {
+      announce(events);
+      setAction(null);
+      setAimId(null);
+      setSkillTargetPos(null);
+      setPreview(null);
+      playThen(events);
+    });
+    return unlisten;
+    // Подписка создаётся на время жизни экрана.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kernel, battleKind, session]);
+
+  // Передача устройства в поочерёдной игре: при смене хода экран ждёт
+  // подтверждения нового игрока, прежде чем показать его панель.
+  const [passReady, setPassReady] = useState(false);
+  useEffect(() => {
+    setPassReady(false);
+  }, [snapshot.turnNumber, pvpActive]);
 
   // Миссия кампании: запись точки для формулировки задачи и цели.
   const mission = battleKind === "campaign" && activeMissionId
@@ -227,7 +266,7 @@ export function BattleScreen() {
     setAimId(null);
     setSkillTargetPos(null);
     setPreview(null);
-  }, [snapshot.turnNumber]);
+  }, [snapshot.turnNumber, viewOwner]);
 
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
@@ -283,6 +322,11 @@ export function BattleScreen() {
   const finishFromEvents = (events: GameEvent[]): void => {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
+    if (battleKind === "pvp") {
+      const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
+      if (winner) session.finishPvpMatch(winner);
+      return;
+    }
     const outcome = ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
     if (battleKind === "campaign") {
       // Исходы бойцов высадки: сопоставление по явной метке rosterIndex,
@@ -329,37 +373,40 @@ export function BattleScreen() {
     playThen(result.events);
   };
 
-  const tryMove = (to: CellPos): void => {
-    if (selectedId === null || paused || busy) return;
-    if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = session.applyBattleCommand({ type: "MOVE", actorId: selectedId, to });
-    if (!result.ok) return;
-    setPreview(null);
-    setAimId(null);
-    playThen(result.events);
-  };
-
-  const tryAttack = (targetId: number): void => {
-    if (selectedId === null || !action || paused || busy) return;
-    if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = action.type === "weapon"
-      ? session.applyBattleCommand({ type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id })
-      : session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id });
+  /** Единственный канал команд: поочерёдная игра — через локальный транспорт. */
+  const applyCommand = (command: Command): void => {
+    if (battleKind === "pvp") {
+      session.sendPvpCommand(command);
+      return;
+    }
+    const result = session.applyBattleCommand(command);
     if (!result.ok) return;
     announce(result.events);
     setAction(null);
     setAimId(null);
     setSkillTargetPos(null);
+    setPreview(null);
     playThen(result.events);
   };
 
+  const tryMove = (to: CellPos): void => {
+    if (selectedId === null || paused || busy) return;
+    if (snapshot.activeOwner !== viewOwner) return;
+    applyCommand({ type: "MOVE", actorId: selectedId, to });
+  };
+
+  const tryAttack = (targetId: number): void => {
+    if (selectedId === null || !action || paused || busy) return;
+    if (snapshot.activeOwner !== viewOwner) return;
+    const command: Command = action.type === "weapon"
+      ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
+      : { type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id };
+    applyCommand(command);
+  };
+
   const useSelfSkill = (skillId: string): void => {
-    if (selectedId === null || paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = session.applyBattleCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
-    if (!result.ok) return;
-    announce(result.events);
-    setAimId(null);
-    playThen(result.events);
+    if (selectedId === null || paused || busy || snapshot.activeOwner !== viewOwner) return;
+    applyCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
   };
 
   const tryPositionSkill = (pos: CellPos): void => {
@@ -370,19 +417,13 @@ export function BattleScreen() {
       setPreview(null);
       return;
     }
-    const result = session.applyBattleCommand({
+    applyCommand({
       type: "USE_SKILL",
       actorId: selectedId,
       skillId: action.id,
       targetId: aimId ?? undefined,
       targetPos: pos,
     });
-    if (!result.ok) return;
-    announce(result.events);
-    setAction(null);
-    setAimId(null);
-    setSkillTargetPos(null);
-    playThen(result.events);
   };
 
   const runEnemyPhase = async (): Promise<void> => {
@@ -415,7 +456,9 @@ export function BattleScreen() {
 
   // Восстановление партии, сохранённой в ход Нави: алгоритм противника
   // продолжает ход с текущего состояния (иначе сторона осталась бы без хода).
+  // В поочерёдной игре алгоритм не применяется — ход принадлежит человеку.
   useEffect(() => {
+    if (battleKind === "pvp") return;
     if (session.getBattleOutcome() !== "ongoing") return;
     if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== ENEMY_OWNER) return;
     void runEnemyPhase();
@@ -425,12 +468,16 @@ export function BattleScreen() {
 
   const endTurn = (): void => {
     if (paused || busy) return;
-    if (snapshot.activeOwner !== PLAYER_OWNER) return;
-    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
-    if (!result.ok) return;
+    if (snapshot.activeOwner !== viewOwner) return;
     setPreview(null);
     setAimId(null);
     setLog(null);
+    if (battleKind === "pvp") {
+      session.sendPvpCommand({ type: "END_TURN", playerId: String(viewOwner) });
+      return;
+    }
+    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
+    if (!result.ok) return;
     setBusy(true);
     void (async () => {
       try {
@@ -446,14 +493,14 @@ export function BattleScreen() {
   };
 
   const onCell = (x: number, y: number): void => {
-    if (paused || busy || snapshot.activeOwner !== PLAYER_OWNER) return;
+    if (paused || busy || snapshot.activeOwner !== viewOwner) return;
     const reach = byReach.get(cellKey(x, y));
     const targeting = action !== null;
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
     const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
     const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
-    if (entity?.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
+    if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
       setSelectedId(entity.id);
       setAction(null);
       setSkillTargetPos(null);
@@ -462,7 +509,7 @@ export function BattleScreen() {
       return;
     }
 
-    const automaticAttack = primaryAttackForEnemy(selected, entity, PLAYER_OWNER, targeting);
+    const automaticAttack = primaryAttackForEnemy(selected, entity, viewOwner, targeting);
     if (automaticAttack) {
       setAction(automaticAttack);
       setAimId(entity?.id ?? null);
@@ -597,16 +644,16 @@ export function BattleScreen() {
         }
         return;
       }
-      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0) {
-        session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
+      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner) {
+        applyCommand({ type: "DEFEND", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
         setAimId(null);
         setPreview(null);
         return;
       }
-      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0) {
-        session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
+      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner) {
+        applyCommand({ type: "OVERWATCH", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
         setAimId(null);
@@ -653,20 +700,25 @@ export function BattleScreen() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session]);
+  }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
-  const roster = snapshot.entities.filter((entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0);
-  const sideKey = snapshot.activeOwner === ENEMY_OWNER ? "field.sideEnemy" : "field.sidePlayer";
+  const roster = snapshot.entities.filter((entity) => entity.owner === viewOwner && entity.coverType === 0);
+  const sideKey = battleKind === "pvp"
+    ? (viewOwner === 1 ? "pvp.side1" : "pvp.side2")
+    : snapshot.activeOwner === ENEMY_OWNER
+      ? "field.sideEnemy"
+      : "field.sidePlayer";
 
-  // Показывать портреты врагов только если они в зоне видимости (или уже мертвы и были видны).
+  // Показывать портреты противников только если они в зоне видимости
+  // (или уже мертвы и были видны). В поочерёдной игре — противники активной стороны.
   const knownEnemies = snapshot.entities.filter((entity) => {
-    if (entity.owner !== ENEMY_OWNER || entity.coverType !== 0) return false;
+    if (entity.owner !== enemyOwner || entity.coverType !== 0) return false;
     const key = cellKey(entity.x, entity.y);
     return visibleCells.has(key) || (entity.dead && exploredCells.has(key));
   });
 
   return (
-    <div className="battle-screen">
+    <div className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}`}>
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
         <header className="battle-top">
@@ -701,6 +753,8 @@ export function BattleScreen() {
                   <span className="mission-badge">{t("campaign.mission")}</span>
                   {activeMissionId ?? ""}
                 </>
+              ) : battleKind === "pvp" ? (
+                t("menu.pvp")
               ) : (
                 t("menu.quickMatch")
               )}
@@ -751,6 +805,22 @@ export function BattleScreen() {
               </div>
             ) : null}
           </div>
+          {battleKind === "pvp" ? (
+            <div className="pvp-sides-strip" aria-label={t("pvp.objective")}>
+              <span className={`pvp-side-emblem is-side1${viewOwner === 1 ? " is-active" : ""}`} aria-hidden="true">
+                1
+              </span>
+              <span className="pvp-side-emblem-sep" aria-hidden="true">
+                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                  <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
+                  <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
+                </svg>
+              </span>
+              <span className={`pvp-side-emblem is-side2${viewOwner === 2 ? " is-active" : ""}`} aria-hidden="true">
+                2
+              </span>
+            </div>
+          ) : null}
           <div className="roster" aria-label={t("field.sidePlayer")}>
             {roster.map((entity) => {
               const face = unitPortrait(entity.configId);
@@ -939,7 +1009,7 @@ export function BattleScreen() {
                 className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
-                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
                   setAction(active ? null : { type: "weapon", id: weaponId });
@@ -968,7 +1038,7 @@ export function BattleScreen() {
                   aria-pressed={active}
                   data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== PLAYER_OWNER}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner}
                   onClick={() => {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
@@ -991,7 +1061,7 @@ export function BattleScreen() {
               className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}`}
               aria-pressed={Boolean(selected?.defending)}
               data-action-state={selected?.defending ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
               title={t("battle.defendHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1010,7 +1080,7 @@ export function BattleScreen() {
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}`}
               aria-pressed={Boolean(selected?.overwatch)}
               data-action-state={selected?.overwatch ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== PLAYER_OWNER}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1028,7 +1098,7 @@ export function BattleScreen() {
           <button
             type="button"
             className="hud-btn hud-btn-primary"
-            disabled={busy || snapshot.activeOwner !== PLAYER_OWNER}
+            disabled={busy || snapshot.activeOwner !== viewOwner}
             onClick={() => endTurn()}
           >
             {t("field.endTurn")}
@@ -1039,6 +1109,21 @@ export function BattleScreen() {
       {enemyPhase ? (
         <div className="phase-banner" role="status">
           {t("battle.enemyTurn")}
+        </div>
+      ) : null}
+
+      {battleKind === "pvp" && !passReady ? (
+        <div className="pass-device-root" role="presentation">
+          <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="pass-title">
+            <p className="eyebrow">{t("pvp.passHint")}</p>
+            <h2 id="pass-title" className="pass-side-title">
+              {viewOwner === 1 ? t("pvp.side1") : t("pvp.side2")}
+            </h2>
+            <p className="muted">{t("pvp.passBody")}</p>
+            <button type="button" className="hud-btn hud-btn-primary pass-ready-btn" onClick={() => setPassReady(true)}>
+              {t("pvp.ready")}
+            </button>
+          </div>
         </div>
       ) : null}
 

@@ -389,5 +389,19 @@
     "pishchal_gun": {
       "name": "Pishchal"
     }
+  },
+  "pvp": {
+    "roomHint": "Pass-and-play on one device. Hand the device over after each turn.",
+    "side1": "Player 1",
+    "side2": "Player 2",
+    "vs": "vs",
+    "n": "N = {count}",
+    "objective": "Victory condition: destroy all enemy units.",
+    "start": "Start battle",
+    "again": "Play again",
+    "won": "wins",
+    "passHint": "Pass the device",
+    "passBody": "The panel shows the side whose turn it is. The other side's panel and fog are hidden.",
+    "ready": "I am ready"
   }
 }

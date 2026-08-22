@@ -163,6 +163,9 @@ importers:
       '@bylina/core':
         specifier: workspace:*
         version: link:../core
+      '@bylina/net':
+        specifier: workspace:*
+        version: link:../net
     devDependencies:
       '@bylina/content':
         specifier: workspace:*

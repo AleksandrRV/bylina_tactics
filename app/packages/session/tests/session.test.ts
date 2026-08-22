@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.13.0", () => {
-    expect(APP_VERSION).toBe("0.13.0");
+  it("reports version 0.14.0", () => {
+    expect(APP_VERSION).toBe("0.14.0");
   });
 
   it("moves between menu and settings", () => {
@@ -86,13 +86,10 @@ describe("createSession", () => {
     expect(session.get().screen).toBe("menu");
   });
 
-  it("records an unavailable mode without leaving the menu", () => {
+  it("opens the pvp room from the menu (mode is available since 0.14.0)", () => {
     const session = createSession("menu");
     session.openMode("pvp");
-    expect(session.get().screen).toBe("menu");
-    expect(session.get().unavailableMode).toBe("pvp");
-    session.dismissUnavailable();
-    expect(session.get().unavailableMode).toBeNull();
+    expect(session.get().screen).toBe("pvpRoom");
   });
 
   it("is the only UI gateway that applies battle commands", () => {
@@ -290,5 +287,58 @@ describe("createSession restored save (0.13.0)", () => {
     const session = createSession("battle", { battleKind: "campaign", restoredMatch: match });
     session.goTo("menu");
     expect(session.get().restoredMatch).toBeUndefined();
+  });
+});
+
+describe("createSession pvp (0.14.0)", () => {
+  function pvpSession() {
+    const session = createSession("menu");
+    session.openPvpRoom();
+    expect(session.get().screen).toBe("pvpRoom");
+    session.startPvpBattle(["bogatyr", "strelets"], ["bogatyr", "strelets"], 42);
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("pvp");
+    expect(session.getPvpSides()).toEqual({ side1: ["bogatyr", "strelets"], side2: ["bogatyr", "strelets"] });
+    return session;
+  }
+
+  it("routes commands through the local transport and delivers event batches", async () => {
+    const session = pvpSession();
+    const host = createTacticsKernel({
+      initial: {
+        turnNumber: 1,
+        activeOwner: 1,
+        grid: { width: 8, height: 6, tiles: Array.from({ length: 48 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), z: 1, pit: false, blockLOS: false })) },
+        entities: [
+          { id: 1, configId: "bogatyr", owner: 1, x: 1, y: 2, z: 1, dir: 1, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 70, defense: 10, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
+          { id: 11, configId: "bogatyr", owner: 2, x: 6, y: 2, z: 1, dir: 3, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 70, defense: 10, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
+        ],
+      },
+    });
+    session.bindTacticsHost(host);
+
+    const events: unknown[] = [];
+    const unlisten = session.subscribePvpEvents((batch) => events.push(batch));
+
+    // Ход стороны 1: завершение хода уходит через транспорт, ядро переключает сторону.
+    session.sendPvpCommand({ type: "END_TURN", playerId: "1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(host.getSnapshot().activeOwner).toBe(2);
+    expect(events.length).toBe(1);
+
+    // Ход стороны 2.
+    session.sendPvpCommand({ type: "END_TURN", playerId: "2" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(host.getSnapshot().activeOwner).toBe(1);
+    expect(events.length).toBe(2);
+    unlisten();
+  });
+
+  it("finishes a pvp match with the winning side", () => {
+    const session = pvpSession();
+    session.finishPvpMatch(2);
+    expect(session.get().screen).toBe("result");
+    expect(session.get().pvpWinner).toBe(2);
+    expect(session.get().outcome).toBe("defeat");
   });
 });

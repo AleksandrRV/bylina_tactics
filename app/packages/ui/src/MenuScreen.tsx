@@ -27,7 +27,6 @@ export function MenuScreen() {
         </button>
         <button type="button" className="btn btn-primary" onClick={() => session.openMode("pvp")}>
           <span>{t("menu.pvp")}</span>
-          <span className="btn-note">{t("common.notReady")}</span>
         </button>
         <button type="button" className="btn btn-ghost" onClick={() => session.goTo("settings")}>
           {t("menu.settings")}

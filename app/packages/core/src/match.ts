@@ -280,3 +280,51 @@ export function createQuickMatch(options: QuickMatchOptions): MatchState {
   state.rngState = String(rng.getState());
   return state;
 }
+
+export interface PvpMatchOptions {
+  units: SpawnUnitConfig[];
+  map: MapGenConfig;
+  /** Состав стороны 1 (записи из общего набора). */
+  side1: readonly string[];
+  /** Состав стороны 2. */
+  side2: readonly string[];
+  seed: number;
+}
+
+/**
+ * Сражение состязательного режима «Потешные бои» (base-design §7, roadmap 0.14.0).
+ * Две стороны на одном поле: сторона 1 появляется у западного края, сторона 2 —
+ * у восточного. Условие победы — уничтожение всех юнитов противника.
+ */
+export function createPvpMatch(options: PvpMatchOptions): MatchState {
+  const rng = createMulberry32(options.seed);
+  const map = options.map;
+  const side1Spawns = playerSpawns(map.height).slice(0, options.side1.length);
+  const side2Spawns = enemySpawns(options.side2.length, map.width, map.height);
+  if (side2Spawns.length !== options.side2.length) {
+    throw new Error(`Map ${map.width}x${map.height} has only ${side2Spawns.length} side-2 spawn cells for requested ${options.side2.length}`);
+  }
+  const generated = generateBattlefield(map, rng, side1Spawns, side2Spawns);
+
+  const state: MatchState = {
+    turnNumber: 1,
+    activeOwner: PLAYER_OWNER,
+    grid: generated.grid,
+    entities: [...generated.covers],
+    rngSeed: String(options.seed >>> 0),
+    rngState: String(rng.getState()),
+  };
+
+  side1Spawns.forEach((point, index) => {
+    const config = pickUnit(options.units, options.side1[index]!);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+  });
+  side2Spawns.forEach((point, index) => {
+    const config = pickUnit(options.units, options.side2[index]!);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
+  });
+  state.rngState = String(rng.getState());
+  return state;
+}

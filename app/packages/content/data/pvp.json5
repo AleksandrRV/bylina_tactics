@@ -1,5 +1,18 @@
 {
-  pool: [],
+  // Состязательный режим «Потешные бои» (выпуск 0.14.0: поочерёдная игра
+  // на одном устройстве). Набор из готовых записей — классы дружины;
+  // условие победы — уничтожение всех юнитов противника.
+  pool: ["bogatyr", "strelets", "znaharka"],
   nMin: 1,
-  objective: "choice",
+  objective: "elimination",
+  map: {
+    width: 14,
+    height: 10,
+    pitChance: 0.04,
+    coverDensity: 0.07,
+    wallDensity: 0.02,
+    edgeCoverChance: 0.4,
+    halfCoverChance: 0.5,
+    heightMix: { z0: 0.12, z1: 0.76, z2: 0.12 },
+  },
 }

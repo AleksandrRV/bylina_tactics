@@ -679,3 +679,84 @@
     transform: translate(-50%, -8px);
   }
 }
+
+/* ===== Поочерёдная игра: акценты сторон и эмблемы (0.14.0) ===== */
+
+.battle-screen.is-pvp-side1 .battle-top {
+  border-bottom-color: rgba(224, 179, 74, 0.45);
+}
+
+.battle-screen.is-pvp-side2 .battle-top {
+  border-bottom-color: rgba(106, 169, 217, 0.45);
+}
+
+.pvp-sides-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.pvp-side-emblem {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 0.95rem;
+  font-weight: 700;
+  border: 2px solid rgba(255, 255, 255, 0.22);
+  color: rgba(255, 255, 255, 0.5);
+  transition: all 260ms ease;
+}
+
+.pvp-side-emblem.is-side1 {
+  background: radial-gradient(circle at 32% 28%, #3a3120, #241d12);
+}
+
+.pvp-side-emblem.is-side2 {
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.pvp-side-emblem.is-active {
+  transform: scale(1.18);
+  color: #f3ecdc;
+}
+
+.pvp-side-emblem.is-side1.is-active {
+  border-color: var(--amber, #e0b34a);
+  box-shadow: 0 0 14px rgba(224, 179, 74, 0.55);
+  animation: emblem-pulse 1.8s ease-in-out infinite;
+}
+
+.pvp-side-emblem.is-side2.is-active {
+  border-color: #6aa9d9;
+  box-shadow: 0 0 14px rgba(106, 169, 217, 0.55);
+  animation: emblem-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes emblem-pulse {
+  0%, 100% {
+    box-shadow: 0 0 8px rgba(224, 179, 74, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(224, 179, 74, 0.7);
+  }
+}
+
+.pvp-side-emblem-sep {
+  display: grid;
+  place-items: center;
+  color: rgba(224, 179, 74, 0.7);
+  animation: sep-sway 2.4s ease-in-out infinite;
+}
+
+@keyframes sep-sway {
+  0%, 100% {
+    transform: rotate(-4deg);
+  }
+  50% {
+    transform: rotate(4deg);
+  }
+}

@@ -4,6 +4,7 @@ import type {
   CellPos,
   Command,
   FogState,
+  GameEvent,
   HitPreview,
   MatchState,
   ReachableCell,
@@ -11,8 +12,9 @@ import type {
   TacticsKernel,
 } from "@bylina/core";
 import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
+import { createLocalTransport, type Envelope } from "@bylina/net";
 
-export const APP_VERSION = "0.13.0";
+export const APP_VERSION = "0.14.0";
 
 export type AppScreen =
   | "boot"
@@ -23,11 +25,15 @@ export type AppScreen =
   | "result"
   | "campaign"
   | "missionResult"
-  | "deployment";
+  | "deployment"
+  | "pvpRoom";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign";
+export type BattleKind = "quick" | "campaign" | "pvp";
+
+/** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
+export type PvpSide = 1 | 2;
 
 export type DifficultyId = "easy" | "normal" | "hard";
 
@@ -67,6 +73,10 @@ export interface SessionState {
    */
   restoredMatch?: MatchState;
   restoredFog?: FogState;
+  /** Составы сторон поочерёдной игры (0.14.0). */
+  pvp?: { side1: string[]; side2: string[] } | null;
+  /** Победившая сторона поочерёдной игры (экран итога). */
+  pvpWinner?: PvpSide | null;
 }
 
 export interface SessionApi {
@@ -112,6 +122,18 @@ export interface SessionApi {
   getBattleFullSnapshot(): MatchState | null;
   /** Полный туман войны всех сторон для сохранения партии (0.13.0). */
   getBattleFog(): FogState | null;
+  /** Открыть комнату сбора поочерёдной игры (0.14.0). */
+  openPvpRoom(): void;
+  /** Начать поочерёдный бой: составы сторон и заготовка поля из конфигурации. */
+  startPvpBattle(side1: string[], side2: string[], seed: number): void;
+  /** Составы сторон текущего поочерёдного боя. */
+  getPvpSides(): { side1: string[]; side2: string[] } | null;
+  /** Отправить команду активной стороны через локальный транспорт (0.14.0). */
+  sendPvpCommand(command: Command): void;
+  /** Подписка на наборы событий поочерёдного боя (ведущий рассылает через транспорт). */
+  subscribePvpEvents(listener: (events: GameEvent[]) => void): () => void;
+  /** Завершить поочерёдный бой победой стороны. */
+  finishPvpMatch(winnerSide: PvpSide): void;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -125,6 +147,8 @@ const idle: Omit<SessionState, "screen"> = {
   deployment: [],
   matchSeed: 0,
   outcome: null,
+  pvp: null,
+  pvpWinner: null,
 };
 
 export function createSession(
@@ -134,6 +158,8 @@ export function createSession(
   let state: SessionState = { screen: initial, ...idle, ...(restored ?? {}) };
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
+  /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
+  let pvpTransport: ReturnType<typeof createLocalTransport> | null = null;
   const listeners = new Set<(state: SessionState) => void>();
   const requireTacticsHost = (): TacticsKernel => {
     if (!tacticsHost) throw new Error("Tactics host is not bound");
@@ -152,6 +178,7 @@ export function createSession(
   return {
     get: () => state,
     goTo: (screen) => {
+      if (screen !== "battle") pvpTransport = null;
       emit({ screen, ...idle });
     },
     openQuickMatch: () => {
@@ -181,10 +208,18 @@ export function createSession(
         emit({ ...idle, screen: "campaign" });
         return;
       }
+      // Состязательный режим открыт с версии 0.14.0 (поочерёдная игра).
+      if (mode === "pvp") {
+        emit({ ...idle, screen: "pvpRoom" });
+        return;
+      }
       emit({ screen: "menu", ...idle, unavailableMode: mode });
     },
     dismissUnavailable: () => {
       emit({ ...state, unavailableMode: null });
+    },
+    openPvpRoom: () => {
+      emit({ ...idle, screen: "pvpRoom" });
     },
     setPaused: (paused) => {
       if (state.screen !== "battle") return;
@@ -237,6 +272,57 @@ export function createSession(
       emit({ ...idle, screen: "campaign" });
     },
     getCampaign: () => requireCampaign(),
+    startPvpBattle: (side1, side2, seed) => {
+      // Локальный транспорт: обе стороны на одном устройстве, правила
+      // исполняет ведущий (этот же процесс). Команда стороны применяется
+      // ядром, набор событий рассылается обратно через транспорт.
+      const transport = createLocalTransport();
+      pvpTransport = transport;
+      transport.subscribe((message: Envelope) => {
+        if (message.type !== "COMMAND") return;
+        const applied = tacticsHost?.apply(message.payload as Command);
+        if (!applied) return;
+        if (applied.ok) {
+          transport.send({
+            type: "EVENT_BATCH",
+            senderId: "host",
+            timestamp: Date.now(),
+            payload: applied.events,
+          });
+        } else {
+          transport.send({
+            type: "REJECT",
+            senderId: "host",
+            timestamp: Date.now(),
+            payload: { commandType: (message.payload as Command).type, reason: applied.reason },
+          });
+        }
+      });
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "pvp",
+        matchSeed: seed,
+        pvp: { side1: [...side1], side2: [...side2] },
+        pvpWinner: null,
+      });
+    },
+    getPvpSides: () => (state.pvp ? { side1: [...state.pvp.side1], side2: [...state.pvp.side2] } : null),
+    sendPvpCommand: (command) => {
+      if (!pvpTransport || state.screen !== "battle" || state.battleKind !== "pvp") return;
+      // Отправитель — активная сторона: ядро само проверит право хода.
+      const senderId = String(tacticsHost?.getSnapshot().activeOwner ?? 1);
+      pvpTransport.send({ type: "COMMAND", senderId, timestamp: Date.now(), payload: command });
+    },
+    subscribePvpEvents: (listener) => {
+      if (!pvpTransport) return () => undefined;
+      return pvpTransport.subscribe((message: Envelope) => {
+        if (message.type === "EVENT_BATCH") listener(message.payload as GameEvent[]);
+      });
+    },
+    finishPvpMatch: (winnerSide) => {
+      emit({ ...state, screen: "result", paused: false, pvpWinner: winnerSide, outcome: winnerSide === 1 ? "victory" : "defeat" });
+    },
     bindTacticsHost: (host) => {
       tacticsHost = host;
     },
