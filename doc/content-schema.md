@@ -1,5 +1,5 @@
 # Схема конфигурации
-## «Былина: Тьма Кощея», версия 1.5
+## «Былина: Тьма Кощея», версия 1.6
 
 Предмет ведения: структура файлов JSON5 и смысл полей. Алгоритмы, использующие эти поля, изложены в документе «Игровая математика». Исполнительное представление в памяти — в документе «Схема исполнительной среды».
 
@@ -160,10 +160,11 @@ interface CampaignConfig {
     weaknessCost: Resources;     // стоимость ступени слабого места
     durationMissions: number;    // миссий на ступень без ускорения Темницы
   };
-  fatigue: {                     // усталость после миссии (раздел 3.9)
-    aimPenalty: number;          // штраф меткости усталого бойца
-    defensePenalty: number;      // штраф защиты усталого бойца
-    xpMultiplier: number;        // множитель опыта усталого бойца, (0, 1]
+  fatigue: {                     // усталость: счётчик 0…5 (раздел 3.9)
+    max: number;                 // предел очков усталости, рекомендуемое значение 5
+    gainPerMission: number;      // прирост за участие в миссии, 1
+    aimPenalty: number[];        // вычет к вероятности попадания по очкам 0…max, процентные пункты, например [0, 5, 10, 15, 20, 20]
+    apPenalty: number;           // −очков действия каждый ход при максимальной усталости, 1
   };
   catchUpXpBonus: number;        // бонус опыта бойцам ниже среднего уровня дружины, 0…1 (раздел 4.3)
   bond: {                        // побратимство (раздел 3.10)
@@ -266,12 +267,12 @@ type PerkEffect =
 
 ```typescript
 interface ShipModuleConfig {
-  id: "bridge" | "forge" | "infirmary" | "dungeon";
+  id: "bridge" | "forge" | "infirmary" | "dungeon" | "rest";
   levels: ShipModuleLevel[];
 }
 
 interface ShipModuleLevel {
-  level: 1 | 2 | 3;
+  level: 1 | 2 | 3 | 4;              // уровень 4 допускается только у модуля «rest» (Комната отдыха)
   cost: Resources;
   requiredMissions: number;          // число завершённых миссий для открытия уровня
   effects: ShipModuleEffect[];
@@ -288,7 +289,7 @@ type ShipModuleEffect =
   | { type: "researchDuration"; missions: number }     // миссий на ступень исследования
   | { type: "revealEnemyComposition"; enabled: boolean }
   | { type: "deployCapIncrease"; amount: number }      // рост предельной численности высадки
-  | { type: "fatigueReduction"; percent: number };     // снижение штрафа усталости, 0…100
+  | { type: "fatigueRecovery"; amount: number };       // снятие очков усталости за пропущенную миссию
 ```
 
 Целевые значения уровней и эффекты — документ «Постоянная прогрессия и развитие», раздел 5.
