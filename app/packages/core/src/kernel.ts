@@ -299,6 +299,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const removeEntity = (entity: EntityState, reason: "FLED" | "EXPIRED" | "EXTRACTED", events: GameEvent[]): void => {
     state.entities = state.entities.filter((candidate) => candidate.id !== entity.id);
+    // Уход носителя без гибели: предмет остаётся в клетке ухода и не имеет
+    // носителя (§17 math; гибель обрабатывает kill, уход — removeEntity).
+    if (state.apple?.carrierId === entity.id) {
+      state.apple.carrierId = null;
+      events.push({ type: "OBJECTIVE_CHANGED", carrierId: null, pos: { ...state.apple.pos } });
+    }
     events.push({ type: "ENTITY_REMOVED", entityId: entity.id, reason });
   };
 

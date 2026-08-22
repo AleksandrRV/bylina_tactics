@@ -130,3 +130,41 @@ describe("apple objective (0.16.0, math §17)", () => {
     ).toThrow();
   });
 });
+
+describe("apple carrier removal (QA 0.16.0)", () => {
+  it("drops the apple when the carrier flees (removal without death)", () => {
+    const match = appleMatch();
+    const player = match.entities.find((e) => e.owner === PLAYER_OWNER && e.coverType === 0)!;
+    const enemy = match.entities.find((e) => e.owner === ENEMY_OWNER && e.coverType === 0)!;
+    player.hp = 3;
+    player.fleeHp = 5;
+    const z = match.grid.tiles.find((t) => t.x === 4 && t.y === 5)!.z;
+    match.apple = { pos: { x: 4, y: 5, z }, carrierId: null };
+    player.x = 4;
+    player.y = 5;
+    player.z = z;
+    enemy.x = 5;
+    enemy.y = 5;
+    enemy.z = z;
+    // Меч с уроном 1: атака не смертельна, но уводит за порог ухода.
+    const gentleSword: WeaponStats = { ...SWORD, minDmg: 1, maxDmg: 1 };
+    const kernel = createTacticsKernel({ initial: match, weapons: { sword: gentleSword }, skills: {}, seed: 21 });
+    // Ход 1: подбор яблока.
+    const pick = kernel.apply({ type: "MOVE", actorId: player.id, to: { x: 3, y: 5, z } });
+    expect(pick.ok).toBe(true);
+    const back = kernel.apply({ type: "MOVE", actorId: player.id, to: { x: 4, y: 5, z } });
+    expect(back.ok).toBe(true);
+    if (!back.ok) return;
+    expect(kernel.getSnapshot().apple?.carrierId).toBe(player.id);
+    // Ход 2 (враг): урон 1 → hp 2 ≤ fleeHp → пороговый уход без гибели.
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    const atk = kernel.apply({ type: "ATTACK", actorId: enemy.id, targetId: player.id, weaponId: "sword" });
+    expect(atk.ok).toBe(true);
+    if (!atk.ok) return;
+    const after = kernel.getSnapshot();
+    expect(after.entities.some((e) => e.id === player.id)).toBe(false);
+    expect(after.apple?.carrierId).toBeNull();
+    expect(after.apple?.pos).toEqual({ x: 4, y: 5, z });
+    expect(atk.events.some((e) => e.type === "OBJECTIVE_CHANGED" && e.carrierId === null)).toBe(true);
+  });
+});

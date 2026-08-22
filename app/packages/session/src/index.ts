@@ -486,6 +486,12 @@ export function createSession(
       // события и снимок стороны ведомого уходят по каналу.
       transport.subscribe((message) => {
         if (message.type === "SYNC_REQUEST") {
+          // Роль подключающегося определяет сам участник (tech-stack §1):
+          // наблюдатель запускает приложение с ролью наблюдателя.
+          const requested = (message.payload as { role?: string } | null)?.role;
+          if (requested === "spectator" || requested === "guest") {
+            emit({ ...state, netPeerRole: requested });
+          }
           sendGuestSync();
           return;
         }
@@ -578,8 +584,8 @@ export function createSession(
           applyGuestQueryResult(message.payload);
         }
       });
-      // Запрос начального снимка у ведущего.
-      transport.send({ type: "SYNC_REQUEST", senderId: "guest", timestamp: Date.now(), payload: null });
+      // Запрос начального снимка у ведущего (роль — соперник).
+      transport.send({ type: "SYNC_REQUEST", senderId: "guest", timestamp: Date.now(), payload: { role: "guest" } });
     },
     getNetSnapshot: () => netGuest?.snapshot ?? null,
     getNetVisible: () => new Set(netGuest?.visible ?? []),
@@ -663,7 +669,7 @@ export function createSession(
           notifyBattle();
         }
       });
-      transport.send({ type: "SYNC_REQUEST", senderId: "spectator", timestamp: Date.now(), payload: null });
+      transport.send({ type: "SYNC_REQUEST", senderId: "spectator", timestamp: Date.now(), payload: { role: "spectator" } });
     },
     setNetOmniscient: (omniscient) => {
       emit({ ...state, netOmniscient: omniscient });

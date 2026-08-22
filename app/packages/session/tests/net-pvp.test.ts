@@ -132,3 +132,54 @@ describe("QA net edge cases (0.15.0)", () => {
     expect(guest.get().netOwner).toBe(2);
   });
 });
+
+describe("QA net peer role from the joining side (0.16.0)", () => {
+  it("a guest that identifies as spectator receives the union snapshot", async () => {
+    const { a, b } = createChannelPair();
+    const host = createSession("menu");
+    const spectator = createSession("menu");
+    // Ведущий не задаёт роль; подключающийся выбирает наблюдателя.
+    host.startNetPvpBattle({ side1: ["bogatyr"], side2: ["bogatyr"] }, 9, a);
+    spectator.bindNetSpectator(b);
+    const kernel = createTacticsKernel({ initial: matchState(), weapons: { sword: SWORD }, skills: {}, seed: 9 });
+    host.bindTacticsHost(kernel);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await spectator.waitForNetSync();
+    const snapshot = spectator.getNetSnapshot();
+    expect(snapshot).not.toBeNull();
+    // Наблюдатель не может ходить: команды не отправляются.
+    spectator.sendNetCommand({ type: "END_TURN", playerId: "1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(kernel.getSnapshot().activeOwner).toBe(1);
+  });
+
+  it("host falls back to guest snapshot when the joining side says guest", async () => {
+    const { a, b } = createChannelPair();
+    const host = createSession("menu");
+    const guest = createSession("menu");
+    // Ведущий изначально рассчитывал на наблюдателя, но подключился соперник.
+    host.startNetPvpBattle({ side1: ["bogatyr"], side2: ["bogatyr"] }, 10, a, { peerRole: "spectator" });
+    guest.bindGuestNetPvp(2, b);
+    // Сцена с ограниченным зрением: боец стороны 1 вне обзора гостя.
+    const state = matchState();
+    for (const entity of state.entities) {
+      entity.vision = 3;
+      if (entity.owner === 1) {
+        entity.x = 1;
+        entity.y = 1;
+      } else {
+        entity.x = 6;
+        entity.y = 2;
+      }
+    }
+    const kernel = createTacticsKernel({ initial: state, weapons: { sword: SWORD }, skills: {}, seed: 10 });
+    host.bindTacticsHost(kernel);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await guest.waitForNetSync();
+    const snapshot = guest.getNetSnapshot();
+    expect(snapshot).not.toBeNull();
+    // Снимок — сторона 2: скрытый от гостя боец стороны 1 отсутствует.
+    if (!snapshot) return;
+    expect(snapshot.entities.some((entity) => entity.owner === 1 && entity.coverType === 0)).toBe(false);
+  });
+});

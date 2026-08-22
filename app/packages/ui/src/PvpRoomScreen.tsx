@@ -258,6 +258,7 @@ function NetworkSetup({
   const [role, setRole] = useState<"host" | "guest">("host");
   const [objective, setObjective] = useState<Objective>("elimination");
   const [peerRole, setPeerRole] = useState<"guest" | "spectator">("guest");
+  const [joinRole, setJoinRole] = useState<"guest" | "spectator">("guest");
   const [omniscient, setOmniscient] = useState(false);
   const [code, setCode] = useState<string>("");
   const [peerCode, setPeerCode] = useState<string>("");
@@ -343,21 +344,10 @@ function NetworkSetup({
               {t("pvp.objectiveApple")}
             </button>
           </div>
-          <div className="pvp-option-group">
-            <span className="pvp-option-title">{t("net.peerRole")}</span>
-            <button type="button" className={`pvp-radio${peerRole === "guest" ? " is-on" : ""}`} onClick={() => setPeerRole("guest")}>
-              {t("net.peerGuest")}
-            </button>
-            <button type="button" className={`pvp-radio${peerRole === "spectator" ? " is-on" : ""}`} onClick={() => setPeerRole("spectator")}>
-              {t("net.peerSpectator")}
-            </button>
-          </div>
-          {peerRole === "spectator" ? (
-            <label className="pvp-check">
-              <input type="checkbox" checked={omniscient} onChange={(event) => { setOmniscient(event.target.checked); onOmniscientChange(event.target.checked); }} />
-              {t("net.omniscient")}
-            </label>
-          ) : null}
+          <label className="pvp-check">
+            <input type="checkbox" checked={omniscient} onChange={(event) => { setOmniscient(event.target.checked); onOmniscientChange(event.target.checked); }} />
+            {t("net.omniscient")}
+          </label>
           {!connected ? (
             <button type="button" className="btn btn-primary" onClick={() => { setError(null); createChannel(true); }}>
               {t("net.create")}
@@ -423,8 +413,13 @@ function NetworkSetup({
                 const channel = createChannel(false);
                 if (!channel) return;
                 (channel as Transport & { receiveSignal(data: unknown): void }).receiveSignal(signal);
-                // Ведомый ждёт партию ведущего; экран боя получит снимок по каналу.
-                onGuestJoin(2, channel);
+                // Ведомый ждёт партию ведущего; роль выбирает сам участник:
+                // соперник управляет стороной 2, наблюдатель команд не шлёт.
+                if (joinRole === "spectator") {
+                  onSpectatorJoin(channel);
+                } else {
+                  onGuestJoin(2, channel);
+                }
               } catch {
                 setError(t("net.badCode"));
               }
@@ -434,6 +429,15 @@ function NetworkSetup({
             {t("net.connect")}
           </button>
           {connected ? <p className="net-connected">{t("net.connected")}</p> : null}
+          <div className="pvp-option-group">
+            <span className="pvp-option-title">{t("net.peerRole")}</span>
+            <button type="button" className={`pvp-radio${joinRole === "guest" ? " is-on" : ""}`} onClick={() => setJoinRole("guest")}>
+              {t("net.peerGuest")}
+            </button>
+            <button type="button" className={`pvp-radio${joinRole === "spectator" ? " is-on" : ""}`} onClick={() => setJoinRole("spectator")}>
+              {t("net.peerSpectator")}
+            </button>
+          </div>
           <p className="muted">{t("net.spectatorJoinHint")}</p>
         </div>
       )}

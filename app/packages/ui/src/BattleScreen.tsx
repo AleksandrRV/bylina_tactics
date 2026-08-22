@@ -223,17 +223,19 @@ export function BattleScreen() {
     grid: { width: 8, height: 6, tiles: [] },
     entities: [],
   };
-  const snapshot = isNetGuest
+  // Наблюдатель, как и гость, не исполняет правила: снимок приходит от ведущего.
+  const usesNetSnapshot = isNetGuest || isSpectator;
+  const snapshot = usesNetSnapshot
     ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
     : session.getBattleSnapshot(viewOwner);
 
   const visibleCells = useMemo(
-    () => (isNetGuest ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, isNetGuest],
+    () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot],
   );
   const exploredCells = useMemo(
-    () => (isNetGuest ? session.getNetExplored() : session.getBattleExplored(viewOwner)),
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, isNetGuest],
+    () => (usesNetSnapshot ? session.getNetExplored() : session.getBattleExplored(viewOwner)),
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot],
   );
 
   const isOwn = (entity: EntityState): boolean =>
@@ -741,7 +743,9 @@ export function BattleScreen() {
     };
   }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
-  const roster = snapshot.entities.filter((entity) => entity.owner === viewOwner && entity.coverType === 0);
+  const roster = snapshot.entities.filter((entity) =>
+    (isSpectator ? (entity.owner === 1 || entity.owner === 2) : entity.owner === viewOwner) && entity.coverType === 0,
+  );
   const sideKey = isSpectator
     ? "net.spectator"
     : battleKind === "pvp" || battleKind === "pvpNet"
@@ -751,9 +755,11 @@ export function BattleScreen() {
       : "field.sidePlayer";
 
   // Показывать портреты противников только если они в зоне видимости
-  // (или уже мертвы и были видны). В поочерёдной игре — противники активной стороны.
+  // (или уже мертвы и были видны). В поочерёдной игре — противники активной
+  // стороны; у наблюдателя — все бойцы обеих сторон.
   const knownEnemies = snapshot.entities.filter((entity) => {
     if (entity.owner !== enemyOwner || entity.coverType !== 0) return false;
+    if (isSpectator && entity.owner !== 1 && entity.owner !== 2) return false;
     const key = cellKey(entity.x, entity.y);
     return visibleCells.has(key) || (entity.dead && exploredCells.has(key));
   });
