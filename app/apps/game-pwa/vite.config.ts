@@ -36,7 +36,11 @@ function pixiResolvePlugin(): Plugin {
 
 const pixiEntry = resolvePixiEntry();
 
+/** Базовый путь публикации: "/" локально, "/bylina_tactics/" на GitHub Pages (переменная BASE_PATH). */
+const basePath = process.env.BASE_PATH ?? "/";
+
 export default defineConfig({
+  base: basePath,
   plugins: [
     pixiResolvePlugin(),
     react(),
@@ -50,7 +54,8 @@ export default defineConfig({
         theme_color: "#14181c",
         background_color: "#14181c",
         display: "standalone",
-        start_url: "/",
+        start_url: basePath,
+        scope: basePath,
         lang: "ru",
         icons: [
           { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
