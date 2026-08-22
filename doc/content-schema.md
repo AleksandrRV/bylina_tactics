@@ -1,5 +1,5 @@
 # Схема конфигурации
-## «Былина: Тьма Кощея», версия 1.3
+## «Былина: Тьма Кощея», версия 1.4
 
 Предмет ведения: структура файлов JSON5 и смысл полей. Алгоритмы, использующие эти поля, изложены в документе «Игровая математика». Исполнительное представление в памяти — в документе «Схема исполнительной среды».
 
@@ -63,8 +63,11 @@ interface WeaponConfig {
     penalty: number;
   };
   tier?: 1 | 2 | 3;          // ярус оружия; отсутствие означает ярус I
+  slots?: number;            // слоты под вставки, 0…3; растут с ярусом
 }
 ```
+
+Число слотов `slots` задаёт вместимость вставок (раздел 6.5 документа о прогрессии); отсутствие поля означает 0. Вставка ярусом выше яруса оружия недопустима.
 
 ---
 
@@ -160,24 +163,60 @@ interface CampaignConfig {
     weaknessCost: Resources;     // стоимость ступени слабого места
     durationMissions: number;    // миссий на ступень без ускорения Темницы
   };
-  fatigue: {                     // усталость бойца после миссии
-    aimPenalty: number;          // штраф меткости усталого бойца
-    defensePenalty: number;      // штраф защиты усталого бойца
-    xpMultiplier: number;        // множитель опыта усталого бойца, (0, 1]
+  morale: {                      // дух как расходуемый ресурс (раздел 3.9)
+    max: number;                 // 0…100, рекомендуемое значение 100
+    tiredRatio: number;          // порог «устал», доля (например 0.66)
+    shakenRatio: number;         // порог «надломлен», доля (например 0.33)
+    recoveryPerMission: number;  // восстановление за пропущенную миссию, 0…100
+    tiredAimPenalty: number;     // штраф меткости усталого бойца
+    tiredDefensePenalty: number; // штраф защиты усталого бойца
+    tiredXpMultiplier: number;   // множитель опыта усталого бойца, (0, 1]
+    loss: {                      // источники потери духа за миссию
+      perWound: number;
+      perSquadmateFallen: number;
+      perUndescribedSighting: number;
+      perGeneral: number;
+    };
+    traitChance: number;         // вероятность «дурного следа» у надломленного, 0…1
   };
+  negativeTraits: string[];      // перечень «дурных следов» (записи traits/*.json5)
   training: {                    // учение бойца вне боя
     cost: Resources;             // стоимость отправки в учение
     missions: number;            // миссий, которые боец пропускает
     xpGain: number;              // запас опыта по завершении
   };
-  bond: {                        // побратимство
-    deployThreshold: number;     // совместных высадок до установления связи
-    aimBonus: number;            // бонус меткости при смежных побратимах
-    griefWillPenalty: number;    // штраф воли при гибели побратима
+  bond: {                        // побратимство (раздел 3.10)
+    deployThreshold: number;     // совместных высадок до установления связи (уровень 1)
+    compatibilityMin: number;    // множитель порога для наименее совместимой пары
+    compatibilityMax: number;    // множитель порога для наиболее совместимой пары
+    level2Threshold: number;     // совместных высадок до уровня 2
+    level3Threshold: number;     // совместных высадок до уровня 3
+    teamworkCharges: number[];   // заряды «Подмоги» по уровням, например [1, 2, 2]
+    spotterAimBonus: number;     // «Прикрытие»: бонус меткости при смежных побратимах
+    spotterCritBonus: number;    // «Прикрытие»: бонус крита при смежных побратимах
+    returnFireChance: number;    // «Ответная стрела»: шанс, 0…1
+    griefMoraleLoss: number;     // потеря духа при гибели побратима
+    griefWillPenalty: number;    // штраф воли на следующую миссию
   };
+  darkEvents: DarkEventConfig[]; // «Козни Кощея» (раздел 8.6)
   ship: ShipModuleConfig[];      // модули Летучего Корабля
   missions: MissionConfig[];     // перечень точек, ≥ 1
 }
+
+interface DarkEventConfig {
+  id: string;
+  triggerMissions: number;       // миссий до срабатывания
+  counterable: boolean;          // может быть сорвана встречной миссией типа «counter»
+  effects: DarkEventEffect[];
+}
+
+type DarkEventEffect =
+  | { type: "woundWorse"; factor: number }                 // тяжелее ранения
+  | { type: "enemyWillBonus"; amount: number }             // +воля противникам
+  | { type: "darknessGainBonus"; amount: number }          // +прирост Тьмы
+  | { type: "enemyHpBonus"; amount: number }               // +здоровье противникам
+  | { type: "extraEnemies"; count: number }                // дополнительные противники
+  | { type: "moraleRecoveryPenalty"; amount: number };     // замедленное восстановление духа
 
 interface Resources {
   gold: number;                  // ≥ 0
@@ -187,12 +226,13 @@ interface Resources {
 
 interface MissionConfig {
   id: string;
-  type: "purge" | "destroy" | "rescue" | "recon" | "needle";
+  type: "purge" | "destroy" | "rescue" | "recon" | "counter" | "needle";
   darknessOnVictory: number;
   darknessOnDefeat: number;
   x: number;                     // положение точки на карте царства, 0…100
   y: number;                     // положение точки на карте царства, 0…100
   threat: number;                // показатель угрозы («Сила Нави»), 0…10; авторы выстраивают состав по нарастающей
+  countersDarkEventId?: string;  // для типа «counter»: кознь, которую срывает успех миссии
   rewards: Resources;            // награда при успехе
   map: MapGenConfig;
   enemies: { unitId: string; count: number }[];
@@ -242,6 +282,40 @@ interface ItemConfig {
 Предмет с полем `bonusVsUnitId` — антитиповый: его модификаторы применяются в бою только против целей указанного типа. Рецепт такого предмета открывается ступенью «Описание» соответствующего исследования (документ «Постоянная прогрессия и развитие», раздел 7.3.1).
 
 Каждый предмет изготовляется один раз за кампанию и хранится в запасах корабля. Изготовление предмета яруса выше текущего уровня Кузни недопустимо. Предмет надевается на бойца при формировании высадки (один предмет на бойца, один владелец) и влияет на следующее сражение: оружие добавляется к набору оружия бойца, умение (`skillId`) — к набору умений, модификаторы складываются с характеристиками (в том числе со штрафами ранения). Предмет обязан давать оружие, умение либо хотя бы один модификатор; стоимость обязана быть положительной. `weaponId` проверяется по записям `weapons`, `skillId` — по записям `skills`.
+
+## 4.1. Вставки оружия (`attachments/*.json5`)
+
+```typescript
+interface AttachmentConfig {
+  id: string;
+  tier: 1 | 2 | 3;               // ярус вставки; не выше яруса оружия
+  aimMod?: number;               // прицел
+  rangeMod?: number;             // дальний прицел: +к дальности дистанционного оружия
+  dmgMod?: number;               // ладный заряд: +к минимальному и максимальному урону
+  freeActionChance?: number;     // стремительный спуск: шанс 0…1 не завершать активацию
+  critMod?: number;              // золотая насечка
+  moveAimMod?: number;           // тяжёлый приклад: +меткости после перемещения в этот ход
+  bonusVsUnitId?: string;        // антитиповая вставка
+  cost: Resources;
+}
+```
+
+Вставка даёт хотя бы один эффект; `bonusVsUnitId` ограничивает эффекты указанным типом противника. Вставка вкладывается в слот оружия (один слот — одна вставка), вставляется и извлекается в Кузне.
+
+## 4.1.1. Дурные следы (`traits/*.json5`)
+
+```typescript
+interface TraitConfig {
+  id: string;
+  // Отрицательная черта, накладываемая на надломленного бойца (раздел 3.9).
+  // Снимается лечением в Горнице либо безупречной миссией.
+  aimMod?: number;               // штраф меткости
+  defenseMod?: number;           // штраф защиты
+  willMod?: number;              // штраф воли
+  panicChanceMod?: number;       // +к шансу паники, 0…100
+  vsUnitId?: string;             // ограничивает штрафы указанным типом (например, страх перед упырями)
+}
+```
 
 ## 4.2. Таланты (`perks/*.json5`)
 
