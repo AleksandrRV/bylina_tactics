@@ -1,3 +1,4 @@
+import type { AppScreen } from "@bylina/session";
 import { BattleScreen } from "./BattleScreen.js";
 import { BootScreen } from "./BootScreen.js";
 import { CampaignScreen } from "./CampaignScreen.js";
@@ -12,19 +13,44 @@ import { ResultScreen } from "./ResultScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { useSessionState } from "./hooks.js";
 
+/**
+ * Чистое соответствие экрана сессии компоненту (0.19.2): вынесено из Shell,
+ * чтобы маршрутизацию можно было покрыть автоматическими проверками без
+ * среды обозревателя. Неизвестный экран завершается главным меню.
+ */
+export function screenComponent(screen: AppScreen): () => React.JSX.Element {
+  switch (screen) {
+    case "boot":
+      return BootScreen;
+    case "settings":
+      return SettingsScreen;
+    case "difficulty":
+      return DifficultyScreen;
+    case "result":
+      return ResultScreen;
+    case "deployment":
+      return DeploymentScreen;
+    case "campaign":
+      return CampaignScreen;
+    case "missionResult":
+      return MissionResultScreen;
+    case "pvpRoom":
+      return PvpRoomScreen;
+    case "replays":
+      return ReplayScreen;
+    case "training":
+      return TrainingScreen;
+    // Экран сражения обучения обрабатывается тем же компонентом, что и бой.
+    case "trainingBattle":
+    case "battle":
+      return BattleScreen;
+    default:
+      return MenuScreen;
+  }
+}
+
 export function Shell() {
   const { screen } = useSessionState();
-
-  if (screen === "boot") return <BootScreen />;
-  if (screen === "settings") return <SettingsScreen />;
-  if (screen === "difficulty") return <DifficultyScreen />;
-  if (screen === "result") return <ResultScreen />;
-  if (screen === "deployment") return <DeploymentScreen />;
-  if (screen === "campaign") return <CampaignScreen />;
-  if (screen === "missionResult") return <MissionResultScreen />;
-  if (screen === "pvpRoom") return <PvpRoomScreen />;
-  if (screen === "replays") return <ReplayScreen />;
-  if (screen === "training") return <TrainingScreen />;
-  if (screen === "trainingBattle" || screen === "battle") return <BattleScreen />;
-  return <MenuScreen />;
+  const Component = screenComponent(screen);
+  return <Component />;
 }

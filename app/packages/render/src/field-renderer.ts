@@ -1575,7 +1575,6 @@ export function createFieldRenderer(): FieldRenderer {
     // Подсветка обучающей подсказки (0.19.0): пульсирующая рамка.
     if (view.trainingHighlight) {
       const { x, y } = view.trainingHighlight;
-      const target = view.snapshot.entities.find((entity) => entity.x === x && entity.y === y);
       const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
       if (tile) {
         const z = visualLevel(tile);
@@ -1591,7 +1590,6 @@ export function createFieldRenderer(): FieldRenderer {
           color: 0xf3ecdc,
           alpha: 0.2 + pulse * 0.25,
         });
-        void target;
       }
     }
 

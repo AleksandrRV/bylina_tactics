@@ -89,6 +89,13 @@ function visibleCoverScenario(seed: number) {
 }
 
 describe("cover destruction (§12)", () => {
+  it("flags the cover-attack preview so the UI shows destruction instead of damage numbers", () => {
+    const { match, cover, strelets } = visibleCoverScenario(102);
+    const kernel = createTacticsKernel({ initial: match, weapons: { ...defaultTrainingWeapons(), env_bow: ENV_BOW } });
+    const preview = kernel.getHitPreview(strelets.id, cover.id, ENV_BOW.id);
+    expect(preview).toMatchObject({ available: true, coverTarget: true, chance: 100 });
+  });
+
   it("reduces full cover by exactly one tier and removes half cover", () => {
     const { match, cover, strelets } = visibleCoverScenario(100);
     cover.coverType = 2;

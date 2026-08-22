@@ -188,7 +188,7 @@ export function generateBattlefield(
     }
 
     const covers: EntityState[] = [];
-    const coverBudget = Math.max(1, Math.floor(config.width * config.height * config.coverDensity));
+    const coverBudget = Math.floor(config.width * config.height * config.coverDensity);
     guard = 0;
     while (covers.length < coverBudget && guard < 400) {
       guard += 1;

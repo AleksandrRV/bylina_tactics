@@ -168,6 +168,12 @@ export interface CampaignOptions {
   items?: ItemConfig[];
   /** Восстановленное состояние кампании (сохранение, версия 0.13.0). */
   initialState?: CampaignState;
+  /**
+   * Допустимые записи классов для назначения рекруту (0.19.2): при заданном
+   * списке `assignClass` отклоняет записи вне его — защита от назначения
+   * чужой или несуществующей записи.
+   */
+  classUnitIds?: string[];
 }
 
 export function createCampaign(config: CampaignConfig, options: CampaignOptions = {}): CampaignApi {
@@ -357,7 +363,6 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       if (state.phase !== "active" || state.activeMissionId !== null) return null;
       const cost = { ...config.scan.cost };
       if (!canPay(cost)) return null;
-      pay(cost);
       const opened: string[] = [];
       for (const point of state.missions) {
         if (point.status !== "locked") continue;
@@ -369,6 +374,10 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
           opened.push(point.id);
         }
       }
+      // Стоимость списывается только за фактически открытые точки (0.19.2):
+      // пустое сканирование (все закрытые точки вне радиуса) запасы не тратит.
+      if (opened.length === 0) return null;
+      pay(cost);
       emit();
       return { cost, opened };
     },
@@ -414,6 +423,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       if (!fighter || !fighter.alive) return false;
       if (fighter.unitId !== config.recruitUnitId) return false;
       if (fighter.level < config.classUnlockLevel) return false;
+      // При заданном перечне классов (0.19.2) назначение чужой либо
+      // несуществующей записи отклоняется.
+      if (options.classUnitIds && !options.classUnitIds.includes(unitId)) return false;
       fighter.unitId = unitId;
       fighter.maxHp = hpOf(unitId);
       fighter.hp = fighter.maxHp;

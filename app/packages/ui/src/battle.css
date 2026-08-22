@@ -860,6 +860,8 @@
   color: #f3ecdc;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   z-index: 69;
+  /* Баннер не должен перехватывать клики по клеткам поля (0.19.2). */
+  pointer-events: none;
 }
 
 .training-mentor-face {
@@ -936,6 +938,8 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   z-index: 70;
   animation: hint-in 300ms ease-out;
+  /* Баннер не должен перехватывать клики по клеткам поля (0.19.2). */
+  pointer-events: none;
 }
 
 @keyframes hint-in {

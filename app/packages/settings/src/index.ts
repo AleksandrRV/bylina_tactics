@@ -7,7 +7,6 @@ export interface SettingsState {
   sfxVolume: number;
   fontScale: number;
   highContrast: boolean;
-  spectatorOmniscient: boolean;
 }
 
 export const defaultSettings: SettingsState = {
@@ -17,7 +16,6 @@ export const defaultSettings: SettingsState = {
   sfxVolume: 80,
   fontScale: 1,
   highContrast: false,
-  spectatorOmniscient: false,
 };
 
 export interface SettingsStorage {
@@ -47,7 +45,6 @@ export function sanitizeSettings(
     sfxVolume: clamp(Number(raw?.sfxVolume ?? defaultSettings.sfxVolume), 0, 100),
     fontScale: clamp(Number(raw?.fontScale ?? defaultSettings.fontScale), 0.85, 1.4),
     highContrast: Boolean(raw?.highContrast),
-    spectatorOmniscient: Boolean(raw?.spectatorOmniscient),
   };
 }
 

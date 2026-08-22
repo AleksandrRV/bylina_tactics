@@ -61,6 +61,12 @@ export function createRelayServer(options = {}) {
         joinedRoomId = String(message.roomId);
         joinRoom(rooms, joinedRoomId, peer, MAX_PEERS);
       } else if (message.type === "SIGNAL" && message.roomId) {
+        // Сигналы допустимы только в комнату, в которую участник вступил:
+        // иначе любой сокет мог бы рассылать сигналы в чужую комнату.
+        if (!joinedRoomId || joinedRoomId !== String(message.roomId)) {
+          send(socket, { type: "ERROR", message: "NOT_IN_ROOM" });
+          return;
+        }
         const room = rooms.get(String(message.roomId));
         for (const other of room?.peers ?? []) {
           if (other.id !== peer.id) send(other.socket, { type: "SIGNAL", from: peer.id, signal: message.signal });

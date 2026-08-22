@@ -219,6 +219,8 @@ export function CampaignScreen() {
   const [trainingId, setTrainingId] = useState<number | null>(null);
   const [scanKey, setScanKey] = useState<number>(0);
   const [justOpened, setJustOpened] = useState<string[]>([]);
+  /** Пустое сканирование: в радиусе нет закрытых точек (0.19.2). */
+  const [scanMissed, setScanMissed] = useState(false);
   const [, setTick] = useState(0);
 
   useEffect(
@@ -257,7 +259,13 @@ export function CampaignScreen() {
       setScanKey((value) => value + 1);
       setJustOpened(result.opened);
       window.setTimeout(() => setJustOpened([]), 1400);
+      setScanMissed(false);
+      return;
     }
+    // Пустое сканирование запасы не тратит (0.19.2): показываем плашку,
+    // что в радиусе нет закрытых точек.
+    setScanMissed(true);
+    window.setTimeout(() => setScanMissed(false), 1400);
   };
 
   const itemById = useMemo(() => {
@@ -365,6 +373,7 @@ export function CampaignScreen() {
             <div className="map-fog" aria-hidden="true" />
             {/* Волна сканирования от корабля */}
             {scanKey > 0 ? <div key={scanKey} className="scan-wave" aria-hidden="true" /> : null}
+            {scanMissed ? <p className="scan-toast" role="status">{t("scan.nothing")}</p> : null}
 
             {missions.map((mission, index) => {
               const point = state.missions.find((candidate) => candidate.id === mission.id);

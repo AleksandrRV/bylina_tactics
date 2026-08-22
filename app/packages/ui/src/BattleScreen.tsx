@@ -25,6 +25,7 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
+import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingHintsSorted, trainingPanelKey } from "./training-progress.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -256,7 +257,7 @@ export function BattleScreen() {
   // конфигурации (0.19.1): порядок массива hints значения не имеет.
   const [hintStep, setHintStep] = useState(0);
   const trainingHints = isTraining && trainingMission
-    ? [...trainingMission.hints].sort((a, b) => a.step - b.step)
+    ? trainingHintsSorted(trainingMission.hints)
     : [];
   const activeHint = trainingHints[hintStep] ?? null;
 
@@ -266,30 +267,7 @@ export function BattleScreen() {
   // а шаг «примените умение» не завершался бы вовсе).
   const advanceTraining = (events: GameEvent[]): void => {
     if (!isTraining || !activeHint) return;
-    const done = events.some((event) => {
-      switch (activeHint.until) {
-        case "move":
-          return event.type === "ENTITY_MOVED";
-        case "attack":
-          return event.type === "COMBAT_RESOLVED";
-        case "skill":
-          return event.type === "SKILL_RESOLVED";
-        case "defend":
-          return event.type === "STATUS_CHANGED" && event.status === "DEFENDING" && event.applied;
-        case "overwatch":
-          return event.type === "STATUS_CHANGED" && event.status === "OVERWATCH" && event.applied;
-        case "end_turn":
-          return event.type === "TURN_CHANGED";
-        case "approach":
-          return event.type === "ENTITY_MOVED" || event.type === "COMBAT_RESOLVED";
-        case "noop":
-          // Ознакомительный шаг: завершается любым первым действием игрока.
-          return true;
-        default:
-          return false;
-      }
-    });
-    if (done) setHintStep((value) => value + 1);
+    if (hintCompletedByEvents(activeHint, events)) setHintStep((value) => value + 1);
   };
 
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
@@ -452,33 +430,13 @@ export function BattleScreen() {
     return map;
   }, [reachable]);
 
-  // Подсветка обучающей подсказки: клетка, сущность либо элемент панели.
-  // Шаг «клетка/зона» без координат (карты миссий обучения случайны, поэтому
-  // фиксированная клетка в конфигурации неприменима) подсвечивает самую
-  // дальнюю достижимую клетку выбранного бойца (0.19.1).
-  const trainingHighlight = (() => {
-    if (!activeHint) return null;
-    if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
-      if (activeHint.cell) return { kind: "cell" as const, x: activeHint.cell.x, y: activeHint.cell.y };
-      const pick = reachable.reduce<ReachableCell | null>(
-        (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
-        null,
-      );
-      if (pick) return { kind: "cell" as const, x: pick.x, y: pick.y };
-      return null;
-    }
-    if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
-      const entity = snapshot.entities.find((candidate) => candidate.configId === activeHint.targetUnitId);
-      if (entity) return { kind: "entity" as const, x: entity.x, y: entity.y };
-    }
-    return null;
-  })();
+  // Подсветка обучающей подсказки: клетка, сущность либо элемент панели
+  // (чистая логика в training-progress.ts, покрыта тестами).
+  const trainingHighlight = resolveTrainingHighlight(activeHint, reachable, snapshot.entities);
 
   // Ключ подсвечиваемого элемента панели/кнопки (highlight "panel"/"button",
   // ui-design §4.5): "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
-  const hintPanelKey = activeHint && (activeHint.highlight === "panel" || activeHint.highlight === "button")
-    ? (activeHint.panelKey ?? null)
-    : null;
+  const hintPanelKey = trainingPanelKey(activeHint);
 
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
@@ -729,17 +687,25 @@ export function BattleScreen() {
   // бойцов активной стороны ход передаётся следующей стороне без команды.
   // В обучении автозавершение отключается на шаге «завершите ход» — этот
   // шаг учит нажимать кнопку. Повторы и наблюдатель ход не завершают.
+  // Условие — чистая функция (training-progress.ts), покрыта тестами.
   useEffect(() => {
-    if (paused || busy || enemyPhase) return;
-    if (isReplay || isSpectator) return;
-    if (snapshot.activeOwner !== viewOwner) return;
-    if (isTraining && activeHint?.until === "end_turn") return;
     const ownUnits = snapshot.entities.filter(
       (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
     );
-    if (ownUnits.length === 0) return;
-    if (ownUnits.some((entity) => entity.ap > 0)) return;
-    if (!isNetGuest && session.getBattleOutcome() !== "ongoing") return;
+    if (!shouldAutoEndTurn({
+      paused,
+      busy,
+      enemyPhase,
+      isReplay,
+      isSpectator,
+      isTraining,
+      activeHint,
+      activeOwner: snapshot.activeOwner,
+      viewOwner,
+      ownUnits,
+      outcomeOngoing: session.getBattleOutcome() === "ongoing",
+      isNetGuest: Boolean(isNetGuest),
+    })) return;
     endTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint]);
@@ -972,8 +938,9 @@ export function BattleScreen() {
   const knownEnemies = snapshot.entities.filter((entity) => {
     if (entity.owner !== enemyOwner || entity.coverType !== 0) return false;
     if (isSpectator && entity.owner !== 1 && entity.owner !== 2) return false;
-    const key = cellKey(entity.x, entity.y);
-    return visibleCells.has(key) || (entity.dead && exploredCells.has(key));
+    // Снимок стороны содержит только видимых чужих юнитов (math §8.3):
+    // погибший противник остаётся в полосе, пока его клетка наблюдаема.
+    return visibleCells.has(cellKey(entity.x, entity.y));
   });
 
   return (
@@ -1174,7 +1141,11 @@ export function BattleScreen() {
                     ? hit.chance === undefined ? t("combat.available") : `${hit.chance}%`
                     : t("combat.unavailable")}
                 </span>
-                {hit.available && hit.dmgMin !== undefined && hit.dmgMax !== undefined ? (
+                {hit.available && hit.coverTarget ? (
+                  // Атака по сущности укрытия: попадание не испытывается,
+                  // укрытие разрушается (§10.4 math) — числа урона не показываются.
+                  <span className="aim-dmg cover-destroy">{t("combat.destroyCover")}</span>
+                ) : hit.available && hit.dmgMin !== undefined && hit.dmgMax !== undefined ? (
                   <span className="aim-dmg">
                     {t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}
                   </span>
@@ -1376,8 +1347,10 @@ export function BattleScreen() {
               title={t("battle.defendHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                const result = session.applyBattleCommand({ type: "DEFEND", actorId: selectedId });
-                if (result.ok) advanceTraining(result.events);
+                // Единый путь команд (0.19.2): как и клавиша 9 — через
+                // applyCommand (транспорт в состязательном режиме, анимация
+                // и продвижение подсказки в обучении).
+                applyCommand({ type: "DEFEND", actorId: selectedId });
                 setAction(null);
                 setSkillTargetPos(null);
                 setAimId(null);
@@ -1396,8 +1369,10 @@ export function BattleScreen() {
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
-                const result = session.applyBattleCommand({ type: "OVERWATCH", actorId: selectedId });
-                if (result.ok) advanceTraining(result.events);
+                // Единый путь команд (0.19.2): как и клавиша 0 — через
+                // applyCommand (транспорт в состязательном режиме, анимация
+                // и продвижение подсказки в обучении).
+                applyCommand({ type: "OVERWATCH", actorId: selectedId });
                 setAction(null);
                 setSkillTargetPos(null);
                 setAimId(null);

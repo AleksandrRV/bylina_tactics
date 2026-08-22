@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.19.1";
+export const CORE_VERSION = "0.19.2";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -1045,6 +1045,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           heightMod: actor.z > target.z ? 1 : actor.z < target.z ? -1 : 0,
           flanked: false,
           actionType: weapon.category === "melee" ? "MELEE" : "RANGED",
+          coverTarget: true,
         };
       }
       const breach = edgeBreach(actor, target, weapon);

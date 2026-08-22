@@ -211,7 +211,8 @@
     "bdTotal": "Total",
     "available": "Available",
     "bdObstacleList": "Obstacles on line",
-    "unavailable": "Unavailable"
+    "unavailable": "Unavailable",
+    "destroyCover": "Destroy cover"
   },
   "settings": {
     "title": "Settings",
@@ -381,7 +382,8 @@
     "action": "Scan",
     "hint": "The ship opens points within {radius} units",
     "cost": "Cost: gold {gold}, herbs {herbs}, artifacts {artifacts}",
-    "allOpen": "All map regions are open"
+    "allOpen": "All map regions are open",
+    "nothing": "No closed points within the radius"
   },
   "forge": {
     "inventory": "Crafted: {current}",

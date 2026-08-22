@@ -94,7 +94,16 @@ export function App() {
     if (!content.ok) return null;
     const unitStats: Record<string, { maxHealth: number }> = {};
     for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
-    return createCampaign(content.data.campaign, { unitStats, items: content.data.items, initialState: saved?.campaign });
+    // Назначение класса рекруту — только записи дружины, кроме самого рекрута.
+    const classUnitIds = content.data.units
+      .filter((unit) => unit.side === "druzhina" && unit.id !== content.data.campaign.recruitUnitId)
+      .map((unit) => unit.id);
+    return createCampaign(content.data.campaign, {
+      unitStats,
+      items: content.data.items,
+      initialState: saved?.campaign,
+      classUnitIds,
+    });
   }, [content, saved]);
 
   useEffect(() => {

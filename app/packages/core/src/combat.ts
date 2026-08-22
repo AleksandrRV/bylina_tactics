@@ -39,6 +39,10 @@ export interface HitPreview {
   actionType?: "MELEE" | "RANGED";
   breakCell?: CellPos | null;
   breakdown?: HitBreakdown;
+  /** Атака по сущности укрытия: испытание попадания не проводится, укрытие
+   *  разрушается (§10.4 math). Позволяет интерфейсу показать «разрушить
+   *  укрытие» вместо чисел вероятности/урона. */
+  coverTarget?: boolean;
 }
 
 export interface AttackResolution {

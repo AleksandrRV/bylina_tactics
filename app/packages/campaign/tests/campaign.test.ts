@@ -60,8 +60,8 @@ const UNIT_STATS = {
   volkhv: { maxHealth: 7 },
 };
 
-function campaign(config: CampaignConfig = CONFIG) {
-  return createCampaign(config, { unitStats: UNIT_STATS, items: ITEMS });
+function campaign(config: CampaignConfig = CONFIG, options: Parameters<typeof createCampaign>[1] = {}) {
+  return createCampaign(config, { unitStats: UNIT_STATS, items: ITEMS, ...options });
 }
 
 describe("createCampaign: deployment limits", () => {
@@ -303,6 +303,24 @@ describe("createCampaign: druzhina", () => {
     expect(automaton.assignClass(after.id, "bogatyr")).toBe(false);
   });
 
+  it("rejects assigning a class outside the configured class list (0.19.2)", () => {
+    const automaton = campaign(CONFIG, { classUnitIds: ["bogatyr", "strelets", "znaharka", "volkhv"] });
+    const fighters = automaton.getState().fighters;
+    // Две победы доводят рекрута до уровня 2 (classUnlockLevel).
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    const ids = automaton.getState().fighters.map((fighter) => fighter.id);
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    automaton.finishMission("clearing_2", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    const recruit = automaton.getState().fighters.find((fighter) => fighter.unitId === "recruit")!;
+    expect(recruit.level).toBe(2);
+    // Чужая/несуществующая запись отклоняется перечнем допустимых классов.
+    expect(automaton.assignClass(recruit.id, "upyr")).toBe(false);
+    expect(automaton.assignClass(recruit.id, "missing_class")).toBe(false);
+    expect(automaton.assignClass(recruit.id, "volkhv")).toBe(true);
+  });
+
   it("loses the campaign when the whole roster falls", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
@@ -374,6 +392,18 @@ describe("createCampaign: хозяйство 0.12", () => {
     // Сканирование недопустимо при нехватке трав.
     const poor = campaign({ ...CONFIG, startingResources: { gold: 6, herbs: 0, artifacts: 0 } });
     expect(poor.scan()).toBeNull();
+  });
+
+  it("does not charge the cost when the scan opens nothing (0.19.2)", () => {
+    const automaton = campaign();
+    // Первое сканирование открывает clearing_2 за 1 траву.
+    expect(automaton.scan()?.opened).toEqual(["clearing_2"]);
+    expect(automaton.getState().resources.herbs).toBe(2);
+    // Корабль у (20,50): clearing_2 уже открыта, clearing_3 (90,50) вне
+    // радиуса 40 — повторное сканирование не открывает точек и запасы
+    // не списывает.
+    expect(automaton.scan()).toBeNull();
+    expect(automaton.getState().resources.herbs).toBe(2);
   });
 
   it("crafts items from configuration once, consuming resources", () => {
