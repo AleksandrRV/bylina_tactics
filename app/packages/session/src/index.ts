@@ -251,6 +251,11 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone"> 
   trainingMissionId: null,
 };
 
+/** Экран активного тактического боя: обычное сражение и сражение обучения. */
+function isBattleScreen(screen: string): boolean {
+  return screen === "battle" || screen === "trainingBattle";
+}
+
 export function createSession(
   initial: AppScreen = "boot",
   restored?: Partial<Omit<SessionState, "screen">>,
@@ -438,7 +443,7 @@ export function createSession(
       emit({ ...idle, screen: "pvpRoom" });
     },
     setPaused: (paused) => {
-      if (state.screen !== "battle") return;
+      if (!isBattleScreen(state.screen)) return;
       emit({ ...state, paused });
     },
     bindCampaign: (automaton) => {
@@ -799,7 +804,10 @@ export function createSession(
       if (netHostTransport && state.battleKind === "pvpNet") sendGuestSync();
     },
     applyBattleCommand: (command) => {
-      if (!tacticsHost || state.screen !== "battle") return { ok: false, reason: "ILLEGAL" };
+      // Единственный путь изменения тактического состояния из интерфейса.
+      // Работает и в обучении (экран trainingBattle): иначе команды игрока
+      // в миссиях обучения отклонялись бы и подсказки не продвигались (0.20.1).
+      if (!tacticsHost || !isBattleScreen(state.screen)) return { ok: false, reason: "ILLEGAL" };
       if (state.battleKind === "pvp" || state.battleKind === "pvpNet") {
         state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
       }
@@ -818,7 +826,7 @@ export function createSession(
       return result;
     },
     debugAutoWinBattle: () => {
-      if (!tacticsHost || state.screen !== "battle") return { ok: false, reason: "ILLEGAL" };
+      if (!tacticsHost || !isBattleScreen(state.screen)) return { ok: false, reason: "ILLEGAL" };
       return tacticsHost.debugAutoWin();
     },
     getBattleSnapshot: (owner) => requireTacticsHost().getSnapshotFor(owner),

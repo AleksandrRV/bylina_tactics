@@ -791,6 +791,14 @@ export function BattleScreen() {
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== viewOwner) return;
+    // Ознакомительный шаг обучения (until "noop", 0.20.1): действие не
+    // предполагается — шаг завершается кликом в любое место поля, сам клик
+    // не выполняет перемещения/атаки (иначе подсказка «застревала» бы до
+    // первого действия, а игроку нужно просто подтвердить понимание).
+    if (isTraining && activeHint?.until === "noop") {
+      setHintStep((value) => value + 1);
+      return;
+    }
     const reach = byReach.get(cellKey(x, y));
     const targeting = action !== null;
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
