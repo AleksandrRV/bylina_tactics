@@ -97,11 +97,14 @@ describe("parseContent", () => {
     expect(result.data.skills.find((skill) => skill.id === "evacuate")?.extract).toBe(true);
     expect(result.data.units.find((unit) => unit.id === "captive")?.skills).toContain("evacuate");
     expect(result.data.campaign.missions.map((mission) => mission.type)).toEqual([
-      "purge", "purge", "purge", "purge", "purge", "destroy", "rescue", "recon",
+      "purge", "purge", "purge", "destroy", "rescue", "recon", "purge", "purge",
     ]);
     expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_5")?.generals).toEqual(["solovey"]);
-    expect(result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1")?.generals).toEqual(["baba_yaga"]);
-    expect(result.data.campaign.missions.find((mission) => mission.id === "recon_route_1")?.generals).toEqual(["baba_yaga"]);
+    // Генералы вводятся последними (0.20.0): Яга — в седьмой миссии цепочки,
+    // Соловей — в восьмой; ранние миссии генералов не содержат.
+    expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_4")?.generals).toEqual(["baba_yaga"]);
+    expect(result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1")?.generals).toBeUndefined();
+    expect(result.data.campaign.missions.find((mission) => mission.id === "recon_route_1")?.generals).toBeUndefined();
     expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.tags).toContain("flying");
     expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.fleeHp).toBe(6);
     expect(result.data.units.find((unit) => unit.id === "solovey")?.tags).toContain("hiddenStart");
@@ -214,7 +217,7 @@ describe("parseContent", () => {
 
     // Миссия типа needle, но её id не совпадает с needleMissionId.
     const wrongId = { ...files };
-    wrongId[campaignKey!] = files[campaignKey]!.replace('type: "purge",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 13,', 'type: "needle",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 13,');
+    wrongId[campaignKey!] = files[campaignKey]!.replace('type: "purge",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,', 'type: "needle",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,');
     const idResult = parseContent(wrongId);
     expect(idResult.ok).toBe(false);
     expect(idResult.ok || idResult.issues.some((issue) => issue.message.includes("does not match needleMissionId"))).toBe(true);
@@ -325,5 +328,39 @@ describe("training config (0.19.0)", () => {
     const result = parseContent(files);
     expect(result.ok).toBe(false);
     expect(result.ok || result.issues.some((issue) => issue.message.includes("hint steps"))).toBe(true);
+  });
+});
+
+describe("campaign onboarding chain (0.20.0)", () => {
+  it("opens missions in the onboarding order: each next point is reachable from the previous, and the start cannot skip ahead", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const radius = result.data.campaign.scan.radius;
+    const missions = result.data.campaign.missions;
+    const distance = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+      Math.hypot(a.x - b.x, a.y - b.y);
+
+    // Каждая следующая точка цепочки достижима из какой-либо предыдущей
+    // сканированием (допускается «вилка»: из одной точки открываются две).
+    for (let index = 1; index < missions.length; index += 1) {
+      const to = missions[index]!;
+      const reachableFromEarlier = missions.slice(0, index).some((from) => distance(from, to) <= radius);
+      expect(reachableFromEarlier).toBe(true);
+    }
+
+    // Первая точка не открывает точки дальше второй: механики вводятся
+    // по одной, «прыжок» через всю цепочку со старта невозможен.
+    const first = missions[0]!;
+    for (let index = 2; index < missions.length; index += 1) {
+      expect(distance(first, missions[index]!)).toBeGreaterThan(radius);
+    }
+
+    // Генералы появляются только в последних миссиях цепочки.
+    const generalIds = missions
+      .map((mission, index) => (mission.generals?.length ? index : -1))
+      .filter((index) => index >= 0);
+    expect(generalIds.length).toBeGreaterThan(0);
+    expect(Math.max(...generalIds)).toBe(missions.length - 1);
   });
 });

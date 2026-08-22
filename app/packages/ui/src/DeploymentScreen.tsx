@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 // useMemo остаётся только для itemById; fighters вычисляются на каждый рендер.
 import type { ItemConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState } from "./hooks.js";
+import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
+import { CampaignHint } from "./CampaignHint.js";
+import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 
 function unitName(unitId: string): string {
   return `unit.${unitId}.name`;
@@ -64,11 +66,14 @@ export function DeploymentScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
-  const { activeMissionId } = useSessionState();
+  const { activeMissionId, campaignHintsDone } = useSessionState();
+  const settings = useSettingsState();
   const campaign = session.getCampaign();
   const mission = activeMissionId ? campaign.getMission(activeMissionId) : undefined;
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [equipFor, setEquipFor] = useState<number | null>(null);
+  /** Очередь туториалов «первого раза» (0.20.0). */
+  const [hintQueue, setHintQueue] = useState<CampaignHintId[]>([]);
   const [, setTick] = useState(0);
 
   useEffect(
@@ -112,6 +117,40 @@ export function DeploymentScreen() {
       }
       return next;
     });
+  };
+
+  // Туториалы «первого раза» высадки (0.20.0): формирование высадки, затем —
+  // эвакуация для миссий спасения и разведки.
+  const wantedHints = useMemo(
+    () => pendingCampaignHints({
+      showHints: settings.showHints,
+      done: campaignHintsDone ?? [],
+      onCampaignMap: false,
+      lockedCount: 0,
+      hasWounded: false,
+      rosterTabActive: false,
+      forgeTabActive: false,
+      onDeployment: true,
+      missionType: mission?.type,
+      onBattleWithGeneral: false,
+    }),
+    [settings.showHints, campaignHintsDone, mission?.type],
+  );
+  useEffect(() => {
+    setHintQueue((previous) => {
+      const next = [...previous];
+      for (const id of wantedHints) {
+        if (!next.includes(id)) next.push(id);
+      }
+      return next;
+    });
+  }, [wantedHints.join(",")]);
+
+  const activeHintId = hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null;
+  const closeHint = (): void => {
+    if (!activeHintId) return;
+    session.markCampaignHintShown(activeHintId);
+    setHintQueue((previous) => previous.filter((id) => id !== activeHintId));
   };
 
   return (
@@ -217,6 +256,10 @@ export function DeploymentScreen() {
           </button>
         </div>
       </footer>
+
+      {activeHintId ? (
+        <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} />
+      ) : null}
 
       {equipTarget ? (
         <div className="pause-root" role="presentation">

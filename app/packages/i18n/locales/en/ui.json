@@ -221,6 +221,8 @@
     "masterVolume": "Master volume",
     "musicVolume": "Music",
     "sfxVolume": "Actions",
+    "showHints": "Show hints",
+    "showHintsHint": "First-time tutorials in the campaign. Turning them off does not block progress.",
     "back": "Back to menu"
   },
   "common": {
@@ -330,7 +332,48 @@
     "tabMap": "Map",
     "lostRosterBody": "The druzhina has fallen: no fighter survived. The campaign is over.",
     "objective": "Objective",
-    "escortee": "Rescue"
+    "escortee": "Rescue",
+    "persona": {
+      "znaharka": "The Healer",
+      "kuznets": "The Smith",
+      "volkhv": "The Sage",
+      "chronicler": "The Chronicler"
+    },
+    "hints": {
+      "ok": "Got it",
+      "darkness": {
+        "title": "The Darkness grows",
+        "text": "Every mission feeds Koschei's ritual: the Darkness counter rises after both victory and defeat. If it reaches the limit, the eternal night falls before the Needle is found."
+      },
+      "scan": {
+        "title": "Scanning",
+        "text": "Hidden map points are revealed by scanning from the Flying Ship. A scan costs one herb and opens every point within the radius."
+      },
+      "wound": {
+        "title": "Wounds",
+        "text": "A fighter who finishes a mission at low health is wounded: aim, defense and mobility suffer. Heal them in the Infirmary — the tab at the bottom of the screen."
+      },
+      "roster": {
+        "title": "The Warband",
+        "text": "This is your warband. A fallen fighter is lost forever; a recruit gains a class after two victories — the Sage wields panic, illusion and ally teleportation."
+      },
+      "forge": {
+        "title": "The Forge",
+        "text": "The Forge crafts equipment for gold and herbs: weapons and charms. A crafted item is equipped during deployment and affects the next battle."
+      },
+      "deploy": {
+        "title": "Deployment",
+        "text": "Choose from one to five fighters — only they will enter the battle. The wounded carry penalties, the equipped carry weapons and charms from the Forge."
+      },
+      "evacuation": {
+        "title": "Extraction zone",
+        "text": "The cells along the western edge are the extraction zone. A fighter standing there may leave the field with a special action: the rescued or the scout counts as survived."
+      },
+      "general": {
+        "title": "General of Nav",
+        "text": "This is no common foe: a General of Nav wields special powers. Kill him for good — his escape threshold lets him flee at low health and return in another mission."
+      }
+    }
   },
   "missionResult": {
     "rosterOutcomes": "Druzhina outcomes",

@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import type { ItemConfig, MissionConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
-import { useI18nTick } from "./hooks.js";
+import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
+import { CampaignHint } from "./CampaignHint.js";
+import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 
 /** Классы дружины, доступные для обучения рекрута. */
 const CLASS_IDS: readonly string[] = ["bogatyr", "strelets", "znaharka", "volkhv"];
@@ -214,6 +216,8 @@ export function CampaignScreen() {
   const state = campaign.getState();
   const missions = campaign.getMissions();
   const items = campaign.getItems();
+  const settings = useSettingsState();
+  const { campaignHintsDone } = useSessionState();
   const [tab, setTab] = useState<CampTab>("map");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [trainingId, setTrainingId] = useState<number | null>(null);
@@ -221,6 +225,8 @@ export function CampaignScreen() {
   const [justOpened, setJustOpened] = useState<string[]>([]);
   /** Пустое сканирование: в радиусе нет закрытых точек (0.19.2). */
   const [scanMissed, setScanMissed] = useState(false);
+  /** Очередь туториалов «первого раза» (0.20.0): показываются по одному. */
+  const [hintQueue, setHintQueue] = useState<CampaignHintId[]>([]);
   const [, setTick] = useState(0);
 
   useEffect(
@@ -252,6 +258,39 @@ export function CampaignScreen() {
   const shipPosition = state.shipPosition;
   const woundedFighters = state.fighters.filter((fighter) => fighter.alive && fighter.wounded);
   const training = trainingId !== null ? state.fighters.find((fighter) => fighter.id === trainingId) : undefined;
+
+  // Туториалы «первого раза» (0.20.0): желаемые по условиям экрана, ещё не
+  // показанные и при включённой настройке подсказок — добавляются в очередь.
+  const wantedHints = useMemo(
+    () => pendingCampaignHints({
+      showHints: settings.showHints,
+      done: campaignHintsDone ?? [],
+      onCampaignMap: tab === "map",
+      lockedCount,
+      hasWounded: woundedFighters.length > 0,
+      rosterTabActive: tab === "roster",
+      forgeTabActive: tab === "forge",
+      onDeployment: false,
+      onBattleWithGeneral: false,
+    }),
+    [settings.showHints, campaignHintsDone, tab, lockedCount, woundedFighters.length],
+  );
+  useEffect(() => {
+    setHintQueue((previous) => {
+      const next = [...previous];
+      for (const id of wantedHints) {
+        if (!next.includes(id)) next.push(id);
+      }
+      return next;
+    });
+  }, [wantedHints.join(",")]);
+
+  const activeHintId = hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null;
+  const closeHint = (): void => {
+    if (!activeHintId) return;
+    session.markCampaignHintShown(activeHintId);
+    setHintQueue((previous) => previous.filter((id) => id !== activeHintId));
+  };
 
   const doScan = (): void => {
     const result = campaign.scan();
@@ -748,6 +787,10 @@ export function CampaignScreen() {
           {state.inventory.length > 0 ? <span className="tab-alert forge-alert" aria-label={t("forge.inventory", { current: state.inventory.length })}>{state.inventory.length}</span> : null}
         </button>
       </nav>
+
+      {activeHintId ? (
+        <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} />
+      ) : null}
 
       {training ? (
         <div className="pause-root" role="presentation">

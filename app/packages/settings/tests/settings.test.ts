@@ -21,6 +21,12 @@ describe("sanitizeSettings", () => {
     const result = sanitizeSettings({ masterVolume: 140 }, ["ru"]);
     expect(result.masterVolume).toBe(100);
   });
+
+  it("keeps hints enabled by default and restores an explicit value (0.20.0)", () => {
+    expect(sanitizeSettings({}, ["ru"]).showHints).toBe(true);
+    expect(sanitizeSettings({ showHints: false }, ["ru"]).showHints).toBe(false);
+    expect(sanitizeSettings({ showHints: true }, ["ru"]).showHints).toBe(true);
+  });
 });
 
 describe("createSettings", () => {
@@ -40,5 +46,16 @@ describe("createSettings", () => {
     const again = createSettings({ storage, allowedLanguages: ["ru", "en"] });
     expect(again.get().language).toBe("en");
     expect(again.get().masterVolume).toBe(25);
+  });
+
+  it("restores the showHints preference from storage (0.20.0)", () => {
+    const storage = memoryStorage({
+      [SETTINGS_STORAGE_KEY]: JSON.stringify({ showHints: false }),
+    });
+    const settings = createSettings({ storage, allowedLanguages: ["ru", "en"] });
+    expect(settings.get().showHints).toBe(false);
+    settings.set({ showHints: true });
+    const again = createSettings({ storage, allowedLanguages: ["ru", "en"] });
+    expect(again.get().showHints).toBe(true);
   });
 });

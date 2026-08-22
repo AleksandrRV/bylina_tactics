@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.19.2";
+export const APP_VERSION = "0.20.0";
 
 export type AppScreen =
   | "boot"
@@ -101,6 +101,8 @@ export interface SessionState {
   trainingMissionId?: string | null;
   /** Пройденные миссии обучения (0.19.0). */
   trainingDone?: string[];
+  /** Показанные туториалы «первого раза» кампании (0.20.0): каждый показывается один раз. */
+  campaignHintsDone?: string[];
   /** Победитель завершённой партии (для сохранения повтора). */
   replayWinner?: 1 | 2 | null;
   /** Черновик журнала текущего боя (команды, seed, составы). */
@@ -213,16 +215,21 @@ export interface SessionApi {
   startTrainingMission(missionId: string): boolean;
   /** Отметить миссию обучения пройденной (0.19.0). */
   completeTrainingMission(missionId: string): void;
+  /** Был ли показан туториал кампании с данным идентификатором (0.20.0). */
+  isCampaignHintShown(hintId: string): boolean;
+  /** Отметить туториал кампании показанным — повторно не появляется (0.20.0). */
+  markCampaignHintShown(hintId: string): void;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
 
 /**
- * Фоновое состояние переходов между экранами. `trainingDone` в нём намеренно
- * отсутствует (0.19.1): прогресс обучения постоянен — переходы между экранами
- * не должны его сбрасывать, а `emit` сохраняет значение из текущего состояния.
+ * Фоновое состояние переходов между экранами. `trainingDone` и
+ * `campaignHintsDone` в нём намеренно отсутствуют (0.19.1/0.20.0): прогресс
+ * обучения и туториалов постоянен — переходы между экранами не должны его
+ * сбрасывать, а `emit` сохраняет значение из текущего состояния.
  */
-const idle: Omit<SessionState, "screen" | "trainingDone"> = {
+const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone"> = {
   unavailableMode: null,
   paused: false,
   battleKind: null,
@@ -248,7 +255,7 @@ export function createSession(
   initial: AppScreen = "boot",
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
-  let state: SessionState = { screen: initial, trainingDone: [], ...idle, ...(restored ?? {}) };
+  let state: SessionState = { screen: initial, trainingDone: [], campaignHintsDone: [], ...idle, ...(restored ?? {}) };
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -281,10 +288,14 @@ export function createSession(
   };
 
   const emit = (next: SessionState): void => {
-    // Прогресс обучения постоянен: если очередное состояние не несёт явного
-    // значения trainingDone (переходы навигации через idle), сохраняется
-    // текущее — отметки «Пройдена» не теряются между экранами (0.19.1).
-    state = { ...next, trainingDone: next.trainingDone ?? state.trainingDone ?? [] };
+    // Прогресс обучения и туториалов постоянен: если очередное состояние не
+    // несёт явных значений (переходы навигации через idle), сохраняются
+    // текущие — отметки не теряются между экранами (0.19.1, 0.20.0).
+    state = {
+      ...next,
+      trainingDone: next.trainingDone ?? state.trainingDone ?? [],
+      campaignHintsDone: next.campaignHintsDone ?? state.campaignHintsDone ?? [],
+    };
     for (const listener of listeners) listener(state);
   };
 
@@ -774,6 +785,12 @@ export function createSession(
       const done = state.trainingDone ?? [];
       if (done.includes(missionId)) return;
       emit({ ...state, trainingDone: [...done, missionId] });
+    },
+    isCampaignHintShown: (hintId) => (state.campaignHintsDone ?? []).includes(hintId),
+    markCampaignHintShown: (hintId) => {
+      const done = state.campaignHintsDone ?? [];
+      if (done.includes(hintId)) return;
+      emit({ ...state, campaignHintsDone: [...done, hintId] });
     },
     bindTacticsHost: (host) => {
       tacticsHost = host;

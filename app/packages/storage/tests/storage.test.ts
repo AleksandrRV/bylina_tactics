@@ -44,6 +44,7 @@ function sampleSave(): SaveData {
       outcome: null,
       difficulty: null,
       trainingDone: ["movement"],
+      campaignHintsDone: ["darkness", "scan"],
     },
   };
 }
@@ -59,6 +60,7 @@ describe("createSaveStorage", () => {
     expect(loaded?.campaign.fighters[0]?.name).toBe("Ратибор");
     expect(loaded?.session.screen).toBe("campaign");
     expect(loaded?.session.trainingDone).toEqual(["movement"]);
+    expect(loaded?.session.campaignHintsDone).toEqual(["darkness", "scan"]);
   });
 
   it("returns null when the record is missing or broken", () => {

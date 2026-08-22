@@ -75,7 +75,7 @@ describe("createSession", () => {
   });
 
   it("reports version 0.19.0", () => {
-    expect(APP_VERSION).toBe("0.19.2");
+    expect(APP_VERSION).toBe("0.20.0");
   });
 
   it("moves between menu and settings", () => {
@@ -390,5 +390,25 @@ describe("createSession training hints (0.19.0)", () => {
     session.completeTrainingMission("combat");
     session.goTo("training");
     expect(session.get().trainingDone).toEqual(["movement", "combat"]);
+  });
+});
+
+describe("createSession campaign hints (0.20.0)", () => {
+  it("marks a campaign hint as shown exactly once", () => {
+    const session = createSession("menu");
+    expect(session.isCampaignHintShown("scan")).toBe(false);
+    session.markCampaignHintShown("scan");
+    expect(session.isCampaignHintShown("scan")).toBe(true);
+    session.markCampaignHintShown("scan");
+    expect(session.get().campaignHintsDone).toEqual(["scan"]);
+  });
+
+  it("keeps shown campaign hints across navigation", () => {
+    const session = createSession("menu");
+    session.markCampaignHintShown("darkness");
+    session.goTo("menu");
+    session.openMode("campaign");
+    expect(session.isCampaignHintShown("darkness")).toBe(true);
+    expect(session.get().campaignHintsDone).toEqual(["darkness"]);
   });
 });

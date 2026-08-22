@@ -56,6 +56,23 @@ export function SettingsScreen() {
         />
       </section>
 
+      <section className="panel">
+        <label className="toggle-row" htmlFor="show-hints">
+          <span className="toggle-meta">
+            <span>{t("settings.showHints")}</span>
+            <span className="muted">{t("settings.showHintsHint")}</span>
+          </span>
+          <input
+            id="show-hints"
+            type="checkbox"
+            role="switch"
+            aria-checked={state.showHints}
+            checked={state.showHints}
+            onChange={(event) => settings.set({ showHints: event.target.checked })}
+          />
+        </label>
+      </section>
+
       <button type="button" className="btn btn-primary" onClick={() => session.goTo("menu")}>
         {t("settings.back")}
       </button>

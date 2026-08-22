@@ -518,6 +518,108 @@
   padding: 22px 20px 18px;
 }
 
+/* Карточка туториала «первого раза» кампании (0.20.0, ui-design §4.5) */
+.campaign-hint-card {
+  border-color: rgba(224, 179, 74, 0.5);
+  animation: campaign-hint-in 320ms ease-out both;
+}
+
+.campaign-hint-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.campaign-hint-face {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(224, 179, 74, 0.55);
+  object-fit: cover;
+  flex: none;
+  box-shadow: 0 0 0 3px rgba(224, 179, 74, 0.12);
+}
+
+.campaign-hint-meta h2 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.campaign-hint-meta .muted {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+/* Баннер туториала в бою: не перекрывает поле (pointer-events только на плашке) */
+.campaign-hint-banner {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(92%, 620px);
+  padding: 10px 12px 10px 10px;
+  background: rgba(16, 22, 16, 0.94);
+  border: 1px solid rgba(224, 179, 74, 0.55);
+  border-radius: 8px;
+  color: #f3ecdc;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 72;
+  animation: campaign-hint-in-banner 320ms ease-out both;
+  pointer-events: auto;
+}
+
+.campaign-hint-banner .campaign-hint-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.campaign-hint-banner .campaign-hint-face {
+  width: 52px;
+  height: 52px;
+}
+
+.campaign-hint-banner .campaign-hint-meta h2 {
+  font-size: 0.98rem;
+}
+
+.campaign-hint-banner .campaign-hint-meta .muted {
+  font-size: 0.84rem;
+}
+
+.campaign-hint-banner .hud-btn {
+  flex: none;
+  margin-top: 0;
+  width: auto;
+  padding: 8px 14px;
+}
+
+@keyframes campaign-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes campaign-hint-in-banner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0) scale(1);
+  }
+}
+
 .pause-card h2 {
   margin: 0 0 14px;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;

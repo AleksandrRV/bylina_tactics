@@ -20,6 +20,8 @@ export interface SessionSaveState {
   difficulty: string | null;
   /** Пройденные миссии обучения (0.19.0). */
   trainingDone?: string[];
+  /** Показанные туториалы «первого раза» кампании (0.20.0). */
+  campaignHintsDone?: string[];
 }
 
 export interface FogSave {

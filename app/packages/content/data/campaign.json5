@@ -1,8 +1,17 @@
 {
-  // Кампания выпуска 0.13.0: Летучий Корабль, дружина, хозяйство,
-  // типы миссий «Уничтожение объекта», «Спасение», «Разведка».
-  // Точки открываются сканированием (правила — поле scan); финальная миссия
-  // «Игла» появится на этапе 5.
+  // Кампания: Летучий Корабль, дружина, хозяйство, типы миссий.
+  // Онбординг (0.20.0): точки открываются сканированием в порядке введения
+  // механик — каждая новая механика появляется по одной:
+  //   1. clearing_1   ближний бой (упырь);
+  //   2. clearing_2   дистанция и удержание (леший);
+  //   3. clearing_3   отравление и воскрешение (кикимора);
+  //   4. destroy_idol_1  разрушение среды (идол);
+  //   5. rescue_captive_1  эвакуация (спасение);
+  //   6. recon_route_1  эвакуация (разведка);
+  //   7. clearing_4   генерал Баба Яга;
+  //   8. clearing_5   генерал Соловей-Разбойник.
+  // Расстояния подобраны так, что из каждой точки открываются только
+  // следующие по порядку (радиус сканирования scan.radius).
   rosterCap: 8,
   deployMin: 1,
   deployMax: 5,
@@ -15,17 +24,18 @@
   woundPenalty: { aim: -15, defense: -10, mobility: -1 },
   startingResources: { gold: 6, herbs: 3, artifacts: 0 },
   scan: {
-    radius: 55,
+    radius: 45,
     cost: { gold: 0, herbs: 1, artifacts: 0 },
   },
   missions: [
     {
+      // Первая миссия: только ближний бой (упырь) — базовые правила.
       id: "clearing_1",
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
-      x: 13,
-      y: 64,
+      x: 10,
+      y: 50,
       rewards: { gold: 10, herbs: 3, artifacts: 0 },
       map: {
         width: 12,
@@ -40,12 +50,13 @@
       enemies: [{ unitId: "upyr", count: 3 }],
     },
     {
+      // Вторая миссия: вводится дистанция и удержание (леший).
       id: "clearing_2",
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
-      x: 31,
-      y: 42,
+      x: 30,
+      y: 38,
       rewards: { gold: 12, herbs: 3, artifacts: 0 },
       map: {
         width: 12,
@@ -63,11 +74,12 @@
       ],
     },
     {
+      // Третья миссия: вводится отравление и воскрешение (кикимора).
       id: "clearing_3",
       type: "purge",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
-      x: 49,
+      x: 56,
       y: 62,
       rewards: { gold: 14, herbs: 4, artifacts: 1 },
       map: {
@@ -86,61 +98,13 @@
       ],
     },
     {
-      id: "clearing_4",
-      type: "purge",
-      darknessOnVictory: 2,
-      darknessOnDefeat: 4,
-      x: 65,
-      y: 36,
-      rewards: { gold: 16, herbs: 4, artifacts: 1 },
-      map: {
-        width: 14,
-        height: 10,
-        pitChance: 0.06,
-        coverDensity: 0.09,
-        wallDensity: 0.035,
-        edgeCoverChance: 0.5,
-        halfCoverChance: 0.5,
-        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
-      },
-      enemies: [
-        { unitId: "upyr", count: 2 },
-        { unitId: "leshy", count: 2 },
-        { unitId: "kikimora", count: 1 },
-      ],
-    },
-    {
-      id: "clearing_5",
-      type: "purge",
-      darknessOnVictory: 2,
-      darknessOnDefeat: 4,
-      x: 82,
-      y: 55,
-      rewards: { gold: 18, herbs: 5, artifacts: 2 },
-      map: {
-        width: 14,
-        height: 10,
-        pitChance: 0.06,
-        coverDensity: 0.09,
-        wallDensity: 0.04,
-        edgeCoverChance: 0.5,
-        halfCoverChance: 0.45,
-        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
-      },
-      enemies: [
-        { unitId: "upyr", count: 4 },
-        { unitId: "leshy", count: 2 },
-      ],
-      generals: ["solovey"],
-    },
-    {
-      // Уничтожение идола: цель задаётся сценарием миссии (0.13.0).
+      // Уничтожение идола: разрушение среды (0.13.0); дистанция уже введена.
       id: "destroy_idol_1",
       type: "destroy",
       darknessOnVictory: 2,
       darknessOnDefeat: 5,
-      x: 24,
-      y: 78,
+      x: 74,
+      y: 52,
       rewards: { gold: 16, herbs: 5, artifacts: 1 },
       map: {
         width: 14,
@@ -159,13 +123,13 @@
       ],
     },
     {
-      // Спасение княжны: вывести сопровождаемого в зону эвакуации (0.13.0).
+      // Спасение княжны: эвакуация без новых противников (0.13.0).
       id: "rescue_captive_1",
       type: "rescue",
       darknessOnVictory: 3,
       darknessOnDefeat: 5,
-      x: 47,
-      y: 18,
+      x: 98,
+      y: 40,
       rewards: { gold: 18, herbs: 6, artifacts: 1 },
       map: {
         width: 14,
@@ -183,16 +147,16 @@
         { unitId: "upyr", count: 3 },
         { unitId: "kikimora", count: 1 },
       ],
-      generals: ["baba_yaga"],
     },
     {
-      // Разведка: хотя бы один боец достигает зоны и эвакуируется (0.13.0).
+      // Разведка: эвакуация хотя бы одного бойца (0.13.0). Без генерала:
+      // генералы вводятся последними (0.20.0).
       id: "recon_route_1",
       type: "recon",
       darknessOnVictory: 2,
       darknessOnDefeat: 4,
-      x: 71,
-      y: 82,
+      x: 48,
+      y: 92,
       rewards: { gold: 14, herbs: 5, artifacts: 1 },
       map: {
         width: 14,
@@ -209,7 +173,59 @@
         { unitId: "upyr", count: 4 },
         { unitId: "leshy", count: 1 },
       ],
+    },
+    {
+      // Смешанный состав и первый генерал — Баба Яга (0.18.0): полёт,
+      // контроль, пороговый уход.
+      id: "clearing_4",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      x: 10,
+      y: 99,
+      rewards: { gold: 16, herbs: 4, artifacts: 1 },
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.06,
+        coverDensity: 0.09,
+        wallDensity: 0.035,
+        edgeCoverChance: 0.5,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 2 },
+        { unitId: "leshy", count: 2 },
+        { unitId: "kikimora", count: 1 },
+      ],
       generals: ["baba_yaga"],
+    },
+    {
+      // Финальная зачистка и второй генерал — Соловей-Разбойник (0.18.0):
+      // скрытность, «Свист».
+      id: "clearing_5",
+      type: "purge",
+      darknessOnVictory: 2,
+      darknessOnDefeat: 4,
+      x: 22,
+      y: 98,
+      rewards: { gold: 18, herbs: 5, artifacts: 2 },
+      map: {
+        width: 14,
+        height: 10,
+        pitChance: 0.06,
+        coverDensity: 0.09,
+        wallDensity: 0.04,
+        edgeCoverChance: 0.5,
+        halfCoverChance: 0.45,
+        heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+      },
+      enemies: [
+        { unitId: "upyr", count: 4 },
+        { unitId: "leshy", count: 2 },
+      ],
+      generals: ["solovey"],
     },
   ],
 }

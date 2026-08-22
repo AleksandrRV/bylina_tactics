@@ -7,6 +7,8 @@ export interface SettingsState {
   sfxVolume: number;
   fontScale: number;
   highContrast: boolean;
+  /** Показывать подсказки и туториалы «первого раза» (0.20.0); по умолчанию включено. */
+  showHints: boolean;
 }
 
 export const defaultSettings: SettingsState = {
@@ -16,6 +18,7 @@ export const defaultSettings: SettingsState = {
   sfxVolume: 80,
   fontScale: 1,
   highContrast: false,
+  showHints: true,
 };
 
 export interface SettingsStorage {
@@ -45,6 +48,7 @@ export function sanitizeSettings(
     sfxVolume: clamp(Number(raw?.sfxVolume ?? defaultSettings.sfxVolume), 0, 100),
     fontScale: clamp(Number(raw?.fontScale ?? defaultSettings.fontScale), 0.85, 1.4),
     highContrast: Boolean(raw?.highContrast),
+    showHints: raw?.showHints !== false,
   };
 }
 

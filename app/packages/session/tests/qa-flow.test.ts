@@ -112,15 +112,17 @@ describe("QA flow: campaign end-to-end (0.13.0)", () => {
       camp.scan();
     }
 
+    // Порядок онбординга (0.20.0): ближний бой → дистанция → отравление →
+    // разрушение → спасение → разведка → генералы (Яга, Соловей).
     expect(played).toEqual([
       "clearing_1",
       "clearing_2",
       "clearing_3",
-      "clearing_4",
-      "clearing_5",
       "destroy_idol_1",
       "rescue_captive_1",
       "recon_route_1",
+      "clearing_4",
+      "clearing_5",
     ]);
     expect(camp.getState().phase).toBe("active");
     expect(camp.getState().fighters.filter((fighter) => fighter.alive).length).toBeGreaterThan(0);

@@ -27,7 +27,8 @@ import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingHintsSorted, trainingPanelKey } from "./training-progress.js";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState } from "./hooks.js";
+import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
+import { CampaignHint } from "./CampaignHint.js";
 import { unitPortrait } from "./portraits.js";
 import "./battle.css";
 
@@ -384,6 +385,19 @@ export function BattleScreen() {
   const mission = battleKind === "campaign" && activeMissionId
     ? session.getCampaign().getMission(activeMissionId)
     : undefined;
+
+  // Туториал «появление генерала» (0.20.0): первый бой миссии с генералом.
+  // Показывается один раз, отключается настройкой подсказок; не блокирует поле.
+  const hintSettings = useSettingsState();
+  const [generalHint, setGeneralHint] = useState(false);
+  useEffect(() => {
+    if (battleKind !== "campaign" || !mission?.generals?.length) return;
+    if (!hintSettings.showHints) return;
+    if (session.isCampaignHintShown("general")) return;
+    setGeneralHint(true);
+    // Показ при создании ядра (старте боя), без повторных срабатываний.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [kernel]);
   const objectiveEntity = mission
     ? snapshot.entities.find((entity) =>
         mission.type === "destroy"
@@ -963,6 +977,17 @@ export function BattleScreen() {
             <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
             <span className="training-hint-text">{t(activeHint.textKey)}</span>
           </div>
+        ) : null}
+        {generalHint ? (
+          <CampaignHint
+            key="general"
+            hintId="general"
+            variant="banner"
+            onClose={() => {
+              session.markCampaignHintShown("general");
+              setGeneralHint(false);
+            }}
+          />
         ) : null}
         {isReplay ? (
           <div className="replay-bar" role="status">

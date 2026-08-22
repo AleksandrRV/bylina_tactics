@@ -20,7 +20,28 @@ const PORTRAIT_FILES: Record<string, string> = {
   solovey: "solovey.jpg",
   // Наставник-летописец (нарративная рамка обучения, roadmap 0.19.0).
   chronicler: "chronicler.jpg",
+  // Кузнец — персонаж туториалов Кузни (0.20.0).
+  kuznets: "kuznets.jpg",
 };
+
+/**
+ * Портреты персонажей корабля для туториалов «первого раза» (0.20.0):
+ * знахарка, кузнец, волхв, летописец.
+ */
+const PERSONA_FILES: Record<string, string> = {
+  znaharka: "znaharka.jpg",
+  kuznets: "kuznets.jpg",
+  volkhv: "volkhv.jpg",
+  chronicler: "chronicler.jpg",
+};
+
+/** Абсолютный URL портрета персонажа (аналогично unitPortrait). */
+export function personaPortrait(persona: string): string | undefined {
+  const file = PERSONA_FILES[persona];
+  if (!file) return undefined;
+  if (typeof document === "undefined") return `portraits/${file}`;
+  return new URL(`portraits/${file}`, document.baseURI).href;
+}
 
 /** Абсолютный URL от baseURI документа — устойчиво к нестандартному base приложения. */
 export function unitPortrait(configId: string): string | undefined {
