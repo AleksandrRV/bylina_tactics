@@ -28,6 +28,7 @@ describe("parseContent", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.data.units.map((unit) => unit.id).sort()).toEqual([
+      "baba_yaga",
       "bogatyr",
       "captive",
       "forest_beast",
@@ -38,6 +39,7 @@ describe("parseContent", () => {
       "leshy",
       "leshy_pvp",
       "recruit",
+      "solovey",
       "strelets",
       "upyr",
       "upyr_pvp",
@@ -90,12 +92,20 @@ describe("parseContent", () => {
       "shield_bash",
       "summon_forest_beast",
       "teleport_ally",
+      "whistle",
     ]);
     expect(result.data.skills.find((skill) => skill.id === "evacuate")?.extract).toBe(true);
     expect(result.data.units.find((unit) => unit.id === "captive")?.skills).toContain("evacuate");
     expect(result.data.campaign.missions.map((mission) => mission.type)).toEqual([
       "purge", "purge", "purge", "purge", "purge", "destroy", "rescue", "recon",
     ]);
+    expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_5")?.generals).toEqual(["solovey"]);
+    expect(result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1")?.generals).toEqual(["baba_yaga"]);
+    expect(result.data.campaign.missions.find((mission) => mission.id === "recon_route_1")?.generals).toEqual(["baba_yaga"]);
+    expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.tags).toContain("flying");
+    expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.fleeHp).toBe(6);
+    expect(result.data.units.find((unit) => unit.id === "solovey")?.tags).toContain("hiddenStart");
+    expect(result.data.skills.find((skill) => skill.id === "whistle")?.effects.map((effect) => effect.type)).toEqual(["damage", "knockback"]);
     const destroy = result.data.campaign.missions.find((mission) => mission.id === "destroy_idol_1");
     expect(destroy?.objectiveUnitId).toBe("idol");
     const rescue = result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1");

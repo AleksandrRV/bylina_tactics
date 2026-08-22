@@ -1,0 +1,19 @@
+{
+  // Соловей-Разбойник: генерал Нави (base-design §6.2, roadmap 0.18.0).
+  // Начинает сражение со скрытностью (tags: hiddenStart); раскрывается
+  // собственной атакой или сближением противника (math §8.2).
+  // Умение «Свист»: урон и принудительное смещение цели.
+  id: "solovey",
+  classId: "solovey",
+  side: "nav",
+  maxHealth: 18,
+  maxAP: 2,
+  mobility: 5,
+  aim: 85,
+  defense: 5,
+  will: 60,
+  vision: 13,
+  weapons: ["bow"],
+  skills: ["whistle"],
+  tags: ["hiddenStart"],
+}

@@ -130,6 +130,12 @@
     },
     "captive": {
       "name": "Princess"
+    },
+    "baba_yaga": {
+      "name": "Baba Yaga"
+    },
+    "solovey": {
+      "name": "Solovey the Brigand"
     }
   },
   "weapon": {
@@ -248,6 +254,9 @@
     },
     "evacuate": {
       "name": "Evacuate"
+    },
+    "whistle": {
+      "name": "Whistle"
     }
   },
   "status": {

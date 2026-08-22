@@ -131,6 +131,7 @@
         { unitId: "upyr", count: 4 },
         { unitId: "leshy", count: 2 },
       ],
+      generals: ["solovey"],
     },
     {
       // Уничтожение идола: цель задаётся сценарием миссии (0.13.0).
@@ -182,6 +183,7 @@
         { unitId: "upyr", count: 3 },
         { unitId: "kikimora", count: 1 },
       ],
+      generals: ["baba_yaga"],
     },
     {
       // Разведка: хотя бы один боец достигает зоны и эвакуируется (0.13.0).
@@ -207,6 +209,7 @@
         { unitId: "upyr", count: 4 },
         { unitId: "leshy", count: 1 },
       ],
+      generals: ["baba_yaga"],
     },
   ],
 }

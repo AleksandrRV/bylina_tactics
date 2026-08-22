@@ -452,3 +452,22 @@ describe("createCampaign: снаряжение и гибель", () => {
     expect(automaton.equipItem(fighters[1]!.id, "aim_charm")).toBe(true);
   });
 });
+
+describe("generals in campaign (0.18.0)", () => {
+  it("a general that died is excluded from later missions", () => {
+    const automaton = campaign();
+    const fighters = automaton.getState().fighters;
+    automaton.startMission("clearing_1");
+    // Миссия без генералов — generalDeaths пуст; затем имитируем гибель Яги.
+    automaton.finishMission("clearing_1", "victory", fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })), ["baba_yaga"]);
+    expect(automaton.getState().deadGenerals).toContain("baba_yaga");
+  });
+
+  it("a general that fled is not marked dead and may return", () => {
+    const automaton = campaign();
+    const fighters = automaton.getState().fighters;
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })), []);
+    expect(automaton.getState().deadGenerals).toEqual([]);
+  });
+});

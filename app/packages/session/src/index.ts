@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.17.0";
+export const APP_VERSION = "0.18.0";
 
 export type AppScreen =
   | "boot"
@@ -125,7 +125,11 @@ export interface SessionApi {
   /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
   confirmDeployment(fighterIds: number[]): boolean;
   /** Завершить активную миссию исходом и исходом участников высадки. */
-  finishCampaignMission(outcome: MissionOutcome, participants: MissionParticipant[]): CampaignFinishInfo | null;
+  finishCampaignMission(
+    outcome: MissionOutcome,
+    participants: MissionParticipant[],
+    generalDeaths?: string[],
+  ): CampaignFinishInfo | null;
   /** Покинуть начатую миссию без последствий и вернуться на карту. */
   leaveCampaignMission(): void;
   /** Вернуться на карту корабля с экрана итога миссии. */
@@ -436,10 +440,10 @@ export function createSession(
       emit({ ...state, screen: "battle", deployment: [...fighterIds] });
       return true;
     },
-    finishCampaignMission: (outcome, participants) => {
+    finishCampaignMission: (outcome, participants, generalDeaths) => {
       const active = state.activeMissionId;
       if (state.battleKind !== "campaign" || active === null) return null;
-      const result = requireCampaign().finishMission(active, outcome, participants);
+      const result = requireCampaign().finishMission(active, outcome, participants, generalDeaths);
       if (!result) return null;
       emit({ ...state, screen: "missionResult", paused: false, outcome });
       return result;

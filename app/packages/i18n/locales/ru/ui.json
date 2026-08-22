@@ -130,6 +130,12 @@
     },
     "captive": {
       "name": "Княжна"
+    },
+    "baba_yaga": {
+      "name": "Баба Яга"
+    },
+    "solovey": {
+      "name": "Соловей-Разбойник"
     }
   },
   "weapon": {
@@ -248,6 +254,9 @@
     },
     "evacuate": {
       "name": "Эвакуация"
+    },
+    "whistle": {
+      "name": "Свист"
     }
   },
   "status": {

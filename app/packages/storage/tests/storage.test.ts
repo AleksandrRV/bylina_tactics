@@ -31,6 +31,7 @@ function sampleSave(): SaveData {
       fighters: [
         { id: 1, name: "Ратибор", unitId: "bogatyr", level: 3, hp: 10, maxHp: 12, wounded: false, alive: true, equippedItemId: null },
       ],
+      deadGenerals: [],
       activeMissionId: null,
       lastResult: null,
     },

@@ -102,6 +102,10 @@ export interface MissionMatchOptions {
   enemies: readonly { unitId: string; count: number }[];
   /** Цель миссии: уничтожение объекта, спасение лица, разведка (0.13.0). */
   objective?: MissionObjective;
+  /** Генералы миссии (0.18.0): записи из конфигурации сценария (base-design §6.2). */
+  generals?: readonly string[];
+  /** Генералы, погибшие ранее в кампании: не появляются вновь (0.18.0). */
+  excludedGenerals?: readonly string[];
   seed: number;
 }
 
@@ -199,6 +203,17 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     const config = pickUnit(options.units, type);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
+  });
+
+  // Генералы (0.18.0): появляются у восточного края по правилам конфигурации
+  // миссии. Погибшие ранее в кампании генералы не возвращаются.
+  const generals = (options.generals ?? []).filter((generalId) => !(options.excludedGenerals ?? []).includes(generalId));
+  generals.forEach((generalId, index) => {
+    const config = pickUnit(options.units, generalId);
+    const point = freeCellNear(generated.grid, generated.covers, state.entities, state.grid.width - 3, Math.floor(state.grid.height / 2));
+    if (!point) throw new Error(`No free spawn cell for general ${generalId}`);
+    const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
+    state.entities.push(spawnUnitState(500 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
   });
 
   // Разведка: сценарий даёт бойцам высадки действие эвакуации — любой из них

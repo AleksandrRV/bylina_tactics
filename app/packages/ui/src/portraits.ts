@@ -15,6 +15,9 @@ const PORTRAIT_FILES: Record<string, string> = {
   upyr_pvp: "upyr.jpg",
   leshy_pvp: "leshy.jpg",
   kikimora_pvp: "kikimora.jpg",
+  // Генералы (0.18.0).
+  baba_yaga: "baba_yaga.jpg",
+  solovey: "solovey.jpg",
 };
 
 /** Абсолютный URL от baseURI документа — устойчиво к нестандартному base приложения. */

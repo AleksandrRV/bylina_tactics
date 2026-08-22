@@ -181,6 +181,8 @@ export function BattleScreen() {
         map: mission.map,
         playerSlots,
         enemies: mission.enemies,
+        generals: mission.generals,
+        excludedGenerals: session.getCampaign().getState().deadGenerals,
         objective: mission.type === "destroy"
           ? { kind: "destroy", unitId: mission.objectiveUnitId! }
           : mission.type === "rescue"
@@ -417,6 +419,11 @@ export function BattleScreen() {
       // а не по порядку идентификаторов. Метка не зависит от призывов,
       // иллюзий и удалённых с поля сущностей.
       const final = session.getBattleSnapshot(PLAYER_OWNER);
+      // Генералы, погибшие в миссии: окончательная гибель (0.18.0).
+      const generalDeaths = (mission?.generals ?? []).filter((generalId) => {
+        const general = final.entities.find((entity) => entity.configId === generalId && entity.owner === ENEMY_OWNER);
+        return general?.dead === true;
+      });
       const participants = deployment.map((fighterId, index) => {
         const entity = final.entities.find((candidate) =>
           candidate.owner === PLAYER_OWNER &&
@@ -430,7 +437,7 @@ export function BattleScreen() {
         if (extracted) return { fighterId, survived: true, hp: extracted.hp };
         return { fighterId, survived: false, hp: 0 };
       });
-      session.finishCampaignMission(outcome, participants);
+      session.finishCampaignMission(outcome, participants, generalDeaths);
       return;
     }
     session.finishMatch(outcome);

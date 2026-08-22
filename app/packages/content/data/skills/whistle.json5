@@ -1,0 +1,18 @@
+{
+  // «Свист» Соловья-Разбойника (base-design §6.2): урон и принудительное
+  // смещение цели от источника (math §13).
+  id: "whistle",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "attack",
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 3,
+  effects: [
+    { type: "damage", minDmg: 3, maxDmg: 5, crit: 10, critBonus: 2 },
+    { type: "knockback" },
+  ],
+}

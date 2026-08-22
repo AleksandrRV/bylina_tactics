@@ -327,6 +327,45 @@ function drawCaptive({ g, cx, cy }: TokenCtx): void {
   g.poly([cx + 10, cy + 1, cx + 13, cy + 6, cx + 10, cy + 6]).fill(0xe8d9b0);
 }
 
+/** Баба Яга: ведьма в ступе; полёт, контроль, пороговый уход (0.18.0). */
+function drawBabaYaga({ g, cx, cy }: TokenCtx): void {
+  // Ступа (тёмное дерево) с парящим ореолом.
+  g.ellipse(cx, cy + 9, 11, 5).fill(0x3a2a1a).stroke({ width: 1, color: 0x241a10 });
+  g.ellipse(cx, cy + 6, 7.5, 4).fill(0x241a10);
+  // Пламя под ступой.
+  g.ellipse(cx, cy + 12, 5, 2.5).fill({ color: 0x7a4a2a, alpha: 0.9 });
+  g.ellipse(cx, cy + 13, 3, 1.6).fill({ color: 0xc97a3a, alpha: 0.95 });
+  // Ведьма: платок и серый плащ.
+  g.circle(cx, cy - 3, 6).fill(0x8a8f98).stroke({ width: 0.8, color: 0x4a4e55 });
+  g.circle(cx, cy - 3.4, 4.4).fill(0xd8cfc0);
+  g.poly([cx - 6.5, cy - 2, cx + 6.5, cy - 2, cx + 4.5, cy + 6, cx - 4.5, cy + 6]).fill(0x5a5f68);
+  // Платок-узел.
+  g.circle(cx, cy - 8.6, 2).fill(0x8a4a3a);
+  // Крючковатый нос.
+  g.poly([cx + 3.4, cy - 4.6, cx + 6, cy - 3.2, cx + 3.4, cy - 2.4]).fill(0xd8cfc0);
+  // Метла за спиной.
+  g.moveTo(cx + 7, cy + 4).lineTo(cx + 13, cy - 2).stroke({ width: 1.4, color: 0x6b4f2a });
+  g.poly([cx + 11, cy - 1, cx + 16, cy - 4, cx + 13, cy + 1]).fill(0xa08050);
+  // Изумрудное свечение зелья.
+  g.circle(cx - 4, cy + 2.4, 1.8).fill({ color: 0x5fd6a8, alpha: 0.9 });
+}
+
+/** Соловей-Разбойник: разбойник с луком и свитком (0.18.0). */
+function drawSolovey({ g, cx, cy }: TokenCtx): void {
+  // Плащ разбойника.
+  g.poly([cx - 9, cy - 4, cx + 9, cy - 4, cx + 7, cy + 11, cx - 7, cy + 11]).fill(0x4a4a3a).stroke({ width: 0.8, color: 0x2c2c22 });
+  // Голова с шапкой.
+  g.circle(cx, cy - 6, 5.5).fill(0xd8c9a8);
+  g.poly([cx - 6, cy - 9, cx + 6, cy - 9, cx + 4, cy - 4, cx - 4, cy - 4]).fill(0x8a2a2a);
+  // Борода.
+  g.poly([cx - 3.4, cy - 3, cx + 3.4, cy - 3, cx, cy + 2.4]).fill(0x6b5b48);
+  // Лук в руке.
+  g.moveTo(cx + 8, cy - 2).quadraticCurveTo(cx + 14, cy + 2, cx + 8, cy + 7).stroke({ width: 1.4, color: 0x8a6a3a });
+  g.moveTo(cx + 8, cy - 2).lineTo(cx + 8, cy + 7).stroke({ width: 0.6, color: 0xd8cfc0 });
+  // Свисток у пояса (золотой).
+  g.circle(cx - 2, cy + 7, 2).fill(0xd9b64a).stroke({ width: 0.6, color: 0x8a6f2a });
+}
+
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   bogatyr: drawBogatyr,
   strelets: drawStrelets,
@@ -339,6 +378,8 @@ const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   illusion: drawIllusion,
   idol: drawIdol,
   captive: drawCaptive,
+  baba_yaga: drawBabaYaga,
+  solovey: drawSolovey,
 };
 
 const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: 0x6d9a3a };
@@ -1254,6 +1295,20 @@ export function createFieldRenderer(): FieldRenderer {
           g.circle(fx.x1, fx.y1, 14 + t * 5).stroke({ width: 1.5, color: secondary, alpha: 1 - t });
           g.moveTo(fx.x1 - 21, fx.y1).lineTo(fx.x1 + 21, fx.y1).stroke({ width: 1, color: primary, alpha: 1 - t });
           g.moveTo(fx.x1, fx.y1 - 21).lineTo(fx.x1, fx.y1 + 21).stroke({ width: 1, color: primary, alpha: 1 - t });
+        }
+        if (fx.style === "whistle") {
+          // «Свист» Соловья: расходящиеся звуковые кольца от источника к цели.
+          const ringRadius = 4 + t * 26;
+          g.circle(px, py, ringRadius).stroke({ width: 2.4, color: 0xffe0b0, alpha: (1 - t) * 0.9 });
+          g.circle(px, py, ringRadius * 0.66).stroke({ width: 1.2, color: 0xfff4dd, alpha: (1 - t) * 0.7 });
+          g.circle(px, py, ringRadius * 0.4).stroke({ width: 0.8, color: 0xfff4dd, alpha: (1 - t) * 0.5 });
+          // Искры-ноты.
+          for (let p = 0; p < 4; p += 1) {
+            const noteAngle = (p / 4) * Math.PI * 2 + t * 5;
+            const noteR = 6 + t * 20;
+            g.circle(px + Math.cos(noteAngle) * noteR, py + Math.sin(noteAngle) * noteR * 0.7, 1.6)
+              .fill({ color: 0xffe0b0, alpha: 1 - t });
+          }
         }
       } else if (fx.kind === "status") {
         const t = (now - fx.start) / 520;

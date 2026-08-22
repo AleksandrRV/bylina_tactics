@@ -91,6 +91,8 @@ export interface CampaignState {
   missions: MissionPointState[];
   /** Реестр дружины. */
   fighters: FighterState[];
+  /** Генералы, погибшие окончательно (0.18.0): не возвращаются в кампании. */
+  deadGenerals: string[];
   /** Идентификатор начатой, но не завершённой миссии. */
   activeMissionId: string | null;
   lastResult: {
@@ -121,7 +123,13 @@ export interface CampaignApi {
    * прирост Тьмы, награду, исходы бойцов, пополнение; корабль перелетает
    * к точке миссии. Возвращает null, если команда недопустима.
    */
-  finishMission(id: string, outcome: MissionOutcome, participants: MissionParticipant[]): MissionFinishResult | null;
+  finishMission(
+    id: string,
+    outcome: MissionOutcome,
+    participants: MissionParticipant[],
+    /** Генералы, погибшие в этой миссии (0.18.0): исключаются из кампании. */
+    generalDeaths?: string[],
+  ): MissionFinishResult | null;
   /** Покинуть начатую миссию без последствий (возврат на карту). */
   abandonMission(): void;
   /** Сканирование окрестности корабля: открывает точки в радиусе за стоимость. */
@@ -206,6 +214,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       status: index === 0 ? "open" : "locked",
     })),
     fighters: initialRoster.map((unitId) => makeFighter(unitId, config.classUnlockLevel)),
+    deadGenerals: [],
     activeMissionId: null,
     lastResult: null,
   };
@@ -218,6 +227,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         shipPosition: { ...options.initialState.shipPosition },
         missions: options.initialState.missions.map((mission) => ({ ...mission })),
         fighters: options.initialState.fighters.map((fighter) => ({ ...fighter })),
+        deadGenerals: [...(options.initialState.deadGenerals ?? [])],
         lastResult: options.initialState.lastResult ? { ...options.initialState.lastResult } : null,
       }
     : freshState;
@@ -270,7 +280,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       emit();
       return true;
     },
-    finishMission: (id, outcome, participants) => {
+    finishMission: (id, outcome, participants, generalDeaths) => {
       if (state.phase !== "active" || state.activeMissionId !== id) return null;
       const point = findMission(id);
       const mission = missions.find((entry) => entry.id === id);
@@ -311,6 +321,10 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
       point.status = "done";
       state.activeMissionId = null;
+      // Окончательная гибель генералов (0.18.0): погибший не возвращается.
+      for (const generalId of generalDeaths ?? []) {
+        if (!state.deadGenerals.includes(generalId)) state.deadGenerals.push(generalId);
+      }
       // Корабль перелетает к завершённой точке; дальнейшие точки открываются сканированием.
       state.shipPosition = { x: mission.x, y: mission.y };
 
