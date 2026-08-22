@@ -1325,6 +1325,50 @@ export function createFieldRenderer(): FieldRenderer {
       ]).fill({ color: 0xf2dd9a, alpha: 0.5 + extractPulse * 0.3 });
     }
 
+    // Домашние края состязательного режима (0.16.0): янтарный западный край
+    // стороны 1 и синий восточный край стороны 2 — зона доставки яблока.
+    for (const tile of view.snapshot.grid.tiles) {
+      if (tile.homeOwner === undefined) continue;
+      const z = visualLevel(tile);
+      const { fx, fy } = faceOf(tile.x, tile.y, z);
+      const color = tile.homeOwner === 1 ? 0xe0b34a : 0x6aa9d9;
+      const pulse = 0.5 + Math.sin(now * 0.0028 + tile.homeOwner) * 0.25;
+      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({
+        width: 1.6,
+        color,
+        alpha: 0.25 + pulse * 0.3,
+      });
+      g.rect(fx + 5, fy + 5, CELL_SIZE - 10, CELL_SIZE - 10).stroke({
+        width: 0.8,
+        color,
+        alpha: 0.12 + pulse * 0.18,
+      });
+    }
+
+    // Молодильное яблоко (0.16.0): пульсирующая фишка в клетке предмета.
+    const apple = view.snapshot.apple;
+    if (apple) {
+      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === apple.pos.x && candidate.y === apple.pos.y);
+      if (tile) {
+        const z = visualLevel(tile);
+        const { fx, fy } = faceOf(tile.x, tile.y, z);
+        const cx = fx + CELL_SIZE / 2;
+        const cy = fy + CELL_SIZE / 2 + 4;
+        const pulse = 0.5 + Math.sin(now * 0.003) * 0.25;
+        // Свечение.
+        g.circle(cx, cy, 10 + pulse * 3).fill({ color: 0xe06a4a, alpha: 0.18 + pulse * 0.1 });
+        // Тень.
+        g.ellipse(cx, cy + 7, 5, 2).fill({ color: 0x000000, alpha: 0.35 });
+        // Яблоко.
+        g.circle(cx, cy, 5.5 + pulse * 0.5).fill(0xd94a3a).stroke({ width: 1, color: 0x8a2a1e });
+        // Блик.
+        g.circle(cx - 1.6, cy - 1.8, 1.6).fill({ color: 0xffe8c9, alpha: 0.85 });
+        // Листик и веточка.
+        g.moveTo(cx, cy - 5.5).lineTo(cx + 0.6, cy - 8).stroke({ width: 1, color: 0x6b4f2a });
+        g.ellipse(cx + 3.4, cy - 8, 2.6, 1.4).fill(0x7fb84d).stroke({ width: 0.6, color: 0x4a7a2e });
+      }
+    }
+
     // Туман войны: анимированный оверлей поверх рельефа.
     if (view.visibleCells) {
       const C = CELL_SIZE;

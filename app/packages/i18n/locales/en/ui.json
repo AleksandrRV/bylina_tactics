@@ -404,7 +404,18 @@
     "passBody": "The panel shows the side whose turn it is. The other side's panel and fog are hidden.",
     "ready": "I am ready",
     "tabLocal": "Same device",
-    "tabNetwork": "Local network"
+    "tabNetwork": "Local network",
+    "objectiveLabel": "Victory condition",
+    "objectiveElimination": "Destroy all enemy units",
+    "objectiveApple": "Carry the youth apple",
+    "nLabel": "Roster size N",
+    "draftPick": "Pick a fighter from the shared pool",
+    "draftDone": "Draft complete — start the battle",
+    "draftEmpty": "Nothing picked yet",
+    "reset": "Reset draft",
+    "appleLabel": "Youth apple",
+    "appleCarrier": "Apple held by {side}",
+    "appleLying": "The apple lies on the field"
   },
   "net": {
     "host": "Create game",
@@ -429,6 +440,13 @@
     "opponentTurn": "Opponent's turn",
     "waitBody": "Waiting for the host's turn...",
     "syncing": "Syncing",
-    "syncingBody": "Receiving the match state from the host..."
+    "syncingBody": "Receiving the match state from the host...",
+    "peerRole": "Who joins",
+    "peerGuest": "Opponent",
+    "peerSpectator": "Spectator",
+    "omniscient": "Spectator full view",
+    "spectator": "Spectator",
+    "spectatorBody": "no commands are sent; free camera",
+    "spectatorJoinHint": "A spectator joins with the same code — the host sets the role."
   }
 }

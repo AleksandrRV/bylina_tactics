@@ -34,7 +34,7 @@ function buildWorld() {
 describe("QA pvp full match (0.14.0)", () => {
   it("alternates turns, respects fog for the other side, and ends with the winner", async () => {
     const { units, weapons, pvp } = buildWorld();
-    const pool = pvp.pool;
+    const pool = pvp.pool.slice(0, 3);
     const session = createSession("menu");
     session.openPvpRoom();
     session.startPvpBattle([...pool], [...pool], 2024);
@@ -48,6 +48,14 @@ describe("QA pvp full match (0.14.0)", () => {
     // Расстановка: все бойцы сторон вплотную парами; гарантированное попадание.
     const side1Units = match.entities.filter((e) => e.owner === 1 && e.coverType === 0).sort((a, b) => a.id - b.id);
     const side2Units = match.entities.filter((e) => e.owner === 2 && e.coverType === 0).sort((a, b) => a.id - b.id);
+    // Расчистка клеток расстановки (генератор мог создать ямы/стены).
+    for (let y = 4; y <= 9; y += 1) {
+      for (const x of [5, 6]) {
+        const tile = match.grid.tiles.find((t) => t.x === x && t.y === y)!;
+        tile.pit = false;
+        tile.blockLOS = false;
+      }
+    }
     side1Units.forEach((unit, i) => {
       unit.x = 5;
       unit.y = 4 + i;

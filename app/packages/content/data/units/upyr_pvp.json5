@@ -1,0 +1,16 @@
+{
+  // Состязательная запись упыря (0.16.0): сопоставима по силе с классами дружины.
+  id: "upyr_pvp",
+  classId: "upyr_pvp",
+  side: "pvp",
+  maxHealth: 9,
+  maxAP: 2,
+  mobility: 5,
+  aim: 62,
+  defense: 2,
+  will: 25,
+  vision: 10,
+  weapons: ["claws"],
+  skills: [],
+  tags: [],
+}

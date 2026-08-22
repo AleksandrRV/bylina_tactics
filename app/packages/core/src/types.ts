@@ -12,6 +12,8 @@ export interface Tile {
   blockLOS: boolean;
   /** Признак зоны эвакуации: юнит, находящийся в клетке, может выполнить умение с признаком извлечения (§6 math). */
   extract?: boolean;
+  /** Клетка домашнего края стороны (переносимый предмет, math §17): 1 или 2. */
+  homeOwner?: number;
 }
 
 export interface Grid {
@@ -108,6 +110,12 @@ export interface MatchState {
    * ухода. Нужно для учёта исходов миссии: эвакуация — не гибель.
    */
   extracted?: { rosterIndex: number; hp: number }[];
+  /**
+   * Переносимый предмет состязательного режима «молодильное яблоко» (0.16.0,
+   * math §17). Предмет не сущность и не занимает клетку: положение задаётся
+   * клеткой либо носителем.
+   */
+  apple?: { pos: CellPos; carrierId: number | null };
 }
 
 /**
@@ -170,6 +178,7 @@ export type GameEvent =
   | { type: "ENTITY_REMOVED"; entityId: number; reason: "FLED" | "EXPIRED" | "EXTRACTED" }
   | { type: "OVERWATCH_FIRED"; watcherId: number; triggerId: number; at: CellPos }
   | { type: "REVEALED"; entityId: number; snapshot: EntityState }
+  | { type: "OBJECTIVE_CHANGED"; carrierId: number | null; pos: CellPos }
   | { type: "MATCH_ENDED"; winnerPlayerId: string | null; reason: "ELIMINATION" | "OBJECTIVE" | "SURRENDER" | "CAMPAIGN_RESULT" };
 
 export type RejectReason =

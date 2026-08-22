@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.15.0";
+export const CORE_VERSION = "0.16.0";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -65,6 +65,7 @@ function cloneState(state: MatchState): MatchState {
     activeOwner: state.activeOwner,
     objective: state.objective ? { ...state.objective } : undefined,
     extracted: state.extracted ? state.extracted.map((entry) => ({ ...entry })) : undefined,
+    apple: state.apple ? { pos: { ...state.apple.pos }, carrierId: state.apple.carrierId } : undefined,
     grid: {
       width: state.grid.width,
       height: state.grid.height,
@@ -259,7 +260,41 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     entity.poison = undefined;
     entity.panic = undefined;
     entity.immobileTurns = undefined;
+    // Гибель носителя: предмет остаётся в клетке гибели и не имеет носителя (§17 math).
+    if (state.apple?.carrierId === entity.id) {
+      state.apple.carrierId = null;
+      events.push({ type: "OBJECTIVE_CHANGED", carrierId: null, pos: { ...state.apple.pos } });
+    }
     events.push({ type: "ENTITY_DIED", entityId: entity.id, causeOfDeath });
+  };
+
+  /**
+   * Обновление носителя предмета (math §17): после перемещения, смещения или
+   * телепортации юнит в клетке предмета становится носителем; носитель несёт
+   * предмет с собой. Событие OBJECTIVE_CHANGED шлётся при изменении.
+   */
+  const updateAppleCarrier = (entity: EntityState, events: GameEvent[]): void => {
+    const apple = state.apple;
+    if (!apple) return;
+    const before = { carrierId: apple.carrierId, pos: { ...apple.pos } };
+    if (apple.carrierId !== null) {
+      const carrier = actorOf(apple.carrierId);
+      if (!carrier || carrier.dead) {
+        apple.carrierId = null;
+      } else {
+        apple.pos = { x: carrier.x, y: carrier.y, z: carrier.z };
+      }
+    } else if (!entity.dead && entity.x === apple.pos.x && entity.y === apple.pos.y && entity.z === apple.pos.z) {
+      apple.carrierId = entity.id;
+    }
+    if (
+      before.carrierId !== apple.carrierId ||
+      before.pos.x !== apple.pos.x ||
+      before.pos.y !== apple.pos.y ||
+      before.pos.z !== apple.pos.z
+    ) {
+      events.push({ type: "OBJECTIVE_CHANGED", carrierId: apple.carrierId, pos: { ...apple.pos } });
+    }
   };
 
   const removeEntity = (entity: EntityState, reason: "FLED" | "EXPIRED" | "EXTRACTED", events: GameEvent[]): void => {
@@ -493,6 +528,22 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const appendOutcome = (events: GameEvent[]): void => {
     if (ended || !eliminationEnabled) return;
     const objective = state.objective;
+
+    // Переносимый предмет (math §17): победа в момент, когда носитель стоит
+    // на клетке домашнего края своей стороны. Проверяется после каждого
+    // перемещения, смещения и начала хода (appendOutcome вызывается везде).
+    if (state.apple && state.apple.carrierId !== null) {
+      const carrier = state.entities.find((entity) => entity.id === state.apple?.carrierId);
+      if (carrier && !carrier.dead && carrier.owner > 0) {
+        const home = tileAt(state.grid, carrier.x, carrier.y);
+        if (home?.homeOwner === carrier.owner) {
+          ended = true;
+          events.push({ type: "MATCH_ENDED", winnerPlayerId: String(carrier.owner), reason: "OBJECTIVE" });
+          return;
+        }
+      }
+    }
+
     const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
     const enemies = state.entities.some((entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
 
@@ -647,6 +698,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       return;
     }
     triggerOverwatch(target, events);
+    updateAppleCarrier(target, events);
   };
 
   const teleport = (target: EntityState, destination: CellPos, events: GameEvent[]): boolean => {
@@ -661,6 +713,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     refresh();
     revealAdjacent(events);
     triggerOverwatch(target, events);
+    updateAppleCarrier(target, events);
     return true;
   };
 
@@ -1353,6 +1406,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         revealAdjacent(events);
         if (triggerOverwatch(actor, events)) break;
       }
+      updateAppleCarrier(actor, events);
       actor.movementSpent = (actor.movementSpent ?? 0) + traversedMp;
       appendOutcome(events);
       emit();

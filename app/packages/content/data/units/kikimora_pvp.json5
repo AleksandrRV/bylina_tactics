@@ -1,0 +1,16 @@
+{
+  // Состязательная запись кикиморы (0.16.0): отравление и воскрешение костяка.
+  id: "kikimora_pvp",
+  classId: "kikimora_pvp",
+  side: "pvp",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 6,
+  aim: 70,
+  defense: 2,
+  will: 30,
+  vision: 10,
+  weapons: ["needle"],
+  skills: ["poison_needles", "raise_skeleton"],
+  tags: [],
+}

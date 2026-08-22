@@ -15,7 +15,7 @@ import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/ca
 import { createLocalTransport, type Envelope, type Transport } from "@bylina/net";
 import { eventsVisibleTo } from "@bylina/core";
 
-export const APP_VERSION = "0.15.0";
+export const APP_VERSION = "0.16.0";
 
 export type AppScreen =
   | "boot"
@@ -78,10 +78,16 @@ export interface SessionState {
   pvp?: { side1: string[]; side2: string[] } | null;
   /** Победившая сторона поочерёдной игры (экран итога). */
   pvpWinner?: PvpSide | null;
-  /** Роль в сетевой игре (0.15.0): ведущий исполняет правила, ведомый передаёт намерение. */
-  netRole?: "host" | "guest" | null;
+  /** Роль в сетевой игре (0.15.0/0.16.0): ведущий, ведомый либо наблюдатель. */
+  netRole?: "host" | "guest" | "spectator" | null;
   /** Номер стороны ведомого в сетевой игре (0.15.0). */
   netOwner?: number | null;
+  /** Условие победы состязательного боя (0.16.0): уничтожение либо вынос яблока. */
+  pvpObjective?: "elimination" | "apple" | null;
+  /** Полный обзор наблюдателя (0.16.0, ui-design §7). */
+  netOmniscient?: boolean | null;
+  /** Роль подключённого ведомого: соперник либо наблюдатель (0.16.0). */
+  netPeerRole?: "guest" | "spectator" | null;
 }
 
 export interface SessionApi {
@@ -129,8 +135,8 @@ export interface SessionApi {
   getBattleFog(): FogState | null;
   /** Открыть комнату сбора поочерёдной игры (0.14.0). */
   openPvpRoom(): void;
-  /** Начать поочерёдный бой: составы сторон и заготовка поля из конфигурации. */
-  startPvpBattle(side1: string[], side2: string[], seed: number): void;
+  /** Начать поочерёдный бой: составы сторон, условие победы (0.16.0). */
+  startPvpBattle(side1: string[], side2: string[], seed: number, options?: { objective?: "elimination" | "apple" }): void;
   /** Составы сторон текущего поочерёдного боя. */
   getPvpSides(): { side1: string[]; side2: string[] } | null;
   /** Отправить команду активной стороны через локальный транспорт (0.14.0). */
@@ -140,7 +146,12 @@ export interface SessionApi {
   /** Завершить поочерёдный бой победой стороны. */
   finishPvpMatch(winnerSide: PvpSide): void;
   /** Ведущий: начать сетевой бой (0.15.0). Транспорт и роли уже установлены комнатой. */
-  startNetPvpBattle(sides: { side1: string[]; side2: string[] }, seed: number, transport: Transport): void;
+  startNetPvpBattle(
+    sides: { side1: string[]; side2: string[] },
+    seed: number,
+    transport: Transport,
+    options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean },
+  ): void;
   /** Ведомый: зарегистрировать сетевой бой (0.15.0); ядро не исполняется, снимок — от ведущего. */
   bindGuestNetPvp(owner: number, transport: Transport): void;
   /** Сетевой: снимок стороны (у ведомого — кэш последнего SYNC_PAYLOAD). */
@@ -156,6 +167,10 @@ export interface SessionApi {
   requestNetHitPreview(actorId: number, targetId: number, weaponId?: string): HitPreview | null;
   /** Сетевой ведомый: дождаться начального снимка ведущего. */
   waitForNetSync(): Promise<boolean>;
+  /** Зарегистрировать наблюдателя (0.16.0): получает объединение сведений сторон, команд не шлёт. */
+  bindNetSpectator(transport: Transport): void;
+  /** Переключатель полного обзора наблюдателя (0.16.0). */
+  setNetOmniscient(omniscient: boolean): void;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -173,6 +188,9 @@ const idle: Omit<SessionState, "screen"> = {
   pvpWinner: null,
   netRole: null,
   netOwner: null,
+  pvpObjective: null,
+  netOmniscient: null,
+  netPeerRole: null,
 };
 
 export function createSession(
@@ -216,9 +234,49 @@ export function createSession(
     for (const listener of listeners) listener(state);
   };
 
-  /** Ведущий: снимок стороны ведомого (сокращённый по зрению) + видимость. */
+  /** Ведущий: снимок подключённого (0.15.0/0.16.0). Гость получает свою сторону
+   *  по зрению; наблюдатель — объединение сведений сторон либо полный обзор. */
   const sendGuestSync = (): void => {
     if (!tacticsHost || !netHostTransport) return;
+    if (state.netPeerRole === "spectator") {
+      const full = tacticsHost.getSnapshot();
+      if (state.netOmniscient === true) {
+        netHostTransport.send({
+          type: "SYNC_PAYLOAD",
+          senderId: "host",
+          timestamp: Date.now(),
+          payload: {
+            match: full,
+            visible: [...tacticsHost.getVisibleCells(1), ...tacticsHost.getVisibleCells(2)],
+            explored: [...tacticsHost.getExploredCells(1), ...tacticsHost.getExploredCells(2)],
+          },
+        });
+        return;
+      }
+      const vis1 = tacticsHost.getVisibleCells(1);
+      const vis2 = tacticsHost.getVisibleCells(2);
+      const exp1 = tacticsHost.getExploredCells(1);
+      const exp2 = tacticsHost.getExploredCells(2);
+      const explored = new Set([...exp1, ...exp2]);
+      const unionEntities = full.entities.filter((entity) => {
+        if (entity.owner === 0) return explored.has(`${entity.x},${entity.y}`);
+        if (entity.owner === 1) return vis1.has(`${entity.x},${entity.y}`) && !entity.hidden;
+        if (entity.owner === 2) return vis2.has(`${entity.x},${entity.y}`) && !entity.hidden;
+        return false;
+      });
+      netHostTransport.send({
+        type: "SYNC_PAYLOAD",
+        senderId: "host",
+        timestamp: Date.now(),
+        payload: {
+          match: { ...full, entities: unionEntities },
+          visible: [...new Set([...vis1, ...vis2])],
+          explored: [...explored],
+        },
+      });
+      return;
+    }
+    // Соперник: сторона 2 по зрению.
     netHostTransport.send({
       type: "SYNC_PAYLOAD",
       senderId: "host",
@@ -365,7 +423,7 @@ export function createSession(
       emit({ ...idle, screen: "campaign" });
     },
     getCampaign: () => requireCampaign(),
-    startPvpBattle: (side1, side2, seed) => {
+    startPvpBattle: (side1, side2, seed, options?: { objective?: "elimination" | "apple" }) => {
       // Локальный транспорт: обе стороны на одном устройстве, правила
       // исполняет ведущий (этот же процесс). Команда стороны применяется
       // ядром, набор событий рассылается обратно через транспорт.
@@ -398,6 +456,7 @@ export function createSession(
         matchSeed: seed,
         pvp: { side1: [...side1], side2: [...side2] },
         pvpWinner: null,
+        pvpObjective: options?.objective ?? null,
       });
     },
     getPvpSides: () => (state.pvp ? { side1: [...state.pvp.side1], side2: [...state.pvp.side2] } : null),
@@ -421,7 +480,7 @@ export function createSession(
     finishPvpMatch: (winnerSide) => {
       emit({ ...state, screen: "result", paused: false, pvpWinner: winnerSide, outcome: winnerSide === 1 ? "victory" : "defeat" });
     },
-    startNetPvpBattle: (sides, seed, transport) => {
+    startNetPvpBattle: (sides, seed, transport, options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean }) => {
       netHostTransport = transport;
       // Ведущий исполняет правила: команды ведомого применяются ядром,
       // события и снимок стороны ведомого уходят по каналу.
@@ -482,6 +541,9 @@ export function createSession(
         pvpWinner: null,
         netRole: "host",
         netOwner: 1,
+        pvpObjective: options?.objective ?? null,
+        netOmniscient: options?.omniscient ?? false,
+        netPeerRole: options?.peerRole ?? "guest",
       });
     },
     bindGuestNetPvp: (owner, transport) => {
@@ -523,7 +585,7 @@ export function createSession(
     getNetVisible: () => new Set(netGuest?.visible ?? []),
     getNetExplored: () => new Set(netGuest?.explored ?? []),
     sendNetCommand: (command) => {
-      if (!netGuest) return;
+      if (!netGuest || state.netRole === "spectator") return;
       netGuest.transport.send({ type: "COMMAND", senderId: "guest", timestamp: Date.now(), payload: command });
     },
     requestNetReachable: (actorId) => {
@@ -568,6 +630,46 @@ export function createSession(
           }
         }, 50);
       }),
+    bindNetSpectator: (transport) => {
+      netGuest = {
+        transport,
+        owner: 0,
+        snapshot: null,
+        visible: new Set(),
+        explored: new Set(),
+        reachable: new Map(),
+        hit: new Map(),
+      };
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "pvpNet",
+        matchSeed: 0,
+        pvp: null,
+        pvpWinner: null,
+        netRole: "spectator",
+        netOwner: 0,
+        pvpObjective: null,
+        netOmniscient: false,
+        netPeerRole: null,
+      });
+      transport.subscribe((message) => {
+        if (message.type === "SYNC_PAYLOAD") {
+          const payload = message.payload as { match: MatchState; visible: string[]; explored: string[] };
+          if (!netGuest) return;
+          netGuest.snapshot = payload.match;
+          netGuest.visible = new Set(payload.visible ?? []);
+          netGuest.explored = new Set(payload.explored ?? []);
+          notifyBattle();
+        }
+      });
+      transport.send({ type: "SYNC_REQUEST", senderId: "spectator", timestamp: Date.now(), payload: null });
+    },
+    setNetOmniscient: (omniscient) => {
+      emit({ ...state, netOmniscient: omniscient });
+      // Немедленно обновить снимок наблюдателя.
+      if (tacticsHost && netHostTransport) sendGuestSync();
+    },
     bindTacticsHost: (host) => {
       tacticsHost = host;
       // Сетевой ведущий: ядро создано (BattleScreen смонтирован) — ведомый

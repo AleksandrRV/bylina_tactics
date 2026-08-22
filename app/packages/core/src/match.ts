@@ -288,18 +288,25 @@ export interface PvpMatchOptions {
   side1: readonly string[];
   /** Состав стороны 2. */
   side2: readonly string[];
+  /** Условие победы (0.16.0): уничтожение либо вынос предмета «молодильное яблоко». */
+  objective?: "elimination" | "apple";
   seed: number;
 }
 
 /**
  * Сражение состязательного режима «Потешные бои» (base-design §7, roadmap 0.14.0).
  * Две стороны на одном поле: сторона 1 появляется у западного края, сторона 2 —
- * у восточного. Условие победы — уничтожение всех юнитов противника.
+ * у восточного. Условие победы — уничтожение всех юнитов противника либо вынос
+ * предмета «молодильное яблоко» на клетку домашнего края своей стороны (math §17).
  */
 export function createPvpMatch(options: PvpMatchOptions): MatchState {
   const rng = createMulberry32(options.seed);
   const map = options.map;
-  const side1Spawns = playerSpawns(map.height).slice(0, options.side1.length);
+  const allSide1Spawns = playerSpawns(map.height);
+  if (options.side1.length > allSide1Spawns.length) {
+    throw new Error(`Map ${map.width}x${map.height} has only ${allSide1Spawns.length} side-1 spawn cells for requested ${options.side1.length}`);
+  }
+  const side1Spawns = allSide1Spawns.slice(0, options.side1.length);
   const side2Spawns = enemySpawns(options.side2.length, map.width, map.height);
   if (side2Spawns.length !== options.side2.length) {
     throw new Error(`Map ${map.width}x${map.height} has only ${side2Spawns.length} side-2 spawn cells for requested ${options.side2.length}`);
@@ -325,6 +332,23 @@ export function createPvpMatch(options: PvpMatchOptions): MatchState {
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
   });
+
+  // Предмет «молодильное яблоко» (math §17): клетки домашнего края — западный
+  // край для стороны 1, восточный для стороны 2; предмет лежит в центре поля.
+  if (options.objective === "apple") {
+    for (let y = 1; y <= map.height - 2; y += 1) {
+      const west = tileAt(generated.grid, 0, y);
+      const east = tileAt(generated.grid, map.width - 1, y);
+      if (west) west.homeOwner = PLAYER_OWNER;
+      if (east) east.homeOwner = ENEMY_OWNER;
+    }
+    const midX = Math.floor(map.width / 2);
+    const midY = Math.floor(map.height / 2);
+    const appleCell = freeCellNear(generated.grid, generated.covers, state.entities, midX, midY);
+    if (!appleCell) throw new Error("No free cell for the apple objective");
+    state.apple = { pos: { x: appleCell.x, y: appleCell.y, z: tileAt(generated.grid, appleCell.x, appleCell.y)?.z ?? 1 }, carrierId: null };
+  }
+
   state.rngState = String(rng.getState());
   return state;
 }

@@ -26,12 +26,13 @@ function BackIcon() {
 }
 
 type RoomTab = "local" | "network";
+type Objective = "elimination" | "apple";
 
 /**
- * Комната сбора «Потешных боев» (roadmap 0.14.0/0.15.0):
- * поочерёдная игра на одном устройстве либо соединение по локальной сети —
- * ведущий создаёт партию и показывает код/QR, ведомый подключается по строке
- * или изображению.
+ * Комната сбора «Потешных боев» (roadmap 0.14.0–0.16.0):
+ * очерёдный выбор бойцов с ограничением N, условие победы (уничтожение либо
+ * вынос яблока), поочерёдная игра на одном устройстве, локальная сеть
+ * (соперник либо наблюдатель с полным обзором).
  */
 export function PvpRoomScreen() {
   useI18nTick();
@@ -39,11 +40,6 @@ export function PvpRoomScreen() {
   const { session, content } = useServices();
   const pool = content.pvp.pool;
   const [tab, setTab] = useState<RoomTab>("local");
-
-  const startLocal = (): void => {
-    if (pool.length === 0) return;
-    session.startPvpBattle([...pool], [...pool], Date.now() >>> 0);
-  };
 
   return (
     <div className="screen pvp-room-screen">
@@ -54,33 +50,28 @@ export function PvpRoomScreen() {
       </header>
 
       <div className="pvp-tabs" role="tablist" aria-label={t("pvp.roomHint")}>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "local"}
-          className={`pvp-tab${tab === "local" ? " is-active" : ""}`}
-          onClick={() => setTab("local")}
-        >
+        <button type="button" role="tab" aria-selected={tab === "local"} className={`pvp-tab${tab === "local" ? " is-active" : ""}`} onClick={() => setTab("local")}>
           {t("pvp.tabLocal")}
         </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "network"}
-          className={`pvp-tab${tab === "network" ? " is-active" : ""}`}
-          onClick={() => setTab("network")}
-        >
+        <button type="button" role="tab" aria-selected={tab === "network"} className={`pvp-tab${tab === "network" ? " is-active" : ""}`} onClick={() => setTab("network")}>
           {t("pvp.tabNetwork")}
         </button>
       </div>
 
       {tab === "local" ? (
-        <LocalSetup pool={pool} onStart={startLocal} />
+        <LocalSetup
+          pool={pool}
+          onStart={(side1, side2, objective) => session.startPvpBattle(side1, side2, Date.now() >>> 0, { objective })}
+        />
       ) : (
         <NetworkSetup
           pool={pool}
-          onHostStart={(transport) => session.startNetPvpBattle({ side1: [...pool], side2: [...pool] }, Date.now() >>> 0, transport)}
+          onHostStart={(side1, side2, objective, peerRole, omniscient, transport) =>
+            session.startNetPvpBattle({ side1, side2 }, Date.now() >>> 0, transport, { objective, peerRole, omniscient })
+          }
           onGuestJoin={(owner, transport) => session.bindGuestNetPvp(owner, transport)}
+          onSpectatorJoin={(transport) => session.bindNetSpectator(transport)}
+          onOmniscientChange={(value) => session.setNetOmniscient(value)}
         />
       )}
 
@@ -94,24 +85,137 @@ export function PvpRoomScreen() {
   );
 }
 
-function LocalSetup({ pool, onStart }: { pool: string[]; onStart: () => void }) {
+/** Очерёдный выбор бойцов (base-design §7, roadmap 0.16.0). */
+function Draft({
+  pool,
+  n,
+  picks,
+  current,
+  onPick,
+}: {
+  pool: string[];
+  n: number;
+  picks: { 1: string[]; 2: string[] };
+  current: 1 | 2 | null;
+  onPick: (unitId: string) => void;
+}) {
   const t = useT();
+  const selected = new Set([...picks[1], ...picks[2]]);
+  const done = current === null && picks[1].length === n && picks[2].length === n;
+  return (
+    <div className="draft">
+      <div className="draft-status">
+        <span className={`draft-side is-side1${current === 1 ? " is-current" : ""}${picks[1].length === n ? " is-full" : ""}`}>
+          {t("pvp.side1")} · {picks[1].length}/{n}
+        </span>
+        <span className="draft-vs" aria-hidden="true">⇄</span>
+        <span className={`draft-side is-side2${current === 2 ? " is-current" : ""}${picks[2].length === n ? " is-full" : ""}`}>
+          {t("pvp.side2")} · {picks[2].length}/{n}
+        </span>
+      </div>
+      {current !== null ? <p className="draft-hint">{t("pvp.draftPick")}</p> : null}
+      {done ? <p className="draft-done">{t("pvp.draftDone")}</p> : null}
+      <div className="draft-pool">
+        {pool.map((unitId) => {
+          const face = unitPortrait(unitId);
+          const taken = selected.has(unitId);
+          return (
+            <button
+              key={unitId}
+              type="button"
+              className={`draft-card${taken ? " is-taken" : ""}`}
+              disabled={taken || current === null}
+              onClick={() => onPick(unitId)}
+            >
+              {face ? <img className="draft-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+              <span className="draft-name">{t(unitName(unitId))}</span>
+              {taken ? <span className="draft-taken-mark" aria-hidden="true">✓</span> : null}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function LocalSetup({
+  pool,
+  onStart,
+}: {
+  pool: string[];
+  onStart: (side1: string[], side2: string[], objective: Objective) => void;
+}) {
+  const t = useT();
+  const maxN = Math.min(5, Math.floor(pool.length / 2));
+  const [objective, setObjective] = useState<Objective>("elimination");
+  const [n, setN] = useState<number>(Math.min(3, maxN));
+  const [starter] = useState<1 | 2>(() => (Math.random() < 0.5 ? 1 : 2));
+  const [picks, setPicks] = useState<{ 1: string[]; 2: string[] }>({ 1: [], 2: [] });
+  const [current, setCurrent] = useState<1 | 2 | null>(starter);
+
+  const pick = (unitId: string): void => {
+    if (current === null) return;
+    if (picks[current].length >= n) return;
+    const next = { ...picks, [current]: [...picks[current], unitId] };
+    setPicks(next);
+    if (next[1].length === n && next[2].length === n) {
+      setCurrent(null);
+    } else {
+      setCurrent(current === 1 ? 2 : 1);
+    }
+  };
+
+  const reset = (): void => {
+    setPicks({ 1: [], 2: [] });
+    setCurrent(starter);
+  };
+
+  const ready = current === null && picks[1].length === n && picks[2].length === n && n >= 1;
+
   return (
     <>
+      <div className="pvp-options">
+        <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
+          <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
+          <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+            {t("pvp.objectiveElimination")}
+          </button>
+          <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+            {t("pvp.objectiveApple")}
+          </button>
+        </div>
+        <div className="pvp-option-group">
+          <span className="pvp-option-title">{t("pvp.nLabel")}</span>
+          <div className="pvp-n-select">
+            {Array.from({ length: maxN }, (_, i) => i + 1).map((value) => (
+              <button key={value} type="button" className={`pvp-n-btn${n === value ? " is-on" : ""}`} onClick={() => { setN(value); reset(); }}>
+                {value}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <Draft pool={pool} n={n} picks={picks} current={current} onPick={pick} />
+
       <div className="pvp-arena">
-        <SideCard side={1} pool={pool} />
+        <SideCard side={1} pool={picks[1]} />
         <div className="pvp-versus" aria-hidden="true">
           <SwordsIcon />
           <span className="pvp-versus-label">{t("pvp.vs")}</span>
-          <span className="pvp-n-badge">{t("pvp.n", { count: pool.length })}</span>
         </div>
-        <SideCard side={2} pool={pool} />
+        <SideCard side={2} pool={picks[2]} />
       </div>
-      <p className="pvp-objective">{t("pvp.objective")}</p>
-      <button type="button" className="btn btn-primary" onClick={onStart} disabled={pool.length === 0}>
-        <span>{t("pvp.start")}</span>
-        <span aria-hidden="true">→</span>
-      </button>
+
+      <div className="pvp-start-row">
+        <button type="button" className="btn btn-ghost" onClick={reset}>
+          {t("pvp.reset")}
+        </button>
+        <button type="button" className="btn btn-primary" disabled={!ready} onClick={() => ready && onStart(picks[1], picks[2], objective)}>
+          <span>{t("pvp.start")}</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </div>
     </>
   );
 }
@@ -122,6 +226,7 @@ function SideCard({ side, pool }: { side: 1 | 2; pool: string[] }) {
     <section className={`pvp-side-card is-side${side}`} aria-label={t(side === 1 ? "pvp.side1" : "pvp.side2")}>
       <h2 className="pvp-side-title">{t(side === 1 ? "pvp.side1" : "pvp.side2")}</h2>
       <div className="pvp-roster">
+        {pool.length === 0 ? <p className="muted">{t("pvp.draftEmpty")}</p> : null}
         {pool.map((unitId) => {
           const face = unitPortrait(unitId);
           return (
@@ -140,13 +245,20 @@ function NetworkSetup({
   pool,
   onHostStart,
   onGuestJoin,
+  onSpectatorJoin,
+  onOmniscientChange,
 }: {
   pool: string[];
-  onHostStart: (transport: Transport) => void;
+  onHostStart: (side1: string[], side2: string[], objective: Objective, peerRole: "guest" | "spectator", omniscient: boolean, transport: Transport) => void;
   onGuestJoin: (owner: number, transport: Transport) => void;
+  onSpectatorJoin: (transport: Transport) => void;
+  onOmniscientChange: (value: boolean) => void;
 }) {
   const t = useT();
   const [role, setRole] = useState<"host" | "guest">("host");
+  const [objective, setObjective] = useState<Objective>("elimination");
+  const [peerRole, setPeerRole] = useState<"guest" | "spectator">("guest");
+  const [omniscient, setOmniscient] = useState(false);
   const [code, setCode] = useState<string>("");
   const [peerCode, setPeerCode] = useState<string>("");
   const [connected, setConnected] = useState(false);
@@ -222,15 +334,32 @@ function NetworkSetup({
       {role === "host" ? (
         <div className="net-panel">
           <p className="muted">{t("net.hostHint")}</p>
+          <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
+            <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
+            <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+              {t("pvp.objectiveElimination")}
+            </button>
+            <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+              {t("pvp.objectiveApple")}
+            </button>
+          </div>
+          <div className="pvp-option-group">
+            <span className="pvp-option-title">{t("net.peerRole")}</span>
+            <button type="button" className={`pvp-radio${peerRole === "guest" ? " is-on" : ""}`} onClick={() => setPeerRole("guest")}>
+              {t("net.peerGuest")}
+            </button>
+            <button type="button" className={`pvp-radio${peerRole === "spectator" ? " is-on" : ""}`} onClick={() => setPeerRole("spectator")}>
+              {t("net.peerSpectator")}
+            </button>
+          </div>
+          {peerRole === "spectator" ? (
+            <label className="pvp-check">
+              <input type="checkbox" checked={omniscient} onChange={(event) => { setOmniscient(event.target.checked); onOmniscientChange(event.target.checked); }} />
+              {t("net.omniscient")}
+            </label>
+          ) : null}
           {!connected ? (
-            <button
-              type="button"
-              className="btn btn-primary"
-              onClick={() => {
-                setError(null);
-                createChannel(true);
-              }}
-            >
+            <button type="button" className="btn btn-primary" onClick={() => { setError(null); createChannel(true); }}>
               {t("net.create")}
             </button>
           ) : null}
@@ -243,14 +372,15 @@ function NetworkSetup({
           ) : null}
           {connected ? (
             <>
-              <label className="net-input-label" htmlFor="net-peer-code">
-                {t("net.peerCode")}
-              </label>
+              <label className="net-input-label" htmlFor="net-peer-code">{t("net.peerCode")}</label>
               <input id="net-peer-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.peerCodePlaceholder")} />
-              <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>
-                {t("net.apply")}
-              </button>
-              <button type="button" className="btn btn-primary" onClick={() => transportRef.current && onHostStart(transportRef.current)} disabled={pool.length === 0}>
+              <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>{t("net.apply")}</button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => transportRef.current && onHostStart([...pool], [...pool], objective, peerRole, omniscient, transportRef.current)}
+                disabled={pool.length === 0}
+              >
                 {t("net.startBattle")}
               </button>
             </>
@@ -259,9 +389,7 @@ function NetworkSetup({
       ) : (
         <div className="net-panel">
           <p className="muted">{t("net.guestHint")}</p>
-          <label className="net-input-label" htmlFor="net-guest-code">
-            {t("net.enterCode")}
-          </label>
+          <label className="net-input-label" htmlFor="net-guest-code">{t("net.enterCode")}</label>
           <input id="net-guest-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.enterCodePlaceholder")} />
           <button
             type="button"
@@ -306,6 +434,7 @@ function NetworkSetup({
             {t("net.connect")}
           </button>
           {connected ? <p className="net-connected">{t("net.connected")}</p> : null}
+          <p className="muted">{t("net.spectatorJoinHint")}</p>
         </div>
       )}
 

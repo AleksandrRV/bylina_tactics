@@ -1,0 +1,18 @@
+{
+  // Состязательная запись лешего (0.16.0): дистанционный бой и удержание.
+  id: "leshy_pvp",
+  classId: "leshy_pvp",
+  side: "pvp",
+  maxHealth: 9,
+  maxAP: 2,
+  mobility: 5,
+  aim: 80,
+  defense: 6,
+  will: 40,
+  vision: 12,
+  weapons: ["branch"],
+  skills: ["roots"],
+  tags: [],
+  camouflageMinCover: true,
+  providesCamouflage: true,
+}

@@ -99,7 +99,9 @@ export function BattleScreen() {
 
   // Сетевой ведомый (0.15.0) не исполняет правила: ядро у ведущего,
   // снимок и предпросмотр приходят по каналу.
-  const isNetGuest = battleKind === "pvpNet" && session.get().netRole === "guest";
+  const netRole = battleKind === "pvpNet" ? session.get().netRole : null;
+  const isNetGuest = netRole === "guest";
+  const isSpectator = netRole === "spectator";
   const [kernel] = useState<TacticsKernel | null>(() => {
     if (isNetGuest) return null;
     // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
@@ -128,6 +130,7 @@ export function BattleScreen() {
         map: content.pvp.map ?? content.quickMatch.map,
         side1: sides.side1,
         side2: sides.side2,
+        objective: session.get().pvpObjective ?? "elimination",
         seed: matchSeed || 1,
       });
     } else if (battleKind === "campaign" && activeMissionId) {
@@ -209,7 +212,7 @@ export function BattleScreen() {
   // Сетевой ведомый всегда видит только свою сторону; ведущий — активную.
   const netOwner = battleKind === "pvpNet" ? session.get().netOwner : null;
   const pvpActive = battleKind === "pvp" || battleKind === "pvpNet"
-    ? (isNetGuest ? netOwner : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER))
+    ? (isNetGuest || isSpectator ? netOwner : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER))
     : null;
   const viewOwner = pvpActive ?? PLAYER_OWNER;
   const enemyOwner = viewOwner === ENEMY_OWNER ? PLAYER_OWNER : ENEMY_OWNER;
@@ -234,7 +237,7 @@ export function BattleScreen() {
   );
 
   const isOwn = (entity: EntityState): boolean =>
-    !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+    !isSpectator && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
 
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
   // локальный — на одном устройстве, сетевой — ведомому от ведущего.
@@ -401,6 +404,7 @@ export function BattleScreen() {
 
   /** Единственный канал команд: поочерёдная игра — через транспорт (0.14.0/0.15.0). */
   const applyCommand = (command: Command): void => {
+    if (isSpectator) return;
     if (battleKind === "pvp") {
       session.sendPvpCommand(command);
       return;
@@ -738,8 +742,10 @@ export function BattleScreen() {
   }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === viewOwner && entity.coverType === 0);
-  const sideKey = battleKind === "pvp" || battleKind === "pvpNet"
-    ? (viewOwner === 1 ? "pvp.side1" : "pvp.side2")
+  const sideKey = isSpectator
+    ? "net.spectator"
+    : battleKind === "pvp" || battleKind === "pvpNet"
+      ? (viewOwner === 1 ? "pvp.side1" : "pvp.side2")
     : snapshot.activeOwner === ENEMY_OWNER
       ? "field.sideEnemy"
       : "field.sidePlayer";
@@ -804,6 +810,20 @@ export function BattleScreen() {
               {" · "}
               {t(sideKey)}
             </p>
+            {snapshot.apple ? (
+              <div className="apple-hud" aria-label={t("pvp.appleLabel")}>
+                <span className="apple-hud-icon" aria-hidden="true">●</span>
+                <span className="apple-hud-text">
+                  {snapshot.apple.carrierId !== null
+                    ? (() => {
+                        const carrier = snapshot.entities.find((entity) => entity.id === snapshot.apple?.carrierId);
+                        const side = carrier?.owner === 1 ? t("pvp.side1") : t("pvp.side2");
+                        return t("pvp.appleCarrier", { side });
+                      })()
+                    : t("pvp.appleLying")}
+                </span>
+              </div>
+            ) : null}
             {objectiveEntity ? (
               <div className="objective-hud" aria-label={t("campaign.objective")}>
                 {unitPortrait(objectiveEntity.configId) ? (
@@ -1000,6 +1020,15 @@ export function BattleScreen() {
           ) : null}
         </div>
 
+        {isSpectator ? (
+          <footer className="battle-bottom spectator-bar">
+            <div className="spectator-note" role="status">
+              <span className="spectator-eye" aria-hidden="true">◉</span>
+              {t("net.spectator")}
+              <span className="muted"> — {t("net.spectatorBody")}</span>
+            </div>
+          </footer>
+        ) : (
         <footer className="battle-bottom">
           <div className="battle-selected">
             {selected ? (
@@ -1139,6 +1168,7 @@ export function BattleScreen() {
             {t("field.endTurn")}
           </button>
         </footer>
+        )}
       </div>
 
       {enemyPhase ? (

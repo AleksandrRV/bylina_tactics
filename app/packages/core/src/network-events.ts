@@ -46,6 +46,8 @@ export function eventsVisibleTo(events: readonly GameEvent[], state: MatchState,
         return [event.watcherId, event.triggerId];
       case "REVEALED":
         return [event.entityId];
+      case "OBJECTIVE_CHANGED":
+        return event.carrierId !== null ? [event.carrierId] : [];
       case "COVER_DESTROYED":
         return [];
       default:
@@ -57,10 +59,13 @@ export function eventsVisibleTo(events: readonly GameEvent[], state: MatchState,
     // Служебные события и глобальные состояния передаются всем.
     if (event.type === "TURN_CHANGED" || event.type === "MATCH_ENDED") return true;
 
-    // Разрушение укрытия передаётся, если клетка была разведана ранее
-    // (изменение уже известной местности).
+    // Разрушение укрытия и предмет без носителя передаются, если клетка
+    // была разведана ранее (изменение уже известной местности).
     if (event.type === "COVER_DESTROYED") {
       return cellKnown(event.gridPos.x, event.gridPos.y);
+    }
+    if (event.type === "OBJECTIVE_CHANGED" && event.carrierId === null) {
+      return cellKnown(event.pos.x, event.pos.y);
     }
 
     const ids = affectedEntities(event);

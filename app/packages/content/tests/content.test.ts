@@ -34,13 +34,22 @@ describe("parseContent", () => {
       "idol",
       "illusion",
       "kikimora",
+      "kikimora_pvp",
       "leshy",
+      "leshy_pvp",
       "recruit",
       "strelets",
       "upyr",
+      "upyr_pvp",
       "volkhv",
       "znaharka",
     ]);
+    expect(result.data.units.filter((unit) => unit.side === "pvp").map((unit) => unit.id).sort()).toEqual([
+      "kikimora_pvp",
+      "leshy_pvp",
+      "upyr_pvp",
+    ]);
+    expect(result.data.pvp.pool).toEqual(["bogatyr", "strelets", "znaharka", "upyr_pvp", "leshy_pvp", "kikimora_pvp"]);
     expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual([
       "circular_sweep",
       "breach",
