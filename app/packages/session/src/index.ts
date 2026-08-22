@@ -555,16 +555,18 @@ export function createSession(
           resolve(true);
           return;
         }
-        const timer = window.setInterval(() => {
+        // Поллинг без window: метод работает и в среде без обозревателя
+        // (автоматические проверки канала, Node-тесты).
+        const started = Date.now();
+        const timer = setInterval(() => {
           if (netGuest?.snapshot) {
-            window.clearInterval(timer);
+            clearInterval(timer);
             resolve(true);
+          } else if (Date.now() - started >= 5000) {
+            clearInterval(timer);
+            resolve(Boolean(netGuest?.snapshot));
           }
         }, 50);
-        window.setTimeout(() => {
-          window.clearInterval(timer);
-          resolve(Boolean(netGuest?.snapshot));
-        }, 5000);
       }),
     bindTacticsHost: (host) => {
       tacticsHost = host;

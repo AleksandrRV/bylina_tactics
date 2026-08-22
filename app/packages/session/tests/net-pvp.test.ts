@@ -110,3 +110,25 @@ describe("network pvp: two app instances (0.15.0)", () => {
     unlisten();
   });
 });
+
+describe("QA net edge cases (0.15.0)", () => {
+  it("waitForNetSync resolves false after timeout without a browser", async () => {
+    const { b } = createChannelPair();
+    const guest = createSession("menu");
+    guest.bindGuestNetPvp(2, b);
+    const result = await guest.waitForNetSync();
+    expect(result).toBe(false);
+  }, 8000);
+
+  it("rebinding the guest transport replaces the old channel cleanly", async () => {
+    const { b: b1 } = createChannelPair();
+    const { b: b2 } = createChannelPair();
+    const guest = createSession("menu");
+    guest.bindGuestNetPvp(2, b1);
+    guest.bindGuestNetPvp(2, b2);
+    // Повторная привязка не ломает состояние.
+    expect(guest.get().battleKind).toBe("pvpNet");
+    expect(guest.get().netRole).toBe("guest");
+    expect(guest.get().netOwner).toBe(2);
+  });
+});
