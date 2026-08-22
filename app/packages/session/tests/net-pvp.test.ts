@@ -183,3 +183,34 @@ describe("QA net peer role from the joining side (0.16.0)", () => {
     expect(snapshot.entities.some((entity) => entity.owner === 1 && entity.coverType === 0)).toBe(false);
   });
 });
+
+describe("QA replay recording (0.17.0)", () => {
+  it("finishing a pvp match records the winner and clears the draft", () => {
+    const session = createSession("menu");
+    session.startPvpBattle(["bogatyr"], ["bogatyr"], 5);
+    const state = matchState();
+    // Вплотную для атаки.
+    const attacker = state.entities.find((entity) => entity.id === 1)!;
+    const target = state.entities.find((entity) => entity.id === 11)!;
+    target.x = attacker.x + 1;
+    target.y = attacker.y;
+    const kernel = createTacticsKernel({ initial: state, weapons: { sword: { ...SWORD, minDmg: 20, maxDmg: 20 } }, skills: {}, seed: 5 });
+    session.bindTacticsHost(kernel);
+    const applied = kernel.apply({ type: "ATTACK", actorId: 1, targetId: 11, weaponId: "sword" });
+    expect(applied.ok).toBe(true);
+    expect(applied.ok && applied.events.some((event) => event.type === "MATCH_ENDED")).toBe(true);
+    session.finishPvpMatch(1);
+    expect(session.get().screen).toBe("result");
+    expect(session.get().replayWinner).toBe(1);
+    // Черновик очищается слоем приложения после записи.
+    session.setReplayDraft(null);
+    expect(session.get().replayDraft).toBeNull();
+  });
+
+  it("an aborted net battle can be saved as a replay with no winner", () => {
+    const session = createSession("menu");
+    session.startPvpBattle(["bogatyr"], ["bogatyr"], 6);
+    session.finishReplayDraft(null);
+    expect(session.get().replayWinner).toBeNull();
+  });
+});

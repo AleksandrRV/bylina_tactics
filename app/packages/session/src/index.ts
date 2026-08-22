@@ -191,6 +191,8 @@ export interface SessionApi {
   setNetDisconnected(disconnected: boolean): void;
   /** Черновик журнала текущего боя (0.17.0): команды и параметры партии. */
   getReplayDraft(): SessionState["replayDraft"];
+  /** Очистить черновик журнала после сохранения повтора (0.17.0). */
+  setReplayDraft(draft: SessionState["replayDraft"]): void;
   /** Завершить журнал текущего боя победой стороны (0.17.0). */
   finishReplayDraft(winner: 1 | 2 | null): void;
   /** Открыть воспроизведение сохранённого повтора (0.17.0). */
@@ -508,7 +510,15 @@ export function createSession(
       });
     },
     finishPvpMatch: (winnerSide) => {
-      emit({ ...state, screen: "result", paused: false, pvpWinner: winnerSide, outcome: winnerSide === 1 ? "victory" : "defeat" });
+      emit({
+        ...state,
+        screen: "result",
+        paused: false,
+        pvpWinner: winnerSide,
+        outcome: winnerSide === 1 ? "victory" : "defeat",
+        // Победитель фиксируется для сохранения повтора (0.17.0).
+        replayWinner: winnerSide,
+      });
     },
     startNetPvpBattle: (sides, seed, transport, options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean }) => {
       state = { ...state, replayDraft: { seed, sides: { side1: [...sides.side1], side2: [...sides.side2] }, objective: options?.objective ?? null, commands: [] }, netDisconnected: null };
@@ -712,6 +722,9 @@ export function createSession(
       emit({ ...state, netDisconnected: disconnected });
     },
     getReplayDraft: () => (state.replayDraft ? { ...state.replayDraft, sides: { side1: [...state.replayDraft.sides.side1], side2: [...state.replayDraft.sides.side2] }, commands: [...state.replayDraft.commands] } : null),
+    setReplayDraft: (draft) => {
+      emit({ ...state, replayDraft: draft });
+    },
     finishReplayDraft: (winner) => {
       emit({ ...state, replayWinner: winner });
     },

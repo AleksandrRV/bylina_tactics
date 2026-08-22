@@ -123,6 +123,9 @@ export function App() {
       for (const command of draft.commands) recorder.record(command);
       const journal = recorder.finish(state.replayWinner ?? null, recorder.getJournal()?.title ?? "Бой");
       if (isReplayJournal(journal)) replayStorage.saveReplay(journal);
+      // Черновик очищается после записи: повтор не дублируется при следующем
+      // автосохранении, а новый бой начинает журнал с нуля.
+      session.setReplayDraft(null);
     }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
     if (!inCampaignBattle) lastMatchRef.current = {};
