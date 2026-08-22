@@ -1,0 +1,112 @@
+{
+  // Режим обучения (0.19.0, base-design §3.5, roadmap §7.2).
+  // Три миссии: «Первые шаги», «Бой», «Умения и состояния».
+  // Игрок проходит их последовательно либо выбирает любую для повторения.
+  missions: [
+    {
+      id: "movement",
+      titleKey: "training.movement.title",
+      descriptionKey: "training.movement.description",
+      map: {
+        width: 10,
+        height: 8,
+        pitChance: 0.08,
+        coverDensity: 0.02,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.3,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.25, z1: 0.6, z2: 0.15 },
+      },
+      playerSlots: ["bogatyr"],
+      enemies: [{ unitId: "upyr", count: 1 }],
+      hints: [
+        {
+          step: 1,
+          textKey: "training.movement.hint1",
+          highlight: "panel",
+          panelKey: "ap",
+          until: "noop",
+        },
+        {
+          step: 2,
+          textKey: "training.movement.hint2",
+          highlight: "cell",
+          until: "move",
+        },
+        {
+          step: 3,
+          textKey: "training.movement.hint3",
+          highlight: "button",
+          panelKey: "end_turn",
+          until: "end_turn",
+        },
+      ],
+    },
+    {
+      id: "combat",
+      titleKey: "training.combat.title",
+      descriptionKey: "training.combat.description",
+      map: {
+        width: 10,
+        height: 8,
+        pitChance: 0.04,
+        coverDensity: 0.08,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.4,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+      },
+      playerSlots: ["bogatyr"],
+      enemies: [{ unitId: "upyr", count: 1 }],
+      hints: [
+        {
+          step: 1,
+          textKey: "training.combat.hint1",
+          highlight: "button",
+          panelKey: "weapon",
+          until: "attack",
+        },
+        {
+          step: 2,
+          textKey: "training.combat.hint2",
+          highlight: "entity",
+          targetUnitId: "upyr",
+          until: "approach",
+        },
+      ],
+    },
+    {
+      id: "skills",
+      titleKey: "training.skills.title",
+      descriptionKey: "training.skills.description",
+      map: {
+        width: 10,
+        height: 8,
+        pitChance: 0.04,
+        coverDensity: 0.06,
+        wallDensity: 0.02,
+        edgeCoverChance: 0.4,
+        halfCoverChance: 0.5,
+        heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+      },
+      playerSlots: ["bogatyr", "znaharka"],
+      enemies: [{ unitId: "upyr", count: 2 }],
+      hints: [
+        {
+          step: 1,
+          textKey: "training.skills.hint1",
+          highlight: "button",
+          panelKey: "skill",
+          until: "skill",
+        },
+        {
+          step: 2,
+          textKey: "training.skills.hint2",
+          highlight: "panel",
+          panelKey: "defend",
+          until: "defend",
+        },
+      ],
+    },
+  ],
+}

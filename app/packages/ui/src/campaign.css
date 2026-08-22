@@ -2690,3 +2690,112 @@
   color: var(--amber, #e0b34a);
   font-size: 0.85rem;
 }
+
+/* ===== Режим обучения (0.19.0) ===== */
+
+.training-screen {
+  gap: 18px;
+}
+
+.training-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.training-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 10px;
+  background: rgba(12, 16, 12, 0.6);
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: all 220ms ease;
+  animation: training-card-in 420ms ease-out both;
+}
+
+.training-card:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.training-card:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+@keyframes training-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.training-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(224, 179, 74, 0.6);
+  box-shadow: 0 8px 26px rgba(0, 0, 0, 0.4);
+}
+
+.training-card.is-done {
+  border-color: rgba(120, 190, 130, 0.45);
+}
+
+.training-card-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  color: var(--amber, #e0b34a);
+  background: radial-gradient(circle at 32% 28%, #3a3120, #241d12);
+}
+
+.training-card.is-done .training-card-icon {
+  border-color: rgba(120, 190, 130, 0.5);
+  color: #8fd89a;
+}
+
+.training-card-index {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8fa1ad;
+}
+
+.training-card-title {
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.15rem;
+  color: #f3ecdc;
+}
+
+.training-card-desc {
+  font-size: 0.82rem;
+  color: #9aa39a;
+  line-height: 1.45;
+}
+
+.training-card-footer {
+  margin-top: 4px;
+}
+
+.training-start {
+  color: var(--amber, #e0b34a);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.training-done-mark {
+  color: #8fd89a;
+  font-size: 0.85rem;
+}

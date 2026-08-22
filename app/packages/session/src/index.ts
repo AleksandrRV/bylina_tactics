@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.18.0";
+export const APP_VERSION = "0.19.0";
 
 export type AppScreen =
   | "boot"
@@ -30,11 +30,13 @@ export type AppScreen =
   | "missionResult"
   | "deployment"
   | "pvpRoom"
-  | "replays";
+  | "replays"
+  | "training"
+  | "trainingBattle";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay";
+export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training";
 
 /** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
 export type PvpSide = 1 | 2;
@@ -95,6 +97,10 @@ export interface SessionState {
   netDisconnected?: boolean | null;
   /** Журнал повтора для воспроизведения (0.17.0). */
   replayJournal?: ReplayJournal | null;
+  /** Активная миссия обучения (0.19.0). */
+  trainingMissionId?: string | null;
+  /** Пройденные миссии обучения (0.19.0). */
+  trainingDone?: string[];
   /** Победитель завершённой партии (для сохранения повтора). */
   replayWinner?: 1 | 2 | null;
   /** Черновик журнала текущего боя (команды, seed, составы). */
@@ -201,6 +207,12 @@ export interface SessionApi {
   finishReplayDraft(winner: 1 | 2 | null): void;
   /** Открыть воспроизведение сохранённого повтора (0.17.0). */
   startReplay(journal: ReplayJournal): void;
+  /** Открыть экран обучения (0.19.0). */
+  openTraining(): void;
+  /** Начать миссию обучения (0.19.0). */
+  startTrainingMission(missionId: string): boolean;
+  /** Отметить миссию обучения пройденной (0.19.0). */
+  completeTrainingMission(missionId: string): void;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -224,6 +236,8 @@ const idle: Omit<SessionState, "screen"> = {
   netDisconnected: null,
   replayJournal: null,
   replayDraft: null,
+  trainingMissionId: null,
+  trainingDone: [],
 };
 
 export function createSession(
@@ -734,6 +748,25 @@ export function createSession(
     },
     startReplay: (journal) => {
       emit({ ...idle, screen: "battle", battleKind: "replay", replayJournal: journal });
+    },
+    openTraining: () => {
+      emit({ ...idle, screen: "training" });
+    },
+    startTrainingMission: (missionId) => {
+      if (!["movement", "combat", "skills"].includes(missionId)) return false;
+      emit({
+        ...idle,
+        screen: "trainingBattle",
+        battleKind: "training",
+        trainingMissionId: missionId,
+        matchSeed: Date.now() >>> 0,
+      });
+      return true;
+    },
+    completeTrainingMission: (missionId) => {
+      const done = state.trainingDone ?? [];
+      if (done.includes(missionId)) return;
+      emit({ ...state, trainingDone: [...done, missionId] });
     },
     bindTacticsHost: (host) => {
       tacticsHost = host;

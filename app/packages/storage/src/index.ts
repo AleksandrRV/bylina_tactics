@@ -12,7 +12,7 @@ import type { FogState, MatchState } from "@bylina/core";
 
 export interface SessionSaveState {
   screen: string;
-  battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | null;
+  battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | null;
   activeMissionId: string | null;
   deployment: number[];
   matchSeed: number;

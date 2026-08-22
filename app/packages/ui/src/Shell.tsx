@@ -7,6 +7,7 @@ import { MenuScreen } from "./MenuScreen.js";
 import { MissionResultScreen } from "./MissionResultScreen.js";
 import { PvpRoomScreen } from "./PvpRoomScreen.js";
 import { ReplayScreen } from "./ReplayScreen.js";
+import { TrainingScreen } from "./TrainingScreen.js";
 import { ResultScreen } from "./ResultScreen.js";
 import { SettingsScreen } from "./SettingsScreen.js";
 import { useSessionState } from "./hooks.js";
@@ -23,6 +24,7 @@ export function Shell() {
   if (screen === "missionResult") return <MissionResultScreen />;
   if (screen === "pvpRoom") return <PvpRoomScreen />;
   if (screen === "replays") return <ReplayScreen />;
+  if (screen === "training") return <TrainingScreen />;
   if (screen === "battle") return <BattleScreen />;
   return <MenuScreen />;
 }

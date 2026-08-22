@@ -309,6 +309,35 @@ export const pvpConfigSchema = z.object({
   map: mapGenConfigSchema.optional(),
 }).strict();
 
+export const trainingHintSchema = z.object({
+  step: z.number().int().min(1),
+  textKey: z.string().min(1),
+  highlight: z.enum(["cell", "entity", "panel", "button", "zone"]),
+  cell: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
+  targetUnitId: id.optional(),
+  panelKey: z.string().optional(),
+  until: z.enum(["move", "attack", "skill", "defend", "overwatch", "end_turn", "approach", "noop"]),
+}).strict();
+
+export const trainingMissionSchema = z.object({
+  id: z.enum(["movement", "combat", "skills"]),
+  titleKey: z.string().min(1),
+  descriptionKey: z.string().min(1),
+  map: mapGenConfigSchema,
+  playerSlots: z.array(id).min(1).max(5),
+  enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(1),
+  hints: z.array(trainingHintSchema).min(1),
+}).strict();
+
+/** Режим обучения (0.19.0): ровно три миссии. */
+export const trainingConfigSchema = z.object({
+  missions: z.array(trainingMissionSchema).length(3),
+}).strict();
+
+export type TrainingHintConfig = z.infer<typeof trainingHintSchema>;
+export type TrainingMissionConfig = z.infer<typeof trainingMissionSchema>;
+export type TrainingConfig = z.infer<typeof trainingConfigSchema>;
+
 export type UnitConfig = z.infer<typeof unitConfigSchema>;
 export type WeaponConfig = z.infer<typeof weaponConfigSchema>;
 export type SkillConfig = z.infer<typeof skillConfigSchema>;

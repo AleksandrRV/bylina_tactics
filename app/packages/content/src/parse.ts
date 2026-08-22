@@ -6,6 +6,7 @@ import {
   pvpConfigSchema,
   quickMatchConfigSchema,
   skillConfigSchema,
+  trainingConfigSchema,
   unitConfigSchema,
   weaponConfigSchema,
   type CampaignConfig,
@@ -13,6 +14,7 @@ import {
   type PvpConfig,
   type QuickMatchConfig,
   type SkillConfig,
+  type TrainingConfig,
   type UnitConfig,
   type WeaponConfig,
 } from "./schemas.js";
@@ -21,6 +23,8 @@ export interface ContentBundle {
   campaign: CampaignConfig;
   quickMatch: QuickMatchConfig;
   pvp: PvpConfig;
+  /** Режим обучения (0.19.0). */
+  training: TrainingConfig;
   units: UnitConfig[];
   weapons: WeaponConfig[];
   skills: SkillConfig[];
@@ -73,18 +77,22 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
   const campaignRaw = byName("campaign.json5");
   const quickRaw = byName("quick-match.json5");
   const pvpRaw = byName("pvp.json5");
+  const trainingRaw = byName("training.json5");
 
   if (!campaignRaw) issues.push({ file: "campaign.json5", message: "file is missing" });
   if (!quickRaw) issues.push({ file: "quick-match.json5", message: "file is missing" });
   if (!pvpRaw) issues.push({ file: "pvp.json5", message: "file is missing" });
+  if (!trainingRaw) issues.push({ file: "training.json5", message: "file is missing" });
 
   const campaign = campaignRaw ? parseFile("campaign.json5", campaignRaw, campaignConfigSchema) : {};
   const quickMatch = quickRaw ? parseFile("quick-match.json5", quickRaw, quickMatchConfigSchema) : {};
   const pvp = pvpRaw ? parseFile("pvp.json5", pvpRaw, pvpConfigSchema) : {};
+  const training = trainingRaw ? parseFile("training.json5", trainingRaw, trainingConfigSchema) : {};
 
   if (campaign.issue) issues.push(campaign.issue);
   if (quickMatch.issue) issues.push(quickMatch.issue);
   if (pvp.issue) issues.push(pvp.issue);
+  if (training.issue) issues.push(training.issue);
 
   const units: UnitConfig[] = [];
   for (const [file, raw] of collect(files, "units")) {
@@ -225,7 +233,28 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     }
   }
 
-  if (issues.length > 0 || !campaign.value || !quickMatch.value || !pvp.value) {
+  // Ссылки миссий обучения: бойцы и противники должны существовать.
+  if (training.value) {
+    for (const mission of training.value.missions) {
+      for (const unitId of mission.playerSlots) {
+        if (!unitIds.has(unitId)) {
+          issues.push({ file: "training.json5", message: `mission ${mission.id}: unknown player unit: ${unitId}` });
+        }
+      }
+      for (const entry of mission.enemies) {
+        if (!unitIds.has(entry.unitId)) {
+          issues.push({ file: "training.json5", message: `mission ${mission.id}: unknown enemy unit: ${entry.unitId}` });
+        }
+      }
+      for (const hint of mission.hints) {
+        if (hint.targetUnitId !== undefined && !unitIds.has(hint.targetUnitId)) {
+          issues.push({ file: "training.json5", message: `mission ${mission.id}: unknown hint unit: ${hint.targetUnitId}` });
+        }
+      }
+    }
+  }
+
+  if (issues.length > 0 || !campaign.value || !quickMatch.value || !pvp.value || !training.value) {
     return { ok: false, issues };
   }
 
@@ -235,6 +264,7 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       campaign: campaign.value,
       quickMatch: quickMatch.value,
       pvp: pvp.value,
+      training: training.value,
       units,
       weapons,
       skills,

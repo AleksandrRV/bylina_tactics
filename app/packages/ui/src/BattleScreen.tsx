@@ -20,6 +20,7 @@ import {
   type TacticsKernel,
   type WeaponStats,
 } from "@bylina/core";
+import type { TrainingMissionConfig } from "@bylina/content";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
@@ -104,7 +105,28 @@ export function BattleScreen() {
   const isSpectator = netRole === "spectator";
   const isReplay = battleKind === "replay";
   const replayJournal = session.get().replayJournal;
+  const isTraining = battleKind === "training";
+  const trainingMission = isTraining
+    ? content.training.missions.find((mission) => mission.id === session.get().trainingMissionId)
+    : undefined;
   const [kernel] = useState<TacticsKernel | null>(() => {
+    if (isTraining && trainingMission) {
+      const host = createTacticsKernel({
+        initial: createMissionMatch({
+          units: content.units,
+          map: trainingMission.map,
+          playerSlots: trainingMission.playerSlots,
+          enemies: trainingMission.enemies,
+          seed: matchSeed || 1,
+        }),
+        weapons,
+        skills,
+        units: content.units,
+        seed: matchSeed || 1,
+      });
+      session.bindTacticsHost(host);
+      return host;
+    }
     if (isReplay && replayJournal) {
       const host = createTacticsKernel({
         initial: createPvpMatch({
@@ -229,6 +251,38 @@ export function BattleScreen() {
     [kernel],
   );
 
+  // Режим обучения (0.19.0): активный шаг подсказки; отслеживание событий
+  // для перехода к следующему шагу.
+  const [hintStep, setHintStep] = useState(0);
+  const trainingHints = isTraining && trainingMission ? trainingMission.hints : [];
+  const activeHint = trainingHints[hintStep] ?? null;
+
+  // Обновление шага по совершённым действиям.
+  const advanceTraining = (events: GameEvent[]): void => {
+    if (!isTraining || !activeHint) return;
+    const done = events.some((event) => {
+      switch (activeHint.until) {
+        case "move":
+          return event.type === "ENTITY_MOVED";
+        case "attack":
+          return event.type === "COMBAT_RESOLVED";
+        case "skill":
+          return event.type === "SKILL_RESOLVED";
+        case "defend":
+          return event.type === "STATUS_CHANGED" && event.status === "DEFENDING" && event.applied;
+        case "overwatch":
+          return event.type === "STATUS_CHANGED" && event.status === "OVERWATCH" && event.applied;
+        case "end_turn":
+          return event.type === "TURN_CHANGED";
+        case "approach":
+          return event.type === "ENTITY_MOVED" || event.type === "COMBAT_RESOLVED";
+        default:
+          return false;
+      }
+    });
+    if (done) setHintStep((value) => value + 1);
+  };
+
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayDone, setReplayDone] = useState(false);
@@ -249,6 +303,7 @@ export function BattleScreen() {
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
+
 
   // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
   const netDisconnected = session.get().netDisconnected === true;
@@ -283,6 +338,15 @@ export function BattleScreen() {
   const snapshot = usesNetSnapshot
     ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
     : session.getBattleSnapshot(viewOwner);
+
+  // Завершение миссии обучения: отметка пройденной и возврат на экран.
+  useEffect(() => {
+    if (!isTraining) return;
+    const ended = snapshot.turnNumber > 0 && session.getBattleOutcome() !== "ongoing";
+    if (!ended) return;
+    if (trainingMission) session.completeTrainingMission(trainingMission.id);
+    session.goTo("training");
+  }, [snapshot.turnNumber]);
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -417,8 +481,8 @@ export function BattleScreen() {
   const finishFromEvents = (events: GameEvent[]): void => {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
-    // Повтор: партия не «завершается» — журнал просто доигрывается до конца.
-    if (isReplay) return;
+    // Повтор: партия не «завершается»; обучение завершает экран отдельным эффектом.
+    if (isReplay || isTraining) return;
     if (battleKind === "pvp" || battleKind === "pvpNet") {
       const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
       if (winner) session.finishPvpMatch(winner);
@@ -600,6 +664,7 @@ export function BattleScreen() {
     setBusy(true);
     void (async () => {
       try {
+        advanceTraining(result.events);
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
         finishFromEvents(result.events);
         if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
@@ -846,6 +911,12 @@ export function BattleScreen() {
     <div className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}`}>
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
+        {isTraining && activeHint ? (
+          <div className="training-hint" role="status" aria-live="polite">
+            <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
+            <span className="training-hint-text">{t(activeHint.textKey)}</span>
+          </div>
+        ) : null}
         {isReplay ? (
           <div className="replay-bar" role="status">
             <span className="replay-label">{t("replay.watching")}</span>

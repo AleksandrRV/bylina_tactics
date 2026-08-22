@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.18.0", () => {
-    expect(APP_VERSION).toBe("0.18.0");
+  it("reports version 0.19.0", () => {
+    expect(APP_VERSION).toBe("0.19.0");
   });
 
   it("moves between menu and settings", () => {
@@ -340,5 +340,26 @@ describe("createSession pvp (0.14.0)", () => {
     expect(session.get().screen).toBe("result");
     expect(session.get().pvpWinner).toBe(2);
     expect(session.get().outcome).toBe("defeat");
+  });
+});
+
+describe("createSession training (0.19.0)", () => {
+  it("opens the training screen and starts a mission", () => {
+    const session = createSession("menu");
+    session.openTraining();
+    expect(session.get().screen).toBe("training");
+    expect(session.startTrainingMission("combat")).toBe(true);
+    expect(session.get().screen).toBe("trainingBattle");
+    expect(session.get().battleKind).toBe("training");
+    expect(session.get().trainingMissionId).toBe("combat");
+  });
+
+  it("rejects an unknown training mission and tracks completion", () => {
+    const session = createSession("menu");
+    expect(session.startTrainingMission("unknown")).toBe(false);
+    session.openTraining();
+    session.startTrainingMission("movement");
+    session.completeTrainingMission("movement");
+    expect(session.get().trainingDone).toContain("movement");
   });
 });

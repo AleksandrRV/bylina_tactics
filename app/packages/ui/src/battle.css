@@ -842,3 +842,47 @@
   flex-wrap: wrap;
   justify-content: center;
 }
+
+/* Баннер подсказки обучения (0.19.0) */
+.training-hint {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 520px;
+  padding: 10px 18px;
+  background: rgba(16, 22, 16, 0.92);
+  border: 1px solid rgba(224, 179, 74, 0.55);
+  border-radius: 6px;
+  color: #f3ecdc;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 70;
+  animation: hint-in 300ms ease-out;
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.training-hint-step {
+  flex: none;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: rgba(224, 179, 74, 0.15);
+  color: var(--amber, #e0b34a);
+  font-family: monospace;
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}

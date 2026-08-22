@@ -13,7 +13,7 @@
     "campaign": "New Tale",
     "pvp": "Exhibition Battles",
     "debugField": "Grid trial",
-    "training": "Staff clash",
+    "training": "Training",
     "settings": "Settings",
     "install": "Install game",
     "unavailableTitle": "This mode is not available yet",
@@ -483,5 +483,32 @@
     "done": "Replay finished",
     "winner": "Side {side} wins",
     "aborted": "Aborted"
+  },
+  "training": {
+    "title": "Training",
+    "hint": "Three missions teach the basics. Go in order or pick any.",
+    "mission": "Mission {number}",
+    "completed": "Completed",
+    "start": "Start",
+    "step": "Step {current} of {total}",
+    "movement": {
+      "title": "First steps",
+      "description": "Grid, levels, pits, action points, movement and dash.",
+      "hint1": "Each fighter has action points. A move costs one, a dash costs two.",
+      "hint2": "Approach the highlighted cell: click it.",
+      "hint3": "End your turn with the button on the right."
+    },
+    "combat": {
+      "title": "Combat",
+      "description": "Attack, cover, height, hit chance and damage.",
+      "hint1": "Pick a weapon and attack the enemy.",
+      "hint2": "The enemy is in cover: move closer to improve your chance."
+    },
+    "skills": {
+      "title": "Skills & statuses",
+      "description": "Class skills, overwatch, statuses, fog of war.",
+      "hint1": "Use the selected fighter's skill.",
+      "hint2": "Use the defensive stance (key 9)."
+    }
   }
 }

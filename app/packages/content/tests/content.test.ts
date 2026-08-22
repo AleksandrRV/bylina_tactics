@@ -289,3 +289,26 @@ describe("parseContent mission objectives (0.13.0)", () => {
     expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown objective unit"))).toBe(true);
   });
 });
+
+describe("training config (0.19.0)", () => {
+  it("loads three training missions with valid hints", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.training.missions.map((mission) => mission.id)).toEqual(["movement", "combat", "skills"]);
+    const combat = result.data.training.missions.find((mission) => mission.id === "combat")!;
+    expect(combat.playerSlots).toEqual(["bogatyr"]);
+    expect(combat.enemies[0]?.unitId).toBe("upyr");
+    expect(combat.hints.length).toBeGreaterThan(0);
+    expect(combat.hints[0]?.until).toBe("attack");
+  });
+
+  it("rejects training with an unknown unit", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("training.json5"))!;
+    files[key] = files[key]!.replace('playerSlots: ["bogatyr"],', 'playerSlots: ["bogatyr_missing"],');
+    const result = parseContent(files);
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown player unit"))).toBe(true);
+  });
+});
