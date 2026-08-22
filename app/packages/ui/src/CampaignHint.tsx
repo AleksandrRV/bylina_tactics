@@ -41,7 +41,7 @@ export function CampaignHint({
 
   if (variant === "banner") {
     return (
-      <div className="campaign-hint-banner" role="status" aria-live="polite">
+      <div className="campaign-hint-banner" role="group" aria-labelledby={`hint-${hintId}-title`}>
         {body}
       </div>
     );

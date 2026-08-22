@@ -285,7 +285,12 @@ export function CampaignScreen() {
     });
   }, [wantedHints.join(",")]);
 
-  const activeHintId = hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null;
+  // Активный туториал: только при включённой настройке подсказок и только
+  // непоказанные (0.20.0). Проверка showHints защищает и от элементов,
+  // уже успевших попасть в очередь до выключения настройки.
+  const activeHintId = settings.showHints
+    ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null)
+    : null;
   const closeHint = (): void => {
     if (!activeHintId) return;
     session.markCampaignHintShown(activeHintId);
