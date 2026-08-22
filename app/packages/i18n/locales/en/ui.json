@@ -402,6 +402,33 @@
     "won": "wins",
     "passHint": "Pass the device",
     "passBody": "The panel shows the side whose turn it is. The other side's panel and fog are hidden.",
-    "ready": "I am ready"
+    "ready": "I am ready",
+    "tabLocal": "Same device",
+    "tabNetwork": "Local network"
+  },
+  "net": {
+    "host": "Create game",
+    "guest": "Join",
+    "hostHint": "Create a match: the guest joins by code or image.",
+    "create": "Create match",
+    "hostWait": "Show the code or image to the opponent, then enter their answer.",
+    "peerCode": "Opponent code",
+    "peerCodePlaceholder": "Paste the opponent's answer code",
+    "apply": "Apply",
+    "startBattle": "Start battle",
+    "guestHint": "Enter the host code or load an image with the code.",
+    "enterCode": "Host code",
+    "enterCodePlaceholder": "Paste the code from the host room",
+    "scanQr": "Scan image",
+    "connect": "Connect",
+    "connected": "Connected",
+    "badCode": "Could not parse the session code",
+    "noQr": "No code found in the image",
+    "qrAlt": "Session code",
+    "waitHint": "Local network",
+    "opponentTurn": "Opponent's turn",
+    "waitBody": "Waiting for the host's turn...",
+    "syncing": "Syncing",
+    "syncingBody": "Receiving the match state from the host..."
   }
 }

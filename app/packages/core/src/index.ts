@@ -61,3 +61,4 @@ export type {
   RejectReason,
   Tile,
 } from "./types.js";
+export { eventsVisibleTo } from "./network-events.js";

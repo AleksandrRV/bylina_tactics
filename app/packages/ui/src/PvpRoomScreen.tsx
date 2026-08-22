@@ -1,3 +1,5 @@
+import { useMemo, useState } from "react";
+import { createQrDataUrl, createWebRtcChannel, decodeQrImage, decodeSessionCode, encodeSessionCode, type Transport } from "@bylina/net";
 import { useServices, useT } from "./context.js";
 import { useI18nTick } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -23,18 +25,22 @@ function BackIcon() {
   );
 }
 
+type RoomTab = "local" | "network";
+
 /**
- * Комната сбора поочерёдной игры (roadmap 0.14.0): две стороны на одном
- * устройстве, готовый набор записей, условие «уничтожение всех юнитов».
+ * Комната сбора «Потешных боев» (roadmap 0.14.0/0.15.0):
+ * поочерёдная игра на одном устройстве либо соединение по локальной сети —
+ * ведущий создаёт партию и показывает код/QR, ведомый подключается по строке
+ * или изображению.
  */
 export function PvpRoomScreen() {
   useI18nTick();
   const t = useT();
   const { session, content } = useServices();
   const pool = content.pvp.pool;
-  const n = pool.length;
+  const [tab, setTab] = useState<RoomTab>("local");
 
-  const start = (): void => {
+  const startLocal = (): void => {
     if (pool.length === 0) return;
     session.startPvpBattle([...pool], [...pool], Date.now() >>> 0);
   };
@@ -47,56 +53,263 @@ export function PvpRoomScreen() {
         <p className="muted">{t("pvp.roomHint")}</p>
       </header>
 
-      <div className="pvp-arena">
-        <section className={`pvp-side-card is-side1`} aria-label={t("pvp.side1")}>
-          <h2 className="pvp-side-title">{t("pvp.side1")}</h2>
-          <div className="pvp-roster">
-            {pool.map((unitId) => {
-              const face = unitPortrait(unitId);
-              return (
-                <div key={unitId} className="pvp-slot">
-                  {face ? <img className="pvp-slot-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
-                  <span className="pvp-slot-name">{t(unitName(unitId))}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        <div className="pvp-versus" aria-hidden="true">
-          <SwordsIcon />
-          <span className="pvp-versus-label">{t("pvp.vs")}</span>
-          <span className="pvp-n-badge">{t("pvp.n", { count: n })}</span>
-        </div>
-
-        <section className="pvp-side-card is-side2" aria-label={t("pvp.side2")}>
-          <h2 className="pvp-side-title">{t("pvp.side2")}</h2>
-          <div className="pvp-roster">
-            {pool.map((unitId) => {
-              const face = unitPortrait(unitId);
-              return (
-                <div key={unitId} className="pvp-slot">
-                  {face ? <img className="pvp-slot-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
-                  <span className="pvp-slot-name">{t(unitName(unitId))}</span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
+      <div className="pvp-tabs" role="tablist" aria-label={t("pvp.roomHint")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "local"}
+          className={`pvp-tab${tab === "local" ? " is-active" : ""}`}
+          onClick={() => setTab("local")}
+        >
+          {t("pvp.tabLocal")}
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "network"}
+          className={`pvp-tab${tab === "network" ? " is-active" : ""}`}
+          onClick={() => setTab("network")}
+        >
+          {t("pvp.tabNetwork")}
+        </button>
       </div>
 
-      <p className="pvp-objective">{t("pvp.objective")}</p>
+      {tab === "local" ? (
+        <LocalSetup pool={pool} onStart={startLocal} />
+      ) : (
+        <NetworkSetup
+          pool={pool}
+          onHostStart={(transport) => session.startNetPvpBattle({ side1: [...pool], side2: [...pool] }, Date.now() >>> 0, transport)}
+          onGuestJoin={(owner, transport) => session.bindGuestNetPvp(owner, transport)}
+        />
+      )}
 
       <nav className="menu-nav">
-        <button type="button" className="btn btn-primary" onClick={start} disabled={pool.length === 0}>
-          <span>{t("pvp.start")}</span>
-          <span aria-hidden="true">→</span>
-        </button>
         <button type="button" className="btn btn-ghost" onClick={() => session.goTo("menu")}>
           <BackIcon />
           {t("common.back")}
         </button>
       </nav>
+    </div>
+  );
+}
+
+function LocalSetup({ pool, onStart }: { pool: string[]; onStart: () => void }) {
+  const t = useT();
+  return (
+    <>
+      <div className="pvp-arena">
+        <SideCard side={1} pool={pool} />
+        <div className="pvp-versus" aria-hidden="true">
+          <SwordsIcon />
+          <span className="pvp-versus-label">{t("pvp.vs")}</span>
+          <span className="pvp-n-badge">{t("pvp.n", { count: pool.length })}</span>
+        </div>
+        <SideCard side={2} pool={pool} />
+      </div>
+      <p className="pvp-objective">{t("pvp.objective")}</p>
+      <button type="button" className="btn btn-primary" onClick={onStart} disabled={pool.length === 0}>
+        <span>{t("pvp.start")}</span>
+        <span aria-hidden="true">→</span>
+      </button>
+    </>
+  );
+}
+
+function SideCard({ side, pool }: { side: 1 | 2; pool: string[] }) {
+  const t = useT();
+  return (
+    <section className={`pvp-side-card is-side${side}`} aria-label={t(side === 1 ? "pvp.side1" : "pvp.side2")}>
+      <h2 className="pvp-side-title">{t(side === 1 ? "pvp.side1" : "pvp.side2")}</h2>
+      <div className="pvp-roster">
+        {pool.map((unitId) => {
+          const face = unitPortrait(unitId);
+          return (
+            <div key={unitId} className="pvp-slot">
+              {face ? <img className="pvp-slot-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+              <span className="pvp-slot-name">{t(unitName(unitId))}</span>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function NetworkSetup({
+  pool,
+  onHostStart,
+  onGuestJoin,
+}: {
+  pool: string[];
+  onHostStart: (transport: Transport) => void;
+  onGuestJoin: (owner: number, transport: Transport) => void;
+}) {
+  const t = useT();
+  const [role, setRole] = useState<"host" | "guest">("host");
+  const [code, setCode] = useState<string>("");
+  const [peerCode, setPeerCode] = useState<string>("");
+  const [connected, setConnected] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [qr, setQr] = useState<string | null>(null);
+  const transportRef = useMemo(() => ({ current: null as (Transport & { receiveSignal(data: unknown): void }) | null }), []);
+  const qrInputRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
+
+  const createChannel = (initiator: boolean): Transport | null => {
+    try {
+      const channel = createWebRtcChannel({
+        initiator,
+        onSignal: (signal) => {
+          const next = encodeSessionCode(signal);
+          setCode(next);
+          void createQrDataUrl(next).then(setQr).catch(() => setQr(null));
+        },
+        receiveSignal: () => undefined,
+        onConnect: () => setConnected(true),
+        onError: (err) => setError(err.message),
+      });
+      transportRef.current = channel;
+      return channel;
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      return null;
+    }
+  };
+
+  const applyPeerCode = (): void => {
+    try {
+      transportRef.current?.receiveSignal(decodeSessionCode(peerCode));
+    } catch {
+      setError(t("net.badCode"));
+    }
+  };
+
+  const onQrFile = (file: File): void => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const image = new Image();
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = image.width;
+        canvas.height = image.height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return;
+        ctx.drawImage(image, 0, 0);
+        const data = ctx.getImageData(0, 0, image.width, image.height);
+        const decoded = decodeQrImage(data);
+        if (decoded) {
+          setPeerCode(decoded);
+        } else {
+          setError(t("net.noQr"));
+        }
+      };
+      image.src = String(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <div className="net-setup">
+      <div className="net-role-switch" role="tablist" aria-label={t("pvp.tabNetwork")}>
+        <button type="button" role="tab" aria-selected={role === "host"} className={`pvp-tab${role === "host" ? " is-active" : ""}`} onClick={() => { setRole("host"); setConnected(false); setError(null); }}>
+          {t("net.host")}
+        </button>
+        <button type="button" role="tab" aria-selected={role === "guest"} className={`pvp-tab${role === "guest" ? " is-active" : ""}`} onClick={() => { setRole("guest"); setConnected(false); setError(null); }}>
+          {t("net.guest")}
+        </button>
+      </div>
+
+      {role === "host" ? (
+        <div className="net-panel">
+          <p className="muted">{t("net.hostHint")}</p>
+          {!connected ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setError(null);
+                createChannel(true);
+              }}
+            >
+              {t("net.create")}
+            </button>
+          ) : null}
+          {code ? (
+            <div className="net-code-box">
+              {qr ? <img className="net-qr" src={qr} alt={t("net.qrAlt")} draggable={false} /> : null}
+              <code className="net-code">{code}</code>
+              <p className="muted">{t("net.hostWait")}</p>
+            </div>
+          ) : null}
+          {connected ? (
+            <>
+              <label className="net-input-label" htmlFor="net-peer-code">
+                {t("net.peerCode")}
+              </label>
+              <input id="net-peer-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.peerCodePlaceholder")} />
+              <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>
+                {t("net.apply")}
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => transportRef.current && onHostStart(transportRef.current)} disabled={pool.length === 0}>
+                {t("net.startBattle")}
+              </button>
+            </>
+          ) : null}
+        </div>
+      ) : (
+        <div className="net-panel">
+          <p className="muted">{t("net.guestHint")}</p>
+          <label className="net-input-label" htmlFor="net-guest-code">
+            {t("net.enterCode")}
+          </label>
+          <input id="net-guest-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.enterCodePlaceholder")} />
+          <button
+            type="button"
+            className="btn btn-ghost"
+            onClick={() => {
+              const input = qrInputRef.current;
+              if (input) input.click();
+            }}
+          >
+            {t("net.scanQr")}
+          </button>
+          <input
+            ref={(node) => { qrInputRef.current = node; }}
+            type="file"
+            accept="image/*"
+            className="net-file-input"
+            aria-hidden="true"
+            tabIndex={-1}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) onQrFile(file);
+            }}
+          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              setError(null);
+              try {
+                const signal = decodeSessionCode(peerCode);
+                const channel = createChannel(false);
+                if (!channel) return;
+                (channel as Transport & { receiveSignal(data: unknown): void }).receiveSignal(signal);
+                // Ведомый ждёт партию ведущего; экран боя получит снимок по каналу.
+                onGuestJoin(2, channel);
+              } catch {
+                setError(t("net.badCode"));
+              }
+            }}
+            disabled={!peerCode.trim()}
+          >
+            {t("net.connect")}
+          </button>
+          {connected ? <p className="net-connected">{t("net.connected")}</p> : null}
+        </div>
+      )}
+
+      {error ? <p className="net-error" role="alert">{error}</p> : null}
     </div>
   );
 }

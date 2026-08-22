@@ -760,3 +760,19 @@
     transform: rotate(4deg);
   }
 }
+
+/* Синхронизация ведомого с ведущим (0.15.0) */
+.net-sync-spinner {
+  width: 26px;
+  height: 26px;
+  border: 2px solid rgba(224, 179, 74, 0.25);
+  border-top-color: var(--amber, #e0b34a);
+  border-radius: 50%;
+  animation: net-spin 0.9s linear infinite;
+}
+
+@keyframes net-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

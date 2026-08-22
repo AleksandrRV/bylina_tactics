@@ -97,10 +97,14 @@ export function BattleScreen() {
     return result;
   }, [content.skills]);
 
-  // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
-  // (сохранение 0.13.0) используется снимок из состояния сессии; инициализатор
-  // может вызываться повторно (StrictMode) — чтение состояния идемпотентно.
-  const [kernel] = useState<TacticsKernel>(() => {
+  // Сетевой ведомый (0.15.0) не исполняет правила: ядро у ведущего,
+  // снимок и предпросмотр приходят по каналу.
+  const isNetGuest = battleKind === "pvpNet" && session.get().netRole === "guest";
+  const [kernel] = useState<TacticsKernel | null>(() => {
+    if (isNetGuest) return null;
+    // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
+    // (сохранение 0.13.0) используется снимок из состояния сессии; инициализатор
+    // может вызываться повторно (StrictMode) — чтение состояния идемпотентно.
     const restored = session.get().restoredMatch;
     if (restored) {
       const host = createTacticsKernel({
@@ -113,9 +117,10 @@ export function BattleScreen() {
       session.bindTacticsHost(host);
       return host;
     }
-    // Поочерёдная игра: составы сторон из комнаты сбора, поле режима (0.14.0).
+    // Поочерёдная игра: составы сторон из комнаты сбора, поле режима (0.14.0);
+    // сетевой ведущий строит ту же партию локально (0.15.0).
     let initial: MatchState;
-    if (battleKind === "pvp") {
+    if (battleKind === "pvp" || battleKind === "pvpNet") {
       const sides = session.getPvpSides();
       if (!sides) throw new Error("PvP sides are missing");
       initial = createPvpMatch({
@@ -201,21 +206,40 @@ export function BattleScreen() {
 
   // Поочерёдная игра: каждый рендер показывает сторону, чей сейчас ход
   // (сокрытие панели чужой стороны и туман стороны при передаче устройства).
-  const pvpActive = battleKind === "pvp" ? (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER) : null;
+  // Сетевой ведомый всегда видит только свою сторону; ведущий — активную.
+  const netOwner = battleKind === "pvpNet" ? session.get().netOwner : null;
+  const pvpActive = battleKind === "pvp" || battleKind === "pvpNet"
+    ? (isNetGuest ? netOwner : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER))
+    : null;
   const viewOwner = pvpActive ?? PLAYER_OWNER;
   const enemyOwner = viewOwner === ENEMY_OWNER ? PLAYER_OWNER : ENEMY_OWNER;
 
-  const snapshot = session.getBattleSnapshot(viewOwner);
+  const EMPTY_SNAPSHOT: MatchState = {
+    turnNumber: 1,
+    activeOwner: viewOwner,
+    grid: { width: 8, height: 6, tiles: [] },
+    entities: [],
+  };
+  const snapshot = isNetGuest
+    ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
+    : session.getBattleSnapshot(viewOwner);
 
-  const visibleCells = useMemo(() => session.getBattleVisible(viewOwner), [kernel, snapshot.turnNumber, snapshot.entities, viewOwner]);
-  const exploredCells = useMemo(() => session.getBattleExplored(viewOwner), [kernel, snapshot.turnNumber, snapshot.entities, viewOwner]);
+  const visibleCells = useMemo(
+    () => (isNetGuest ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, isNetGuest],
+  );
+  const exploredCells = useMemo(
+    () => (isNetGuest ? session.getNetExplored() : session.getBattleExplored(viewOwner)),
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, isNetGuest],
+  );
 
   const isOwn = (entity: EntityState): boolean =>
     !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
 
-  // События поочерёдного боя приходят через локальный транспорт (0.14.0).
+  // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
+  // локальный — на одном устройстве, сетевой — ведомому от ведущего.
   useEffect(() => {
-    if (battleKind !== "pvp") return;
+    if (battleKind !== "pvp" && battleKind !== "pvpNet") return;
     const unlisten = session.subscribePvpEvents((events) => {
       announce(events);
       setAction(null);
@@ -273,8 +297,9 @@ export function BattleScreen() {
 
   const reachable = useMemo(() => {
     if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
+    if (isNetGuest) return session.requestNetReachable(selectedId);
     return session.getBattleReachable(selectedId);
-  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy]);
+  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy, isNetGuest]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -293,6 +318,7 @@ export function BattleScreen() {
     if (selectedId === null || !action) return null;
     if (action.type === "weapon") {
       if (aimId === null) return null;
+      if (isNetGuest) return session.requestNetHitPreview(selectedId, aimId, action.id);
       return session.getBattleHitPreview(selectedId, aimId, action.id);
     }
     if (aimId === null && !skillTargetPos) return null;
@@ -322,7 +348,7 @@ export function BattleScreen() {
   const finishFromEvents = (events: GameEvent[]): void => {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
-    if (battleKind === "pvp") {
+    if (battleKind === "pvp" || battleKind === "pvpNet") {
       const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
       if (winner) session.finishPvpMatch(winner);
       return;
@@ -373,10 +399,14 @@ export function BattleScreen() {
     playThen(result.events);
   };
 
-  /** Единственный канал команд: поочерёдная игра — через локальный транспорт. */
+  /** Единственный канал команд: поочерёдная игра — через транспорт (0.14.0/0.15.0). */
   const applyCommand = (command: Command): void => {
     if (battleKind === "pvp") {
       session.sendPvpCommand(command);
+      return;
+    }
+    if (isNetGuest) {
+      session.sendNetCommand(command);
       return;
     }
     const result = session.applyBattleCommand(command);
@@ -434,6 +464,7 @@ export function BattleScreen() {
         const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
         if (session.getBattleOutcome() !== "ongoing") break;
+        if (!kernel) break;
         const command = pickEnemyCommand(kernel);
         const applied = command
           ? session.applyBattleCommand(command)
@@ -458,7 +489,7 @@ export function BattleScreen() {
   // продолжает ход с текущего состояния (иначе сторона осталась бы без хода).
   // В поочерёдной игре алгоритм не применяется — ход принадлежит человеку.
   useEffect(() => {
-    if (battleKind === "pvp") return;
+    if (battleKind === "pvp" || battleKind === "pvpNet") return;
     if (session.getBattleOutcome() !== "ongoing") return;
     if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== ENEMY_OWNER) return;
     void runEnemyPhase();
@@ -474,6 +505,10 @@ export function BattleScreen() {
     setLog(null);
     if (battleKind === "pvp") {
       session.sendPvpCommand({ type: "END_TURN", playerId: String(viewOwner) });
+      return;
+    }
+    if (isNetGuest) {
+      session.sendNetCommand({ type: "END_TURN", playerId: String(viewOwner) });
       return;
     }
     const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
@@ -703,7 +738,7 @@ export function BattleScreen() {
   }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
   const roster = snapshot.entities.filter((entity) => entity.owner === viewOwner && entity.coverType === 0);
-  const sideKey = battleKind === "pvp"
+  const sideKey = battleKind === "pvp" || battleKind === "pvpNet"
     ? (viewOwner === 1 ? "pvp.side1" : "pvp.side2")
     : snapshot.activeOwner === ENEMY_OWNER
       ? "field.sideEnemy"
@@ -1123,6 +1158,29 @@ export function BattleScreen() {
             <button type="button" className="hud-btn hud-btn-primary pass-ready-btn" onClick={() => setPassReady(true)}>
               {t("pvp.ready")}
             </button>
+          </div>
+        </div>
+      ) : null}
+
+      {battleKind === "pvpNet" && isNetGuest && !session.getNetSnapshot() ? (
+        <div className="pass-device-root" role="presentation">
+          <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="net-sync-title">
+            <p className="eyebrow">{t("net.waitHint")}</p>
+            <h2 id="net-sync-title" className="pass-side-title">{t("net.syncing")}</h2>
+            <p className="muted">{t("net.syncingBody")}</p>
+            <span className="net-sync-spinner" aria-hidden="true" />
+          </div>
+        </div>
+      ) : null}
+
+      {battleKind === "pvpNet" && isNetGuest && session.getNetSnapshot() && snapshot.activeOwner !== viewOwner ? (
+        <div className="pass-device-root" role="presentation">
+          <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="net-wait-title">
+            <p className="eyebrow">{t("net.waitHint")}</p>
+            <h2 id="net-wait-title" className="pass-side-title">
+              {t("net.opponentTurn")}
+            </h2>
+            <p className="muted">{t("net.waitBody")}</p>
           </div>
         </div>
       ) : null}

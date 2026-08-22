@@ -134,9 +134,9 @@ describe("path optimality", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.14.0 and does not touch the document object", () => {
+  it("reports 0.15.0 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.14.0");
+    expect(kernel.version).toBe("0.15.0");
     expect(typeof globalThis.document).toBe("undefined");
   });
 
