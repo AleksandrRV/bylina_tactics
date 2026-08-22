@@ -276,6 +276,9 @@ export function BattleScreen() {
           return event.type === "TURN_CHANGED";
         case "approach":
           return event.type === "ENTITY_MOVED" || event.type === "COMBAT_RESOLVED";
+        case "noop":
+          // Ознакомительный шаг: завершается любым первым действием игрока.
+          return true;
         default:
           return false;
       }
@@ -339,14 +342,30 @@ export function BattleScreen() {
     ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
     : session.getBattleSnapshot(viewOwner);
 
+  // Подсветка обучающей подсказки: клетка или сущность.
+  const trainingHighlight = (() => {
+    if (!activeHint) return null;
+    if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
+      if (activeHint.cell) return { kind: "cell" as const, x: activeHint.cell.x, y: activeHint.cell.y };
+      return null;
+    }
+    if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
+      const entity = snapshot.entities.find((candidate) => candidate.configId === activeHint.targetUnitId);
+      if (entity) return { kind: "entity" as const, x: entity.x, y: entity.y };
+    }
+    return null;
+  })();
+
   // Завершение миссии обучения: отметка пройденной и возврат на экран.
+  // Зависимость включает snapshot.entities: исход атакой (без смены хода)
+  // меняет сущностей, но не turnNumber — без этого эффект не перезапустится.
   useEffect(() => {
     if (!isTraining) return;
     const ended = snapshot.turnNumber > 0 && session.getBattleOutcome() !== "ongoing";
     if (!ended) return;
     if (trainingMission) session.completeTrainingMission(trainingMission.id);
     session.goTo("training");
-  }, [snapshot.turnNumber]);
+  }, [snapshot.turnNumber, snapshot.entities]);
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -623,6 +642,7 @@ export function BattleScreen() {
         }
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
+        advanceTraining(applied.events);
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
@@ -802,8 +822,9 @@ export function BattleScreen() {
       exploredCells,
       aimBreakCell,
       hoverCell,
+      trainingHighlight,
     });
-  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell]);
+  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

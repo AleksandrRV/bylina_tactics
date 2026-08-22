@@ -18,6 +18,8 @@ export interface SessionSaveState {
   matchSeed: number;
   outcome: "victory" | "defeat" | null;
   difficulty: string | null;
+  /** Пройденные миссии обучения (0.19.0). */
+  trainingDone?: string[];
 }
 
 export interface FogSave {

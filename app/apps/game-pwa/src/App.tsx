@@ -71,6 +71,7 @@ export function App() {
       outcome: entry?.outcome ?? null,
       difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
       paused: false,
+      trainingDone: entry?.trainingDone ?? [],
       ...restoredBattle,
     });
     // createSession создаётся один раз за жизнь приложения.
@@ -158,6 +159,7 @@ export function App() {
         matchSeed: state.matchSeed,
         outcome: state.outcome,
         difficulty: state.difficulty,
+        trainingDone: state.trainingDone ?? [],
       },
       match,
       fog: fog ? serializeFog(fog) : undefined,

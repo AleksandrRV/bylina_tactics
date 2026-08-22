@@ -33,6 +33,8 @@ export interface FieldView {
   aimBreakCell?: CellPos | null;
   /** Клетка, над которой сейчас курсор (для подсветки защиты при перемещении). */
   hoverCell?: CellPos | null;
+  /** Подсветка обучающей подсказки (0.19.0): клетка либо сущность. */
+  trainingHighlight?: { kind: "cell" | "entity"; x: number; y: number } | null;
 }
 
 export interface FieldRenderer {
@@ -1568,6 +1570,29 @@ export function createFieldRenderer(): FieldRenderer {
         x: hx, y: hy, z: view.hoverCell.z,
       } as EntityState;
       drawProtectionHighlights(g, hoverEntity, view, 0.35);
+    }
+
+    // Подсветка обучающей подсказки (0.19.0): пульсирующая рамка.
+    if (view.trainingHighlight) {
+      const { x, y } = view.trainingHighlight;
+      const target = view.snapshot.entities.find((entity) => entity.x === x && entity.y === y);
+      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
+      if (tile) {
+        const z = visualLevel(tile);
+        const { fx, fy } = faceOf(tile.x, tile.y, z);
+        const pulse = 0.5 + Math.sin(now * 0.004) * 0.3;
+        g.rect(fx + 1, fy + 1, CELL_SIZE - 2, CELL_SIZE - 2).stroke({
+          width: 2.4,
+          color: 0xe0b34a,
+          alpha: 0.45 + pulse * 0.4,
+        });
+        g.rect(fx + 5, fy + 5, CELL_SIZE - 10, CELL_SIZE - 10).stroke({
+          width: 1,
+          color: 0xf3ecdc,
+          alpha: 0.2 + pulse * 0.25,
+        });
+        void target;
+      }
     }
 
     // Маркеры пересечения луча прицеливания с укрытиями.

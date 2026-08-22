@@ -363,3 +363,14 @@ describe("createSession training (0.19.0)", () => {
     expect(session.get().trainingDone).toContain("movement");
   });
 });
+
+describe("createSession training hints (0.19.0)", () => {
+  it("completing the mission records progress once", () => {
+    const session = createSession("menu");
+    session.openTraining();
+    session.startTrainingMission("skills");
+    session.completeTrainingMission("skills");
+    session.completeTrainingMission("skills");
+    expect(session.get().trainingDone).toEqual(["skills"]);
+  });
+});

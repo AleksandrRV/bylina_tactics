@@ -43,6 +43,7 @@ function sampleSave(): SaveData {
       matchSeed: 42,
       outcome: null,
       difficulty: null,
+      trainingDone: ["movement"],
     },
   };
 }
@@ -57,6 +58,7 @@ describe("createSaveStorage", () => {
     expect(loaded).not.toBeNull();
     expect(loaded?.campaign.fighters[0]?.name).toBe("Ратибор");
     expect(loaded?.session.screen).toBe("campaign");
+    expect(loaded?.session.trainingDone).toEqual(["movement"]);
   });
 
   it("returns null when the record is missing or broken", () => {
