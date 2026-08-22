@@ -641,6 +641,215 @@
   }
 }
 
+/* ===== Desktop enhancements (comfort on large screens) ===== */
+@media (min-width: 1200px) {
+  .battle-hud {
+    max-width: 1400px;
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .battle-top,
+  .battle-bottom {
+    padding-left: 24px;
+    padding-right: 24px;
+  }
+
+  .battle-selected {
+    flex: 1 1 220px;
+  }
+
+  .aim-card {
+    max-width: 420px;
+  }
+}
+
+@media (min-width: 1600px) {
+  .battle-hud {
+    max-width: 1600px;
+  }
+}
+
+/* ===== Mobile responsive (portrait + landscape) ===== */
+@media (max-width: 640px) {
+  .battle-hud {
+    font-size: 14px;
+  }
+
+  .battle-top,
+  .battle-bottom {
+    padding: 4px;
+    gap: 4px;
+  }
+
+  .hud-btn {
+    min-height: 40px;
+    padding: 6px 8px;
+    font-size: 0.85rem;
+  }
+
+  .roster-card {
+    min-width: 72px;
+    min-height: 40px;
+    padding: 3px 6px;
+    gap: 4px;
+  }
+
+  .roster-face {
+    width: 28px;
+    height: 28px;
+  }
+
+  .roster-meta .name {
+    font-size: 0.72rem;
+  }
+
+  .battle-selected {
+    flex: 1 1 120px;
+  }
+
+  .sel-face {
+    width: 40px;
+    height: 40px;
+  }
+
+  .skill-slot {
+    min-width: 64px;
+    padding-left: 16px;
+    font-size: 0.78rem;
+  }
+
+  .skill-slot kbd {
+    font-size: 0.6rem;
+  }
+
+  .battle-objective {
+    flex: 1 1 100px;
+  }
+
+  .enemies-strip {
+    margin-top: 4px;
+  }
+
+  .enemy-face {
+    width: 24px;
+    height: 24px;
+  }
+
+  .phase-banner {
+    top: 52px;
+    padding: 6px 18px;
+    font-size: 0.9rem;
+  }
+
+  .training-mentor,
+  .training-hint,
+  .training-note,
+  .campaign-hint-banner {
+    top: 48px;
+    max-width: 94%;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
+  .save-toast {
+    top: 48px;
+  }
+
+  .aim-card {
+    margin: 0 4px;
+    padding: 4px 8px;
+    font-size: 0.76rem;
+    max-width: 280px;
+  }
+}
+
+/* Extra compact portrait phones */
+@media (max-width: 420px) and (orientation: portrait) {
+  .battle-top,
+  .battle-bottom {
+    flex-wrap: wrap;
+  }
+
+  .roster {
+    flex: 1 1 100%;
+    justify-content: flex-start;
+  }
+
+  .battle-selected {
+    flex: 1 1 100%;
+    order: 3;
+  }
+
+  .skill-row {
+    flex: 1 1 100%;
+    order: 2;
+    justify-content: flex-start;
+  }
+
+  .hud-btn.hud-btn-primary {
+    flex: 1 1 100%;
+    order: 4;
+  }
+}
+
+/* Landscape phones: make sure bottom bar doesn't eat too much */
+@media (max-height: 420px) and (orientation: landscape) {
+  .battle-bottom {
+    padding: 2px 6px;
+  }
+
+  .hud-btn.skill-slot {
+    min-width: 52px;
+    font-size: 0.72rem;
+    padding: 3px 6px 3px 12px;
+  }
+
+  .battle-selected {
+    flex: 0 0 160px;
+  }
+}
+
+/* Landscape phones/tablets */
+@media (max-height: 420px) {
+  .battle-top,
+  .battle-bottom {
+    padding: 3px 6px;
+    gap: 3px;
+  }
+
+  .hud-btn {
+    min-height: 36px;
+    padding: 4px 8px;
+  }
+
+  .roster-card {
+    min-height: 36px;
+    padding: 2px 5px;
+  }
+
+  .sel-face {
+    width: 34px;
+    height: 34px;
+  }
+
+  .skill-slot {
+    min-width: 58px;
+    padding: 4px 8px 4px 14px;
+  }
+
+  .phase-banner {
+    top: 42px;
+  }
+
+  .training-mentor,
+  .training-hint,
+  .campaign-hint-banner {
+    top: 40px;
+    padding: 4px 8px;
+  }
+}
+
 /* Бейдж миссии в заголовке тактического сражения */
 .mission-badge {
   display: inline-block;
