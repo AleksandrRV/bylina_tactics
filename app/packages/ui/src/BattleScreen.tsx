@@ -357,9 +357,12 @@ export function BattleScreen() {
 
   const reachable = useMemo(() => {
     if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
+    // Гость запрашивает достижимость у ведущего; наблюдатель и повтор не
+    // вычисляют её вовсе (нет ядра / просмотр).
     if (isNetGuest) return session.requestNetReachable(selectedId);
+    if (usesNetSnapshot || isReplay) return [] as ReachableCell[];
     return session.getBattleReachable(selectedId);
-  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy, isNetGuest]);
+  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy, isNetGuest, usesNetSnapshot, isReplay]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -369,19 +372,25 @@ export function BattleScreen() {
 
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
+    // Гость и наблюдатель не исполняют правила: маршрут им не вычисляется
+    // (иначе requireTacticsHost бросит исключение).
+    if (usesNetSnapshot) return [] as CellPos[];
     const [xs, ys] = preview.split(",");
     const path = session.getBattlePath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
     return path?.path ?? [];
-  }, [preview, selectedId, kernel, snapshot.turnNumber]);
+  }, [preview, selectedId, kernel, snapshot.turnNumber, usesNetSnapshot]);
 
   const hit: HitPreview | null = useMemo(() => {
     if (selectedId === null || !action) return null;
     if (action.type === "weapon") {
       if (aimId === null) return null;
       if (isNetGuest) return session.requestNetHitPreview(selectedId, aimId, action.id);
+      if (usesNetSnapshot || isReplay) return null;
       return session.getBattleHitPreview(selectedId, aimId, action.id);
     }
     if (aimId === null && !skillTargetPos) return null;
+    // Предпросмотр умений у гостя/наблюдателя не вычисляется (нет ядра).
+    if (usesNetSnapshot) return null;
     const result = session.getBattleSkillPreview(selectedId, action.id, aimId ?? undefined, skillTargetPos ?? undefined);
     return {
       available: result.available,
@@ -408,6 +417,8 @@ export function BattleScreen() {
   const finishFromEvents = (events: GameEvent[]): void => {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
+    // Повтор: партия не «завершается» — журнал просто доигрывается до конца.
+    if (isReplay) return;
     if (battleKind === "pvp" || battleKind === "pvpNet") {
       const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
       if (winner) session.finishPvpMatch(winner);

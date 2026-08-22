@@ -380,7 +380,7 @@ function NetworkSetup({
               <button
                 type="button"
                 className="btn btn-primary"
-                onClick={() => transportRef.current && onHostStart([...pool], [...pool], objective, peerRole, omniscient, transportRef.current)}
+                onClick={() => transportRef.current && onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), objective, peerRole, omniscient, transportRef.current)}
                 disabled={pool.length === 0}
               >
                 {t("net.startBattle")}
@@ -503,7 +503,9 @@ function PublicSetup({
       sessionRef.current = { transport: signaling.transport, close: () => signaling.close() };
       setStatus(role === "host" ? t("net.publicHostWait") : t("net.publicGuestWait"));
       if (role === "host") {
-        onHostStart([...pool], [...pool], content.pvp.objective === "apple" ? "apple" : "elimination", signaling.transport);
+        // Сторона 1 ограничена пятью клетками высадки (createPvpMatch): сетевой
+        // бой использует не более пяти записей пула на сторону.
+        onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), content.pvp.objective === "apple" ? "apple" : "elimination", signaling.transport);
       } else {
         // Сторона 2; экран боя получит снимок по каналу.
         onGuestJoin(2, signaling.transport);

@@ -727,7 +727,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const panic = unit.panic;
     if (!panic || unit.dead) return;
     const source = actorOf(panic.sourceId);
-    if (source) {
+    // §15.3: если источник паники погиб или покинул поле, перемещение
+    // не выполняется (остаток ОД сгорает).
+    if (source && !source.dead) {
       const probe = { ...unit, ap: 1, movementSpent: 0, panic: undefined };
       const candidates = listReachable(state.grid, state.entities, probe)
         .filter((cell) => cell.apCost === 1 && distH(cell.x, cell.y, source.x, source.y) > distH(unit.x, unit.y, source.x, source.y))

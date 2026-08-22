@@ -51,15 +51,20 @@ export function App() {
 
   const session = useMemo(() => {
     const entry = saved?.session;
-    const screen =
-      entry?.screen === "battle" && entry?.battleKind === "campaign"
-        ? "battle"
-        : ((entry?.screen as "boot" | "menu" | "campaign" | "deployment" | "missionResult") ?? "boot");
-    const restoredBattle = saved?.match && entry?.battleKind === "campaign" && entry?.screen === "battle"
+    // Экран сражения восстанавливается только для партии кампании: локальная
+    // и сетевая партии эфемерны (ядро/транспорт не сохраняются), повтор
+    // открывается из списка повторов. Иначе BattleScreen упадёт без ядра.
+    const inCampaignBattle = entry?.screen === "battle" && entry?.battleKind === "campaign";
+    const screen = inCampaignBattle
+      ? "battle"
+      : entry?.screen === "deployment" || entry?.screen === "campaign" || entry?.screen === "missionResult"
+        ? entry.screen
+        : "menu";
+    const restoredBattle = saved?.match && inCampaignBattle
       ? { restoredMatch: saved.match, restoredFog: deserializeFog(saved.fog) }
       : undefined;
     return createSession(screen, {
-      battleKind: entry?.battleKind ?? null,
+      battleKind: inCampaignBattle ? "campaign" : null,
       activeMissionId: entry?.activeMissionId ?? null,
       deployment: entry?.deployment ?? [],
       matchSeed: entry?.matchSeed ?? 0,
