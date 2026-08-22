@@ -102,7 +102,27 @@ export function BattleScreen() {
   const netRole = battleKind === "pvpNet" ? session.get().netRole : null;
   const isNetGuest = netRole === "guest";
   const isSpectator = netRole === "spectator";
+  const isReplay = battleKind === "replay";
+  const replayJournal = session.get().replayJournal;
   const [kernel] = useState<TacticsKernel | null>(() => {
+    if (isReplay && replayJournal) {
+      const host = createTacticsKernel({
+        initial: createPvpMatch({
+          units: replayJournal.options.units,
+          map: replayJournal.options.map,
+          side1: replayJournal.options.side1,
+          side2: replayJournal.options.side2,
+          objective: replayJournal.options.objective,
+          seed: replayJournal.options.seed,
+        }),
+        weapons,
+        skills,
+        units: content.units,
+        seed: replayJournal.options.seed,
+      });
+      session.bindTacticsHost(host);
+      return host;
+    }
     if (isNetGuest) return null;
     // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
     // (сохранение 0.13.0) используется снимок из состояния сессии; инициализатор
@@ -207,6 +227,39 @@ export function BattleScreen() {
     [kernel],
   );
 
+  // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
+  const [replayIndex, setReplayIndex] = useState(0);
+  const [replayDone, setReplayDone] = useState(false);
+  useEffect(() => {
+    if (!isReplay || !replayJournal || !kernel || replayDone) return;
+    const commands = replayJournal.commands;
+    const timer = window.setInterval(() => {
+      const index = replayIndex;
+      if (index >= commands.length) {
+        window.clearInterval(timer);
+        setReplayDone(true);
+        return;
+      }
+      const command = commands[index];
+      if (command) kernel.apply(command);
+      setReplayIndex(index + 1);
+    }, 480);
+    return () => window.clearInterval(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
+
+  // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
+  const netDisconnected = session.get().netDisconnected === true;
+  const [disconnectLeft, setDisconnectLeft] = useState(30);
+  useEffect(() => {
+    if (!netDisconnected) return;
+    setDisconnectLeft(30);
+    const timer = window.setInterval(() => {
+      setDisconnectLeft((value) => Math.max(0, value - 1));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [netDisconnected]);
+
   // Поочерёдная игра: каждый рендер показывает сторону, чей сейчас ход
   // (сокрытие панели чужой стороны и туман стороны при передаче устройства).
   // Сетевой ведомый всегда видит только свою сторону; ведущий — активную.
@@ -239,7 +292,7 @@ export function BattleScreen() {
   );
 
   const isOwn = (entity: EntityState): boolean =>
-    !isSpectator && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+    !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
 
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
   // локальный — на одном устройстве, сетевой — ведомому от ведущего.
@@ -406,7 +459,7 @@ export function BattleScreen() {
 
   /** Единственный канал команд: поочерёдная игра — через транспорт (0.14.0/0.15.0). */
   const applyCommand = (command: Command): void => {
-    if (isSpectator) return;
+    if (isSpectator || isReplay) return;
     if (battleKind === "pvp") {
       session.sendPvpCommand(command);
       return;
@@ -768,6 +821,18 @@ export function BattleScreen() {
     <div className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}`}>
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
+        {isReplay ? (
+          <div className="replay-bar" role="status">
+            <span className="replay-label">{t("replay.watching")}</span>
+            <span className="replay-progress">
+              <i style={{ width: `${replayJournal ? Math.min(100, (replayIndex / Math.max(1, replayJournal.commands.length)) * 100) : 0}%` }} />
+            </span>
+            <span className="muted">
+              {replayIndex}/{replayJournal?.commands.length ?? 0}
+            </span>
+            {replayDone ? <span className="replay-done">{t("replay.done")}</span> : null}
+          </div>
+        ) : null}
         <header className="battle-top">
           <div className="top-controls">
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
@@ -1217,6 +1282,44 @@ export function BattleScreen() {
               {t("net.opponentTurn")}
             </h2>
             <p className="muted">{t("net.waitBody")}</p>
+          </div>
+        </div>
+      ) : null}
+
+      {netDisconnected ? (
+        <div className="pass-device-root" role="presentation">
+          <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="net-lost-title">
+            <p className="eyebrow">{t("net.waitHint")}</p>
+            <h2 id="net-lost-title" className="pass-side-title">{t("net.connectionLost")}</h2>
+            <p className="muted">
+              {disconnectLeft > 0
+                ? t("net.reconnectIn", { seconds: disconnectLeft })
+                : t("net.reconnectExpired")}
+            </p>
+            <div className="net-lost-actions">
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={() => {
+                  // Сохранение повтора выполняется слоем приложения (persistRef).
+                  session.finishReplayDraft(null);
+                  session.setNetDisconnected(false);
+                  session.goTo("menu");
+                }}
+              >
+                {t("net.saveReplay")}
+              </button>
+              <button
+                type="button"
+                className="btn btn-ghost"
+                onClick={() => {
+                  session.setNetDisconnected(false);
+                  session.goTo("menu");
+                }}
+              >
+                {t("net.leaveRoom")}
+              </button>
+            </div>
           </div>
         </div>
       ) : null}

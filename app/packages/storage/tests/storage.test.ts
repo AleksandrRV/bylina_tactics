@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createSaveStorage, deserializeFog, isSaveData, serializeFog, type SaveData } from "../src/index.js";
+import { createReplayStorage, createSaveStorage, deserializeFog, isSaveData, serializeFog, type SaveData } from "../src/index.js";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 
@@ -94,5 +94,17 @@ describe("isSaveData", () => {
     expect(isSaveData(sampleSave())).toBe(true);
     expect(isSaveData(null)).toBe(false);
     expect(isSaveData({ version: "0.13.0" })).toBe(false);
+  });
+});
+
+describe("createReplayStorage (0.17.0)", () => {
+  it("saves, lists, and deletes replays", () => {
+    const backend = memoryBackend();
+    const replays = createReplayStorage("bylina.replays.test", backend);
+    replays.saveReplay({ createdAt: 1, title: "Бой 1" });
+    replays.saveReplay({ createdAt: 2, title: "Бой 2" });
+    expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 2", "Бой 1"]);
+    replays.deleteReplay(2);
+    expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 1"]);
   });
 });

@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { createQrDataUrl, createWebRtcChannel, decodeQrImage, decodeSessionCode, encodeSessionCode, type Transport } from "@bylina/net";
+import { createSignalingSession, listRooms, type RoomSummary } from "@bylina/signaling";
 import { useServices, useT } from "./context.js";
 import { useI18nTick } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
@@ -25,7 +26,7 @@ function BackIcon() {
   );
 }
 
-type RoomTab = "local" | "network";
+type RoomTab = "local" | "network" | "public";
 type Objective = "elimination" | "apple";
 
 /**
@@ -56,9 +57,20 @@ export function PvpRoomScreen() {
         <button type="button" role="tab" aria-selected={tab === "network"} className={`pvp-tab${tab === "network" ? " is-active" : ""}`} onClick={() => setTab("network")}>
           {t("pvp.tabNetwork")}
         </button>
+        <button type="button" role="tab" aria-selected={tab === "public"} className={`pvp-tab${tab === "public" ? " is-active" : ""}`} onClick={() => setTab("public")}>
+          {t("pvp.tabPublic")}
+        </button>
       </div>
 
-      {tab === "local" ? (
+      {tab === "public" ? (
+        <PublicSetup
+          onHostStart={(side1, side2, objective, transport) =>
+            session.startNetPvpBattle({ side1, side2 }, Date.now() >>> 0, transport, { objective })
+          }
+          onGuestJoin={(owner, transport) => session.bindGuestNetPvp(owner, transport)}
+          onDisconnect={() => session.setNetDisconnected(true)}
+        />
+      ) : tab === "local" ? (
         <LocalSetup
           pool={pool}
           onStart={(side1, side2, objective) => session.startPvpBattle(side1, side2, Date.now() >>> 0, { objective })}
@@ -442,6 +454,109 @@ function NetworkSetup({
         </div>
       )}
 
+      {error ? <p className="net-error" role="alert">{error}</p> : null}
+    </div>
+  );
+}
+
+
+/** Сеть общего пользования (0.17.0): подключение через ретранслятор. */
+function PublicSetup({
+  onHostStart,
+  onGuestJoin,
+  onDisconnect,
+}: {
+  onHostStart: (side1: string[], side2: string[], objective: "elimination" | "apple", transport: Transport) => void;
+  onGuestJoin: (owner: number, transport: Transport) => void;
+  onDisconnect: () => void;
+}) {
+  const t = useT();
+  const { content } = useServices();
+  const pool = content.pvp.pool;
+  const [relayUrl, setRelayUrl] = useState("http://localhost:8080");
+  const [rooms, setRooms] = useState<RoomSummary[]>([]);
+  const [roomId, setRoomId] = useState("");
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const sessionRef = useMemo(() => ({ current: null as { transport: Transport; close(): void } | null }), []);
+
+  const refreshRooms = async (): Promise<void> => {
+    try {
+      setRooms(await listRooms(relayUrl));
+      setError(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const connect = (id: string, role: "host" | "guest"): void => {
+    setError(null);
+    try {
+      const signaling = createSignalingSession({
+        url: relayUrl.replace(/^http/, "ws"),
+        roomId: id,
+        role,
+        name: role === "host" ? "Ведущий" : "Гость",
+      });
+      signaling.onClose(() => onDisconnect());
+      signaling.onError((message: string) => setError(message));
+      sessionRef.current = { transport: signaling.transport, close: () => signaling.close() };
+      setStatus(role === "host" ? t("net.publicHostWait") : t("net.publicGuestWait"));
+      if (role === "host") {
+        onHostStart([...pool], [...pool], content.pvp.objective === "apple" ? "apple" : "elimination", signaling.transport);
+      } else {
+        // Сторона 2; экран боя получит снимок по каналу.
+        onGuestJoin(2, signaling.transport);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  return (
+    <div className="net-setup">
+      <div className="net-panel">
+        <label className="net-input-label" htmlFor="relay-url">{t("net.relayUrl")}</label>
+        <input id="relay-url" className="net-input" value={relayUrl} onChange={(event) => setRelayUrl(event.target.value)} placeholder="http://localhost:8080" />
+        <div className="pvp-start-row">
+          <button type="button" className="btn btn-ghost" onClick={() => void refreshRooms()}>
+            {t("net.refreshRooms")}
+          </button>
+        </div>
+        {rooms.length > 0 ? (
+          <div className="room-list">
+            <p className="muted">{t("net.roomsTitle")}</p>
+            {rooms.map((room) => (
+              <div key={room.id} className="room-row">
+                <span className="room-id">{room.id}</span>
+                <span className="muted">{room.peers.length}/4 · {t("net.host")}: {room.host ?? "—"}</span>
+                <button type="button" className="btn btn-ghost" onClick={() => { setRoomId(room.id); connect(room.id, "guest"); }}>
+                  {t("net.join")}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : null}
+        <div className="pvp-start-row">
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => {
+              const id = `room-${Math.random().toString(36).slice(2, 8)}`;
+              setRoomId(id);
+              connect(id, "host");
+            }}
+          >
+            {t("net.createRoom")}
+          </button>
+        </div>
+        <label className="net-input-label" htmlFor="room-id">{t("net.roomId")}</label>
+        <input id="room-id" className="net-input" value={roomId} onChange={(event) => setRoomId(event.target.value)} placeholder="room-xxxxxx" />
+        <button type="button" className="btn btn-primary" disabled={!roomId.trim()} onClick={() => connect(roomId.trim(), "guest")}>
+          {t("net.connect")}
+        </button>
+        {status ? <p className="net-connected">{status}</p> : null}
+      </div>
       {error ? <p className="net-error" role="alert">{error}</p> : null}
     </div>
   );

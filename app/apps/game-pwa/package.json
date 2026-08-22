@@ -1,6 +1,6 @@
 {
   "name": "@bylina/game-pwa",
-  "version": "0.16.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -22,7 +22,9 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@bylina/campaign": "workspace:*",
-    "@bylina/storage": "workspace:*"
+    "@bylina/storage": "workspace:*",
+    "@bylina/replay": "workspace:*",
+    "@bylina/signaling": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

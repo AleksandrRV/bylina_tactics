@@ -776,3 +776,69 @@
     transform: rotate(360deg);
   }
 }
+
+/* ===== Повтор партии и обрыв соединения (0.17.0) ===== */
+
+.replay-bar {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+  background: rgba(10, 14, 10, 0.85);
+  border: 1px solid rgba(106, 169, 217, 0.4);
+  border-radius: 4px;
+  z-index: 70;
+  animation: replay-in 300ms ease-out;
+}
+
+@keyframes replay-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.replay-label {
+  color: #6aa9d9;
+  font-size: 0.8rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.replay-progress {
+  display: block;
+  width: 140px;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.replay-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4a8fc9, #6aa9d9);
+  transition: width 200ms linear;
+}
+
+.replay-done {
+  color: #8fd89a;
+  font-size: 0.8rem;
+  animation: net-ok 300ms ease-out;
+}
+
+.net-lost-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

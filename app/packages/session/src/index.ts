@@ -14,8 +14,10 @@ import type {
 import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
 import { createLocalTransport, type Envelope, type Transport } from "@bylina/net";
 import { eventsVisibleTo } from "@bylina/core";
+import type { Command as ReplayCommand } from "@bylina/core";
+import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.16.0";
+export const APP_VERSION = "0.17.0";
 
 export type AppScreen =
   | "boot"
@@ -27,11 +29,12 @@ export type AppScreen =
   | "campaign"
   | "missionResult"
   | "deployment"
-  | "pvpRoom";
+  | "pvpRoom"
+  | "replays";
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet";
+export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay";
 
 /** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
 export type PvpSide = 1 | 2;
@@ -88,6 +91,19 @@ export interface SessionState {
   netOmniscient?: boolean | null;
   /** Роль подключённого ведомого: соперник либо наблюдатель (0.16.0). */
   netPeerRole?: "guest" | "spectator" | null;
+  /** Обрыв канала состязательного боя (0.17.0, ui-design §8). */
+  netDisconnected?: boolean | null;
+  /** Журнал повтора для воспроизведения (0.17.0). */
+  replayJournal?: ReplayJournal | null;
+  /** Победитель завершённой партии (для сохранения повтора). */
+  replayWinner?: 1 | 2 | null;
+  /** Черновик журнала текущего боя (команды, seed, составы). */
+  replayDraft?: {
+    seed: number;
+    sides: { side1: string[]; side2: string[] };
+    objective: "elimination" | "apple" | null;
+    commands: ReplayCommand[];
+  } | null;
 }
 
 export interface SessionApi {
@@ -171,6 +187,14 @@ export interface SessionApi {
   bindNetSpectator(transport: Transport): void;
   /** Переключатель полного обзора наблюдателя (0.16.0). */
   setNetOmniscient(omniscient: boolean): void;
+  /** Зафиксировать обрыв канала состязательного боя (0.17.0). */
+  setNetDisconnected(disconnected: boolean): void;
+  /** Черновик журнала текущего боя (0.17.0): команды и параметры партии. */
+  getReplayDraft(): SessionState["replayDraft"];
+  /** Завершить журнал текущего боя победой стороны (0.17.0). */
+  finishReplayDraft(winner: 1 | 2 | null): void;
+  /** Открыть воспроизведение сохранённого повтора (0.17.0). */
+  startReplay(journal: ReplayJournal): void;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -191,6 +215,9 @@ const idle: Omit<SessionState, "screen"> = {
   pvpObjective: null,
   netOmniscient: null,
   netPeerRole: null,
+  netDisconnected: null,
+  replayJournal: null,
+  replayDraft: null,
 };
 
 export function createSession(
@@ -424,6 +451,7 @@ export function createSession(
     },
     getCampaign: () => requireCampaign(),
     startPvpBattle: (side1, side2, seed, options?: { objective?: "elimination" | "apple" }) => {
+      state = { ...state, replayDraft: { seed, sides: { side1: [...side1], side2: [...side2] }, objective: options?.objective ?? null, commands: [] }, netDisconnected: null };
       // Локальный транспорт: обе стороны на одном устройстве, правила
       // исполняет ведущий (этот же процесс). Команда стороны применяется
       // ядром, набор событий рассылается обратно через транспорт.
@@ -431,7 +459,9 @@ export function createSession(
       pvpTransport = transport;
       transport.subscribe((message: Envelope) => {
         if (message.type !== "COMMAND") return;
-        const applied = tacticsHost?.apply(message.payload as Command);
+        const command = message.payload as Command;
+        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
+        const applied = tacticsHost?.apply(command);
         if (!applied) return;
         if (applied.ok) {
           transport.send({
@@ -481,6 +511,7 @@ export function createSession(
       emit({ ...state, screen: "result", paused: false, pvpWinner: winnerSide, outcome: winnerSide === 1 ? "victory" : "defeat" });
     },
     startNetPvpBattle: (sides, seed, transport, options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean }) => {
+      state = { ...state, replayDraft: { seed, sides: { side1: [...sides.side1], side2: [...sides.side2] }, objective: options?.objective ?? null, commands: [] }, netDisconnected: null };
       netHostTransport = transport;
       // Ведущий исполняет правила: команды ведомого применяются ядром,
       // события и снимок стороны ведомого уходят по каналу.
@@ -501,6 +532,7 @@ export function createSession(
         }
         if (message.type !== "COMMAND") return;
         const command = message.payload as Command;
+        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
         // Ведомый управляет только своей стороной (номер 2): чужие ходы
         // отклоняются, даже если команда формально допустима.
         const guestOwner = 2;
@@ -676,6 +708,16 @@ export function createSession(
       // Немедленно обновить снимок наблюдателя.
       if (tacticsHost && netHostTransport) sendGuestSync();
     },
+    setNetDisconnected: (disconnected) => {
+      emit({ ...state, netDisconnected: disconnected });
+    },
+    getReplayDraft: () => (state.replayDraft ? { ...state.replayDraft, sides: { side1: [...state.replayDraft.sides.side1], side2: [...state.replayDraft.sides.side2] }, commands: [...state.replayDraft.commands] } : null),
+    finishReplayDraft: (winner) => {
+      emit({ ...state, replayWinner: winner });
+    },
+    startReplay: (journal) => {
+      emit({ ...idle, screen: "battle", battleKind: "replay", replayJournal: journal });
+    },
     bindTacticsHost: (host) => {
       tacticsHost = host;
       // Сетевой ведущий: ядро создано (BattleScreen смонтирован) — ведомый
@@ -684,6 +726,9 @@ export function createSession(
     },
     applyBattleCommand: (command) => {
       if (!tacticsHost || state.screen !== "battle") return { ok: false, reason: "ILLEGAL" };
+      if (state.battleKind === "pvp" || state.battleKind === "pvpNet") {
+        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
+      }
       const result = tacticsHost.apply(command);
       // Сетевой ведущий: любое изменение состояния (своё или гостя) уходит
       // ведомому — события, сокращённые по зрению, и свежий снимок стороны.

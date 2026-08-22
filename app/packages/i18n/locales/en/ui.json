@@ -18,7 +18,8 @@
     "install": "Install game",
     "unavailableTitle": "This mode is not available yet",
     "unavailableBody": "This mode will open in version {version}.",
-    "unavailableHint": "Quick Match, the staff clash, the grid trial, and settings are available."
+    "unavailableHint": "Quick Match, the staff clash, the grid trial, and settings are available.",
+    "replays": "Replays"
   },
   "difficulty": {
     "title": "Difficulty",
@@ -415,7 +416,8 @@
     "reset": "Reset draft",
     "appleLabel": "Youth apple",
     "appleCarrier": "Apple held by {side}",
-    "appleLying": "The apple lies on the field"
+    "appleLying": "The apple lies on the field",
+    "tabPublic": "Public network"
   },
   "net": {
     "host": "Create game",
@@ -447,6 +449,30 @@
     "omniscient": "Spectator full view",
     "spectator": "Spectator",
     "spectatorBody": "no commands are sent; free camera",
-    "spectatorJoinHint": "A spectator joins with the same code — the host sets the role."
+    "spectatorJoinHint": "A spectator joins with the same code — the host sets the role.",
+    "relayUrl": "Relay address",
+    "refreshRooms": "Refresh rooms",
+    "roomsTitle": "Open rooms",
+    "createRoom": "Create room",
+    "roomId": "Room code",
+    "join": "Join",
+    "publicHostWait": "Room created. Waiting for the opponent...",
+    "publicGuestWait": "Connecting to the room...",
+    "connectionLost": "Connection lost",
+    "reconnectIn": "Reconnecting in {seconds}s...",
+    "reconnectExpired": "Connection was not restored",
+    "saveReplay": "Save replay",
+    "leaveRoom": "Leave room"
+  },
+  "replay": {
+    "title": "Match replays",
+    "hint": "Recorded competitive matches: pass-and-play and networked battles.",
+    "empty": "No saved replays yet.",
+    "watch": "Watch",
+    "delete": "Delete",
+    "watching": "Replay",
+    "done": "Replay finished",
+    "winner": "Side {side} wins",
+    "aborted": "Aborted"
   }
 }

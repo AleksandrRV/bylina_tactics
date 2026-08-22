@@ -31,6 +31,9 @@ export function MenuScreen() {
         <button type="button" className="btn btn-ghost" onClick={() => session.goTo("settings")}>
           {t("menu.settings")}
         </button>
+        <button type="button" className="btn btn-ghost" onClick={() => session.goTo("replays")}>
+          {t("menu.replays")}
+        </button>
         {install.canInstall && !install.installed ? (
           <button type="button" className="btn btn-install" onClick={() => void install.prompt()}>
             {t("menu.install")}

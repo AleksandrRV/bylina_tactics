@@ -12,7 +12,7 @@ import type { FogState, MatchState } from "@bylina/core";
 
 export interface SessionSaveState {
   screen: string;
-  battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | null;
+  battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | null;
   activeMissionId: string | null;
   deployment: number[];
   matchSeed: number;
@@ -93,6 +93,66 @@ export function isSaveData(value: unknown): value is SaveData {
     candidate.session !== null &&
     Array.isArray(candidate.session.deployment)
   );
+}
+
+/** Ключ списка повторов партий (0.17.0). */
+export const DEFAULT_REPLAYS_KEY = "bylina.replays.v1";
+
+export interface ReplayStorage {
+  listReplays(): unknown[];
+  saveReplay(journal: unknown): boolean;
+  deleteReplay(createdAt: number): void;
+  clearReplays(): void;
+}
+
+/** Хранилище повторов: массив журналов в том же backend (0.17.0). */
+export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?: StorageBackend): ReplayStorage {
+  const storage = backend ?? {
+    getItem: (storageKey) => {
+      if (typeof localStorage === "undefined") return null;
+      return localStorage.getItem(storageKey);
+    },
+    setItem: (storageKey, value) => {
+      if (typeof localStorage !== "undefined") localStorage.setItem(storageKey, value);
+    },
+    removeItem: (storageKey) => {
+      if (typeof localStorage !== "undefined") localStorage.removeItem(storageKey);
+    },
+  };
+  const read = (): unknown[] => {
+    try {
+      const raw = storage.getItem(key);
+      if (!raw) return [];
+      const parsed: unknown = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+  const write = (replays: unknown[]): boolean => {
+    try {
+      storage.setItem(key, JSON.stringify(replays));
+      return true;
+    } catch {
+      return false;
+    }
+  };
+  return {
+    listReplays: () => read(),
+    saveReplay: (journal) => {
+      const replays = read();
+      // Не более 20 сохранённых повторов.
+      replays.unshift(journal);
+      if (replays.length > 20) replays.length = 20;
+      return write(replays);
+    },
+    deleteReplay: (createdAt) => {
+      write(read().filter((entry) => (entry as { createdAt?: number }).createdAt !== createdAt));
+    },
+    clearReplays: () => {
+      write([]);
+    },
+  };
 }
 
 export const DEFAULT_SAVE_KEY = "bylina.save.v1";

@@ -3,7 +3,8 @@ import { createCampaign } from "@bylina/campaign";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
-import { createSaveStorage, deserializeFog, serializeFog } from "@bylina/storage";
+import { createReplayStorage, createSaveStorage, deserializeFog, serializeFog } from "@bylina/storage";
+import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
 import { loadAppContent } from "./content-files.js";
@@ -45,6 +46,7 @@ export function App() {
   // Сохранение кампании и активной партии (выпуск 0.13.0): запись читается
   // один раз при старте, затем перезаписывается при каждом изменении.
   const saveStorage = useMemo(() => createSaveStorage(), []);
+  const replayStorage = useMemo(() => createReplayStorage(), []);
   const saved = useMemo(() => saveStorage.load(), [saveStorage]);
 
   const session = useMemo(() => {
@@ -81,6 +83,7 @@ export function App() {
     });
   }, [i18n, settings]);
 
+  const contentData = content.ok ? content.data : null;
   const campaign = useMemo(() => {
     if (!content.ok) return null;
     const unitStats: Record<string, { maxHealth: number }> = {};
@@ -104,6 +107,23 @@ export function App() {
   persistRef.current = () => {
     if (!campaign) return;
     const state = session.get();
+    // Сохранение повтора состязательной партии (0.17.0): при завершении
+    // либо обрыве боя черновик журнала превращается в запись.
+    if ((state.screen === "result" || state.netDisconnected === true) && (state.battleKind === "pvp" || state.battleKind === "pvpNet") && state.replayDraft) {
+      const draft = state.replayDraft;
+      const pvpOptions = {
+        units: contentData!.units,
+        map: contentData!.pvp.map ?? contentData!.quickMatch.map,
+        side1: draft.sides.side1,
+        side2: draft.sides.side2,
+        objective: draft.objective ?? "elimination",
+        seed: draft.seed,
+      };
+      const recorder = createReplayRecorder(pvpOptions, `${state.battleKind === "pvpNet" ? "Сеть" : "Поочерёдная"} · ${new Date().toLocaleDateString()}`);
+      for (const command of draft.commands) recorder.record(command);
+      const journal = recorder.finish(state.replayWinner ?? null, recorder.getJournal()?.title ?? "Бой");
+      if (isReplayJournal(journal)) replayStorage.saveReplay(journal);
+    }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
     if (!inCampaignBattle) lastMatchRef.current = {};
     let match = inCampaignBattle ? (session.getBattleFullSnapshot() ?? undefined) : undefined;
