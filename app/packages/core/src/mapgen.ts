@@ -14,6 +14,9 @@ export interface MapGenConfig {
   heightMix: { z0: number; z1: number; z2: number };
   /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки, §3.2 base-design). */
   extract?: boolean;
+  /** Минимальное число целоклеточных укрытий (0.20.1): генератор доводит
+   *  количество укрытий до этого значения. Гарантия для обучающих карт. */
+  minCovers?: number;
 }
 
 export const QUICK_MATCH_MAP: MapGenConfig = {
@@ -228,6 +231,46 @@ export function generateBattlefield(
         flying: false,
         coverType,
         edge,
+        overwatch: false,
+        defending: false,
+        movementSpent: 0,
+      });
+    }
+
+    // Гарантия минимального числа целоклеточных укрытий (0.20.1, minCovers):
+    // если случайная генерация дала меньше, недостающие добавляются
+    // целоклеточными (edge = undefined) в свободные клетки.
+    const minCovers = config.minCovers ?? 0;
+    let guaranteeGuard = 0;
+    while (covers.filter((cover) => cover.edge === undefined).length < minCovers && guaranteeGuard < 400) {
+      guaranteeGuard += 1;
+      const x = rng.nextInt(2, config.width - 3);
+      const y = rng.nextInt(1, config.height - 2);
+      if (reserved.has(key(x, y)) || extractZone.has(key(x, y))) continue;
+      const tile = tileAt(grid, x, y);
+      if (!tile || tile.pit || tile.blockLOS) continue;
+      if (covers.some((cover) => cover.x === x && cover.y === y)) continue;
+      covers.push({
+        id: 200 + covers.length,
+        configId: "cover",
+        owner: 0,
+        x,
+        y,
+        z: tile.z,
+        dir: 0,
+        ap: 0,
+        maxAp: 0,
+        mobility: 0,
+        hp: 2,
+        maxHp: 2,
+        aim: 0,
+        defense: 0,
+        vision: 0,
+        weaponId: "",
+        obstacle: true,
+        dead: false,
+        flying: false,
+        coverType: 2,
         overwatch: false,
         defending: false,
         movementSpent: 0,

@@ -304,6 +304,15 @@ describe("training config (0.19.0)", () => {
     expect(combat.enemies[0]?.unitId).toBe("upyr");
     expect(combat.hints.length).toBeGreaterThan(0);
     expect(combat.hints[0]?.until).toBe("attack");
+    // Доводка 0.20.1: карта «Боя» гарантирует укрытия, «Первые шаги» учат рывку,
+    // «Умения» несут реактивные плашки.
+    expect(combat.map.minCovers).toBeGreaterThanOrEqual(2);
+    const movement = result.data.training.missions.find((mission) => mission.id === "movement")!;
+    expect(movement.hints.some((hint) => hint.until === "dash")).toBe(true);
+    const skills = result.data.training.missions.find((mission) => mission.id === "skills")!;
+    expect(skills.notes?.poison).toBeTruthy();
+    expect(skills.notes?.resurrect).toBeTruthy();
+    expect(skills.notes?.summon).toBeTruthy();
   });
 
   it("rejects training with an unknown unit", () => {

@@ -75,7 +75,7 @@ describe("createSession", () => {
   });
 
   it("reports version 0.19.0", () => {
-    expect(APP_VERSION).toBe("0.20.0");
+    expect(APP_VERSION).toBe("0.20.1");
   });
 
   it("moves between menu and settings", () => {

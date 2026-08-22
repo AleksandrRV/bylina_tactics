@@ -235,9 +235,17 @@ export function App() {
 
   void content;
 
+  // Отладочный режим (0.20.1): средства QA (автопобеда, оверлей стоимости)
+  // доступны только при адресе с параметром ?debug=1 — в обычной игре
+  // служебные кнопки в боевом интерфейсе не показываются.
+  const debug = useMemo(
+    () => (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
+    [],
+  );
+
   return (
     <ServicesProvider
-      value={{ i18n, settings, session, content: content.data, version: APP_VERSION, install }}
+      value={{ i18n, settings, session, content: content.data, version: APP_VERSION, install, debug }}
     >
       <Shell />
     </ServicesProvider>

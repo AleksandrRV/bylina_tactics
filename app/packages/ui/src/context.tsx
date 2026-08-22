@@ -17,6 +17,8 @@ export interface AppServices {
   content: ContentBundle;
   version: string;
   install: InstallController;
+  /** Отладочный режим (адрес с параметром ?debug=1): включает средства QA (0.20.1). */
+  debug: boolean;
 }
 
 const ServicesContext = createContext<AppServices | null>(null);

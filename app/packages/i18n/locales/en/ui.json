@@ -12,7 +12,6 @@
     "quickMatch": "Quick Match",
     "campaign": "New Tale",
     "pvp": "Exhibition Battles",
-    "debugField": "Grid trial",
     "training": "Training",
     "settings": "Settings",
     "install": "Install game",
@@ -41,7 +40,6 @@
     "toMenu": "Menu"
   },
   "field": {
-    "title": "Grid trial",
     "back": "Menu",
     "endTurn": "End turn",
     "turn": "Turn {turn}",
@@ -92,7 +90,15 @@
     "toCampaignMap": "To the ship map",
     "debugAutoWin": "Finish mission",
     "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission.",
-    "saved": "Saved"
+    "saved": "Saved",
+    "controls": {
+      "weapons": "weapons and skills (press again to cancel)",
+      "defend": "defensive stance",
+      "overwatch": "overwatch",
+      "next": "next fighter",
+      "pause": "pause",
+      "touch": "Touch: tap twice to confirm, pinch to zoom, long press for help."
+    }
   },
   "unit": {
     "bogatyr": {
@@ -372,6 +378,18 @@
       "general": {
         "title": "General of Nav",
         "text": "This is no common foe: a General of Nav wields special powers. Kill him for good — his escape threshold lets him flee at low health and return in another mission."
+      },
+      "first_battle": {
+        "title": "First battle",
+        "text": "Click a highlighted cell to move, click an enemy to attack with the main weapon. The \"End turn\" button on the right passes the turn to Nav. Newcomers are advised to finish the Training in the main menu first."
+      },
+      "first_leshy": {
+        "title": "Leshy",
+        "text": "The Leshy keeps its distance and shoots from afar, while its roots entangle the target — an immobile fighter cannot move. Close in and strike point-blank."
+      },
+      "first_kikimora": {
+        "title": "Kikimora",
+        "text": "The Kikimora poisons — the poison ticks at the start of a turn — and raises fallen skeletons. Remove poison with the Znaharka's skill and kill the skeletons again."
       }
     }
   },
@@ -558,14 +576,16 @@
       "intro": "The training deck of the Flying Ship. Let us start with the basics: the grid, the levels and action points.",
       "hint1": "Each fighter has action points. A move costs one, a dash costs two.",
       "hint2": "Approach the highlighted cell: click it.",
-      "hint3": "End your turn with the button on the right."
+      "hint3": "End your turn with the button on the right.",
+      "hint4": "Nice step! Now the dash: pick the farthest highlighted cell — a move for two action points.",
+      "hint5": "End your turn — and the enemy will move."
     },
     "combat": {
       "title": "Combat",
       "description": "Attack, cover, height, hit chance and damage.",
       "intro": "Against Nav bravery alone is not enough: height, cover and a careful aim decide the outcome.",
       "hint1": "Pick a weapon and attack the enemy.",
-      "hint2": "The enemy is in cover: move closer to improve your chance."
+      "hint2": "The enemy takes cover: cover lowers your hit chance by 25–50%, height changes it by 20%. Move closer or flank around."
     },
     "skills": {
       "title": "Skills & statuses",
@@ -573,7 +593,10 @@
       "intro": "The Znaharka and the hero's skills: heal, cleanse and stand watch to the last.",
       "hint1": "Use the selected fighter's skill.",
       "hint2": "Use the defensive stance (key 9).",
-      "hint3": "Put a fighter on overwatch (key 0)."
+      "hint3": "Put a fighter on overwatch (key 0): they will answer an enemy entering their sector. The fog of war hides everything out of sight.",
+      "notePoison": "A fighter is poisoned! The poison ticks at the start of a turn — cleanse it with the Znaharka's skill.",
+      "noteResurrect": "The Kikimora raised a skeleton! Kill it again.",
+      "noteSummon": "The Znaharka summoned a forest beast: it fights for you and fades after a few turns."
     },
     "over": {
       "victory": "Mission completed",
@@ -581,6 +604,10 @@
       "defeat": "Mission failed",
       "defeatBody": "Try again — the chronicle awaits its next chapter.",
       "back": "Back to training"
-    }
+    },
+    "skip": "Skip",
+    "allDone": "Training completed",
+    "allDoneHint": "All three missions are done. The Chronicler is pleased — the Quick Match awaits you.",
+    "toQuickMatch": "Go to Quick Match"
   }
 }

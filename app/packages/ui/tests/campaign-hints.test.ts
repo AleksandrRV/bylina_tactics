@@ -11,6 +11,8 @@ const BASE: CampaignHintsContext = {
   forgeTabActive: false,
   onDeployment: false,
   onBattleWithGeneral: false,
+  onBattle: false,
+  enemyTypes: [],
 };
 
 describe("pendingCampaignHints (0.20.0)", () => {
@@ -43,6 +45,25 @@ describe("pendingCampaignHints (0.20.0)", () => {
     expect(pendingCampaignHints({ ...BASE, onBattleWithGeneral: true })).toEqual(["general"]);
   });
 
+  it("adds the first-battle hint and first-enemy-type hints in campaign battles (0.20.1)", () => {
+    expect(pendingCampaignHints({ ...BASE, onBattle: true })).toEqual(["first_battle"]);
+    expect(pendingCampaignHints({ ...BASE, onBattle: true, enemyTypes: ["upyr", "leshy"] })).toEqual([
+      "first_battle",
+      "first_leshy",
+    ]);
+    expect(pendingCampaignHints({ ...BASE, onBattle: true, enemyTypes: ["kikimora"] })).toEqual([
+      "first_battle",
+      "first_kikimora",
+    ]);
+    // Уже показанные не повторяются.
+    expect(pendingCampaignHints({
+      ...BASE,
+      done: ["first_battle", "first_leshy"],
+      onBattle: true,
+      enemyTypes: ["leshy"],
+    })).toEqual([]);
+  });
+
   it("does not repeat hints that were already shown", () => {
     const hints = pendingCampaignHints({
       ...BASE,
@@ -65,6 +86,8 @@ describe("pendingCampaignHints (0.20.0)", () => {
       onDeployment: true,
       missionType: "recon",
       onBattleWithGeneral: true,
+      onBattle: true,
+      enemyTypes: ["upyr", "leshy", "kikimora"],
     });
     expect(all.length).toBeGreaterThan(0);
     for (const id of all) expect(CAMPAIGN_HINT_PERSONAS[id]).toBeTruthy();

@@ -143,6 +143,9 @@ export const mapGenConfigSchema = z.object({
   }).strict().refine((mix) => Math.abs(mix.z0 + mix.z1 + mix.z2 - 1) < 1e-9, "heightMix values must sum to 1"),
   /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки). */
   extract: z.boolean().optional(),
+  /** Минимальное число целоклеточных укрытий (0.20.1): генератор доводит
+   *  количество укрытий до этого значения — гарантия для обучающих карт. */
+  minCovers: z.number().int().min(0).optional(),
 }).strict();
 
 export const resourcesSchema = z.object({
@@ -316,7 +319,7 @@ export const trainingHintSchema = z.object({
   cell: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
   targetUnitId: id.optional(),
   panelKey: z.string().optional(),
-  until: z.enum(["move", "attack", "skill", "defend", "overwatch", "end_turn", "approach", "noop"]),
+  until: z.enum(["move", "dash", "attack", "skill", "defend", "overwatch", "end_turn", "approach", "noop"]),
 }).strict();
 
 export const trainingMissionSchema = z.object({
@@ -327,6 +330,13 @@ export const trainingMissionSchema = z.object({
   playerSlots: z.array(id).min(1).max(5),
   enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(1),
   hints: z.array(trainingHintSchema).min(1),
+  /** Реактивные подсказки (0.20.1): ключи локализации плашек на отравление,
+   *  воскрешение и призыв в миссии «Умения и состояния». */
+  notes: z.object({
+    poison: z.string().min(1),
+    resurrect: z.string().min(1),
+    summon: z.string().min(1),
+  }).strict().optional(),
 }).strict().superRefine((value, context) => {
   // Поле step задаёт порядок шагов (content-schema §8): шаги обязаны
   // образовывать последовательность 1..N ровно по одному разу — интерфейс

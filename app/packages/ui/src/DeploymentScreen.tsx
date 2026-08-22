@@ -133,6 +133,8 @@ export function DeploymentScreen() {
       onDeployment: true,
       missionType: mission?.type,
       onBattleWithGeneral: false,
+      onBattle: false,
+      enemyTypes: [],
     }),
     [settings.showHints, campaignHintsDone, mission?.type],
   );

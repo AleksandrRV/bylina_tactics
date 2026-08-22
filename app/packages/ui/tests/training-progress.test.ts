@@ -20,6 +20,7 @@ function hint(partial: Partial<TrainingHintConfig>): TrainingHintConfig {
 }
 
 const MOVED: GameEvent = { type: "ENTITY_MOVED", entityId: 1, path: [], isDash: false, apSpent: 1 };
+const DASHED: GameEvent = { type: "ENTITY_MOVED", entityId: 1, path: [], isDash: true, apSpent: 2 };
 const RESOLVED: GameEvent = { type: "COMBAT_RESOLVED", sourceId: 1, targetId: 2, actionType: "MELEE", result: "HIT", damageDealt: 4, isFlanked: false, heightMod: 0 };
 const SKILL: GameEvent = { type: "SKILL_RESOLVED", sourceId: 1, skillId: "heal", success: true };
 const DEFEND: GameEvent = { type: "STATUS_CHANGED", entityId: 1, status: "DEFENDING", applied: true };
@@ -41,6 +42,9 @@ describe("hintCompletedByEvents", () => {
   it.each([
     ["move", MOVED, true],
     ["move", SKILL, false],
+    ["dash", DASHED, true],
+    ["dash", MOVED, false],
+    ["dash", SKILL, false],
     ["attack", RESOLVED, true],
     ["attack", MOVED, false],
     ["skill", SKILL, true],
@@ -122,6 +126,19 @@ describe("resolveTrainingHighlight", () => {
     const reachable = [{ x: 3, y: 3, z: 1, mpCost: 6, apCost: 2 as const }];
     expect(resolveTrainingHighlight(hint({ highlight: "cell", cell: { x: 1, y: 2 } }), reachable, []))
       .toEqual({ kind: "cell", x: 1, y: 2 });
+  });
+
+  it("matches the highlighted cell cost to the taught action (0.20.1)", () => {
+    const reachable = [
+      { x: 1, y: 1, z: 1, mpCost: 1, apCost: 1 as const },
+      { x: 2, y: 2, z: 1, mpCost: 3, apCost: 1 as const },
+      { x: 3, y: 3, z: 1, mpCost: 9, apCost: 2 as const },
+    ];
+    // Шаг «перемещение» подсвечивает дальнюю клетку за одно ОД, шаг «рывок» — за два.
+    expect(resolveTrainingHighlight(hint({ highlight: "cell", until: "move" }), reachable, []))
+      .toEqual({ kind: "cell", x: 2, y: 2 });
+    expect(resolveTrainingHighlight(hint({ highlight: "cell", until: "dash" }), reachable, []))
+      .toEqual({ kind: "cell", x: 3, y: 3 });
   });
 
   it("resolves an entity hint to the first entity of the target unit id", () => {

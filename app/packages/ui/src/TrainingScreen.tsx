@@ -59,6 +59,8 @@ export function TrainingScreen() {
   const { trainingDone } = useSessionState();
   const missions = content.training.missions;
   const done = trainingDone ?? [];
+  // Обучение пройдено полностью (0.20.1): все три миссии завершены победой.
+  const allDone = missions.length > 0 && missions.every((mission) => done.includes(mission.id));
 
   return (
     <div className="screen menu-screen training-screen">
@@ -99,6 +101,17 @@ export function TrainingScreen() {
           );
         })}
       </div>
+
+      {allDone ? (
+        <div className="training-all-done" role="status">
+          <p className="training-all-done-title">{t("training.allDone")}</p>
+          <p className="muted">{t("training.allDoneHint")}</p>
+          <button type="button" className="btn btn-primary" onClick={() => session.openQuickMatch()}>
+            {t("training.toQuickMatch")}
+            <span aria-hidden="true">→</span>
+          </button>
+        </div>
+      ) : null}
 
       <nav className="menu-nav">
         <button type="button" className="btn btn-ghost" onClick={() => session.goTo("menu")}>

@@ -45,6 +45,29 @@ describe("generateBattlefield", () => {
   });
 });
 
+describe("generateBattlefield minCovers (0.20.1)", () => {
+  it("guarantees at least the requested number of whole-cell covers", () => {
+    const config = { ...QUICK_MATCH_MAP, coverDensity: 0, minCovers: 3 };
+    for (const seed of [1, 7, 42, 99, 2024]) {
+      const rng = createMulberry32(seed);
+      const players = playerSpawns(config.height);
+      const enemies = enemySpawns(3, config.width, config.height);
+      const { covers } = generateBattlefield(config, rng, players, enemies);
+      const wholeCell = covers.filter((cover) => cover.edge === undefined);
+      expect(wholeCell.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it("does not add covers when minCovers is not set", () => {
+    const config = { ...QUICK_MATCH_MAP, coverDensity: 0 };
+    const rng = createMulberry32(1);
+    const players = playerSpawns(config.height);
+    const enemies = enemySpawns(3, config.width, config.height);
+    const { covers } = generateBattlefield(config, rng, players, enemies);
+    expect(covers.filter((cover) => cover.edge === undefined).length).toBe(0);
+  });
+});
+
 describe("playerSpawns", () => {
   it("provides five distinct spawn cells for a five-fighter deployment", () => {
     const players = playerSpawns(10);

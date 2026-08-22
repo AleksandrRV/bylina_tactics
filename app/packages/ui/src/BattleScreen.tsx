@@ -29,6 +29,7 @@ import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, tra
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
+import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { unitPortrait } from "./portraits.js";
 import "./battle.css";
 
@@ -71,7 +72,7 @@ function DebugIcon() {
 export function BattleScreen() {
   useI18nTick();
   const t = useT();
-  const { session, content } = useServices();
+  const { session, content, debug } = useServices();
   const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
@@ -271,6 +272,36 @@ export function BattleScreen() {
     if (hintCompletedByEvents(activeHint, events)) setHintStep((value) => value + 1);
   };
 
+  // Реактивные плашки обучения (0.20.1): отравление, воскрешение, призыв.
+  // Показываются событиями любой стороны (яд накладывает кикимора в свой ход).
+  const [trainingNote, setTrainingNote] = useState<string | null>(null);
+  const noteTimerRef = useRef<number | undefined>(undefined);
+  const showTrainingNote = (events: GameEvent[]): void => {
+    if (!isTraining || !trainingMission?.notes) return;
+    let key: string | null = null;
+    for (const event of events) {
+      if (event.type === "STATUS_CHANGED" && event.status === "POISON" && event.applied) {
+        key = trainingMission.notes.poison;
+        break;
+      }
+      if (event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION") {
+        key = trainingMission.notes.resurrect;
+        break;
+      }
+      if (event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON") {
+        key = trainingMission.notes.summon;
+        break;
+      }
+    }
+    if (!key) return;
+    setTrainingNote(key);
+    if (noteTimerRef.current !== undefined) window.clearTimeout(noteTimerRef.current);
+    noteTimerRef.current = window.setTimeout(() => setTrainingNote(null), 6000);
+  };
+  useEffect(() => () => {
+    if (noteTimerRef.current !== undefined) window.clearTimeout(noteTimerRef.current);
+  }, []);
+
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
   const [replayIndex, setReplayIndex] = useState(0);
   const [replayDone, setReplayDone] = useState(false);
@@ -386,18 +417,47 @@ export function BattleScreen() {
     ? session.getCampaign().getMission(activeMissionId)
     : undefined;
 
-  // Туториал «появление генерала» (0.20.0): первый бой миссии с генералом.
-  // Показывается один раз, отключается настройкой подсказок; не блокирует поле.
+  // Боевые туториалы кампании (0.20.0/0.20.1): «первый бой», «первый леший»,
+  // «первая кикимора», «появление генерала». Показываются один раз, отключаются
+  // настройкой подсказок; «первый бой» — модальной карточкой, остальные —
+  // баннерами, не блокирующими поле.
   const hintSettings = useSettingsState();
-  const [generalHint, setGeneralHint] = useState(false);
+  const { campaignHintsDone } = useSessionState();
+  const battleWantedHints = useMemo(
+    () => pendingCampaignHints({
+      showHints: hintSettings.showHints,
+      done: campaignHintsDone ?? [],
+      onCampaignMap: false,
+      lockedCount: 0,
+      hasWounded: false,
+      rosterTabActive: false,
+      forgeTabActive: false,
+      onDeployment: false,
+      onBattle: battleKind === "campaign" && Boolean(mission),
+      enemyTypes: mission?.enemies.map((entry) => entry.unitId) ?? [],
+      onBattleWithGeneral: Boolean(mission?.generals?.length),
+    }),
+    [hintSettings.showHints, campaignHintsDone, battleKind, mission],
+  );
+  const [battleHintQueue, setBattleHintQueue] = useState<CampaignHintId[]>([]);
   useEffect(() => {
-    if (battleKind !== "campaign" || !mission?.generals?.length) return;
-    if (!hintSettings.showHints) return;
-    if (session.isCampaignHintShown("general")) return;
-    setGeneralHint(true);
-    // Показ при создании ядра (старте боя), без повторных срабатываний.
+    setBattleHintQueue((previous) => {
+      const next = [...previous];
+      for (const id of battleWantedHints) {
+        if (!next.includes(id)) next.push(id);
+      }
+      return next;
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kernel]);
+  }, [battleWantedHints.join(","), kernel]);
+  const activeBattleHint = hintSettings.showHints
+    ? (battleHintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null)
+    : null;
+  const closeBattleHint = (): void => {
+    if (!activeBattleHint) return;
+    session.markCampaignHintShown(activeBattleHint);
+    setBattleHintQueue((previous) => previous.filter((id) => id !== activeBattleHint));
+  };
   const objectiveEntity = mission
     ? snapshot.entities.find((entity) =>
         mission.type === "destroy"
@@ -552,9 +612,10 @@ export function BattleScreen() {
     });
   };
 
-  /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы. */
+  /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы.
+   *  Доступна только в отладочном режиме (?debug=1) и не действует в повторе (0.20.1). */
   const debugAutoWin = (): void => {
-    if (paused || busy) return;
+    if (paused || busy || isReplay || !debug) return;
     const result = session.debugAutoWinBattle();
     if (!result.ok) return;
     setPreview(null);
@@ -578,8 +639,10 @@ export function BattleScreen() {
     const result = session.applyBattleCommand(command);
     if (!result.ok) return;
     announce(result.events);
-    // Подсказка обучения продвигается событиями действия самого игрока (0.19.1).
+    // Подсказка обучения продвигается событиями действия самого игрока (0.19.1);
+    // реактивные плашки (яд, воскрешение, призыв) показываются любыми событиями (0.20.1).
     advanceTraining(result.events);
+    showTrainingNote(result.events);
     setAction(null);
     setAimId(null);
     setSkillTargetPos(null);
@@ -643,6 +706,7 @@ export function BattleScreen() {
         }
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
+        showTrainingNote(applied.events);
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
@@ -685,6 +749,7 @@ export function BattleScreen() {
     void (async () => {
       try {
         advanceTraining(result.events);
+        showTrainingNote(result.events);
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
         finishFromEvents(result.events);
         if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
@@ -976,17 +1041,24 @@ export function BattleScreen() {
           <div className="training-hint" role="status" aria-live="polite">
             <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
             <span className="training-hint-text">{t(activeHint.textKey)}</span>
+            {/* Пропуск подсказки (0.20.1): полезен при повторном прохождении. */}
+            <button type="button" className="training-skip" onClick={() => setHintStep((value) => value + 1)}>
+              {t("training.skip")}
+            </button>
           </div>
         ) : null}
-        {generalHint ? (
+        {trainingNote ? (
+          <div className="training-note" role="status" aria-live="polite">
+            <span className="training-note-mark" aria-hidden="true">✦</span>
+            {t(trainingNote)}
+          </div>
+        ) : null}
+        {activeBattleHint ? (
           <CampaignHint
-            key="general"
-            hintId="general"
-            variant="banner"
-            onClose={() => {
-              session.markCampaignHintShown("general");
-              setGeneralHint(false);
-            }}
+            key={activeBattleHint}
+            hintId={activeBattleHint}
+            variant={activeBattleHint === "first_battle" ? "modal" : "banner"}
+            onClose={closeBattleHint}
           />
         ) : null}
         {isReplay ? (
@@ -1006,25 +1078,29 @@ export function BattleScreen() {
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
               {t("battle.pause")}
             </button>
-            <button
-              type="button"
-              className={`hud-btn hud-icon-btn debug-toggle${debugMovement ? " is-on" : ""}`}
-              onClick={() => setDebugMovement((value) => !value)}
-              title={t(debugMovement ? "battle.debugMovementHint" : "battle.debugMovement")}
-              aria-pressed={debugMovement}
-              aria-label={t("battle.debugMovement")}
-            >
-              <DebugIcon />
-            </button>
-            <button
-              type="button"
-              className="hud-btn hud-icon-btn debug-win"
-              onClick={() => debugAutoWin()}
-              title={t("battle.debugAutoWinHint")}
-              aria-label={t("battle.debugAutoWin")}
-            >
-              <AutoWinIcon />
-            </button>
+            {debug ? (
+              <>
+                <button
+                  type="button"
+                  className={`hud-btn hud-icon-btn debug-toggle${debugMovement ? " is-on" : ""}`}
+                  onClick={() => setDebugMovement((value) => !value)}
+                  title={t(debugMovement ? "battle.debugMovementHint" : "battle.debugMovement")}
+                  aria-pressed={debugMovement}
+                  aria-label={t("battle.debugMovement")}
+                >
+                  <DebugIcon />
+                </button>
+                <button
+                  type="button"
+                  className="hud-btn hud-icon-btn debug-win"
+                  onClick={() => debugAutoWin()}
+                  title={t("battle.debugAutoWinHint")}
+                  aria-label={t("battle.debugAutoWin")}
+                >
+                  <AutoWinIcon />
+                </button>
+              </>
+            ) : null}
           </div>
           <div className="battle-objective">
             <p className="eyebrow">
@@ -1523,6 +1599,17 @@ export function BattleScreen() {
         <div className="pause-root" role="presentation">
           <div className="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
             <h2 id="pause-title">{t("battle.pause")}</h2>
+            <details className="controls-help">
+              <summary>{t("battle.controls")}</summary>
+              <ul>
+                <li><kbd>1–8</kbd> {t("battle.controls.weapons")}</li>
+                <li><kbd>9</kbd> {t("battle.controls.defend")}</li>
+                <li><kbd>0</kbd> {t("battle.controls.overwatch")}</li>
+                <li><kbd>Tab</kbd> {t("battle.controls.next")}</li>
+                <li><kbd>Esc</kbd> {t("battle.controls.pause")}</li>
+                <li>{t("battle.controls.touch")}</li>
+              </ul>
+            </details>
             <button type="button" className="hud-btn hud-btn-primary" onClick={() => session.setPaused(false)}>
               {t("battle.resume")}
             </button>

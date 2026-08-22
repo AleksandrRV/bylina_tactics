@@ -272,6 +272,8 @@ export function CampaignScreen() {
       forgeTabActive: tab === "forge",
       onDeployment: false,
       onBattleWithGeneral: false,
+      onBattle: false,
+      enemyTypes: [],
     }),
     [settings.showHints, campaignHintsDone, tab, lockedCount, woundedFighters.length],
   );

@@ -15,7 +15,11 @@ export type CampaignHintId =
   | "forge" // Кузня и снаряжение — кузнец, вкладка «Кузня»
   | "deploy" // формирование высадки — летописец, экран высадки
   | "evacuation" // эвакуация — летописец, высадка в миссии спасения/разведки
-  | "general"; // появление генерала — волхв, бой с генералом
+  | "general" // появление генерала — волхв, бой с генералом
+  // Доводка 0.20.1 (roadmap 7.3.1): ввод боя и типов противников.
+  | "first_battle" // первый бой кампании — летописец
+  | "first_leshy" // первый леший — волхв (дистанция, корни)
+  | "first_kikimora"; // первая кикимора — знахарка (яд, воскрешение)
 
 export type PersonaId = "znaharka" | "kuznets" | "volkhv" | "chronicler";
 
@@ -30,6 +34,9 @@ export const CAMPAIGN_HINT_PERSONAS: Record<CampaignHintId, PersonaId> = {
   deploy: "chronicler",
   evacuation: "chronicler",
   general: "volkhv",
+  first_battle: "chronicler",
+  first_leshy: "volkhv",
+  first_kikimora: "znaharka",
 };
 
 export interface CampaignHintsContext {
@@ -53,6 +60,10 @@ export interface CampaignHintsContext {
   missionType?: MissionConfig["type"];
   /** Идёт бой миссии с генералом. */
   onBattleWithGeneral: boolean;
+  /** Идёт бой миссии кампании (0.20.1). */
+  onBattle: boolean;
+  /** Записи противников миссии (0.20.1): туториалы «первый тип противника». */
+  enemyTypes: readonly string[];
 }
 
 /**
@@ -73,6 +84,10 @@ export function pendingCampaignHints(context: CampaignHintsContext): CampaignHin
   push("forge", context.forgeTabActive);
   push("deploy", context.onDeployment);
   push("evacuation", context.onDeployment && (context.missionType === "rescue" || context.missionType === "recon"));
+  // Боевые туториалы (0.20.1): первый бой — раньше типов противников.
+  push("first_battle", context.onBattle);
+  push("first_leshy", context.onBattle && context.enemyTypes.includes("leshy"));
+  push("first_kikimora", context.onBattle && context.enemyTypes.includes("kikimora"));
   push("general", context.onBattleWithGeneral);
   return result;
 }

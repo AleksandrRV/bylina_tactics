@@ -22,6 +22,9 @@ export function hintCompletedByEvents(hint: TrainingHintConfig, events: readonly
     switch (hint.until) {
       case "move":
         return event.type === "ENTITY_MOVED";
+      case "dash":
+        // Рывок (0.20.1): перемещение за два очка действия помечено в событии.
+        return event.type === "ENTITY_MOVED" && event.isDash === true;
       case "attack":
         return event.type === "COMBAT_RESOLVED";
       case "skill":
@@ -90,7 +93,13 @@ export function resolveTrainingHighlight(
   if (!activeHint) return null;
   if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
     if (activeHint.cell) return { kind: "cell", x: activeHint.cell.x, y: activeHint.cell.y };
-    const pick = reachable.reduce<ReachableCell | null>(
+    // Шаг «перемещение» подсвечивает дальнюю клетку за одно очко действия,
+    // шаг «рывок» — дальнюю за два (0.20.1): подсветка соответствует цене
+    // обучаемого действия.
+    const pool = reachable.filter((cell) =>
+      activeHint.until === "move" ? cell.apCost === 1 : activeHint.until === "dash" ? cell.apCost === 2 : true,
+    );
+    const pick = pool.reduce<ReachableCell | null>(
       (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
       null,
     );

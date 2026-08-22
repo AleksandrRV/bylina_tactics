@@ -19,6 +19,8 @@
       },
       playerSlots: ["bogatyr"],
       enemies: [{ unitId: "upyr", count: 1 }],
+      // Доводка 0.20.1: добавлен явный шаг «рывок» — перемещение за два
+      // очка действия (шаги 3 и 5 — завершение хода между перемещениями).
       hints: [
         {
           step: 1,
@@ -40,12 +42,27 @@
           panelKey: "end_turn",
           until: "end_turn",
         },
+        {
+          step: 4,
+          textKey: "training.movement.hint4",
+          highlight: "cell",
+          until: "dash",
+        },
+        {
+          step: 5,
+          textKey: "training.movement.hint5",
+          highlight: "button",
+          panelKey: "end_turn",
+          until: "end_turn",
+        },
       ],
     },
     {
       id: "combat",
       titleKey: "training.combat.title",
       descriptionKey: "training.combat.description",
+      // Доводка 0.20.1: minCovers гарантирует укрытие на карте — подсказка
+      // про укрытие не бывает ложной; текст объясняет вероятность.
       map: {
         width: 10,
         height: 8,
@@ -55,6 +72,7 @@
         edgeCoverChance: 0.4,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        minCovers: 2,
       },
       playerSlots: ["bogatyr"],
       enemies: [{ unitId: "upyr", count: 1 }],
@@ -121,6 +139,13 @@
           until: "overwatch",
         },
       ],
+      // Доводка 0.20.1: реактивные подсказки на отравление, воскрешение
+      // и призыв показываются плашками в бою (ключи training.skills.note*).
+      notes: {
+        poison: "training.skills.notePoison",
+        resurrect: "training.skills.noteResurrect",
+        summon: "training.skills.noteSummon",
+      },
     },
   ],
 }
