@@ -9,7 +9,7 @@ import {
   type GameEvent, type SkillStats, type WeaponStats, type TacticsKernel,
 } from "@bylina/core";
 import {
-  hintCompletedByEvents, shouldAutoEndTurn, trainingActionAllowed,
+  hintCompletedByEvents, shouldAutoEndTurn, trainingActionAllowed, trainingManualTurnRecoveryAllowed,
   trainingHintsSorted, trainingStepAfterAutoSkip,
 } from "../src/training-progress.js";
 
@@ -267,5 +267,32 @@ describe("training missions under real UI rules (0.20.2)", () => {
     expect(sim.notes.poison).toBeGreaterThan(0);
     expect(sim.notes.resurrect).toBeGreaterThan(0);
     expect(sim.notes.summon).toBeGreaterThan(0);
+  });
+});
+
+
+describe("training AP exhaustion safeguards (0.20.6)", () => {
+  const base = (activeHint: { until: string } | null, isTraining = true) => shouldAutoEndTurn({
+    paused: false, busy: false, enemyPhase: false, isReplay: false, isSpectator: false,
+    isTraining, activeHint: activeHint as Sim["hints"][number] | null,
+    activeOwner: PLAYER_OWNER, viewOwner: PLAYER_OWNER, ownUnits: [{ ap: 0 }],
+    outcomeOngoing: true, isNetGuest: false,
+  });
+
+  it("never auto-ends an unfinished concrete training action", () => {
+    for (const until of ["move", "dash", "attack", "skill", "defend", "overwatch", "approach", "end_turn", "noop"]) {
+      expect(base({ until })).toBe(false);
+    }
+  });
+
+  it("keeps normal auto-ending after hints are complete and outside training", () => {
+    expect(base(null)).toBe(true);
+    expect(base({ until: "attack" }, false)).toBe(true);
+  });
+
+  it("allows an explicit recovery turn only after AP are exhausted", () => {
+    expect(trainingManualTurnRecoveryAllowed({ until: "skill" } as Sim["hints"][number], [{ ap: 0 }])).toBe(true);
+    expect(trainingManualTurnRecoveryAllowed({ until: "attack" } as Sim["hints"][number], [{ ap: 1 }])).toBe(false);
+    expect(trainingManualTurnRecoveryAllowed(null, [{ ap: 0 }])).toBe(false);
   });
 });

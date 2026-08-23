@@ -67,7 +67,8 @@ export interface AutoEndTurnConditions {
  * стороне без команды, когда ни один боец стороны не имеет допустимых
  * действий. Для стороны игрока единственный такой случай — нулевые запасы
  * ОД всех живых бойцов (стойка и дозор допустимы при любом ненулевом
- * остатке). В обучении авто-завершение отключается на шаге «завершите ход».
+ * остатке). В обучении авто-завершение запрещено на любом незавершённом
+ * шаге: ход не может смениться раньше требуемого действия.
  *
  * Ограничение по исходу партии (не «в процессе») в обучении не применяется
  * (0.20.2): миссия без противников по правилам ядра сразу «выиграна», а
@@ -79,11 +80,27 @@ export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (conditions.paused || conditions.busy || conditions.enemyPhase) return false;
   if (conditions.isReplay || conditions.isSpectator) return false;
   if (conditions.activeOwner !== conditions.viewOwner) return false;
-  if (conditions.isTraining && conditions.activeHint?.until === "end_turn") return false;
+  // A training step is a contract with the player. In particular, auto-ending
+  // on attack/skill/defend/overwatch used to make the required action
+  // impossible after spending the final AP.
+  if (conditions.isTraining && conditions.activeHint !== null) return false;
   if (conditions.ownUnits.length === 0) return false;
   if (conditions.ownUnits.some((unit) => unit.ap > 0)) return false;
   if (!conditions.isNetGuest && !conditions.outcomeOngoing && !conditions.isTraining) return false;
   return true;
+}
+
+
+/**
+ * When a player spent all AP before completing a training step, they may end
+ * the turn manually to recover AP on the next turn. Automatic ending remains
+ * blocked, so the hint is never skipped by the engine.
+ */
+export function trainingManualTurnRecoveryAllowed(
+  activeHint: TrainingHintConfig | null,
+  ownUnits: readonly { ap: number }[],
+): boolean {
+  return activeHint !== null && ownUnits.length > 0 && ownUnits.every((unit) => unit.ap <= 0);
 }
 
 /** Категории действий игрока, допустимые на шаге обучения. */

@@ -25,7 +25,7 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
-import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingPanelKey, trainingStepAfterAutoSkip } from "./training-progress.js";
+import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingManualTurnRecoveryAllowed, trainingPanelKey, trainingStepAfterAutoSkip } from "./training-progress.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -414,6 +414,10 @@ export function BattleScreen() {
   const trainingUntil = isTraining && activeHint ? activeHint.until : null;
   const trainingCan = (action: Parameters<typeof trainingActionAllowed>[1]): boolean =>
     trainingUntil === null ? true : trainingActionAllowed(trainingUntil, action);
+  const trainingRecoveryTurn = trainingManualTurnRecoveryAllowed(
+    activeHint,
+    snapshot.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0),
+  );
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -1629,7 +1633,7 @@ export function BattleScreen() {
           <button
             type="button"
             className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
-            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingCan("endTurn")}
+            disabled={busy || snapshot.activeOwner !== viewOwner || (!trainingCan("endTurn") && !trainingRecoveryTurn)}
             onClick={() => endTurn()}
           >
             {t("field.endTurn")}
