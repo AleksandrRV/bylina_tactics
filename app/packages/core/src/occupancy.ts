@@ -164,10 +164,16 @@ export function edgeCost(
     };
     if (dx !== 0 && dy !== 0) {
       // Диагональ: проверяем обе оси.
-      const costX = checkEdge(fromX, fromY, fromX + dx, fromY);
-      const costY = checkEdge(fromX, fromY, fromX, fromY + dy);
-      if (costX === Number.POSITIVE_INFINITY || costY === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;
-      edgeCoverCost = Math.max(costX, costY);
+      // A diagonal intersects two boundaries on each L-shaped route. Check
+      // both halves so a full edge at the destination cannot be bypassed.
+      const costs = [
+        checkEdge(fromX, fromY, fromX + dx, fromY),
+        checkEdge(fromX + dx, fromY, toX, toY),
+        checkEdge(fromX, fromY, fromX, fromY + dy),
+        checkEdge(fromX, fromY + dy, toX, toY),
+      ];
+      if (costs.some((cost) => cost === Number.POSITIVE_INFINITY)) return Number.POSITIVE_INFINITY;
+      edgeCoverCost = Math.max(...costs);
     } else {
       edgeCoverCost = checkEdge(fromX, fromY, toX, toY);
       if (edgeCoverCost === Number.POSITIVE_INFINITY) return Number.POSITIVE_INFINITY;

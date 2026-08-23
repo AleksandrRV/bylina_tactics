@@ -299,6 +299,23 @@ export function generateBattlefield(
     if (ok) return generated;
   }
 
+  // Deterministic fallback still honours the public map contract.
   const fallback = makeGrid(config.width, config.height, 1);
-  return { grid: fallback, covers: [] };
+  if (config.extract) {
+    for (let y = 1; y <= config.height - 2; y += 1) {
+      const tile = tileAt(fallback, 0, y);
+      if (tile) tile.extract = true;
+    }
+  }
+  const covers: EntityState[] = [];
+  const minCovers = config.minCovers ?? 0;
+  for (let x = 2; x <= config.width - 3 && covers.length < minCovers; x += 1) {
+    for (let y = 1; y <= config.height - 2 && covers.length < minCovers; y += 1) {
+      if (reserved.has(key(x, y))) continue;
+      const tile = tileAt(fallback, x, y);
+      if (!tile) continue;
+      covers.push({ id: 900 + covers.length, configId: "cover", owner: 0, x, y, z: tile.z, dir: 0, ap: 0, maxAp: 0, mobility: 0, hp: 2, maxHp: 2, aim: 0, defense: 0, vision: 0, weaponId: "", obstacle: true, dead: false, flying: false, coverType: 2, overwatch: false, defending: false, movementSpent: 0 });
+    }
+  }
+  return { grid: fallback, covers };
 }

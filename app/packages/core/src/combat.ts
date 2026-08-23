@@ -13,6 +13,8 @@ export interface AttackOptions {
   flankedOverride?: boolean;
   coverDetailsOverride?: CoverDetail[];
   damageReduction?: number;
+  /** Area skills with filter all/allies may intentionally hit the source side. */
+  allowFriendly?: boolean;
 }
 
 export interface HitBreakdown {
@@ -67,7 +69,7 @@ export function previewAttack(
   if (attacker.dead || target.dead || target.coverType > 0) {
     return { available: false, reason: "ILLEGAL" };
   }
-  if (attacker.owner === target.owner) return { available: false, reason: "ILLEGAL" };
+  if (attacker.owner === target.owner && !options.allowFriendly) return { available: false, reason: "ILLEGAL" };
   if (!options.ignoreAp && attacker.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
 
   const melee = weapon.category === "melee";
@@ -171,7 +173,7 @@ export function resolveAttack(
   const preview = previewAttack(grid, entities, attacker, target, weapon, options);
   if (!preview.available || preview.chance === undefined) return null;
 
-  const critChance = clampChance(weapon.crit + (preview.flanked ? 40 : 0));
+  const critChance = Math.max(0, Math.min(100, Math.round(weapon.crit + (preview.flanked ? 40 : 0))));
   const hitRoll = rng.nextInt(1, 100);
   if (hitRoll > preview.chance) {
     return {
