@@ -12,12 +12,12 @@ import type {
   TacticsKernel,
 } from "@bylina/core";
 import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
-import { createLocalTransport, type Envelope, type Transport } from "@bylina/net";
+import { createLocalTransport, isCommandPayload, isEventBatchPayload, isSyncPayload, type Envelope, type Transport } from "@bylina/net";
 import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.7";
+export const APP_VERSION = "0.20.8";
 
 export type AppScreen =
   | "boot"
@@ -475,7 +475,10 @@ export function createSession(
       });
       // Границы численности высадки задаются конфигурацией кампании (content-schema §4).
       const limits = requireCampaign().getDeployLimits();
-      if (!alive || fighterIds.length < limits.min || fighterIds.length > limits.max) return false;
+      // One fighter may occupy one deployment slot only; duplicate IDs would otherwise
+      // create duplicate entities despite passing the roster-size check.
+      const unique = new Set(fighterIds).size === fighterIds.length;
+      if (!unique || !alive || fighterIds.length < limits.min || fighterIds.length > limits.max) return false;
       emit({ ...state, screen: "battle", deployment: [...fighterIds] });
       return true;
     },
@@ -503,7 +506,7 @@ export function createSession(
       const transport = createLocalTransport();
       pvpTransport = transport;
       transport.subscribe((message: Envelope) => {
-        if (message.type !== "COMMAND") return;
+        if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
         const command = message.payload as Command;
         state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
         const applied = tacticsHost?.apply(command);
@@ -544,12 +547,12 @@ export function createSession(
     subscribePvpEvents: (listener) => {
       if (netGuest) {
         return netGuest.transport.subscribe((message: Envelope) => {
-          if (message.type === "EVENT_BATCH") listener(message.payload as GameEvent[]);
+          if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload)) listener(message.payload as GameEvent[]);
         });
       }
       if (!pvpTransport) return () => undefined;
       return pvpTransport.subscribe((message: Envelope) => {
-        if (message.type === "EVENT_BATCH") listener(message.payload as GameEvent[]);
+        if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload)) listener(message.payload as GameEvent[]);
       });
     },
     finishPvpMatch: (winnerSide) => {
@@ -583,7 +586,7 @@ export function createSession(
           handleGuestQuery(message);
           return;
         }
-        if (message.type !== "COMMAND") return;
+        if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
         const command = message.payload as Command;
         state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
         // Ведомый управляет только своей стороной (номер 2): чужие ходы
@@ -658,7 +661,7 @@ export function createSession(
         netOwner: owner,
       });
       transport.subscribe((message) => {
-        if (message.type === "SYNC_PAYLOAD") {
+        if (message.type === "SYNC_PAYLOAD" && isSyncPayload(message.payload)) {
           const payload = message.payload as { match: MatchState; visible: string[]; explored: string[] };
           if (!netGuest) return;
           netGuest.snapshot = payload.match;
@@ -745,7 +748,7 @@ export function createSession(
         netPeerRole: null,
       });
       transport.subscribe((message) => {
-        if (message.type === "SYNC_PAYLOAD") {
+        if (message.type === "SYNC_PAYLOAD" && isSyncPayload(message.payload)) {
           const payload = message.payload as { match: MatchState; visible: string[]; explored: string[] };
           if (!netGuest) return;
           netGuest.snapshot = payload.match;

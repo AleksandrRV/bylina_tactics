@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.7", () => {
-    expect(APP_VERSION).toBe("0.20.7");
+  it("reports version 0.20.8", () => {
+    expect(APP_VERSION).toBe("0.20.8");
   });
 
   it("moves between menu and settings", () => {
@@ -145,6 +145,8 @@ describe("createSession", () => {
     session.startCampaignMission("clearing_1");
     expect(session.confirmDeployment([])).toBe(false);
     expect(session.confirmDeployment([999])).toBe(false);
+    // Один и тот же боец не может занимать две позиции высадки.
+    expect(session.confirmDeployment([ids[0]!, ids[0]!])).toBe(false);
   });
 
   it("enforces deployMin and deployMax from the campaign config", () => {
