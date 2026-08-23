@@ -17,7 +17,8 @@ const localeModules = import.meta.glob("../../../packages/i18n/locales/*/*.json"
 
 export function App() {
   const install = useInstallPrompt();
-  const content = useMemo(() => loadAppContent(), []);
+  const [content, setContent] = useState<Awaited<ReturnType<typeof loadAppContent>> | null>(null);
+  useEffect(() => { void Promise.resolve(loadAppContent()).then(setContent); }, []);
   const catalogs = useMemo(() => collectCatalogsFromModules(localeModules), []);
   const allowedLanguages = useMemo(
     () => manifest.languages.map((item) => item.code),
@@ -50,9 +51,9 @@ export function App() {
   const replayStorage = useMemo(() => createReplayStorage(), []);
   const saved = useMemo(() => saveStorage.load(), [saveStorage]);
 
-  const contentData = content.ok ? content.data : null;
+  const contentData = content?.ok ? content.data : null;
   const campaign = useMemo(() => {
-    if (!content.ok) return null;
+    if (!content?.ok) return null;
     const unitStats: Record<string, { maxHealth: number }> = {};
     for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
     // Назначение класса рекруту — только записи дружины, кроме самого рекрута.
@@ -235,22 +236,7 @@ export function App() {
     };
   }, [session]);
 
-  if (!content.ok) {
-    return (
-      <div className="content-error">
-        <h1>Configuration error</h1>
-        <ul>
-          {content.issues.map((issue) => (
-            <li key={issue.file}>
-              {issue.file}: {issue.message}
-            </li>
-          ))}
-        </ul>
-      </div>
-    );
-  }
 
-  void content;
 
   // Отладочный режим (0.20.1, doc/debug-mode.md): средства QA (автопобеда,
   // оверлей стоимости) доступны при адресе с параметром ?debug=1 либо при
@@ -267,6 +253,23 @@ export function App() {
       (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
     [debugMode],
   );
+
+  if (!content) return <div className="content-error"><h1>Loading content…</h1></div>;
+  if (!content.ok) {
+    return (
+      <div className="content-error">
+        <h1>Configuration error</h1>
+        <ul>
+          {content.issues.map((issue) => (
+            <li key={issue.file}>
+              {issue.file}: {issue.message}
+            </li>
+          ))}
+        </ul>
+      </div>
+    );
+  }
+
 
   return (
     <ServicesProvider
