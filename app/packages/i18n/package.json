@@ -1,14 +1,15 @@
 {
   "name": "@bylina/i18n",
-  "version": "0.20.9",
+  "version": "0.20.10",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
     "./manifest": "./locales/manifest.json"
   },
   "scripts": {
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit -p tsconfig.json"
+    "test": "node scripts/check-dictionaries.mjs && vitest run",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "check:i18n": "node scripts/check-dictionaries.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.3",
