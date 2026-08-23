@@ -596,28 +596,35 @@
       "description": "Grid, levels, pits, action points, movement and dash.",
       "intro": "The training deck of the Flying Ship. Let us start with the basics: the grid, the levels and action points.",
       "hint1": "Each fighter has action points. A move costs one, a dash costs two.",
-      "hint2": "Approach the highlighted cell: click it.",
+      "hint2": "Move to the highlighted cell: a normal step costs one action point. On this step only that cell is open.",
       "hint3": "End your turn with the button on the right.",
-      "hint4": "Nice step! Now the dash: pick the farthest highlighted cell — a move for two action points.",
+      "hint4": "Nice step! Now the dash: move to the highlighted far cell — a move for two action points at once.",
       "hint5": "End the turn with the button on the right — a new turn begins."
     },
     "combat": {
       "title": "Combat",
       "description": "Attack, cover, height, hit chance and damage.",
       "intro": "Against Nav bravery alone is not enough: height, cover and a careful aim decide the outcome.",
-      "hint1": "Pick a weapon and attack the enemy: close in on it first.",
-      "hint2": "The upyr hides behind cover: cover subtracts 25–50 from your hit chance, height changes it by 20. Compare the numbers in the hit breakdown, move closer or flank around."
+      "hint1": "The Bogatyr's weapons: the sword is quicker, the mace is stronger. The lesson starts with the sword — its button glows on the panel.",
+      "hint2": "The upyr hides behind cover. Step into the highlighted cell next to it: from the side cover does not help, and from above height wins.",
+      "hint3": "Strike the upyr with the sword: the weapon button and the target glow. An attack spends the remaining points — end the turn and repeat until the upyr falls."
     },
     "skills": {
       "title": "Skills & statuses",
       "description": "Class skills, overwatch, poison and resurrection, summons, fog of war.",
       "intro": "Three against Nav: the Bogatyr strikes, the Znaharka heals and summons, the Strelets shoots from afar. Try skills, the stance and overwatch.",
-      "hint1": "Use the selected fighter's skill: the Bogatyr's \"Circular Sweep\" or the Znaharka's \"Summon Beast\".",
-      "hint2": "Use the defensive stance (key 9): Nav strikes back — the stance reduces the damage.",
-      "hint3": "Put a fighter on overwatch (key 0): they will answer an enemy entering their sector. The fog of war hides everything out of sight.",
+      "hint1": "The Znaharka summons a forest beast: pick the highlighted skill, then the highlighted cell beside her.",
+      "hint2": "The Strelets stands watch (key 0): he will answer an enemy entering his sector. The fog of war hides everything out of sight.",
+      "hint3": "End your turn — and watch what Nav can do.",
       "notePoison": "A fighter is poisoned! The poison ticks at the start of a turn — cleanse it with the Znaharka's skill.",
       "noteResurrect": "The Kikimora raised a skeleton! Kill it again.",
-      "noteSummon": "The Znaharka summoned a forest beast: it fights for you and fades after a few turns."
+      "noteSummon": "The Znaharka summoned a forest beast: it fights for you and fades after a few turns.",
+      "hint4": "The Bogatyr is poisoned: the venom ticks at the start of a turn. The Znaharka will cleanse it — the skill and the target glow.",
+      "hint5": "The Bogatyr takes the defensive stance (key 9): while Nav strikes, the stance reduces the damage.",
+      "hint6": "The Strelets strikes from afar: the bow glows, the target is the framed Kikimora. Range and height decide.",
+      "hint7": "End your turn.",
+      "hint8": "The Znaharka heals the most wounded: the skill and the target glow.",
+      "hint9": "Finish Nav off: follow the highlight — the Chronicler will point out every strike. The Kikimora may raise the upyr — slay it again."
     },
     "over": {
       "victory": "Mission completed",
@@ -641,7 +648,15 @@
       "combat": "Follow the Chronicler and defeat the upyr.",
       "skills": "Try skills, the defensive stance and overwatch against Nav."
     },
-    "offerOpen": "Start training"
+    "offerOpen": "Start training",
+    "locked": {
+      "actor": "Another fighter acts on this step — that one is already selected.",
+      "cell": "The lesson asks for a different cell: move to the highlighted one.",
+      "endTurn": "Complete the step action first: ending the turn is unavailable now.",
+      "generic": "Follow the Chronicler's hint: this action is locked until the step is done.",
+      "skill": "The lesson asks for a different skill: the needed button glows.",
+      "weapon": "The lesson asks for a different weapon: the needed button glows."
+    }
   },
   "cover": {
     "full": "Full cover",

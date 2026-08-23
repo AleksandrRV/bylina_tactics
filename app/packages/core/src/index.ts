@@ -28,6 +28,14 @@ export type { MissionMatchOptions, PvpMatchOptions, QuickMatchOptions, RosterMod
 export { isCombatant, livingOf, matchOutcome } from "./outcome.js";
 export type { MatchOutcome } from "./outcome.js";
 export { pickEnemyCommand, runEnemyTurn } from "./ai.js";
+export {
+  pickScriptedEnemyCommand,
+  type ScriptedEnemyDecision,
+  type TrainingEnemyAction,
+  type TrainingEnemyCondition,
+  type TrainingEnemyScript,
+  type TrainingEnemyScriptState,
+} from "./training-ai.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
 export { canFinish, canTransit, edgeCost, edgeCoverBetween } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";

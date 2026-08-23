@@ -303,7 +303,11 @@ describe("training config (0.19.0)", () => {
     expect(combat.playerSlots).toEqual(["bogatyr"]);
     expect(combat.enemies[0]?.unitId).toBe("upyr");
     expect(combat.hints.length).toBeGreaterThan(0);
-    expect(combat.hints[0]?.until).toBe("attack");
+    // Строгий сценарий (0.20.13): «Бой» открывается ознакомительным шагом,
+    // затем приближение и атака предписанным оружием до гибели цели.
+    expect(combat.hints[0]?.until).toBe("noop");
+    expect(combat.hints.some((hint) => hint.until === "attack" && hint.weaponId === "sword" && hint.repeatUntil === "targetDead")).toBe(true);
+    expect(combat.enemyScript?.actions.length).toBeGreaterThan(0);
     // Доводка 0.20.1: карта «Боя» гарантирует укрытия, «Первые шаги» учат рывку,
     // «Умения» несут реактивные плашки.
     expect(combat.map.minCovers).toBeGreaterThanOrEqual(2);

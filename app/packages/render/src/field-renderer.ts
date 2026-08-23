@@ -37,6 +37,12 @@ export interface FieldView {
   hoverCell?: CellPos | null;
   /** Подсветка обучающей подсказки (0.19.0): клетка либо сущность. */
   trainingHighlight?: { kind: "cell" | "entity"; x: number; y: number } | null;
+  /**
+   * Режим обучения: активный шаг сценария (0.20.13). Поле приглушается
+   * («свет прожектора»), а подсветка указания — единственный яркий элемент:
+   * прежде золотистая рамка терялась на жёлтой подсветке клеток рывка.
+   */
+  trainingFocus?: boolean;
 }
 
 export interface FieldRenderer {
@@ -1570,24 +1576,103 @@ export function createFieldRenderer(): FieldRenderer {
       drawProtectionHighlights(g, hoverEntity, view, 0.35);
     }
 
-    // Подсветка обучающей подсказки (0.19.0): пульсирующая рамка.
-    if (view.trainingHighlight) {
-      const { x, y } = view.trainingHighlight;
-      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
-      if (tile) {
-        const z = visualLevel(tile);
-        const { fx, fy } = faceOf(tile.x, tile.y, z);
-        const pulse = 0.5 + Math.sin(now * 0.004) * 0.3;
-        g.rect(fx + 1, fy + 1, CELL_SIZE - 2, CELL_SIZE - 2).stroke({
-          width: 2.4,
-          color: 0xe0b34a,
-          alpha: 0.45 + pulse * 0.4,
-        });
-        g.rect(fx + 5, fy + 5, CELL_SIZE - 10, CELL_SIZE - 10).stroke({
-          width: 1,
-          color: 0xf3ecdc,
-          alpha: 0.2 + pulse * 0.25,
-        });
+    // Подсветка обучающего указания (0.19.0; строгий сценарий 0.20.13):
+    // поле приглушается «прожектором», а цель указания — единственный яркий
+    // элемент. Прежде золотистая рамка (0xe0b34a) была почти неотличима на
+    // жёлтой подсветке клеток рывка — теперь ледяной голубо-белый маркер
+    // контрастен и янтарным, и синим клеткам достижимости.
+    if (view.trainingFocus || view.trainingHighlight) {
+      const highlight = view.trainingHighlight ?? null;
+      const tile = highlight
+        ? view.snapshot.grid.tiles.find((candidate) => candidate.x === highlight.x && candidate.y === highlight.y)
+        : undefined;
+      const z = tile ? visualLevel(tile) : 0;
+      const cellRect = tile ? faceOf(tile.x, tile.y, z) : null;
+
+      // Затемнение поля: четыре полосы вокруг «окна» подсветки. Шаги с
+      // элементом панели (маркера нет) затемняют всё поле целиком.
+      const dimColor = 0x060a08;
+      const mapW = view.snapshot.grid.width;
+      const mapH = view.snapshot.grid.height;
+      const outer = {
+        x0: 2,
+        y0: 2,
+        x1: PAD * 2 + mapW * CELL_SIZE - 2,
+        y1: PAD * 2 + RISE * 2 + mapH * CELL_SIZE - 2,
+      };
+      const frameRects = (
+        outside: { x0: number; y0: number; x1: number; y1: number },
+        inside: { x0: number; y0: number; x1: number; y1: number },
+        alpha: number,
+      ): void => {
+        if (inside.x0 >= inside.x1 || inside.y0 >= inside.y1) {
+          g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, outside.y1 - outside.y0).fill({ color: dimColor, alpha });
+          return;
+        }
+        // Верхняя и нижняя полосы, затем левая и правая.
+        g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, inside.y0 - outside.y0).fill({ color: dimColor, alpha });
+        g.rect(outside.x0, inside.y1, outside.x1 - outside.x0, outside.y1 - inside.y1).fill({ color: dimColor, alpha });
+        g.rect(outside.x0, inside.y0, inside.x0 - outside.x0, inside.y1 - inside.y0).fill({ color: dimColor, alpha });
+        g.rect(inside.x1, inside.y0, outside.x1 - inside.x1, inside.y1 - inside.y0).fill({ color: dimColor, alpha });
+      };
+      if (view.trainingFocus) {
+        const pulseDim = 0.5 + Math.sin(now * 0.0021) * 0.04;
+        if (cellRect) {
+          const clamp = (r: { x0: number; y0: number; x1: number; y1: number }) => ({
+            x0: Math.max(r.x0, outer.x0),
+            y0: Math.max(r.y0, outer.y0),
+            x1: Math.min(r.x1, outer.x1),
+            y1: Math.min(r.y1, outer.y1),
+          });
+          const m2 = 16;
+          const m1 = 8;
+          const hole2 = clamp({ x0: cellRect.fx - m2, y0: cellRect.fy - m2, x1: cellRect.fx + CELL_SIZE + m2, y1: cellRect.fy + CELL_SIZE + m2 });
+          const hole1 = clamp({ x0: cellRect.fx - m1, y0: cellRect.fy - m1, x1: cellRect.fx + CELL_SIZE + m1, y1: cellRect.fy + CELL_SIZE + m1 });
+          const hole = clamp({ x0: cellRect.fx - 2, y0: cellRect.fy - 2, x1: cellRect.fx + CELL_SIZE + 2, y1: cellRect.fy + CELL_SIZE + 2 });
+          frameRects(outer, hole2, 0.5 * pulseDim + 0.14);
+          frameRects(hole2, hole1, 0.28 * pulseDim + 0.06);
+          frameRects(hole1, hole, 0.12 * pulseDim);
+        } else {
+          frameRects(outer, { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 }, 0.38 * pulseDim + 0.06);
+        }
+      }
+
+      // Яркий маркер цели указания: рамка со свечением, уголки и маяк.
+      if (highlight && cellRect && tile) {
+        const pulse = 0.5 + Math.sin(now * 0.005) * 0.5;
+        const fx = cellRect.fx;
+        const fy = cellRect.fy;
+        const C = CELL_SIZE;
+        // Внутренняя заливка «фонаря».
+        g.rect(fx + 2, fy + 2, C - 4, C - 4).fill({ color: 0x86e8ff, alpha: 0.08 + pulse * 0.1 });
+        // Основная рамка.
+        g.rect(fx + 1.5, fy + 1.5, C - 3, C - 3).stroke({ width: 3, color: 0x9df0ff, alpha: 0.8 + pulse * 0.2 });
+        // Двойное внешнее свечение.
+        g.rect(fx - 2, fy - 2, C + 4, C + 4).stroke({ width: 2, color: 0x86e8ff, alpha: 0.28 + pulse * 0.32 });
+        g.rect(fx - 5, fy - 5, C + 10, C + 10).stroke({ width: 1, color: 0x86e8ff, alpha: 0.1 + pulse * 0.2 });
+        // Уголки-шевроны: дышат к центру.
+        const inset = 7 + Math.round(pulse * 3);
+        const arm = 9;
+        const cw = 2.6;
+        const corner = (cx: number, cy: number, dx: number, dy: number): void => {
+          g.moveTo(cx + dx * arm, cy).lineTo(cx, cy).lineTo(cx, cy + dy * arm).stroke({ width: cw, color: 0xf4feff, alpha: 0.85 });
+        };
+        corner(fx + inset, fy + inset, 1, 1);
+        corner(fx + C - inset, fy + inset, -1, 1);
+        corner(fx + inset, fy + C - inset, 1, -1);
+        corner(fx + C - inset, fy + C - inset, -1, -1);
+        // Маяк над клеткой: покачивающийся треугольник «сюда».
+        const bob = Math.sin(now * 0.006) * 3;
+        const bx = fx + C / 2;
+        const by = fy - 12 - bob;
+        g.poly([bx, by + 8, bx - 6, by - 2, bx + 6, by - 2]).fill({ color: 0xf4feff, alpha: 0.65 + pulse * 0.35 });
+        g.poly([bx, by + 8, bx - 6, by - 2, bx + 6, by - 2]).stroke({ width: 1.2, color: 0x9df0ff, alpha: 0.9 });
+        // Цель-сущность: пульсирующее кольцо вокруг фишки.
+        if (highlight.kind === "entity") {
+          const { cx, cy } = centerOf(tile.x, tile.y, z);
+          g.circle(cx, cy - 2, 21 + pulse * 3).stroke({ width: 3, color: 0x9df0ff, alpha: 0.75 + pulse * 0.25 });
+          g.circle(cx, cy - 2, 26 + pulse * 4).stroke({ width: 1.4, color: 0x86e8ff, alpha: 0.25 + pulse * 0.3 });
+        }
       }
     }
 

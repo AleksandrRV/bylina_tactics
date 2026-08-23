@@ -313,6 +313,26 @@ export const pvpConfigSchema = z.object({
   map: mapGenConfigSchema.optional(),
 }).strict();
 
+/**
+ * Запись хода Нави в сценарии обучения (0.20.13). Структурно совместима с
+ * типом TrainingEnemyAction ядра (@bylina/core): конфигурация передаётся
+ * исполнителю сценария без преобразования.
+ */
+export const trainingEnemyActionSchema = z.object({
+  unitId: id.optional(),
+  kind: z.enum(["attack", "skill", "approach", "defend", "overwatch", "resurrect", "endTurn"]),
+  targetUnitId: id.optional(),
+  weaponId: id.optional(),
+  skillId: id.optional(),
+  corpseUnitId: id.optional(),
+  onlyIf: z.enum(["targetAlive", "targetNotPoisoned", "targetWounded", "corpseExists"]).optional(),
+}).strict();
+
+export const trainingEnemyScriptSchema = z.object({
+  priority: z.array(trainingEnemyActionSchema),
+  actions: z.array(trainingEnemyActionSchema),
+}).strict();
+
 export const trainingHintSchema = z.object({
   step: z.number().int().min(1),
   textKey: z.string().min(1),
@@ -321,6 +341,12 @@ export const trainingHintSchema = z.object({
   targetUnitId: id.optional(),
   panelKey: z.string().optional(),
   until: z.enum(["move", "dash", "attack", "skill", "defend", "overwatch", "end_turn", "approach", "noop"]),
+  // Строгий сценарий (0.20.13): шаг предписывает ровно одно действие
+  // конкретного бойца; иное действие интерфейс не исполняет.
+  actorUnitId: id.optional(),
+  weaponId: id.optional(),
+  skillId: id.optional(),
+  repeatUntil: z.enum(["targetDead", "victory"]).optional(),
 }).strict();
 
 export const trainingMissionSchema = z.object({
@@ -331,6 +357,8 @@ export const trainingMissionSchema = z.object({
   playerSlots: z.array(id).min(1).max(5),
   enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(0),
   hints: z.array(trainingHintSchema).min(1),
+  /** Сценарий Нави (0.20.13): строго предопределённые ходы противника. */
+  enemyScript: trainingEnemyScriptSchema.optional(),
   /** Реактивные подсказки (0.20.1): ключи локализации плашек на отравление,
    *  воскрешение и призыв в миссии «Умения и состояния». */
   notes: z.object({

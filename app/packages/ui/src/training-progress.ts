@@ -1,10 +1,11 @@
 import type { TrainingHintConfig } from "@bylina/content";
-import type { GameEvent, ReachableCell } from "@bylina/core";
+import type { GameEvent } from "@bylina/core";
 
 /**
- * Чистая логика режима обучения (0.19.2): выделена из BattleScreen, чтобы
- * продвижение подсказок, авто-завершение хода и подсветку можно было
- * покрыть автоматическими проверками без среды обозревателя.
+ * Чистая логика режима обучения (0.19.2): продвижение подсказок и правило
+ * авто-завершения хода покрыты автоматическими проверками без среды
+ * обозревателя. Точные указания шагов (клетка, оружие, умение, цель) с
+ * версии 0.20.13 вычисляет модуль training-scenario.ts.
  */
 
 /** Шаги в порядке поля step (порядок массива конфигурации значения не имеет). */
@@ -15,7 +16,8 @@ export function trainingHintsSorted(hints: readonly TrainingHintConfig[]): Train
 /**
  * Завершил ли набор событий обучающий шаг. Шаг завершается только действием
  * игрока: события хода противника в этот список не попадают (вызывающий
- * код передаёт события команд игрока).
+ * код передаёт события команд игрока). Шаги с полем repeatUntil (0.20.13)
+ * проверяются по снимку — см. trainingStepCompleted в training-scenario.ts.
  */
 export function hintCompletedByEvents(hint: TrainingHintConfig, events: readonly GameEvent[]): boolean {
   return events.some((event) => {
@@ -67,161 +69,27 @@ export interface AutoEndTurnConditions {
  * стороне без команды, когда ни один боец стороны не имеет допустимых
  * действий. Для стороны игрока единственный такой случай — нулевые запасы
  * ОД всех живых бойцов (стойка и дозор допустимы при любом ненулевом
- * остатке). В обучении авто-завершение запрещено на любом незавершённом
- * шаге: ход не может смениться раньше требуемого действия.
+ * остатке). В обучении авто-завершение запрещено, пока активен шаг
+ * сценария (0.20.13): завершение хода — само по себе предписанный шаг, а
+ * остальные указания ведут бой; иначе ход мог бы смениться раньше
+ * требуемого действия.
  *
  * Ограничение по исходу партии (не «в процессе») в обучении не применяется
  * (0.20.2): миссия без противников по правилам ядра сразу «выиграна», а
- * миссия с противниками становится «выигранной» после их гибели — пока шаги
- * подсказки не выполнены, бой обучения продолжается, и авто-завершение хода
+ * миссия с противниками становится «выигранной» после их гибели — пока
+ * сценарий не завершён, бой обучения продолжается, и авто-завершение хода
  * обязано работать, чтобы сторона не застревала с нулевыми ОД.
  */
 export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (conditions.paused || conditions.busy || conditions.enemyPhase) return false;
   if (conditions.isReplay || conditions.isSpectator) return false;
   if (conditions.activeOwner !== conditions.viewOwner) return false;
-  // A training step is a contract with the player. In particular, auto-ending
-  // on attack/skill/defend/overwatch used to make the required action
-  // impossible after spending the final AP.
+  // A training step is a contract with the player. The scenario prescribes
+  // an explicit end-turn step whenever the turn must change hands; automatic
+  // ending must not leap ahead of the lesson (0.20.13).
   if (conditions.isTraining && conditions.activeHint !== null) return false;
   if (conditions.ownUnits.length === 0) return false;
   if (conditions.ownUnits.some((unit) => unit.ap > 0)) return false;
   if (!conditions.isNetGuest && !conditions.outcomeOngoing && !conditions.isTraining) return false;
   return true;
-}
-
-
-/**
- * When a player spent all AP before completing a training step, they may end
- * the turn manually to recover AP on the next turn. Automatic ending remains
- * blocked, so the hint is never skipped by the engine.
- */
-export function trainingManualTurnRecoveryAllowed(
-  activeHint: TrainingHintConfig | null,
-  ownUnits: readonly { ap: number }[],
-): boolean {
-  return activeHint !== null && ownUnits.length > 0 && ownUnits.every((unit) => unit.ap <= 0);
-}
-
-/** Категории действий игрока, допустимые на шаге обучения. */
-export type TrainingActionKind =
-  | "move"
-  | "dash"
-  | "attack"
-  | "skill"
-  | "defend"
-  | "overwatch"
-  | "endTurn";
-
-/**
- * Допустимо ли действие `action` на активном шаге обучения `until`.
- * Используется, чтобы игрок в обучении не мог совершить иное действие,
- * чем предписывает шаг (доработка обучения): например, на шаге
- * «перемещение» недоступны атака, умения, стойка, дозор и завершение хода.
- * Шаг «ознакомление» (noop) не допускает никаких действий, кроме клика
- * для подтверждения. Неизвестный тип шага не ограничивает (безопасный предел).
- *
- * Доводка 0.20.2: шаги «умение», «стойка» и «дозор» миссии с действующей
- * Навью допускают также перемещение и атаку — шаг по-прежнему завершается
- * только предписанным действием, но бой не «замораживается»: игрок
- * сражается, а яд, воскрешение и ответный выстрел дозора становятся
- * достижимыми событиями.
- */
-export function trainingActionAllowed(until: string | undefined, action: TrainingActionKind): boolean {
-  switch (until) {
-    case "noop":
-      return false;
-    case "move":
-      return action === "move";
-    case "dash":
-      return action === "dash";
-    case "attack":
-      return action === "move" || action === "attack";
-    case "approach":
-      return action === "move" || action === "attack";
-    case "skill":
-      return action !== "endTurn";
-    case "defend":
-      return action !== "endTurn";
-    case "overwatch":
-      return action !== "endTurn";
-    case "end_turn":
-      return action === "endTurn";
-    default:
-      return true;
-  }
-}
-
-/**
- * Подсветка обучающей подсказки на поле: клетка либо сущность. Шаг
- * «клетка/зона» без координат (карты миссий случайны) подсвечивает самую
- * дальнюю достижимую клетку выбранного бойца; если клеток обучаемой цены
- * нет (боец прижат), подсвечивается самая дальняя достижимая клетка вообще —
- * шаг не обязан «молчать» без маркера (0.20.2). Погибшая цель шага
- * «сущность» не подсвечивается: такой шаг автопропускается вызывающим кодом.
- */
-export function resolveTrainingHighlight(
-  activeHint: TrainingHintConfig | null,
-  reachable: readonly ReachableCell[],
-  entities: readonly { configId: string; x: number; y: number; dead?: boolean }[],
-): { kind: "cell" | "entity"; x: number; y: number } | null {
-  if (!activeHint) return null;
-  if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
-    if (activeHint.cell) return { kind: "cell", x: activeHint.cell.x, y: activeHint.cell.y };
-    // Шаг «перемещение» подсвечивает дальнюю клетку за одно очко действия,
-    // шаг «рывок» — дальнюю за два (0.20.1): подсветка соответствует цене
-    // обучаемого действия. Если таких клеток нет — дальняя из любых
-    // достижимых (0.20.2), чтобы маркер не исчезал молча.
-    const pool = reachable.filter((cell) =>
-      activeHint.until === "move" ? cell.apCost === 1 : activeHint.until === "dash" ? cell.apCost === 2 : true,
-    );
-    const source = pool.length > 0 ? pool : [...reachable];
-    const pick = source.reduce<ReachableCell | null>(
-      (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
-      null,
-    );
-    if (pick) return { kind: "cell", x: pick.x, y: pick.y };
-    return null;
-  }
-  if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
-    const entity = entities.find((candidate) => candidate.configId === activeHint.targetUnitId && !candidate.dead);
-    if (entity) return { kind: "entity", x: entity.x, y: entity.y };
-  }
-  return null;
-}
-
-/**
- * Автопропуск шагов, выполнение которых стало невозможным (0.20.2): шаг
- * «приблизьтесь» с погибшей целью пропускается сразу (цель уже «достигнута»
- * атакой). Возвращает индекс шага, с которого продолжать; шаги не меняются.
- */
-export function trainingStepAfterAutoSkip(
-  hints: readonly TrainingHintConfig[],
-  step: number,
-  entities: readonly { configId: string; dead?: boolean }[],
-): number {
-  let next = step;
-  while (next < hints.length) {
-    const current = hints[next]!;
-    if (current.until === "approach" && current.targetUnitId) {
-      const target = entities.find((candidate) => candidate.configId === current.targetUnitId);
-      const alive = target !== undefined && !target.dead;
-      if (!alive) {
-        next += 1;
-        continue;
-      }
-    }
-    break;
-  }
-  return next;
-}
-
-/**
- * Ключ подсвечиваемого элемента панели/кнопки для highlight "panel"/"button"
- * (ui-design §4.5): "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
- */
-export function trainingPanelKey(activeHint: TrainingHintConfig | null): string | null {
-  return activeHint && (activeHint.highlight === "panel" || activeHint.highlight === "button")
-    ? (activeHint.panelKey ?? null)
-    : null;
 }

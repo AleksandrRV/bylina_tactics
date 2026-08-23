@@ -2,6 +2,13 @@
   // Режим обучения (0.19.0, base-design §3.5, roadmap §7.2).
   // Три миссии: «Первые шаги», «Бой», «Умения и состояния».
   // Игрок проходит их последовательно либо выбирает любую для повторения.
+  //
+  // Строгий сценарий (0.20.13): каждый шаг игрока предписывает ровно одно
+  // действие конкретного бойца (actorUnitId) — точную клетку, оружие, умение
+  // и цель; иные действия интерфейс не исполняет (ui-design §4.5). Ходы Нави
+  // заданы полем enemyScript: постоянные правила (priority) и линейная
+  // очередь действий (actions) с маркерами конца хода. Окружение фиксировано
+  // постоянным seed, поэтому вся партия воспроизводима шаг за шагом.
   missions: [
     {
       id: "movement",
@@ -34,12 +41,14 @@
           highlight: "panel",
           panelKey: "ap",
           until: "noop",
+          actorUnitId: "bogatyr",
         },
         {
           step: 2,
           textKey: "training.movement.hint2",
           highlight: "cell",
           until: "move",
+          actorUnitId: "bogatyr",
         },
         {
           step: 3,
@@ -47,12 +56,14 @@
           highlight: "button",
           panelKey: "end_turn",
           until: "end_turn",
+          actorUnitId: "bogatyr",
         },
         {
           step: 4,
           textKey: "training.movement.hint4",
           highlight: "cell",
           until: "dash",
+          actorUnitId: "bogatyr",
         },
         {
           step: 5,
@@ -60,6 +71,7 @@
           highlight: "button",
           panelKey: "end_turn",
           until: "end_turn",
+          actorUnitId: "bogatyr",
         },
       ],
     },
@@ -82,13 +94,23 @@
       },
       playerSlots: ["bogatyr"],
       enemies: [{ unitId: "upyr", count: 1 }],
+      // Сценарий (0.20.13): упырь сближается и бьёт когтями Богатыря;
+      // после исчерпания очереди действует обычный алгоритм.
+      enemyScript: {
+        priority: [],
+        actions: [
+          { unitId: "upyr", kind: "attack", targetUnitId: "bogatyr", weaponId: "claws" },
+          { kind: "endTurn" },
+        ],
+      },
       hints: [
         {
           step: 1,
           textKey: "training.combat.hint1",
-          highlight: "button",
+          highlight: "panel",
           panelKey: "weapon",
-          until: "attack",
+          until: "noop",
+          actorUnitId: "bogatyr",
         },
         {
           step: 2,
@@ -96,6 +118,18 @@
           highlight: "entity",
           targetUnitId: "upyr",
           until: "approach",
+          actorUnitId: "bogatyr",
+        },
+        {
+          step: 3,
+          textKey: "training.combat.hint3",
+          highlight: "entity",
+          targetUnitId: "upyr",
+          panelKey: "weapon",
+          until: "attack",
+          actorUnitId: "bogatyr",
+          weaponId: "sword",
+          repeatUntil: "targetDead",
         },
       ],
     },
@@ -124,27 +158,106 @@
         { unitId: "upyr", count: 1 },
         { unitId: "kikimora", count: 1 },
       ],
+      // Сценарий Нави (0.20.13): постоянное правило — кикимора поднимает
+      // погибшего упыря, как только появится тело (урок воскрешения);
+      // первые два хода расписаны: отравление Богатыря, затем атаки.
+      enemyScript: {
+        priority: [
+          { unitId: "kikimora", kind: "resurrect", corpseUnitId: "upyr", skillId: "raise_skeleton" },
+        ],
+        actions: [
+          { unitId: "kikimora", kind: "skill", skillId: "poison_needles", targetUnitId: "bogatyr" },
+          { unitId: "upyr", kind: "attack", targetUnitId: "bogatyr", weaponId: "claws" },
+          { kind: "endTurn" },
+          { unitId: "upyr", kind: "attack", targetUnitId: "bogatyr", weaponId: "claws" },
+          { unitId: "kikimora", kind: "attack", targetUnitId: "strelets", weaponId: "needle" },
+          { kind: "endTurn" },
+        ],
+      },
       hints: [
         {
+          // Урок призыва: Знахарка зовёт лесного зверя в подсвеченную клетку.
           step: 1,
           textKey: "training.skills.hint1",
-          highlight: "button",
+          highlight: "cell",
           panelKey: "skill",
           until: "skill",
+          actorUnitId: "znaharka",
+          skillId: "summon_forest_beast",
         },
         {
+          // Урок дозора: Стрелец стережет сектор на подступах.
           step: 2,
           textKey: "training.skills.hint2",
           highlight: "panel",
-          panelKey: "defend",
-          until: "defend",
+          panelKey: "overwatch",
+          until: "overwatch",
+          actorUnitId: "strelets",
         },
         {
+          // Яд Нави показателен лишь в её ход — завершаем свой.
           step: 3,
           textKey: "training.skills.hint3",
           highlight: "button",
-          panelKey: "overwatch",
-          until: "overwatch",
+          panelKey: "end_turn",
+          until: "end_turn",
+        },
+        {
+          // Урок очищения: снять яд отравления с Богатыря.
+          step: 4,
+          textKey: "training.skills.hint4",
+          highlight: "entity",
+          targetUnitId: "bogatyr",
+          panelKey: "skill",
+          until: "skill",
+          actorUnitId: "znaharka",
+          skillId: "cleanse",
+        },
+        {
+          // Урок стойки: Богатырь встречает упыря щитом.
+          step: 5,
+          textKey: "training.skills.hint5",
+          highlight: "panel",
+          panelKey: "defend",
+          until: "defend",
+          actorUnitId: "bogatyr",
+        },
+        {
+          // Урок дистанции: Стрелец разит кикимору из лука.
+          step: 6,
+          textKey: "training.skills.hint6",
+          highlight: "entity",
+          targetUnitId: "kikimora",
+          panelKey: "weapon",
+          until: "attack",
+          actorUnitId: "strelets",
+          weaponId: "bow",
+        },
+        {
+          step: 7,
+          textKey: "training.skills.hint7",
+          highlight: "button",
+          panelKey: "end_turn",
+          until: "end_turn",
+        },
+        {
+          // Урок лечения: вернуть силы самому раненому.
+          step: 8,
+          textKey: "training.skills.hint8",
+          highlight: "entity",
+          panelKey: "skill",
+          until: "skill",
+          actorUnitId: "znaharka",
+          skillId: "heal",
+        },
+        {
+          // Финал (строгий сценарий): указания ведут бой до победы.
+          step: 9,
+          textKey: "training.skills.hint9",
+          highlight: "entity",
+          panelKey: "weapon",
+          until: "attack",
+          repeatUntil: "victory",
         },
       ],
       // Доводка 0.20.1: реактивные подсказки на отравление, воскрешение

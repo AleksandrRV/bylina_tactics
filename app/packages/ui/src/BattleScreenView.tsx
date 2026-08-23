@@ -7,6 +7,7 @@ import {
   createTacticsKernel,
   defaultTrainingWeapons,
   pickEnemyCommand,
+  pickScriptedEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
   type Command,
@@ -18,6 +19,7 @@ import {
   type RosterMods,
   type SkillStats,
   type TacticsKernel,
+  type TrainingEnemyScriptState,
   type WeaponStats,
 } from "@bylina/core";
 import type { TrainingMissionConfig } from "@bylina/content";
@@ -25,7 +27,17 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
-import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingPanelKey, trainingStepAfterAutoSkip } from "./training-progress.js";
+import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
+import {
+  directiveAllowsAction,
+  resolveTrainingDirective,
+  trainingActionKindOfCommand,
+  trainingCommandAllowed,
+  trainingDenialKey,
+  trainingStepCompleted,
+  type TrainingActionKind,
+  type TrainingDirectiveView,
+} from "./training-scenario.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -34,7 +46,6 @@ import { unitPortrait } from "./portraits.js";
 import { useBattleNetwork } from "./useBattleNetwork.js";
 import { useBattleInput } from "./useBattleInput.js";
 import { useReplayControls } from "./useReplayControls.js";
-import { useTrainingFlow } from "./useTrainingFlow.js";
 import "./battle.css";
 
 function cellKey(x: number, y: number): string {
@@ -266,6 +277,9 @@ export function BattleScreenView() {
   // для перехода к следующему шагу. Шаги выполняются по порядку поля step
   // конфигурации (0.19.1): порядок массива hints значения не имеет.
   const [hintStep, setHintStep] = useState(0);
+  // Позиция в очереди сценария Нави (0.20.13): живёт на время боя, очередь
+  // с маркерами конца хода читается последовательно.
+  const enemyScriptRef = useRef<TrainingEnemyScriptState>({ index: 0 });
   const trainingHints = isTraining && trainingMission
     ? trainingHintsSorted(trainingMission.hints)
     : [];
@@ -273,11 +287,12 @@ export function BattleScreenView() {
 
   // Обновление шага по событиям действий ИГРОКА (0.19.1): подсказка
   // завершается только действием игрока — события хода Нави подсказки
-  // не продвигают (иначе шаг «атакуйте» засчитывался бы атакой противника,
-  // а шаг «примените умение» не завершался бы вовсе).
+  // не продвигают. Шаги с repeatUntil (0.20.13) проверяются по снимку:
+  // «бить до победы» не завершается единичной атакой.
   const advanceTraining = (events: GameEvent[]): void => {
     if (!isTraining || !activeHint) return;
-    if (hintCompletedByEvents(activeHint, events)) setHintStep((value) => value + 1);
+    const full = session.getBattleFullSnapshot();
+    if (trainingStepCompleted(activeHint, events, full ?? snapshot)) setHintStep((value) => value + 1);
   };
 
   // Реактивные плашки обучения (0.20.1): отравление, воскрешение, призыв.
@@ -367,28 +382,44 @@ export function BattleScreenView() {
 
   // Завершение миссии обучения: итоговая плашка вместо мгновенного возврата
   // (ui-design §3: «…→ итог → экран обучения»). Пройденной считается только
-  // победа (0.19.1). Подсветка обучающей подсказки вычисляется ниже, после
-  // зоны достижимости: шагу «клетка» без координат нужен список достижимых.
+  // победа (0.19.1).
   const [trainingOver, setTrainingOver] = useState<"victory" | "defeat" | null>(null);
 
-  // Автопропуск шагов, ставших невыполнимыми (0.20.2): шаг «приблизьтесь»
-  // с погибшей целью перескакивается — цель уже поражена. Пересчёт на каждое
-  // изменение снимка: цель могла погибнуть как действием игрока, так и
-  // событием чужого хода.
-  useEffect(() => {
-    if (!isTraining || trainingOver) return;
-    setHintStep((value) => trainingStepAfterAutoSkip(trainingHints, value, snapshot.entities));
-  }, [isTraining, trainingHints, snapshot.entities, trainingOver]);
+  // Строгий сценарий (0.20.13): активный шаг превращается в точное указание
+  // (клетка, оружие, умение, цель, исполнитель). Всё остальное интерфейс не
+  // исполняет; подсветка указания — единственный яркий элемент поля.
+  const directiveView = useMemo<TrainingDirectiveView | null>(() => {
+    if (!isTraining || !activeHint || trainingOver) return null;
+    const full = session.getBattleFullSnapshot();
+    if (!full) return null;
+    return resolveTrainingDirective(activeHint, {
+      snapshot: full,
+      reachable: (actorId) => session.getBattleReachable(actorId),
+      hitPreview: (actorId, targetId, weaponId) => session.getBattleHitPreview(actorId, targetId, weaponId),
+      skillPreview: (actorId, skillId, targetId, pos) => session.getBattleSkillPreview(actorId, skillId, targetId, pos),
+      skills,
+    });
+    // Пересчёт на каждое изменение боя: указание зависит от достижимости,
+    // предпросмотров и состояния цели. Полный снимок ведущего обязателен:
+    // сокращённый снимок стороны скрывает чужие сущности в тумане.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isTraining, activeHint, trainingOver, skills, snapshot, session]);
 
-  // Завершение миссии обучения (0.19.0, доводка 0.20.2). Пути к победе:
+  // Указание, оказавшееся невыполнимым (исполнитель погиб, цель уже мертва,
+  // умение исчерпано), пропускается — сценарий самовосстанавливается.
+  useEffect(() => {
+    if (!isTraining || !activeHint || trainingOver) return;
+    if (directiveView === null) setHintStep((value) => value + 1);
+  }, [isTraining, activeHint, directiveView, trainingOver]);
+
+  // Завершение миссии обучения (0.19.0; строгий сценарий 0.20.13). Пути к победе:
   // - миссия без противника («Первые шаги») завершается выполнением ВСЕХ
   //   шагов подсказки: по правилам ядра такая партия «выиграна» с самого
   //   начала, поэтому исход ядра здесь неприменим;
   // - миссия с противником («Бой», «Умения и состояния») играется до итога
-  //   боя — уничтожения всех противников (roadmap: «проходима до итога»):
-  //   шаги подсказки ведут урок посреди боя, но не запирают победу, иначе
-  //   быстрые подсказки завершали бы миссию прежде, чем Навь успеет
-  //   отравить бойца или поднять костяка (реактивные плашки не сработали бы).
+  //   боя — уничтожения всех противников: последний шаг сценария
+  //   (repeatUntil victory) ведёт игрока указаниями до самой победы, поэтому
+  //   реактивные плашки (яд, воскрешение) успевают сработать.
   // Поражение — гибель всех бойцов игрока: Навь в обучении действует.
   const trainingDone = isTraining && trainingHints.length > 0 && hintStep >= trainingHints.length;
   useEffect(() => {
@@ -404,16 +435,26 @@ export function BattleScreenView() {
     if (outcome === "defeat") setTrainingOver("defeat");
   }, [snapshot.turnNumber, snapshot.entities, busy, isTraining, trainingDone, trainingHints.length, hintStep, trainingOver, trainingMission]);
 
-  // Ограничение действий в обучении (доработка обучения): игрок может
-  // совершать только то, что предписывает активный шаг. Клик по полю в
-  // ознакомительном шаге и пауза/выход из обучения остаются всегда доступны.
-  const trainingUntil = isTraining && activeHint ? activeHint.until : null;
-  const trainingCan = (action: Parameters<typeof trainingActionAllowed>[1]): boolean =>
-    trainingUntil === null ? true : trainingActionAllowed(trainingUntil, action);
-  const { canRecoverTurn: trainingRecoveryTurn } = useTrainingFlow(
-    activeHint,
-    snapshot.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0),
-  );
+  // Ограничение действий в обучении (строгий сценарий, 0.20.13): игрок может
+  // совершать только то действие, которое предписывает активное указание, —
+  // и только указанным исполнителем, оружием, умением и целью. Пауза и выход
+  // из обучения остаются доступны всегда. Отклонённое действие поясняется
+  // строкой лога (ключи training.locked.*, ui-design §4.5).
+  const trainingAllows = (action: TrainingActionKind): boolean => directiveAllowsAction(directiveView, action);
+  const trainingDeny = (action: TrainingActionKind): void => {
+    if (directiveView) setLog(t(trainingDenialKey(directiveView, action)));
+  };
+  const trainingDirective = directiveView?.directive ?? null;
+  const trainingActorId =
+    trainingDirective && trainingDirective.kind !== "noop" && trainingDirective.kind !== "endTurn"
+      ? trainingDirective.actorId
+      : null;
+  /** Разрешено ли текущее указание этому исполнителю с этим оружием. */
+  const trainingWeaponAllowed = (weaponId: string): boolean =>
+    !isTraining || (trainingDirective?.kind === "attack" && trainingDirective.weaponId === weaponId);
+  /** Разрешено ли текущее указание этому умению. */
+  const trainingSkillAllowed = (skillId: string): boolean =>
+    !isTraining || (trainingDirective?.kind === "skill" && trainingDirective.skillId === skillId);
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -517,13 +558,17 @@ export function BattleScreenView() {
   }, [snapshot.turnNumber, battleKind]);
 
   useEffect(() => {
-    const first = snapshot.entities.find(isOwn);
+    // Обучение: выбран всегда исполнитель текущего указания — произвольный
+    // выбор бойца в обучении запрещён (строгий сценарий, 0.20.13).
+    const first = (isTraining && trainingActorId !== null
+      ? snapshot.entities.find((entity) => entity.id === trainingActorId)
+      : undefined) ?? snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
     setAction(null);
     setAimId(null);
     setSkillTargetPos(null);
     setPreview(null);
-  }, [snapshot.turnNumber, viewOwner]);
+  }, [snapshot.turnNumber, viewOwner, trainingActorId]);
 
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
@@ -543,13 +588,15 @@ export function BattleScreenView() {
     return map;
   }, [reachable]);
 
-  // Подсветка обучающей подсказки: клетка, сущность либо элемент панели
-  // (чистая логика в training-progress.ts, покрыта тестами).
-  const trainingHighlight = resolveTrainingHighlight(activeHint, reachable, snapshot.entities);
+  // Подсветка строгого указания (0.20.13): маркер на поле берётся из самого
+  // указания (чистая логика в training-scenario.ts, покрыта тестами), а
+  // прочие элементы поля и панелей приглушаются (ui-design §4.5).
+  const trainingHighlight = directiveView?.highlight ?? null;
+  const trainingFocus = isTraining && directiveView !== null;
 
-  // Ключ подсвечиваемого элемента панели/кнопки (highlight "panel"/"button",
-  // ui-design §4.5): "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
-  const hintPanelKey = trainingPanelKey(activeHint);
+  // Ключ подсвечиваемого элемента панели/кнопки (ui-design §4.5):
+  // "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
+  const hintPanelKey = directiveView?.panelKey ?? null;
 
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
@@ -678,6 +725,13 @@ export function BattleScreenView() {
       session.sendNetCommand(command);
       return;
     }
+    // Обучение: финальная проверка строгого сценария (0.20.13) — команда
+    // обязана совпадать с активным указанием; жестовые проверки кнопок и
+    // кликов выше дают удобство, эта точка гарантирует полноту запрета.
+    if (isTraining && !trainingCommandAllowed(directiveView, command)) {
+      trainingDeny(trainingActionKindOfCommand(command));
+      return;
+    }
     const result = session.applyBattleCommand(command);
     if (!result.ok) {
       // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
@@ -702,20 +756,51 @@ export function BattleScreenView() {
   const tryMove = (to: CellPos): void => {
     if (selectedId === null || paused || busy) return;
     if (snapshot.activeOwner !== viewOwner) return;
-    // Обучение: перемещение допустимо только на шагах «перемещение»/«рывок».
-    if (!trainingCan("move") && !trainingCan("dash")) return;
+    // Обучение: перемещение допустимо только в подсвеченную клетку текущего
+    // указания и только предписанным исполнителем (строгий сценарий, 0.20.13).
+    if (isTraining) {
+      const directive = trainingDirective;
+      if (
+        !directive ||
+        directive.kind !== "move" ||
+        directive.actorId !== selectedId ||
+        directive.cell.x !== to.x ||
+        directive.cell.y !== to.y
+      ) {
+        trainingDeny("move");
+        return;
+      }
+    }
     applyCommand({ type: "MOVE", actorId: selectedId, to });
   };
 
   const tryAttack = (targetId: number): void => {
     if (selectedId === null || !action || paused || busy) return;
     if (snapshot.activeOwner !== viewOwner) return;
-    // Обучение: оружейная атака — только на шагах «атака»/«приближение»,
-    // применение умения — только на шаге «умение» (tryAttack обслуживает оба).
-    const isWeapon = action.type === "weapon";
-    if (isWeapon && !trainingCan("attack")) return;
-    if (!isWeapon && !trainingCan("skill")) return;
-    const command: Command = isWeapon
+    // Обучение: только предписанное оружие/умение, исполнитель и цель
+    // (строгий сценарий, 0.20.13). tryAttack обслуживает и оружейную атаку,
+    // и умение по сущности.
+    if (isTraining) {
+      const directive = trainingDirective;
+      const isWeapon = action.type === "weapon";
+      const allowed =
+        directive !== null &&
+        ((isWeapon &&
+          directive.kind === "attack" &&
+          directive.actorId === selectedId &&
+          directive.weaponId === action.id &&
+          directive.targetId === targetId) ||
+          (!isWeapon &&
+            directive.kind === "skill" &&
+            directive.actorId === selectedId &&
+            directive.skillId === action.id &&
+            directive.targetId === targetId));
+      if (!allowed) {
+        trainingDeny(isWeapon ? "attack" : "skill");
+        return;
+      }
+    }
+    const command: Command = action.type === "weapon"
       ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
       : { type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id };
     applyCommand(command);
@@ -723,15 +808,42 @@ export function BattleScreenView() {
 
   const useSelfSkill = (skillId: string): void => {
     if (selectedId === null || paused || busy || snapshot.activeOwner !== viewOwner) return;
-    // Обучение: умение допустимо только на шаге «умение».
-    if (!trainingCan("skill")) return;
+    // Обучение: само-умение допустимо, только если предписано указанием.
+    if (isTraining) {
+      const directive = trainingDirective;
+      if (
+        !directive ||
+        directive.kind !== "skill" ||
+        directive.actorId !== selectedId ||
+        directive.skillId !== skillId ||
+        directive.targetId !== undefined
+      ) {
+        trainingDeny("skill");
+        return;
+      }
+    }
     applyCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
   };
 
   const tryPositionSkill = (pos: CellPos): void => {
     if (selectedId === null || action?.type !== "skill" || paused || busy) return;
-    // Обучение: позиционное умение допустимо только на шаге «умение».
-    if (!trainingCan("skill")) return;
+    // Обучение: позиционное умение применяется только в подсвеченную клетку
+    // указания (строгий сценарий, 0.20.13).
+    if (isTraining) {
+      const directive = trainingDirective;
+      if (
+        !directive ||
+        directive.kind !== "skill" ||
+        directive.actorId !== selectedId ||
+        directive.skillId !== action.id ||
+        directive.cell === undefined ||
+        directive.cell.x !== pos.x ||
+        directive.cell.y !== pos.y
+      ) {
+        trainingDeny("skill");
+        return;
+      }
+    }
     const same = skillTargetPos?.x === pos.x && skillTargetPos.y === pos.y && skillTargetPos.z === pos.z;
     if (!same) {
       setSkillTargetPos(pos);
@@ -752,9 +864,11 @@ export function BattleScreenView() {
     try {
       // В обучении без противника («Первые шаги») ход Нави отсутствует:
       // завершаем его сразу, возвращая управление игроку. В миссиях с
-      // противником («Бой», «Умения и состояния», 0.20.2) Навь действует
-      // обычным алгоритмом — укрытия, стойка и дозор обретают смысл, а
-      // реактивные плашки (яд, воскрешение) реально срабатывают.
+      // противником («Бой», «Умения и состояния») Навь действует строго по
+      // сценарию миссии (0.20.13, base-design §3.5): постоянные правила и
+      // линейная очередь действий заданы в training.json5 (enemyScript);
+      // когда очередь исчерпана, ход достаётся обычному детерминированному
+      // алгоритму как предохранитель.
       if (isTraining && (trainingMission?.enemies.length ?? 0) === 0) {
         session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
         finishFromEvents([]);
@@ -766,7 +880,14 @@ export function BattleScreenView() {
         if (snap.activeOwner !== ENEMY_OWNER) break;
         if (session.getBattleOutcome() !== "ongoing") break;
         if (!kernel) break;
-        const command = pickEnemyCommand(kernel);
+        let command: Command | null;
+        if (isTraining) {
+          const decision = pickScriptedEnemyCommand(kernel, trainingMission?.enemyScript, enemyScriptRef.current);
+          enemyScriptRef.current = decision.state;
+          command = decision.command;
+        } else {
+          command = pickEnemyCommand(kernel);
+        }
         const applied = command
           ? session.applyBattleCommand(command)
           : session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
@@ -802,6 +923,12 @@ export function BattleScreenView() {
   const endTurn = (): void => {
     if (paused || busy) return;
     if (snapshot.activeOwner !== viewOwner) return;
+    // Обучение: завершение хода — само по себе шаг сценария (0.20.13);
+    // вне такого шага оно запрещено.
+    if (isTraining && directiveView?.directive.kind !== "endTurn") {
+      trainingDeny("endTurn");
+      return;
+    }
     setPreview(null);
     setAimId(null);
     setLog(null);
@@ -876,6 +1003,12 @@ export function BattleScreenView() {
     const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
     if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
+      // Обучение: выбор иного бойца запрещён — действует только исполнитель
+      // текущего указания (строгий сценарий, 0.20.13).
+      if (isTraining && trainingActorId !== null && entity.id !== trainingActorId) {
+        setLog(t("training.locked.actor"));
+        return;
+      }
       setSelectedId(entity.id);
       setAction(null);
       setSkillTargetPos(null);
@@ -885,15 +1018,40 @@ export function BattleScreenView() {
     }
 
     const automaticAttack = primaryAttackForEnemy(selected, entity, viewOwner, targeting);
-    // Обучение: авто-атака по врагу допустима только на шагах «атака»/«приближение».
-    if (automaticAttack && trainingCan("attack")) {
-      setAction(automaticAttack);
-      setAimId(entity?.id ?? null);
-      setPreview(null);
+    // Обучение: авто-включение оружия по врагу допустимо, только когда враг —
+    // цель текущего указания, а основное оружие — предписанное.
+    if (automaticAttack) {
+      if (!isTraining) {
+        setAction(automaticAttack);
+        setAimId(entity?.id ?? null);
+        setPreview(null);
+        return;
+      }
+      const directive = trainingDirective;
+      if (directive?.kind === "attack" && entity?.id === directive.targetId && automaticAttack.id === directive.weaponId) {
+        setAction(automaticAttack);
+        setAimId(entity?.id ?? null);
+        setPreview(null);
+        return;
+      }
+      trainingDeny("attack");
       return;
     }
 
     if (entity && selectedId !== null && targeting) {
+      // Обучение: прицеливание допустимо только по цели текущего указания.
+      if (isTraining) {
+        const directive = trainingDirective;
+        const isWeapon = action.type === "weapon";
+        const allowed =
+          directive !== null &&
+          ((isWeapon && directive.kind === "attack" && directive.targetId === entity.id) ||
+            (!isWeapon && directive.kind === "skill" && directive.targetId === entity.id));
+        if (!allowed) {
+          trainingDeny(isWeapon ? "attack" : "skill");
+          return;
+        }
+      }
       if (aimId === entity.id && hit?.available) {
         tryAttack(entity.id);
         return;
@@ -915,14 +1073,18 @@ export function BattleScreenView() {
     // Граневое укрытие в ней не перехватывает выбор как цель атаки.
     if (reach && !targeting) {
       const id = cellKey(x, y);
-      const cell = byReach.get(id);
-      // Обучение: шаг «перемещение» принимает только клетки за одно очко
-      // действия, шаг «рывок» — только за два. Иной клик игнорируется, чтобы
-      // игрок не совершил действие, отличное от предписанного шагом.
-      if (trainingUntil === "move" && cell && cell.apCost !== 1) return;
-      if (trainingUntil === "dash" && cell && cell.apCost !== 2) return;
+      // Обучение: шаг принимает только подсвеченную клетку указания —
+      // точную проверку выполняет tryMove (строгий сценарий, 0.20.13).
       const coarse = window.matchMedia("(pointer: coarse)").matches;
       if (coarse && preview !== id) {
+        const directive = trainingDirective;
+        if (
+          isTraining &&
+          (!directive || directive.kind !== "move" || directive.cell.x !== x || directive.cell.y !== y)
+        ) {
+          trainingDeny("move");
+          return;
+        }
         setPreview(id);
         setAimId(null);
         return;
@@ -1002,8 +1164,9 @@ export function BattleScreenView() {
       aimBreakCell,
       hoverCell,
       trainingHighlight,
+      trainingFocus,
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -1014,6 +1177,8 @@ export function BattleScreenView() {
       if (paused || busy) return;
       if (event.key === "Tab") {
         event.preventDefault();
+        // Обучение: перебор бойцов запрещён — действует исполнитель указания.
+        if (isTraining && trainingActorId !== null) return;
         const living = snapshot.entities.filter(isOwn);
         if (living.length === 0) return;
         const withAp = living.filter((entity) => entity.ap > 0);
@@ -1028,7 +1193,7 @@ export function BattleScreenView() {
         }
         return;
       }
-      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingCan("defend")) {
+      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingAllows("defend") && (!isTraining || trainingActorId === selectedId)) {
         applyCommand({ type: "DEFEND", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -1036,7 +1201,7 @@ export function BattleScreenView() {
         setPreview(null);
         return;
       }
-      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingCan("overwatch")) {
+      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingAllows("overwatch") && (!isTraining || trainingActorId === selectedId)) {
         applyCommand({ type: "OVERWATCH", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -1046,9 +1211,17 @@ export function BattleScreenView() {
       }
       if (ACTION_SHORTCUTS.includes(event.key as (typeof ACTION_SHORTCUTS)[number]) && selected) {
         const index = Number(event.key) - 1;
-        // Обучение: умение недопустимо вне шага «умение».
-        if (!trainingCan("skill")) return;
         const chosen = selectableActions(selected)[index];
+        // Обучение: клавиша допустима, только если её действие предписано
+        // указанием — точное совпадение оружия/умения (строгий сценарий).
+        if (isTraining) {
+          const directive = trainingDirective;
+          const allowed =
+            directive !== null &&
+            ((chosen?.type === "weapon" && directive.kind === "attack" && directive.actorId === selectedId && directive.weaponId === chosen.id) ||
+              (chosen?.type === "skill" && directive.kind === "skill" && directive.actorId === selectedId && directive.skillId === chosen.id));
+          if (!allowed) return;
+        }
         if (!chosen) return;
         if (chosen.type === "skill") {
           const skill = skills[chosen.id];
@@ -1111,7 +1284,9 @@ export function BattleScreenView() {
   });
 
   return (
-    <div className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}`}>
+    <div
+      className={`battle-screen${battleKind === "pvp" ? (viewOwner === 1 ? " is-pvp-side1" : " is-pvp-side2") : ""}${trainingFocus ? " is-training-focus" : ""}`}
+    >
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
         {isTraining && trainingMission ? (
@@ -1343,6 +1518,12 @@ export function BattleScreenView() {
                   className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
                   onClick={() => {
                     if (entity.dead) return;
+                    // Обучение: выбор иного бойца запрещён — действует только
+                    // исполнитель текущего указания (строгий сценарий, 0.20.13).
+                    if (isTraining && trainingActorId !== null && entity.id !== trainingActorId) {
+                      setLog(t("training.locked.actor"));
+                      return;
+                    }
                     setSelectedId(entity.id);
                     setAction(null);
                     setSkillTargetPos(null);
@@ -1531,10 +1712,10 @@ export function BattleScreenView() {
               <button
                 key={`weapon-${weaponId}`}
                 type="button"
-                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && index === 0 ? " hint-pulse" : ""}`}
+                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId) ? " hint-pulse" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
-                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("attack")}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId)}
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
                   setAction(active ? null : { type: "weapon", id: weaponId });
@@ -1559,11 +1740,11 @@ export function BattleScreenView() {
                 <button
                   key={`skill-${skillId}`}
                   type="button"
-                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}${hintPanelKey === "skill" && (selected?.skillIds?.[0] ?? "") === skillId ? " hint-pulse" : ""}`}
+                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}${hintPanelKey === "skill" && trainingSkillAllowed(skillId) ? " hint-pulse" : ""}`}
                   aria-pressed={active}
                   data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingCan("skill")}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId)}
                   onClick={() => {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
@@ -1586,7 +1767,7 @@ export function BattleScreenView() {
               className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}${hintPanelKey === "defend" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.defending)}
               data-action-state={selected?.defending ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("defend")}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("defend")}
               title={t("battle.defendHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1608,7 +1789,7 @@ export function BattleScreenView() {
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}${hintPanelKey === "overwatch" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.overwatch)}
               data-action-state={selected?.overwatch ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("overwatch")}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("overwatch")}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1629,7 +1810,7 @@ export function BattleScreenView() {
           <button
             type="button"
             className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
-            disabled={busy || snapshot.activeOwner !== viewOwner || (!trainingCan("endTurn") && !trainingRecoveryTurn)}
+            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn")}
             onClick={() => endTurn()}
           >
             {t("field.endTurn")}

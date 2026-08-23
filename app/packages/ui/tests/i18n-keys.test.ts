@@ -117,4 +117,13 @@ describe("i18n catalogs cover every static key used by the UI (0.20.2)", () => {
       expect(catalogs[locale]!.has("battle.reject.generic")).toBe(true);
     }
   });
+
+  it("covers dynamic training lock explanations (0.20.13)", () => {
+    const locks = ["cell", "weapon", "skill", "actor", "endTurn", "generic"];
+    for (const locale of ["ru", "en"]) {
+      for (const lock of locks) {
+        expect(catalogs[locale]!.has(`training.locked.${lock}`), `${locale}: training.locked.${lock}`).toBe(true);
+      }
+    }
+  });
 });

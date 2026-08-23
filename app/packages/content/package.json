@@ -1,6 +1,6 @@
 {
   "name": "@bylina/content",
-  "version": "0.20.12",
+  "version": "0.20.13",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
