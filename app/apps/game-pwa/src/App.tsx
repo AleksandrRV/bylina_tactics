@@ -49,47 +49,6 @@ export function App() {
   const replayStorage = useMemo(() => createReplayStorage(), []);
   const saved = useMemo(() => saveStorage.load(), [saveStorage]);
 
-  const session = useMemo(() => {
-    const entry = saved?.session;
-    // Экран сражения восстанавливается только для партии кампании: локальная
-    // и сетевая партии эфемерны (ядро/транспорт не сохраняются), повтор
-    // открывается из списка повторов. Иначе BattleScreen упадёт без ядра.
-    const inCampaignBattle = entry?.screen === "battle" && entry?.battleKind === "campaign";
-    const screen = inCampaignBattle
-      ? "battle"
-      : entry?.screen === "deployment" || entry?.screen === "campaign" || entry?.screen === "missionResult"
-        ? entry.screen
-        : "menu";
-    const restoredBattle = saved?.match && inCampaignBattle
-      ? { restoredMatch: saved.match, restoredFog: deserializeFog(saved.fog) }
-      : undefined;
-    return createSession(screen, {
-      battleKind: inCampaignBattle ? "campaign" : null,
-      activeMissionId: entry?.activeMissionId ?? null,
-      deployment: entry?.deployment ?? [],
-      matchSeed: entry?.matchSeed ?? 0,
-      outcome: entry?.outcome ?? null,
-      difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
-      paused: false,
-      trainingDone: entry?.trainingDone ?? [],
-      campaignHintsDone: entry?.campaignHintsDone ?? [],
-      ...restoredBattle,
-    });
-    // createSession создаётся один раз за жизнь приложения.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const [, setLocaleTick] = useState(0);
-
-  useEffect(() => {
-    applyDocumentLocale(i18n);
-    return i18n.subscribe(() => {
-      applyDocumentLocale(i18n);
-      settings.set({ language: i18n.getLanguage() });
-      setLocaleTick((value) => value + 1);
-    });
-  }, [i18n, settings]);
-
   const contentData = content.ok ? content.data : null;
   const campaign = useMemo(() => {
     if (!content.ok) return null;
@@ -107,9 +66,55 @@ export function App() {
     });
   }, [content, saved]);
 
+  const session = useMemo(() => {
+    const entry = saved?.session;
+    // Экран сражения восстанавливается только для партии кампании: локальная
+    // и сетевая партии эфемерны (ядро/транспорт не сохраняются), повтор
+    // открывается из списка повторов. Иначе BattleScreen упадёт без ядра.
+    const inCampaignBattle = entry?.screen === "battle" && entry?.battleKind === "campaign";
+    const screen = inCampaignBattle
+      ? "battle"
+      : entry?.screen === "deployment" || entry?.screen === "campaign" || entry?.screen === "missionResult"
+        ? entry.screen
+        : "menu";
+    const restoredBattle = saved?.match && inCampaignBattle
+      ? { restoredMatch: saved.match, restoredFog: deserializeFog(saved.fog) }
+      : undefined;
+    const created = createSession(screen, {
+      battleKind: inCampaignBattle ? "campaign" : null,
+      activeMissionId: entry?.activeMissionId ?? null,
+      deployment: entry?.deployment ?? [],
+      matchSeed: entry?.matchSeed ?? 0,
+      outcome: entry?.outcome ?? null,
+      difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
+      paused: false,
+      trainingDone: entry?.trainingDone ?? [],
+      campaignHintsDone: entry?.campaignHintsDone ?? [],
+      ...restoredBattle,
+    });
+    // Исправление (0.20.2): кампания привязывается СИНХРОННО при создании
+    // сессии, до первого рендера экранов. Восстановление сохранения на
+    // экранах кампании (карта корабля, высадка, итог миссии, бой кампании)
+    // читает кампанию в первом же рендере; привязка в эффекте запаздывала,
+    // и приложение падало «Campaign automaton is not bound» — пустой экран
+    // вместо меню при повторном открытии (на мобильных — при каждом
+    // обновлении PWA, перезагружающем страницу).
+    if (campaign) created.bindCampaign(campaign);
+    return created;
+    // createSession создаётся один раз за жизнь приложения.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign]);
+
+  const [, setLocaleTick] = useState(0);
+
   useEffect(() => {
-    if (campaign) session.bindCampaign(campaign);
-  }, [session, campaign]);
+    applyDocumentLocale(i18n);
+    return i18n.subscribe(() => {
+      applyDocumentLocale(i18n);
+      settings.set({ language: i18n.getLanguage() });
+      setLocaleTick((value) => value + 1);
+    });
+  }, [i18n, settings]);
 
   // Автосохранение: кампания и активная партия пишутся при каждом изменении.
   // Пока ядро боя не привязано (экран «battle» смонтирован, BattleScreen ещё
