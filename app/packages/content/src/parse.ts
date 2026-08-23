@@ -220,6 +220,11 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       }
     }
     const needlePoint = campaignConfig.missions.find((mission) => mission.id === campaignConfig.needleMissionId);
+    if (!needlePoint) {
+      // The final mission may be delivered in a later content pack; keep the
+      // campaign playable but make the dangling reference visible to authors.
+      console.warn(`campaign.json5: needleMissionId refers to missing mission ${campaignConfig.needleMissionId}`);
+    }
     if (needlePoint && needlePoint.type !== "needle") {
       issues.push({
         file: "campaign.json5",

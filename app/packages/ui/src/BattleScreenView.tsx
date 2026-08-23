@@ -1411,7 +1411,7 @@ export function BattleScreenView() {
                         b.rangePenalty > 0 ? `${t("combat.bdRange")}: −${b.rangePenalty}` : null,
                         b.coverDetails.length > 0 ? "" : null,
                         b.coverDetails.length > 0 ? t("combat.bdObstacleList") : null,
-                        ...b.coverDetails.map((d) => `  ${d.label}`),
+                        ...b.coverDetails.map((d) => `  ${t(d.label)}`),
                       ].filter(Boolean);
                       navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
                     }}
@@ -1463,7 +1463,7 @@ export function BattleScreenView() {
                       <span className="bd-details-title">{t("combat.bdObstacleList")}</span>
                       {hit.breakdown.coverDetails.map((d, i) => (
                         <span key={i} className="bd-obs">
-                          {d.label}
+                          {t(d.label)}
                         </span>
                       ))}
                     </div>

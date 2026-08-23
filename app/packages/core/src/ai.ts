@@ -71,7 +71,7 @@ function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly En
     hits.push({ foe, dist: distH(actor.x, actor.y, foe.x, foe.y) });
   }
   if (hits.length === 0) return null;
-  const kite = actor.configId === "leshy";
+  const kite = actor.preferredRange !== undefined;
   hits.sort((a, b) => {
     if (kite && a.dist !== b.dist) return b.dist - a.dist;
     if (a.dist !== b.dist) return a.dist - b.dist;
@@ -84,11 +84,11 @@ function bestAttack(kernel: TacticsKernel, actor: EntityState, foes: readonly En
 
 function scoreMove(actor: EntityState, cell: ReachableCell, foe: EntityState): number {
   const next = distH(cell.x, cell.y, foe.x, foe.y);
-  if (actor.configId === "leshy") {
+  if (actor.preferredRange !== undefined) {
     const now = distH(actor.x, actor.y, foe.x, foe.y);
-    if (now < 5) return next * 10 - cell.apCost;
-    if (now > 7) return -next * 10 - cell.apCost;
-    return -Math.abs(next - 6) * 10 - cell.apCost;
+    if (now < (actor.preferredRange! - 1)) return next * 10 - cell.apCost;
+    if (now > (actor.preferredRange! + 1)) return -next * 10 - cell.apCost;
+    return -Math.abs(next - actor.preferredRange!) * 10 - cell.apCost;
   }
   return -next * 10 - cell.apCost;
 }
@@ -110,9 +110,9 @@ function bestMove(kernel: TacticsKernel, actor: EntityState, foes: readonly Enti
   const best = ranked[0];
   if (!best) return null;
   const next = distH(best.x, best.y, foe.x, foe.y);
-  if (actor.configId === "leshy") {
-    if (now < 5 && next <= now) return null;
-    if (now > 7 && next >= now) return null;
+  if (actor.preferredRange !== undefined) {
+    if (now < (actor.preferredRange! - 1) && next <= now) return null;
+    if (now > (actor.preferredRange! + 1) && next >= now) return null;
   } else if (next >= now) {
     return null;
   }

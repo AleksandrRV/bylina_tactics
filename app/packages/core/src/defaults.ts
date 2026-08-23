@@ -13,6 +13,7 @@ export interface SpawnUnitConfig {
   skills?: string[];
   tags?: ("flying" | "hiddenStart")[];
   decoy?: boolean;
+  preferredRange?: number;
   timedLife?: number;
   fleeHp?: number;
   camouflageMinCover?: boolean;
@@ -198,6 +199,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     skills: ["roots"],
     camouflageMinCover: true,
     providesCamouflage: true,
+    preferredRange: 6,
   },
   kikimora: {
     id: "kikimora",

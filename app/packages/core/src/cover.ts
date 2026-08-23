@@ -121,7 +121,7 @@ export function evaluateCover(
       rawTier: cover.coverType,
       effectiveTier: eTier,
       heightDiff,
-      label: `${cover.coverType === 2 ? "Полное укрытие" : "Полуукрытие"} (${cover.x},${cover.y}) z=${cover.z} h=${heightDiff >= 0 ? "+" : ""}${heightDiff} → ${eTier === 0 ? "игнор" : eTier === 1 ? "−25" : "−50"}`,
+      label: cover.coverType === 2 ? "cover.full" : "cover.half",
     });
     if (eTier > best) best = eTier;
   }
@@ -145,7 +145,7 @@ export function evaluateCover(
         rawTier: 2,
         effectiveTier: 2,
         heightDiff: tile.z - attacker.z,
-        label: `Глухая стена (${tile.x},${tile.y}) → −50`,
+        label: "cover.wall",
       });
     }
   }
@@ -161,7 +161,7 @@ export function evaluateCover(
         rawTier: terrainTier,
         effectiveTier: terrainTier,
         heightDiff: terrainTier,
-        label: `Перепад высот +${terrainTier} → ${terrainTier === 1 ? "−25" : "−50"}`,
+        label: terrainTier === 2 ? "cover.terrainFull" : "cover.terrainHalf",
       });
       if (terrainTier > best) best = terrainTier;
     }

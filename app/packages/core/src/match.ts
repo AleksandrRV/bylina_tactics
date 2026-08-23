@@ -59,6 +59,7 @@ export function spawnUnitState(
     fleeHp: config.fleeHp,
     camouflageMinCover: config.camouflageMinCover ?? false,
     providesCamouflage: config.providesCamouflage ?? false,
+    preferredRange: config.preferredRange,
     coverType: 0,
     overwatch: false,
     defending: false,

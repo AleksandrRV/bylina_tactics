@@ -14,4 +14,5 @@
   tags: [],
   camouflageMinCover: true,
   providesCamouflage: true,
+  preferredRange: 6,
 }

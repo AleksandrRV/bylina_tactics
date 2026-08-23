@@ -642,5 +642,12 @@
       "skills": "Try skills, the defensive stance and overwatch against Nav."
     },
     "offerOpen": "Start training"
+  },
+  "cover": {
+    "full": "Full cover",
+    "half": "Half cover",
+    "wall": "Solid wall",
+    "terrainFull": "Full terrain cover",
+    "terrainHalf": "Half terrain cover"
   }
 }
