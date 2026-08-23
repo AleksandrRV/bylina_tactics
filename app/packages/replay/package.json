@@ -1,6 +1,6 @@
 {
   "name": "@bylina/replay",
-  "version": "0.20.4",
+  "version": "0.20.5",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

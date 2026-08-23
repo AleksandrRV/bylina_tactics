@@ -102,3 +102,21 @@ describe("signaling relay client (0.17.0)", () => {
     for (const session of sessions) session.close();
   });
 });
+
+it("reconnects the signaling socket after an unexpected close", async () => {
+  const localRelay = await createRelayServer({ port: 0, host: "127.0.0.1", heartbeatMs: 10_000 });
+  const states: string[] = [];
+  const session = createSignalingSession({
+    url: `ws://127.0.0.1:${localRelay.port}`,
+    roomId: "reconnect", role: "guest", name: "retry", reconnectDelayMs: 10,
+    channelFactory: fakeChannelPair().make,
+  });
+  session.onStateChange((state) => states.push(state));
+  await new Promise((resolve) => setTimeout(resolve, 40));
+  for (const socket of localRelay.wss.clients) socket.close();
+  await new Promise((resolve) => setTimeout(resolve, 100));
+  expect(states).toContain("reconnecting");
+  expect(states).toContain("signaling-connected");
+  session.close();
+  localRelay.wss.close(); localRelay.server.close();
+});

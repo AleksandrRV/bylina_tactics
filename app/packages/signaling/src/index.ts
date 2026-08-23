@@ -1,199 +1,173 @@
 import { createWebRtcChannel, type Envelope, type Transport } from "@bylina/net";
 
-/**
- * Клиент ретранслятора установления соединения (roadmap 0.17.0).
- *
- * Ретранслятор знакомит участников комнаты и передаёт описания сессии WebRTC;
- * игровые конверты (COMMAND/EVENT_BATCH/SYNC...) идут по каналу WebRTC
- * напрямую между обозревателями. При обрыве канала клиент сообщает об этом
- * (onClose) — сессия повторно подключается к комнате.
- */
-
 export type PeerRole = "host" | "guest" | "spectator";
+export type SignalingState = "connecting" | "reconnecting" | "signaling-connected" | "rtc-connected" | "closed";
 
-export interface SignalingPeer {
-  id: string;
-  role: PeerRole;
-  name: string;
-}
+export interface SignalingPeer { id: string; role: PeerRole; name: string; }
+export interface RoomSummary { id: string; createdAt: number; host: string | null; peers: SignalingPeer[]; }
+export interface DataChannel extends Transport { receiveSignal(data: unknown): void; close?(): void; }
 
 export interface SignalingSession {
-  /** Транспорт для игровых конвертов: до установки WebRTC буферизует, затем идёт по каналу. */
   transport: Transport;
-  /** Полный канал данных готов (WebRTC установлен). */
-  onOpen: (listener: () => void) => void;
-  onClose: (listener: () => void) => void;
-  onError: (listener: (message: string) => void) => void;
+  onOpen(listener: () => void): void;
+  /** Fired only when explicitly closed, not during an automatic reconnect. */
+  onClose(listener: () => void): void;
+  onError(listener: (message: string) => void): void;
+  onRoleChange(listener: (role: PeerRole) => void): void;
+  onStateChange(listener: (state: SignalingState) => void): void;
+  getState(): SignalingState;
+  getRole(): PeerRole;
   close(): void;
-}
-
-export interface RoomSummary {
-  id: string;
-  createdAt: number;
-  host: string | null;
-  peers: { id: string; role: PeerRole; name: string }[];
-}
-
-/** Канал данных (WebRTC в браузере; фейковый канал в автоматических проверках). */
-export interface DataChannel extends Transport {
-  receiveSignal(data: unknown): void;
-  close?(): void;
 }
 
 export function createSignalingSession(options: {
-  url: string;
-  roomId: string;
-  role: PeerRole;
-  name: string;
-  /** Фабрика канала данных; по умолчанию — WebRTC (createWebRtcChannel). */
+  url: string; roomId: string; role: PeerRole; name: string;
   channelFactory?: (initiator: boolean) => DataChannel;
+  reconnectDelayMs?: number;
 }): SignalingSession {
-  const socket = openSocket(options.url);
   const openListeners = new Set<() => void>();
   const closeListeners = new Set<() => void>();
   const errorListeners = new Set<(message: string) => void>();
-  let dataTransport: DataChannel | null = null;
+  const roleListeners = new Set<(role: PeerRole) => void>();
+  const stateListeners = new Set<(state: SignalingState) => void>();
+  const listeners = new Set<(message: Envelope) => void>();
+  const channels = new Map<string, DataChannel>();
+  const peers = new Map<string, SignalingPeer>();
   const buffered: Envelope[] = [];
+  let socket: SocketLike | null = null;
   let closed = false;
+  let state: SignalingState = "connecting";
+  let role: PeerRole = options.role;
+  let selfId: string | null = null;
+  let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  let reconnectAttempt = 0;
 
-  let upgradeToData: (initiator: boolean) => void;
-
-  const deliverSignal = (signal: unknown): void => {
-    if (dataTransport) {
-      dataTransport.receiveSignal(signal);
-      return;
-    }
-    // Сигнал пришёл раньше, чем создан канал (оффер ведомому): создаём канал.
-    upgradeToData(options.role !== "host");
-    (dataTransport as DataChannel | null)?.receiveSignal(signal);
+  const emitState = (next: SignalingState): void => {
+    if (state === next) return;
+    state = next;
+    for (const listener of stateListeners) listener(next);
   };
-
-  upgradeToData = (initiator: boolean): void => {
-    if (dataTransport) return;
+  const report = (message: string): void => { for (const listener of errorListeners) listener(message); };
+  const signal = (to: string, data: unknown): void => {
+    try { socket?.send(JSON.stringify({ type: "SIGNAL", roomId: options.roomId, to, signal: data })); }
+    catch { beginReconnect(); }
+  };
+  const createChannel = (peerId: string, initiator: boolean): DataChannel => {
+    const existing = channels.get(peerId); if (existing) return existing;
     const factory = options.channelFactory ?? ((isInitiator: boolean) => createWebRtcChannel({
       initiator: isInitiator,
-      onSignal: (signal) => {
-        socket.send(JSON.stringify({ type: "SIGNAL", roomId: options.roomId, signal }));
-      },
-      receiveSignal: () => undefined,
+      onSignal: (data) => signal(peerId, data),
       onConnect: () => {
+        emitState("rtc-connected");
         for (const listener of openListeners) listener();
+        flush();
       },
-      onClose: () => {
-        for (const listener of closeListeners) listener();
-      },
-      onError: (error) => {
-        for (const listener of errorListeners) listener(error.message);
-      },
+      onClose: () => beginReconnect(),
+      onError: (error) => report(error.message),
+      receiveSignal: () => undefined,
     }));
     const channel = factory(initiator);
-    dataTransport = channel;
-    // Мост: конверты из канала данных доставляются подписчикам транспорта.
-    channel.subscribe((message) => {
-      for (const listener of listeners) listener(message);
-    });
-    for (const message of buffered) channel.send(message);
-    buffered.length = 0;
+    channels.set(peerId, channel);
+    channel.subscribe((message) => { for (const listener of listeners) listener(message); });
+    // Test/in-process channels have no separate connect event. Real WebRTC
+    // flushes from onConnect above, avoiding sends before its data channel opens.
+    if (options.channelFactory) flush();
+    return channel;
   };
-
-  const listeners = new Set<(message: Envelope) => void>();
-  const transport: Transport = {
-    send: (message) => {
-      if (dataTransport) dataTransport.send(message);
-      else buffered.push(message);
-    },
-    subscribe: (listener) => {
-      listeners.add(listener);
-      return () => {
-        listeners.delete(listener);
-      };
-    },
+  const flush = (): void => {
+    if (!channels.size) return;
+    while (buffered.length) {
+      const message = buffered.shift();
+      if (message) for (const channel of channels.values()) channel.send(message);
+    }
   };
-
-  socket.on("open", () => {
-    socket.send(JSON.stringify({ type: "JOIN", roomId: options.roomId, role: options.role, name: options.name }));
-  });
-  socket.on("message", (raw) => {
+  const resetChannels = (): void => { for (const channel of channels.values()) channel.close?.(); channels.clear(); };
+  const join = (): void => socket?.send(JSON.stringify({ type: "JOIN", roomId: options.roomId, role, name: options.name }));
+  const beginReconnect = (): void => {
+    if (closed || reconnectTimer) return;
+    resetChannels();
+    emitState("reconnecting");
+    const delay = Math.min(10_000, (options.reconnectDelayMs ?? 250) * 2 ** reconnectAttempt++);
+    reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
+  };
+  const handleMessage = (raw: unknown): void => {
     let message: Record<string, unknown>;
-    try {
-      message = JSON.parse(String(raw)) as Record<string, unknown>;
-    } catch {
-      return;
-    }
-    if (message.type === "JOINED") {
-      // Обе стороны создают канал сразу: ведущий — инициатор, ведомый —
-      // отвечающий. Оффер/ответ приходят сигналами ретранслятора.
-      upgradeToData(message.role === "host");
-    } else if (message.type === "SIGNAL" && message.signal !== undefined) {
-      deliverSignal(message.signal);
-    } else if (message.type === "PEER_JOINED") {
-      // Появился соперник: если мы ведущий и канала ещё нет — создаём оффер.
-      if (options.role === "host") upgradeToData(true);
-    } else if (message.type === "ERROR" && typeof message.message === "string") {
-      for (const listener of errorListeners) listener(message.message);
-    }
-  });
-  socket.on("close", () => {
-    for (const listener of closeListeners) listener();
-  });
-  socket.on("error", (error) => {
-    for (const listener of errorListeners) listener(error instanceof Error ? error.message : String(error));
-  });
+    try { message = JSON.parse(rawText(raw)) as Record<string, unknown>; } catch { return; }
+    if (message.type === "JOINED" && typeof message.peerId === "string" && validRole(message.role)) {
+      selfId = message.peerId; role = message.role; peers.clear();
+      for (const value of Array.isArray(message.peers) ? message.peers : []) if (isPeer(value)) peers.set(value.id, value);
+      emitState("signaling-connected");
+      // The host initiates one addressed channel per peer. A guest creates its
+      // answering peer eagerly as well: simple-peer waits for the offer, while
+      // deterministic test channels can become connected without an SDP roundtrip.
+      if (role === "host") for (const peer of peers.values()) createChannel(peer.id, true);
+      else for (const peer of peers.values()) if (peer.role === "host") createChannel(peer.id, false);
+    } else if (message.type === "PEER_JOINED" && isPeer(message.peer)) {
+      peers.set(message.peer.id, message.peer);
+      if (role === "host") createChannel(message.peer.id, true);
+    } else if (message.type === "PEER_LEFT" && typeof message.peerId === "string") {
+      peers.delete(message.peerId); channels.get(message.peerId)?.close?.(); channels.delete(message.peerId);
+    } else if (message.type === "SIGNAL" && typeof message.from === "string" && message.signal !== undefined) {
+      const peer = peers.get(message.from);
+      // A signal is accepted only from a peer announced by the relay.
+      if (!peer) return;
+      createChannel(message.from, false).receiveSignal(message.signal);
+    } else if (message.type === "ROLE_CHANGED" && validRole(message.role)) {
+      role = message.role;
+      for (const listener of roleListeners) listener(role);
+      if (role === "host") for (const peer of peers.values()) createChannel(peer.id, true);
+    } else if (message.type === "ERROR" && typeof message.message === "string") report(message.message);
+  };
+  const connect = (): void => {
+    if (closed) return;
+    try { socket = openSocket(options.url); }
+    catch (error) { report(error instanceof Error ? error.message : String(error)); beginReconnect(); return; }
+    socket.on("open", () => join());
+    socket.on("message", handleMessage);
+    socket.on("close", () => beginReconnect());
+    socket.on("error", (error) => report(error instanceof Error ? error.message : String(error)));
+  };
 
+  const transport: Transport = {
+    send: (message) => { if (channels.size) for (const channel of channels.values()) channel.send(message); else buffered.push(message); },
+    subscribe: (listener) => { listeners.add(listener); return () => listeners.delete(listener); },
+  };
+  connect();
   return {
     transport,
-    onOpen: (listener) => {
-      openListeners.add(listener);
-    },
-    onClose: (listener) => {
-      closeListeners.add(listener);
-    },
-    onError: (listener) => {
-      errorListeners.add(listener);
-    },
+    onOpen: (listener) => { openListeners.add(listener); },
+    onClose: (listener) => { closeListeners.add(listener); },
+    onError: (listener) => { errorListeners.add(listener); },
+    onRoleChange: (listener) => { roleListeners.add(listener); },
+    onStateChange: (listener) => { stateListeners.add(listener); },
+    getState: () => state,
+    getRole: () => role,
     close: () => {
-      if (closed) return;
-      closed = true;
-      try {
-        socket.send(JSON.stringify({ type: "LEAVE" }));
-      } catch {
-        /* сокет уже закрыт */
-      }
-      socket.close();
-      dataTransport?.close?.();
+      if (closed) return; closed = true;
+      if (reconnectTimer) clearTimeout(reconnectTimer);
+      try { socket?.send(JSON.stringify({ type: "LEAVE" })); } catch { /* closed already */ }
+      socket?.close(); resetChannels(); emitState("closed");
+      for (const listener of closeListeners) listener();
     },
   };
 }
 
-/** Перечень комнат ретранслятора (GET /rooms). */
 export async function listRooms(url: string): Promise<RoomSummary[]> {
-  const base = url.replace(/\/$/, "");
-  const response = await fetch(`${base}/rooms`);
+  const response = await fetch(`${url.replace(/\/$/, "")}/rooms`);
   if (!response.ok) throw new Error(`Relay /rooms failed: ${response.status}`);
-  const data = (await response.json()) as { rooms: RoomSummary[] };
-  return data.rooms ?? [];
+  return ((await response.json()) as { rooms?: RoomSummary[] }).rooms ?? [];
 }
 
-type SocketLike = {
-  send(data: string): void;
-  close(): void;
-  on(event: "open" | "close" | "error" | "message", listener: (data?: unknown) => void): void;
-};
-
+type SocketLike = { send(data: string): void; close(): void; on(event: "open" | "close" | "error" | "message", listener: (data?: unknown) => void): void; };
 function openSocket(url: string): SocketLike {
-  // Node-среда (автоматические проверки канала): используется ws-клиент,
-  // у нативного WebSocket Node нет метода on.
   if (typeof process !== "undefined" && typeof process.versions?.node === "string") {
     // eslint-disable-next-line @typescript-eslint/no-var-requires
     const { WebSocket: NodeWebSocket } = require("ws") as typeof import("ws");
     return new NodeWebSocket(url) as unknown as SocketLike;
   }
   const socket = new WebSocket(url);
-  return {
-    send: (data: string) => socket.send(data),
-    close: () => socket.close(),
-    on: (event, listener: (data?: unknown) => void) => {
-      socket.addEventListener(event, (eventData) => listener(eventData as unknown));
-    },
-  } as SocketLike;
+  return { send: (data) => socket.send(data), close: () => socket.close(), on: (event, listener) => socket.addEventListener(event, (value) => listener(event === "message" ? (value as MessageEvent).data : value)) };
 }
+function rawText(raw: unknown): string { return typeof raw === "string" ? raw : String(raw); }
+function validRole(value: unknown): value is PeerRole { return value === "host" || value === "guest" || value === "spectator"; }
+function isPeer(value: unknown): value is SignalingPeer { const peer = value as Partial<SignalingPeer>; return !!peer && typeof peer.id === "string" && typeof peer.name === "string" && validRole(peer.role); }

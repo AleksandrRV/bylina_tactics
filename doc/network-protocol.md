@@ -313,71 +313,22 @@ interface EventMatchEnded {
 
 ## 6. Снимок состояния
 
-Применяется при начале сражения, повторном подключении и записи сохранения. Ведомому направляется уже сокращённый снимок.
+Применяется при начале сражения и после восстановления канала. В реализации один формат для гостя и наблюдателя:
 
 ```typescript
 interface SyncPayload {
-  matchMeta: {
-    turnNumber: number;
-    activePlayerId: string;
-    rngSeed: string;
-    rngState: string; // текущее ui32-состояние Mulberry32 для продолжения снимка
-  };
-  grid: {
-    width: number;
-    height: number;
-    tiles: TileData[];
-  };
-  entities: EntitySnapshot[];
-  visible: { x: number; y: number }[];
-  seen: { x: number; y: number }[];
-  objective?: {
-    kind: "APPLE";
-    pos: { x: number; y: number; z: number };
-    carrierId: number | null;
-  };
-}
-
-interface TileData {
-  x: number;
-  y: number;
-  z: number;
-  pit: boolean;
-  blockLOS: boolean;
-  extract?: boolean;
-  homeOwner?: number;
-}
-
-interface EntitySnapshot {
-  id: number;
-  configId: string;
-  ownerId: string | null;
-  pos: { x: number; y: number; z: number };
-  dir: number;
-  stats: {
-    hp: number;
-    maxHp: number;
-    ap: number;
-    maxAp: number;
-  };
-  coverType?: 1 | 2;
-  coverEdge?: 0 | 1 | 2 | 3; // только для граневого укрытия
-  tags: string[];
-  statusData?: {
-    poisonDamage?: number;
-    poisonTurns?: number;
-    panicSourceId?: number;
-    panicTurns?: number;
-    immobileTurns?: number;
-    timedLife?: number;
-    skillCooldowns?: Record<string, number>;
-    skillUses?: Record<string, number>;
-  };
+  /** Полный MatchState у ведущего либо сокращённый getSnapshotFor(owner). */
+  match: MatchState;
+  /** Ключи видимых сейчас клеток: `"x,y"`. */
+  visible: string[];
+  /** Ключи всех разведанных клеток: `"x,y"`. */
+  explored: string[];
 }
 ```
 
-Клетки, которые сторона никогда не наблюдала, в массиве `tiles` у ведомого либо опускаются, либо передаются без признаков, кроме координат; выбранный способ должен быть единым в реализации и не раскрывать ямы и стены за пределами разведанной местности. Рекомендуется опускать неразведанные клетки.
+Ведущий формирует `match` методом `getSnapshotFor(2)` для гостя. Для наблюдателя используются объединённые видимость и разведанность сторон; при включённом полном обзоре передаётся полный снимок. Сущности, невидимые получателю, в снимок не включаются. Никаких альтернативных полей (`matchMeta`, `grid`, `entities`, `seen`) протокол не содержит.
 
+---
 ---
 
 ## 7. Пример последовательности
@@ -432,6 +383,21 @@ interface EntitySnapshot {
 
 ---
 
-## 8. Правило добавления возможности
+## 8. Сигнализация и восстановление канала
+
+Сигнализация использует WebSocket только для установления WebRTC. Сообщение адресно и ретранслятор не рассылает его остальным участникам:
+
+```typescript
+// клиент → relay
+{ type: "SIGNAL", roomId: string, to: string, signal: unknown }
+// relay → клиент
+{ type: "SIGNAL", from: string, signal: unknown }
+```
+
+`JOINED` включает `peerId` клиента и список участников; `PEER_JOINED` добавляет участника, `PEER_LEFT` удаляет его. При уходе ведущего relay назначает нового и направляет ему `{ type: "ROLE_CHANGED", role: "host" }`; новый ведущий создаёт адресные WebRTC-каналы оставшимся участникам.
+
+Relay отправляет WebSocket `ping` каждые 30 секунд и удаляет сокет, не ответивший `pong`. Клиент проходит состояния `reconnecting` → `signaling-connected` → `rtc-connected`; закрытие транспорта запускает повторное подключение с растущей задержкой. Явное закрытие сессии отменяет попытки восстановления.
+
+## 9. Правило добавления возможности
 
 Любое изменение мира описывается тремя элементами: командой либо внутренним срабатыванием, отражением в снимке, событием для отображения. Прямое изменение запаса здоровья из компонента интерфейса запрещено.

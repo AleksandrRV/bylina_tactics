@@ -10,4 +10,4 @@ export interface RelayServerHandle {
 }
 
 /** Создать ретранслятор установления соединения. */
-export function createRelayServer(options?: { port?: number; host?: string }): Promise<RelayServerHandle>;
+export function createRelayServer(options?: { port?: number; host?: string; heartbeatMs?: number }): Promise<RelayServerHandle>;
