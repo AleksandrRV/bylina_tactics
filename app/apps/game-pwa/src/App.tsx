@@ -3,7 +3,7 @@ import { createCampaign } from "@bylina/campaign";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
-import { createReplayStorage, createSaveSerializer, createSaveStorage, deserializeFog } from "@bylina/storage";
+import { createReplayStorage, createSaveSerializer, createSaveStorage, deserializeFog, SAVE_FORMAT_VERSION } from "@bylina/storage";
 import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
@@ -170,6 +170,7 @@ export function App() {
     // MatchState, fog conversion and JSON.stringify run in packages/storage's
     // worker. localStorage itself remains synchronous but receives ready JSON.
     void saveSerializer.serialize({
+      formatVersion: SAVE_FORMAT_VERSION,
       version: APP_VERSION,
       savedAt: Date.now(),
       campaign: campaign.getState(),

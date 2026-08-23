@@ -28,7 +28,12 @@ export interface FogSave {
   [owner: number]: { explored: string[]; visible: string[] };
 }
 
+/** Current on-disk shape of a campaign save; independent from APP_VERSION. */
+export const SAVE_FORMAT_VERSION = 2;
+
 export interface SaveData {
+  /** Explicit on-disk format, migrated by migrateSave on load. */
+  formatVersion: number;
   /** Версия приложения, создавшего запись (0.13.0). */
   version: string;
   savedAt: number;
@@ -101,6 +106,8 @@ export function isSaveData(value: unknown): value is SaveData {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<SaveData>;
   return (
+    typeof candidate.formatVersion === "number" &&
+    candidate.formatVersion === SAVE_FORMAT_VERSION &&
     typeof candidate.version === "string" &&
     typeof candidate.savedAt === "number" &&
     typeof candidate.campaign === "object" &&
@@ -111,6 +118,20 @@ export function isSaveData(value: unknown): value is SaveData {
     candidate.session !== null &&
     Array.isArray(candidate.session.deployment)
   );
+}
+
+/**
+ * Upgrades persisted data in small explicit steps. Format 1 predates the
+ * formatVersion field; it is otherwise structurally identical to format 2.
+ * Unknown future formats are rejected rather than silently corrupted.
+ */
+export function migrateSave(value: unknown): SaveData | null {
+  if (typeof value !== "object" || value === null) return null;
+  const candidate = value as Partial<SaveData> & { formatVersion?: unknown };
+  const sourceVersion = candidate.formatVersion === undefined ? 1 : candidate.formatVersion;
+  if (sourceVersion !== 1 && sourceVersion !== SAVE_FORMAT_VERSION) return null;
+  const migrated = sourceVersion === 1 ? { ...candidate, formatVersion: SAVE_FORMAT_VERSION } : candidate;
+  return isSaveData(migrated) ? migrated : null;
 }
 
 /** Ключ списка повторов партий (0.17.0). */
@@ -208,8 +229,11 @@ export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: Stor
         const raw = storage.getItem(key);
         if (!raw) return null;
         const parsed: unknown = JSON.parse(raw);
-        if (!isSaveData(parsed)) return null;
-        return parsed;
+        const migrated = migrateSave(parsed);
+        if (!migrated) return null;
+        // Persist a successful migration immediately, so it runs once.
+        if ((parsed as { formatVersion?: unknown }).formatVersion !== SAVE_FORMAT_VERSION) write(JSON.stringify(migrated));
+        return migrated;
       } catch {
         return null;
       }
