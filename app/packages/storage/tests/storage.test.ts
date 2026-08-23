@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReplayStorage, createSaveStorage, deserializeFog, isSaveData, serializeFog, type SaveData } from "../src/index.js";
+import { createReplayStorage, createSaveStorage, deserializeFog, isSaveData, migrateSave, serializeFog, type SaveData } from "../src/index.js";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 
@@ -18,6 +18,7 @@ function memoryBackend() {
 
 function sampleSave(): SaveData {
   return {
+    formatVersion: 2,
     version: "0.13.0",
     savedAt: 123,
     campaign: {
@@ -140,5 +141,17 @@ describe("storage quota handling", () => {
     const storage = createSaveStorage("bylina.quota", backend, { onQuotaExceeded });
     expect(storage.save(sampleSave())).toBe(false);
     expect(onQuotaExceeded).toHaveBeenCalledWith(quotaError);
+  });
+});
+
+
+describe("save format migrations", () => {
+  it("upgrades a legacy v1 save without a formatVersion", () => {
+    const legacy = sampleSave() as unknown as Record<string, unknown>;
+    delete legacy.formatVersion;
+    expect(migrateSave(legacy)?.formatVersion).toBe(2);
+  });
+  it("rejects unknown future save formats", () => {
+    expect(migrateSave({ ...sampleSave(), formatVersion: 99 })).toBeNull();
   });
 });
