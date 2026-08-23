@@ -1,4 +1,5 @@
 import { createRequire } from "node:module";
+import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
@@ -34,6 +35,36 @@ function pixiResolvePlugin(): Plugin {
   };
 }
 
+
+/** Emits JSON5 as fetchable assets instead of importing all content into the entry chunk. */
+function contentAssetsPlugin(): Plugin {
+  const contentRoot = path.resolve(appRoot, "packages/content/data");
+  const files = (dir: string, prefix = ""): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+    entry.isDirectory() ? files(path.join(dir, entry.name), `${prefix}${entry.name}/`) : entry.name.endsWith(".json5") ? [`${prefix}${entry.name}`] : [],
+  );
+  const names = files(contentRoot);
+  return {
+    name: "bylina-content-assets",
+    configureServer(server) {
+      server.middlewares.use("/content/", (req, res, next) => {
+        const relative = decodeURIComponent(req.url ?? "").replace(/^\/+/, "");
+        const target = path.resolve(contentRoot, relative);
+        if (!target.startsWith(contentRoot) || !names.includes(relative)) return next();
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(readFileSync(target));
+      });
+      server.middlewares.use("/content-manifest.json", (_req, res) => {
+        res.setHeader("Content-Type", "application/json; charset=utf-8");
+        res.end(JSON.stringify(names.map((name) => `content/${name}`)));
+      });
+    },
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "content-manifest.json", source: JSON.stringify(names.map((name) => `content/${name}`)) });
+      for (const name of names) this.emitFile({ type: "asset", fileName: `content/${name}`, source: readFileSync(path.join(contentRoot, name)) });
+    },
+  };
+}
+
 const pixiEntry = resolvePixiEntry();
 
 /** Базовый путь публикации: "/" локально, "/bylina_tactics/" на GitHub Pages (переменная BASE_PATH). */
@@ -42,10 +73,12 @@ const basePath = process.env.BASE_PATH ?? "/";
 export default defineConfig({
   base: basePath,
   plugins: [
+    contentAssetsPlugin(),
     pixiResolvePlugin(),
     react(),
     VitePWA({
       registerType: "autoUpdate",
+      workbox: { globPatterns: ["**/*.{js,css,html,ico,png,svg,json,json5}"] },
       includeAssets: ["favicon.svg", "icons/icon-192.png", "icons/icon-512.png", "portraits/*.jpg"],
       manifest: {
         name: "Былина: Тьма Кощея",
