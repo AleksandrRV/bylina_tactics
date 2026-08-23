@@ -1,5 +1,9 @@
+import { lazy } from "react";
+
 /**
- * Public battle screen boundary. Heavy orchestration and presentation are
- * separated into BattleScreenView while dedicated hooks own feature flows.
+ * Battle implementation (PixiJS and battle orchestration) is loaded only when
+ * a battle route is opened, keeping it out of the application entry chunk.
  */
-export { BattleScreenView as BattleScreen } from "./BattleScreenView.js";
+export const BattleScreen = lazy(async () => ({
+  default: (await import("./BattleScreenView.js")).BattleScreenView,
+}));

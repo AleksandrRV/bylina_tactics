@@ -1,4 +1,5 @@
 import type { AppScreen } from "@bylina/session";
+import { Suspense, type ComponentType } from "react";
 import { BattleScreen } from "./BattleScreen.js";
 import { BootScreen } from "./BootScreen.js";
 import { CampaignScreen } from "./CampaignScreen.js";
@@ -18,7 +19,7 @@ import { useSessionState } from "./hooks.js";
  * чтобы маршрутизацию можно было покрыть автоматическими проверками без
  * среды обозревателя. Неизвестный экран завершается главным меню.
  */
-export function screenComponent(screen: AppScreen): () => React.JSX.Element {
+export function screenComponent(screen: AppScreen): ComponentType {
   switch (screen) {
     case "boot":
       return BootScreen;
@@ -52,5 +53,5 @@ export function screenComponent(screen: AppScreen): () => React.JSX.Element {
 export function Shell() {
   const { screen } = useSessionState();
   const Component = screenComponent(screen);
-  return <Component />;
+  return <Suspense fallback={<div className="boot-screen" />}><Component /></Suspense>;
 }
