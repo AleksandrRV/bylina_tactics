@@ -1,14 +1,15 @@
 {
   "name": "bylina",
   "private": true,
-  "version": "0.19.0",
+  "version": "0.20.3",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",
     "build": "pnpm --filter @bylina/game-pwa build",
     "preview": "pnpm --filter @bylina/game-pwa preview --host 0.0.0.0",
     "test": "pnpm -r --if-present test",
-    "typecheck": "pnpm -r --if-present typecheck"
+    "typecheck": "pnpm -r --if-present typecheck",
+    "check:versions": "node scripts/check-version-consistency.mjs"
   },
   "engines": {
     "node": ">=20"

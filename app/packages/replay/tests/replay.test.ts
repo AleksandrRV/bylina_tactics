@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createPvpMatch, createTacticsKernel, type PvpMatchOptions } from "@bylina/core";
-import { createReplayRecorder, isReplayJournal } from "../src/index.js";
+import { REPLAY_VERSION, createReplayRecorder, isReplayJournal } from "../src/index.js";
 
 const OPTIONS: PvpMatchOptions = {
   units: [
@@ -13,7 +13,11 @@ const OPTIONS: PvpMatchOptions = {
   seed: 99,
 };
 
-describe("replay journal (0.17.0)", () => {
+describe("replay journal (0.20.3)", () => {
+  it("uses the current replay format version", () => {
+    expect(REPLAY_VERSION).toBe("0.20.3");
+  });
+
   it("records commands and serializes to a plain object", () => {
     const recorder = createReplayRecorder(OPTIONS, "QA-бой");
     recorder.record({ type: "END_TURN", playerId: "1" });
