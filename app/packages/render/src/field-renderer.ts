@@ -17,6 +17,8 @@ const RISE = 12;
 const PAD = 26;
 
 export interface FieldView {
+  /** Seed identifies the generated terrain; it changes only when a new map is created. */
+  matchSeed: number;
   snapshot: MatchState;
   selectedId: number | null;
   aimId: number | null;
@@ -612,10 +614,11 @@ const BOLT_MS_PER_CELL = 30;
 export function createFieldRenderer(): FieldRenderer {
   const app = new Application();
   const world = new Container();
-  const ground = new Container();
+  // Terrain is immutable for a generated map and remains outside dynamic overlays.
+  const terrain = new Container();
   const fxLayer = new Graphics();
   const debugLayer = new Container();
-  world.addChild(ground, fxLayer, debugLayer);
+  world.addChild(terrain, fxLayer, debugLayer);
   world.eventMode = "static";
   world.hitArea = new Rectangle(-4000, -4000, 12000, 12000);
 
@@ -636,7 +639,7 @@ export function createFieldRenderer(): FieldRenderer {
 
   let playing = false;
   let holdDisplay = false;
-  let staticDirty = true;
+  let terrainSeed: number | null = null;
   const jobs: Array<{ events: GameEvent[]; done: () => void }> = [];
 
   let drag = false;
@@ -950,20 +953,6 @@ export function createFieldRenderer(): FieldRenderer {
       }
     }
 
-    // Досягаемость и маршрут — поверх грани.
-    if (view) {
-      const reachCell = view.reachable.find((cell) => cell.x === tile.x && cell.y === tile.y);
-      if (reachCell) {
-        const tint = reachCell.apCost === 1 ? 0x388cdc : 0xe0b34a;
-        g.rect(1, 1, C - 2, C - 2).fill({ color: tint, alpha: 0.32 });
-        g.rect(2.5, 2.5, C - 5, C - 5).stroke({ width: 1.8, color: tint, alpha: 0.9 });
-      }
-      if (view.path.some((cell) => cell.x === tile.x && cell.y === tile.y)) {
-        g.rect(4, 4, C - 8, C - 8).stroke({ width: 2, color: 0xf6f2e4 });
-        g.circle(C / 2, C / 2, 2.4).fill(0xf6f2e4);
-      }
-    }
-
     g.position.set(PAD + tile.x * CELL_SIZE, fy);
     // Pits are holes in the ground — draw them below non-pit tiles at same Y.
     const zIdx = tile.pit ? tile.y * 100 - 5 : tile.y * 100 + z * 10;
@@ -971,22 +960,14 @@ export function createFieldRenderer(): FieldRenderer {
     return g;
   };
 
-  // drawDebugLabel used for terrain cover display
-  const drawDebugLabel = (tile: Tile): Text | null => {
-    if (!view?.debugMovement) return null;
-    const reachCell = view.reachable.find((cell) => cell.x === tile.x && cell.y === tile.y);
-    if (!reachCell) return null;
-    return null; // moved to paintDebug
-  };
-
   const paintStatic = (): void => {
     if (!view || destroyed || !mounted) return;
-    ground.removeChildren().forEach((child) => child.destroy());
+    terrain.removeChildren().forEach((child) => child.destroy());
     for (const tile of view.snapshot.grid.tiles) {
-      ground.addChild(drawTile(tile));
+      terrain.addChild(drawTile(tile));
     }
-    ground.sortableChildren = true;
-    paintDebug();
+    terrain.sortableChildren = true;
+    terrainSeed = view.matchSeed;
   };
 
   const paintDebug = (): void => {
@@ -1365,6 +1346,23 @@ export function createFieldRenderer(): FieldRenderer {
     g.clear();
     const now = performance.now();
 
+    // Movement and route previews are dynamic UI, not part of cached terrain.
+    for (const cell of view.reachable) {
+      const tile = tileAt(view.snapshot.grid, cell.x, cell.y);
+      if (!tile) continue;
+      const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
+      const tint = cell.apCost === 1 ? 0x388cdc : 0xe0b34a;
+      g.rect(fx + 1, fy + 1, CELL_SIZE - 2, CELL_SIZE - 2).fill({ color: tint, alpha: 0.32 });
+      g.rect(fx + 2.5, fy + 2.5, CELL_SIZE - 5, CELL_SIZE - 5).stroke({ width: 1.8, color: tint, alpha: 0.9 });
+    }
+    for (const cell of view.path) {
+      const tile = tileAt(view.snapshot.grid, cell.x, cell.y);
+      if (!tile) continue;
+      const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
+      g.rect(fx + 4, fy + 4, CELL_SIZE - 8, CELL_SIZE - 8).stroke({ width: 2, color: 0xf6f2e4 });
+      g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 2.4).fill(0xf6f2e4);
+    }
+
     // Зона эвакуации: пульсирующее свечение у края поля (0.13.0).
     // Рисуется под туманом войны: разведанные клетки зоны читаются как «выход».
     const extractPulse = 0.5 + Math.sin(now * 0.0022) * 0.25;
@@ -1602,10 +1600,6 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   const paint = (): void => {
-    if (staticDirty) {
-      staticDirty = false;
-      paintStatic();
-    }
     paintFx();
   };
 
@@ -2041,7 +2035,10 @@ export function createFieldRenderer(): FieldRenderer {
           shown.maxHp = entity.maxHp;
         }
       }
-      staticDirty = true;
+      // The map seed changes only when a battlefield is generated. State updates
+      // redraw overlays/tokens, never the cached terrain graphics.
+      if (terrainSeed !== next.matchSeed) paintStatic();
+      paintDebug();
       fit();
       paint();
     },

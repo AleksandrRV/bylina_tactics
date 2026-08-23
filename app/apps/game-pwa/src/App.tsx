@@ -3,7 +3,7 @@ import { createCampaign } from "@bylina/campaign";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
-import { createReplayStorage, createSaveStorage, deserializeFog, serializeFog } from "@bylina/storage";
+import { createReplayStorage, createSaveSerializer, createSaveStorage, deserializeFog } from "@bylina/storage";
 import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
@@ -46,6 +46,7 @@ export function App() {
   // Сохранение кампании и активной партии (выпуск 0.13.0): запись читается
   // один раз при старте, затем перезаписывается при каждом изменении.
   const saveStorage = useMemo(() => createSaveStorage(), []);
+  const saveSerializer = useMemo(() => createSaveSerializer(), []);
   const replayStorage = useMemo(() => createReplayStorage(), []);
   const saved = useMemo(() => saveStorage.load(), [saveStorage]);
 
@@ -125,6 +126,8 @@ export function App() {
     fog: saved?.match ? deserializeFog(saved.fog) : undefined,
   });
   const persistRef = useRef<() => void>(() => undefined);
+  // A later state must not be overwritten by an earlier worker response.
+  const saveRequestRef = useRef(0);
   persistRef.current = () => {
     if (!campaign) return;
     const state = session.get();
@@ -162,7 +165,10 @@ export function App() {
       : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
         ? state.screen
         : "menu";
-    saveStorage.save({
+    const request = ++saveRequestRef.current;
+    // MatchState, fog conversion and JSON.stringify run in packages/storage's
+    // worker. localStorage itself remains synchronous but receives ready JSON.
+    void saveSerializer.serialize({
       version: APP_VERSION,
       savedAt: Date.now(),
       campaign: campaign.getState(),
@@ -178,9 +184,15 @@ export function App() {
         campaignHintsDone: state.campaignHintsDone ?? [],
       },
       match,
-      fog: fog ? serializeFog(fog) : undefined,
+      fog,
+    }).then((serialized) => {
+      if (request === saveRequestRef.current) saveStorage.saveSerialized(serialized);
+    }).catch(() => {
+      // The worker can disappear during page shutdown; the next autosave retries.
     });
   };
+
+  useEffect(() => () => saveSerializer.dispose(), [saveSerializer]);
 
   useEffect(() => {
     let unBattle: (() => void) | undefined;

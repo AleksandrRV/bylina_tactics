@@ -988,6 +988,7 @@ export function BattleScreen() {
 
   useEffect(() => {
     rendererRef.current?.update({
+      matchSeed,
       snapshot,
       selectedId,
       aimId,
@@ -1002,7 +1003,7 @@ export function BattleScreen() {
       hoverCell,
       trainingHighlight,
     });
-  }, [snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {

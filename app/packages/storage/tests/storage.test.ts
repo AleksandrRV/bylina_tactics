@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { createReplayStorage, createSaveStorage, deserializeFog, isSaveData, serializeFog, type SaveData } from "../src/index.js";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
@@ -111,5 +111,34 @@ describe("createReplayStorage (0.17.0)", () => {
     expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 2", "Бой 1"]);
     replays.deleteReplay(2);
     expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 1"]);
+  });
+});
+
+describe("asynchronous save serialization", () => {
+  it("converts fog sets and returns JSON without changing the save shape", async () => {
+    const { createSaveSerializer } = await import("../src/index.js");
+    const serializer = createSaveSerializer();
+    const serialized = await serializer.serialize({
+      ...sampleSave(),
+      fog: { 1: { explored: new Set(["1,1"]), visible: new Set(["1,1"]) } },
+    });
+    serializer.dispose();
+    const parsed = JSON.parse(serialized) as SaveData;
+    expect(parsed.fog?.[1]?.explored).toEqual(["1,1"]);
+  });
+});
+
+describe("storage quota handling", () => {
+  it("does not throw and reports an exhausted localStorage backend", () => {
+    const quotaError = Object.assign(new Error("full"), { name: "QuotaExceededError" });
+    const backend = {
+      getItem: () => null,
+      setItem: () => { throw quotaError; },
+      removeItem: () => undefined,
+    };
+    const onQuotaExceeded = vi.fn();
+    const storage = createSaveStorage("bylina.quota", backend, { onQuotaExceeded });
+    expect(storage.save(sampleSave())).toBe(false);
+    expect(onQuotaExceeded).toHaveBeenCalledWith(quotaError);
   });
 });

@@ -77,6 +77,7 @@ export default defineConfig({
       "@bylina/net": path.resolve(appRoot, "packages/net/src/index.ts"),
       "@bylina/session": path.resolve(appRoot, "packages/session/src/index.ts"),
       "@bylina/settings": path.resolve(appRoot, "packages/settings/src/index.ts"),
+      "@bylina/storage": path.resolve(appRoot, "packages/storage/src/index.ts"),
       "@bylina/render": path.resolve(appRoot, "packages/render/src/index.ts"),
       "@bylina/ui": path.resolve(appRoot, "packages/ui/src/index.ts"),
     },

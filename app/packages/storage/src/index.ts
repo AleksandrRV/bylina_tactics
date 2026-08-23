@@ -41,14 +41,28 @@ export interface SaveData {
 
 export interface SaveStorage {
   save(data: SaveData): boolean;
+  /** Writes JSON produced by SaveSerializer without repeating JSON.stringify on the UI thread. */
+  saveSerialized(serialized: string): boolean;
   load(): SaveData | null;
   clear(): void;
+}
+
+export interface SaveStorageOptions {
+  /** Called when browser storage is full; autosave remains non-fatal. */
+  onQuotaExceeded?: (error: unknown) => void;
 }
 
 export interface StorageBackend {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
+}
+
+/** Safari uses code 22, Firefox may use 1014; modern engines use the name. */
+export function isQuotaExceededError(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as { name?: unknown; code?: unknown };
+  return candidate.name === "QuotaExceededError" || candidate.code === 22 || candidate.code === 1014;
 }
 
 /** Сериализация тумана войны: множества → массивы строк. */
@@ -161,7 +175,7 @@ export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?:
 
 export const DEFAULT_SAVE_KEY = "bylina.save.v1";
 
-export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: StorageBackend): SaveStorage {
+export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: StorageBackend, options: SaveStorageOptions = {}): SaveStorage {
   const storage = backend ?? {
     getItem: (storageKey) => {
       if (typeof localStorage === "undefined") return null;
@@ -175,15 +189,20 @@ export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: Stor
     },
   };
 
+  const write = (serialized: string): boolean => {
+    try {
+      storage.setItem(key, serialized);
+      return true;
+    } catch (error) {
+      // Full localStorage must never break a turn or leave the UI in an error state.
+      if (isQuotaExceededError(error)) options.onQuotaExceeded?.(error);
+      return false;
+    }
+  };
+
   return {
-    save: (data) => {
-      try {
-        storage.setItem(key, JSON.stringify(data));
-        return true;
-      } catch {
-        return false;
-      }
-    },
+    save: (data) => write(JSON.stringify(data)),
+    saveSerialized: (serialized) => write(serialized),
     load: () => {
       try {
         const raw = storage.getItem(key);
@@ -203,4 +222,69 @@ export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: Stor
       }
     },
   };
+}
+
+/** A save before fog sets are converted to JSON-safe arrays. */
+export type SaveDraft = Omit<SaveData, "fog"> & { fog?: FogState };
+
+/** Performs the expensive JSON conversion performed by the save worker. */
+export function serializeSaveDraft(data: SaveDraft): string {
+  const { fog, ...save } = data;
+  return JSON.stringify({ ...save, fog: fog ? serializeFog(fog) : undefined });
+}
+
+export interface SaveSerializer {
+  /** Serializes MatchState and fog off the UI thread where Workers are available. */
+  serialize(data: SaveDraft): Promise<string>;
+  dispose(): void;
+}
+
+type WorkerRequest = { id: number; data: SaveDraft };
+type WorkerResponse = { id: number; serialized?: string; error?: string };
+
+/**
+ * Creates the asynchronous serializer used by autosave. The synchronous fallback
+ * is retained for SSR and test runners which do not provide Web Workers.
+ */
+export function createSaveSerializer(): SaveSerializer {
+  if (typeof Worker === "undefined") {
+    return {
+      serialize: async (data) => serializeSaveDraft(data),
+      dispose: () => undefined,
+    };
+  }
+
+  try {
+    const worker = new Worker(new URL("./save-worker.ts", import.meta.url), { type: "module" });
+    let nextId = 1;
+    const pending = new Map<number, { resolve: (value: string) => void; reject: (reason: Error) => void }>();
+    worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
+      const request = pending.get(data.id);
+      if (!request) return;
+      pending.delete(data.id);
+      if (data.serialized !== undefined) request.resolve(data.serialized);
+      else request.reject(new Error(data.error ?? "Save worker serialization failed"));
+    };
+    worker.onerror = () => {
+      for (const request of pending.values()) request.reject(new Error("Save worker failed"));
+      pending.clear();
+    };
+    return {
+      serialize: (data) => new Promise<string>((resolve, reject) => {
+        const id = nextId++;
+        pending.set(id, { resolve, reject });
+        worker.postMessage({ id, data } satisfies WorkerRequest);
+      }),
+      dispose: () => {
+        worker.terminate();
+        for (const request of pending.values()) request.reject(new Error("Save worker disposed"));
+        pending.clear();
+      },
+    };
+  } catch {
+    return {
+      serialize: async (data) => serializeSaveDraft(data),
+      dispose: () => undefined,
+    };
+  }
 }
