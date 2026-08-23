@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.10";
+export const CORE_VERSION = "0.20.11";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -174,9 +174,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   let ended = false;
   /** Победа по цели миссии (эвакуация при rescue/recon), фиксируется ядром. */
   let objectiveVictory = false;
-  const eliminationEnabled = [PLAYER_OWNER, ENEMY_OWNER].every((owner) =>
-    state.entities.some((entity) => !entity.dead && entity.owner === owner && entity.coverType === 0)
-  );
+  const eliminationOwners = new Set(state.entities
+    .filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false)
+    .map((entity) => entity.owner));
+  const eliminationEnabled = eliminationOwners.size >= 2;
 
   const actorOf = (id: number): EntityState | undefined => state.entities.find((entity) => entity.id === id);
   const weaponIdsOf = (entity: EntityState): string[] => entity.weaponIds ?? (entity.weaponId ? [entity.weaponId] : []);
@@ -550,8 +551,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
     }
 
-    const players = state.entities.some((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
-    const enemies = state.entities.some((entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false);
+    const livingOwners = new Set(state.entities.filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false).map((entity) => entity.owner));
+    const players = livingOwners.has(PLAYER_OWNER);
+    const enemies = [...livingOwners].some((owner) => owner !== PLAYER_OWNER);
 
     // Уничтожение объекта: победа при гибели указанного идола/строения,
     // независимо от оставшихся противников (base-design §3.2).
@@ -1314,7 +1316,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             if (weapon.category === "melee" && edgeCoverOnLine(actor, areaTarget)?.coverType === 2 && !breach) continue;
             const edgeOptions = breach?.options ?? currentEdgeOptions(actor, areaTarget, weapon);
             if (breach) damageCover(breach.cover, events);
-            const hit = resolveCombatAgainst(actor, areaTarget, weapon, events, edgeOptions);
+            const hit = resolveCombatAgainst(actor, areaTarget, weapon, events, {
+              ...(edgeOptions ?? {}),
+              allowFriendly: skill.filter === "all" || skill.filter === "allies",
+            });
             if (!hit) continue;
             success = true;
             applySkillEffects(actor, skill, areaTarget, command.targetPos, events, Boolean(breach));

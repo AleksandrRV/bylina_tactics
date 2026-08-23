@@ -17,7 +17,8 @@ function eliminationLivingOf(state: MatchState, owner: number): EntityState[] {
 
 /** Успех — уничтожены все противники. Поражение — гибель всех основных бойцов игрока; временные призывы не заменяют дружину. */
 export function matchOutcome(state: MatchState): MatchOutcome {
-  if (eliminationLivingOf(state, PLAYER_OWNER).length === 0) return "defeat";
-  if (eliminationLivingOf(state, ENEMY_OWNER).length === 0) return "victory";
-  return "ongoing";
+  const livingOwners = new Set(state.entities.filter((entity) => isCombatant(entity) && entity.countsForElimination !== false).map((entity) => entity.owner));
+  if (!livingOwners.has(PLAYER_OWNER)) return "defeat";
+  // Owner 1 is the player perspective; any other living owner is an opponent.
+  return [...livingOwners].some((owner) => owner !== PLAYER_OWNER) ? "ongoing" : "victory";
 }
