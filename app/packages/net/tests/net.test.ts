@@ -49,3 +49,15 @@ describe("local transport", () => {
     expect(seen).toEqual(["ok", "ok"]);
   });
 });
+
+describe("runtime tactical payload validation", () => {
+  it("accepts valid commands and rejects malformed commands", async () => {
+    const { isCommandPayload, isEventBatchPayload, isSyncPayload } = await import("../src/index.js");
+    expect(isCommandPayload({ type: "MOVE", actorId: 1, to: { x: 1, y: 2, z: 1 } })).toBe(true);
+    expect(isCommandPayload({ type: "ATTACK", actorId: "1", targetId: 2, weaponId: "bow" })).toBe(false);
+    expect(isEventBatchPayload([{ type: "ENTITY_MOVED" }])).toBe(true);
+    expect(isEventBatchPayload({ type: "ENTITY_MOVED" })).toBe(false);
+    expect(isSyncPayload({ match: { turnNumber: 1, activeOwner: 1, grid: { tiles: [] }, entities: [] }, visible: [], explored: [] })).toBe(true);
+    expect(isSyncPayload({ match: {}, visible: [1], explored: [] })).toBe(false);
+  });
+});

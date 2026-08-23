@@ -47,8 +47,8 @@ export function createRelayServer(options = {}) {
         peer.name = message.name.trim(); peer.role = message.role; joinedRoomId = message.roomId;
         joinRoom(rooms, joinedRoomId, peer, MAX_PEERS);
       } else if (message.type === "SIGNAL") {
-        if (!joinedRoomId || message.roomId !== joinedRoomId) return send(socket, { type: "ERROR", message: "NOT_IN_ROOM" });
-        if (typeof message.to !== "string" || !validSignal(message.signal)) return send(socket, { type: "ERROR", message: "BAD_SIGNAL" });
+        if (!validRoomId(message.roomId) || !joinedRoomId || message.roomId !== joinedRoomId) return send(socket, { type: "ERROR", message: "NOT_IN_ROOM" });
+        if (typeof message.to !== "string" || message.to.length === 0 || message.to.length > 80 || !validSignal(message.signal)) return send(socket, { type: "ERROR", message: "BAD_SIGNAL" });
         const target = rooms.get(joinedRoomId)?.peers.find((candidate) => candidate.id === message.to);
         if (!target) return send(socket, { type: "ERROR", message: "PEER_NOT_FOUND" });
         send(target.socket, { type: "SIGNAL", from: peer.id, signal: message.signal });
