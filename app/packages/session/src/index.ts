@@ -777,12 +777,16 @@ export function createSession(
     },
     startTrainingMission: (missionId) => {
       if (!["movement", "combat", "skills"].includes(missionId)) return false;
+      // Окружение обучения фиксировано: постоянный seed даёт одну и ту же
+      // карту при каждом прохождении (base-design §3.5, доработка обучения).
+      // Без фиксации генератор строил бы новое поле на каждом запуске.
+      const TRAINING_SEED = { movement: 101, combat: 202, skills: 303 } as const;
       emit({
         ...idle,
         screen: "trainingBattle",
         battleKind: "training",
         trainingMissionId: missionId,
-        matchSeed: Date.now() >>> 0,
+        matchSeed: TRAINING_SEED[missionId as keyof typeof TRAINING_SEED] ?? 1,
       });
       return true;
     },

@@ -9,6 +9,13 @@ export interface SettingsState {
   highContrast: boolean;
   /** Показывать подсказки и туториалы «первого раза» (0.20.0); по умолчанию включено. */
   showHints: boolean;
+  /**
+   * Отладочный режим (0.20.1, doc/debug-mode.md): включает средства QA
+   * (оверлей стоимости, автопобеда) в боевом интерфейсе. Помимо адреса с
+   * параметром `?debug=1` теперь активируется и настройкой — удобно на
+   * устройствах, где параметр адреса недоступен. По умолчанию выключено.
+   */
+  debugMode: boolean;
 }
 
 export const defaultSettings: SettingsState = {
@@ -19,6 +26,7 @@ export const defaultSettings: SettingsState = {
   fontScale: 1,
   highContrast: false,
   showHints: true,
+  debugMode: false,
 };
 
 export interface SettingsStorage {
@@ -49,6 +57,7 @@ export function sanitizeSettings(
     fontScale: clamp(Number(raw?.fontScale ?? defaultSettings.fontScale), 0.85, 1.4),
     highContrast: Boolean(raw?.highContrast),
     showHints: raw?.showHints !== false,
+    debugMode: Boolean(raw?.debugMode),
   };
 }
 

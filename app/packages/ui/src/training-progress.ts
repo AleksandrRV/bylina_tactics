@@ -80,6 +80,49 @@ export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   return true;
 }
 
+/** Категории действий игрока, допустимые на шаге обучения. */
+export type TrainingActionKind =
+  | "move"
+  | "dash"
+  | "attack"
+  | "skill"
+  | "defend"
+  | "overwatch"
+  | "endTurn";
+
+/**
+ * Допустимо ли действие `action` на активном шаге обучения `until`.
+ * Используется, чтобы игрок в обучении не мог совершить иное действие,
+ * чем предписывает шаг (доработка обучения): например, на шаге
+ * «перемещение» недоступны атака, умения, стойка, дозор и завершение хода.
+ * Шаг «ознакомление» (noop) не допускает никаких действий, кроме клика
+ * для подтверждения. Неизвестный тип шага не ограничивает (безопасный предел).
+ */
+export function trainingActionAllowed(until: string | undefined, action: TrainingActionKind): boolean {
+  switch (until) {
+    case "noop":
+      return false;
+    case "move":
+      return action === "move";
+    case "dash":
+      return action === "dash";
+    case "attack":
+      return action === "move" || action === "attack";
+    case "approach":
+      return action === "move" || action === "attack";
+    case "skill":
+      return action === "skill";
+    case "defend":
+      return action === "defend";
+    case "overwatch":
+      return action === "overwatch";
+    case "end_turn":
+      return action === "endTurn";
+    default:
+      return true;
+  }
+}
+
 /**
  * Подсветка обучающей подсказки на поле: клетка либо сущность. Шаг
  * «клетка/зона» без координат (карты миссий случайны) подсвечивает самую

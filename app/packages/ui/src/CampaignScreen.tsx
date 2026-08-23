@@ -320,9 +320,30 @@ export function CampaignScreen() {
     return map;
   }, [items]);
 
+  // Иконка выхода из стратегического режима в главное меню (доработка).
+  function ExitToMenuIcon() {
+    return (
+      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M13 4H6v16h7" />
+        <path d="M16 8l4 4-4 4" />
+        <path d="M10 12h9" />
+      </svg>
+    );
+  }
+
   return (
     <div className="screen campaign-screen">
       <header className="campaign-top">
+        <button
+          type="button"
+          className="campaign-exit-btn"
+          onClick={() => session.goTo("menu")}
+          title={t("campaign.toMenu")}
+          aria-label={t("campaign.toMenu")}
+        >
+          <ExitToMenuIcon />
+          {t("campaign.toMenu")}
+        </button>
         <div className="campaign-title-block">
           <p className="eyebrow">{t("campaign.kingdom")}</p>
           <h1>{t("menu.campaign")}</h1>

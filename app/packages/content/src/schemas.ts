@@ -328,7 +328,7 @@ export const trainingMissionSchema = z.object({
   descriptionKey: z.string().min(1),
   map: mapGenConfigSchema,
   playerSlots: z.array(id).min(1).max(5),
-  enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(1),
+  enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()).min(0),
   hints: z.array(trainingHintSchema).min(1),
   /** Реактивные подсказки (0.20.1): ключи локализации плашек на отравление,
    *  воскрешение и призыв в миссии «Умения и состояния». */

@@ -742,11 +742,16 @@
     font-size: 0.9rem;
   }
 
-  .training-mentor,
-  .training-hint,
-  .training-note,
+  .training-coach,
   .campaign-hint-banner {
     top: 48px;
+    max-width: 94%;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+  }
+
+  .training-note {
+    bottom: 70px;
     max-width: 94%;
     padding: 6px 10px;
     font-size: 0.82rem;
@@ -842,10 +847,14 @@
     top: 42px;
   }
 
-  .training-mentor,
-  .training-hint,
+  .training-coach,
   .campaign-hint-banner {
     top: 40px;
+    padding: 4px 8px;
+  }
+
+  .training-note {
+    bottom: 52px;
     padding: 4px 8px;
   }
 }
@@ -1154,53 +1163,80 @@
   justify-content: center;
 }
 
-/* Нарративная рамка обучения: наставник-летописец (0.19.1) */
-.training-mentor {
+/* Единая обучающая панель «наставник» (доработка вёрстки обучения):
+   одна компактная карточка у верхнего края вместо трёх плавающих баннеров,
+   перекрывавших центр поля. Карточка не перехватывает клики по клеткам. */
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.training-coach {
   position: absolute;
-  top: 60px;
+  top: 56px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   align-items: center;
   gap: 12px;
-  max-width: 560px;
-  padding: 8px 16px 8px 10px;
-  background: rgba(16, 22, 16, 0.92);
-  border: 1px solid rgba(224, 179, 74, 0.4);
-  border-radius: 8px;
+  width: min(92%, 640px);
+  max-width: 640px;
+  padding: 10px 14px 10px 12px;
+  background: linear-gradient(180deg, rgba(20, 28, 20, 0.96), rgba(14, 20, 14, 0.94));
+  border: 1px solid rgba(224, 179, 74, 0.45);
+  border-bottom: 2px solid rgba(224, 179, 74, 0.55);
+  border-radius: 10px;
   color: #f3ecdc;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   z-index: 69;
-  /* Баннер не должен перехватывать клики по клеткам поля (0.19.2). */
   pointer-events: none;
+  animation: hint-in 300ms ease-out;
 }
 
-.training-mentor-face {
-  width: 44px;
-  height: 44px;
+.training-coach-face {
+  width: 48px;
+  height: 48px;
   border-radius: 50%;
-  border: 1px solid rgba(224, 179, 74, 0.5);
+  border: 2px solid rgba(224, 179, 74, 0.55);
+  box-shadow: 0 0 0 3px rgba(224, 179, 74, 0.12);
   object-fit: cover;
   flex: none;
 }
 
-.training-mentor-meta {
+.training-coach-body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 3px;
   min-width: 0;
+  flex: 1 1 auto;
 }
 
-.training-mentor-name {
+.training-coach-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.training-coach-name {
   color: var(--amber, #e0b34a);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  font-weight: 600;
 }
 
-.training-mentor-line {
-  font-size: 0.88rem;
-  line-height: 1.35;
+.training-coach-line {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #ece6d6;
 }
 
 /* Пульсирующая подсветка элемента панели/кнопки для подсказок (0.19.1) */
@@ -1229,41 +1265,7 @@
   margin: 6px 0;
 }
 
-/* Баннер подсказки обучения (0.19.0) */
-.training-hint {
-  position: absolute;
-  top: 128px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: 520px;
-  padding: 10px 18px;
-  background: rgba(16, 22, 16, 0.92);
-  border: 1px solid rgba(224, 179, 74, 0.55);
-  border-radius: 6px;
-  color: #f3ecdc;
-  font-size: 0.9rem;
-  line-height: 1.4;
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
-  z-index: 70;
-  animation: hint-in 300ms ease-out;
-  /* Баннер не должен перехватывать клики по клеткам поля (0.19.2). */
-  pointer-events: none;
-}
-
-@keyframes hint-in {
-  from {
-    opacity: 0;
-    transform: translate(-50%, -10px);
-  }
-  to {
-    opacity: 1;
-    transform: translate(-50%, 0);
-  }
-}
-
+/* Шаг обучения (номер в бейдже панели наставника). */
 .training-hint-step {
   flex: none;
   padding: 2px 10px;
@@ -1317,10 +1319,11 @@
   text-align: center;
 }
 
-/* Плашка реактивной подсказки обучения (0.20.1) */
+/* Плашка реактивной подсказки обучения (0.20.1): у нижнего края, над
+   панелью действий, чтобы не перекрывать центр поля. */
 .training-note {
   position: absolute;
-  top: 178px;
+  bottom: 84px;
   left: 50%;
   transform: translateX(-50%);
   display: flex;

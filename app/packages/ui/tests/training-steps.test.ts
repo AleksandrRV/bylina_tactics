@@ -144,10 +144,14 @@ describe("QA manual: training missions follow the hint steps exactly", () => {
     const hints = [...mission.hints].sort((a, b) => a.step - b.step);
     let step = 0;
     const visited: string[] = [];
+    // В «Первых шагах» противника нет (окружение соответствует уроку
+    // перемещения), поэтому не прерываем цикл по отсутствию врага — ведём
+    // игрока по шагам подсказки до их завершения.
+    const hasEnemies = mission.enemies.length > 0;
     for (let turn = 0; turn < 60 && step < hints.length; turn += 1) {
       const snap = kernel.getSnapshot();
       if (snap.activeOwner !== PLAYER_OWNER) { enemyTurn(kernel); continue; }
-      if (livingOf(snap, ENEMY_OWNER).length === 0) break;
+      if (hasEnemies && livingOf(snap, ENEMY_OWNER).length === 0) break;
       const until = hints[step]!.until;
       const events = actPerHint(kernel, until);
       if (until === "end_turn" && events.some((e) => e.type === "TURN_CHANGED")) {

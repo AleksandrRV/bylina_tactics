@@ -229,6 +229,8 @@
     "sfxVolume": "Actions",
     "showHints": "Show hints",
     "showHintsHint": "First-time tutorials in the campaign. Turning them off does not block progress.",
+    "debugMode": "Debug mode",
+    "debugModeHint": "Inspection tools (movement-cost overlay, auto-win) in battle. For developers and QA.",
     "back": "Back to menu"
   },
   "common": {
@@ -606,6 +608,8 @@
       "back": "Back to training"
     },
     "skip": "Skip",
+    "exit": "Exit training",
+    "exitHint": "Abandon training and return to mission selection.",
     "allDone": "Training completed",
     "allDoneHint": "All three missions are done. The Chronicler is pleased — the Quick Match awaits you.",
     "toQuickMatch": "Go to Quick Match"

@@ -25,7 +25,7 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
-import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingHintsSorted, trainingPanelKey } from "./training-progress.js";
+import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingPanelKey } from "./training-progress.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -65,6 +65,17 @@ function DebugIcon() {
       <path d="M12 8v12" />
       <path d="M7 12H3M21 12h-4M7.5 17l-3 2.5M16.5 17l3 2.5M7.5 11l-3-2.5M16.5 11l3-2.5" />
       <circle cx="12" cy="7" r="2.5" />
+    </svg>
+  );
+}
+
+/** Иконка выхода из обучения: дверь с выходящей стрелкой. */
+function ExitIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M13 4H6v16h7" />
+      <path d="M16 8l4 4-4 4" />
+      <path d="M10 12h9" />
     </svg>
   );
 }
@@ -364,17 +375,30 @@ export function BattleScreen() {
   // зоны достижимости: шагу «клетка» без координат нужен список достижимых.
   const [trainingOver, setTrainingOver] = useState<"victory" | "defeat" | null>(null);
 
-  // Завершение миссии обучения: итоговая плашка; отметка «пройдена» — только
-  // при победе. Зависимость включает snapshot.entities: исход атакой (без
-  // смены хода) меняет сущностей, но не turnNumber — без этого эффект не
-  // перезапустится. Ожидается окончание воспроизведения событий (busy).
+  // Критерий завершения обучения — выполнение ВСЕХ шагов подсказки, а не
+  // уничтожение противников (доработка обучения). Окружение в обучении
+  // может не содержать врага (миссия перемещения), поэтому победа по
+  // правилам ядра (все противники уничтожены) здесь неприменима и могла бы
+  // сработать до начала действий. Поражение возможно лишь если сторона
+  // игрока потеряла всех бойцов — враги в обучении не ходят, иного пути нет.
+  const trainingDone = isTraining && trainingHints.length > 0 && hintStep >= trainingHints.length;
   useEffect(() => {
-    if (!isTraining || busy) return;
+    if (!isTraining || busy || trainingOver) return;
+    if (trainingDone && trainingMission) {
+      session.completeTrainingMission(trainingMission.id);
+      setTrainingOver("victory");
+      return;
+    }
     const outcome = session.getBattleOutcome();
-    if (outcome === "ongoing") return;
-    if (outcome === "victory" && trainingMission) session.completeTrainingMission(trainingMission.id);
-    setTrainingOver(outcome);
-  }, [snapshot.turnNumber, snapshot.entities, busy]);
+    if (outcome === "defeat") setTrainingOver("defeat");
+  }, [snapshot.turnNumber, snapshot.entities, busy, isTraining, trainingDone, trainingHints.length, hintStep, trainingOver, trainingMission]);
+
+  // Ограничение действий в обучении (доработка обучения): игрок может
+  // совершать только то, что предписывает активный шаг. Клик по полю в
+  // ознакомительном шаге и пауза/выход из обучения остаются всегда доступны.
+  const trainingUntil = isTraining && activeHint ? activeHint.until : null;
+  const trainingCan = (action: Parameters<typeof trainingActionAllowed>[1]): boolean =>
+    trainingUntil === null ? true : trainingActionAllowed(trainingUntil, action);
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -653,13 +677,20 @@ export function BattleScreen() {
   const tryMove = (to: CellPos): void => {
     if (selectedId === null || paused || busy) return;
     if (snapshot.activeOwner !== viewOwner) return;
+    // Обучение: перемещение допустимо только на шагах «перемещение»/«рывок».
+    if (!trainingCan("move") && !trainingCan("dash")) return;
     applyCommand({ type: "MOVE", actorId: selectedId, to });
   };
 
   const tryAttack = (targetId: number): void => {
     if (selectedId === null || !action || paused || busy) return;
     if (snapshot.activeOwner !== viewOwner) return;
-    const command: Command = action.type === "weapon"
+    // Обучение: оружейная атака — только на шагах «атака»/«приближение»,
+    // применение умения — только на шаге «умение» (tryAttack обслуживает оба).
+    const isWeapon = action.type === "weapon";
+    if (isWeapon && !trainingCan("attack")) return;
+    if (!isWeapon && !trainingCan("skill")) return;
+    const command: Command = isWeapon
       ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
       : { type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id };
     applyCommand(command);
@@ -667,11 +698,15 @@ export function BattleScreen() {
 
   const useSelfSkill = (skillId: string): void => {
     if (selectedId === null || paused || busy || snapshot.activeOwner !== viewOwner) return;
+    // Обучение: умение допустимо только на шаге «умение».
+    if (!trainingCan("skill")) return;
     applyCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
   };
 
   const tryPositionSkill = (pos: CellPos): void => {
     if (selectedId === null || action?.type !== "skill" || paused || busy) return;
+    // Обучение: позиционное умение допустимо только на шаге «умение».
+    if (!trainingCan("skill")) return;
     const same = skillTargetPos?.x === pos.x && skillTargetPos.y === pos.y && skillTargetPos.z === pos.z;
     if (!same) {
       setSkillTargetPos(pos);
@@ -690,6 +725,14 @@ export function BattleScreen() {
   const runEnemyPhase = async (): Promise<void> => {
     setEnemyPhase(true);
     try {
+      // В обучении противник не ходит: окружение соответствует уроку, а ход
+      // врага только отвлекал бы и мог создать угрозу (доработка обучения).
+      // Завершаем ход Нави сразу, возвращая управление игроку.
+      if (isTraining) {
+        session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
+        finishFromEvents([]);
+        return;
+      }
       await sleep(430);
       for (let guard = 0; guard < 96; guard += 1) {
         const snap = session.getBattleSnapshot(PLAYER_OWNER);
@@ -815,7 +858,8 @@ export function BattleScreen() {
     }
 
     const automaticAttack = primaryAttackForEnemy(selected, entity, viewOwner, targeting);
-    if (automaticAttack) {
+    // Обучение: авто-атака по врагу допустима только на шагах «атака»/«приближение».
+    if (automaticAttack && trainingCan("attack")) {
       setAction(automaticAttack);
       setAimId(entity?.id ?? null);
       setPreview(null);
@@ -844,6 +888,12 @@ export function BattleScreen() {
     // Граневое укрытие в ней не перехватывает выбор как цель атаки.
     if (reach && !targeting) {
       const id = cellKey(x, y);
+      const cell = byReach.get(id);
+      // Обучение: шаг «перемещение» принимает только клетки за одно очко
+      // действия, шаг «рывок» — только за два. Иной клик игнорируется, чтобы
+      // игрок не совершил действие, отличное от предписанного шагом.
+      if (trainingUntil === "move" && cell && cell.apCost !== 1) return;
+      if (trainingUntil === "dash" && cell && cell.apCost !== 2) return;
       const coarse = window.matchMedia("(pointer: coarse)").matches;
       if (coarse && preview !== id) {
         setPreview(id);
@@ -950,7 +1000,7 @@ export function BattleScreen() {
         }
         return;
       }
-      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner) {
+      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingCan("defend")) {
         applyCommand({ type: "DEFEND", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -958,7 +1008,7 @@ export function BattleScreen() {
         setPreview(null);
         return;
       }
-      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner) {
+      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingCan("overwatch")) {
         applyCommand({ type: "OVERWATCH", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -968,6 +1018,8 @@ export function BattleScreen() {
       }
       if (ACTION_SHORTCUTS.includes(event.key as (typeof ACTION_SHORTCUTS)[number]) && selected) {
         const index = Number(event.key) - 1;
+        // Обучение: умение недопустимо вне шага «умение».
+        if (!trainingCan("skill")) return;
         const chosen = selectableActions(selected)[index];
         if (!chosen) return;
         if (chosen.type === "skill") {
@@ -1035,27 +1087,34 @@ export function BattleScreen() {
       <div ref={hostRef} className="battle-stage" />
       <div className="battle-hud">
         {isTraining && trainingMission ? (
-          <div className="training-mentor" role="status">
+          // Единая обучающая панель «наставник»: портрет, шаг и инструкция
+          // собраны в одну компактную карточку у верхнего края, чтобы не
+          // перекрывать центр поля (доработка вёрстки обучения).
+          <div className="training-coach" role="status" aria-live="polite">
             {unitPortrait("chronicler") ? (
-              <img className="training-mentor-face" src={unitPortrait("chronicler")} alt="" draggable={false} />
+              <img className="training-coach-face" src={unitPortrait("chronicler")} alt="" draggable={false} />
             ) : null}
-            <div className="training-mentor-meta">
-              <span className="training-mentor-name">{t("training.mentor")}</span>
-              <span className="training-mentor-line">{t(`training.${trainingMission.id}.intro`)}</span>
+            <div className="training-coach-body">
+              <div className="training-coach-head">
+                <span className="training-coach-name">{t("training.mentor")}</span>
+                {activeHint ? (
+                  <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
+                ) : null}
+              </div>
+              <p className="training-coach-line">
+                {activeHint ? t(activeHint.textKey) : t(`training.${trainingMission.id}.intro`)}
+              </p>
             </div>
-          </div>
-        ) : null}
-        {isTraining && activeHint ? (
-          <div className="training-hint" role="status" aria-live="polite">
-            <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
-            <span className="training-hint-text">{t(activeHint.textKey)}</span>
-            {/* Пропуск подсказки (0.20.1): полезен при повторном прохождении. */}
-            <button type="button" className="training-skip" onClick={() => setHintStep((value) => value + 1)}>
-              {t("training.skip")}
-            </button>
+            {activeHint ? (
+              <button type="button" className="training-skip" onClick={() => setHintStep((value) => value + 1)}>
+                {t("training.skip")}
+              </button>
+            ) : null}
           </div>
         ) : null}
         {trainingNote ? (
+          // Реактивные плашки (яд, воскрешение, призыв) — у нижнего края,
+          // над панелью действий, чтобы не перекрывать центр поля.
           <div className="training-note" role="status" aria-live="polite">
             <span className="training-note-mark" aria-hidden="true">✦</span>
             {t(trainingNote)}
@@ -1086,6 +1145,17 @@ export function BattleScreen() {
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
               {t("battle.pause")}
             </button>
+            {isTraining ? (
+              <button
+                type="button"
+                className="hud-btn hud-icon-btn training-exit"
+                onClick={() => session.goTo("training")}
+                title={t("training.exit")}
+                aria-label={t("training.exit")}
+              >
+                <ExitIcon />
+              </button>
+            ) : null}
             {debug ? (
               <>
                 <button
@@ -1400,7 +1470,7 @@ export function BattleScreen() {
                 className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && index === 0 ? " hint-pulse" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
-                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("attack")}
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
                   setAction(active ? null : { type: "weapon", id: weaponId });
@@ -1429,7 +1499,7 @@ export function BattleScreen() {
                   aria-pressed={active}
                   data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingCan("skill")}
                   onClick={() => {
                     if (skill?.category === "self") useSelfSkill(skillId);
                     else {
@@ -1452,7 +1522,7 @@ export function BattleScreen() {
               className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}${hintPanelKey === "defend" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.defending)}
               data-action-state={selected?.defending ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("defend")}
               title={t("battle.defendHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1474,7 +1544,7 @@ export function BattleScreen() {
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}${hintPanelKey === "overwatch" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.overwatch)}
               data-action-state={selected?.overwatch ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingCan("overwatch")}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -1495,7 +1565,7 @@ export function BattleScreen() {
           <button
             type="button"
             className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
-            disabled={busy || snapshot.activeOwner !== viewOwner}
+            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingCan("endTurn")}
             onClick={() => endTurn()}
           >
             {t("field.endTurn")}

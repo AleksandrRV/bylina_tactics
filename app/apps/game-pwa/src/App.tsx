@@ -235,12 +235,20 @@ export function App() {
 
   void content;
 
-  // Отладочный режим (0.20.1): средства QA (автопобеда, оверлей стоимости)
-  // доступны только при адресе с параметром ?debug=1 — в обычной игре
-  // служебные кнопки в боевом интерфейсе не показываются.
+  // Отладочный режим (0.20.1, doc/debug-mode.md): средства QA (автопобеда,
+  // оверлей стоимости) доступны при адресе с параметром ?debug=1 либо при
+  // включённой настройкой отладочного режима. Настройка реактивна: включение
+  // в «Настройках» сразу открывает служебные кнопки в бою.
+  const [debugMode, setDebugMode] = useState(settings.get().debugMode ?? false);
+  useEffect(
+    () => settings.subscribe((state) => setDebugMode(Boolean(state.debugMode))),
+    [settings],
+  );
   const debug = useMemo(
-    () => (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
-    [],
+    () =>
+      debugMode ||
+      (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
+    [debugMode],
   );
 
   return (

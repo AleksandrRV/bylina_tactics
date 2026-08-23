@@ -73,6 +73,23 @@ export function SettingsScreen() {
         </label>
       </section>
 
+      <section className="panel">
+        <label className="toggle-row" htmlFor="debug-mode">
+          <span className="toggle-meta">
+            <span>{t("settings.debugMode")}</span>
+            <span className="muted">{t("settings.debugModeHint")}</span>
+          </span>
+          <input
+            id="debug-mode"
+            type="checkbox"
+            role="switch"
+            aria-checked={state.debugMode}
+            checked={state.debugMode}
+            onChange={(event) => settings.set({ debugMode: event.target.checked })}
+          />
+        </label>
+      </section>
+
       <button type="button" className="btn btn-primary" onClick={() => session.goTo("menu")}>
         {t("settings.back")}
       </button>
