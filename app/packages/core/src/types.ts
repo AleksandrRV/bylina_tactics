@@ -71,6 +71,7 @@ export interface EntityState {
   countsForElimination?: boolean;
   camouflageMinCover?: boolean;
   providesCamouflage?: boolean;
+  preferredRange?: number;
   fleeHp?: number;
   coverType: 0 | 1 | 2;
   /** Граневое укрытие: 0=N, 1=E, 2=S, 3=W. undefined = занимает всю клетку. */

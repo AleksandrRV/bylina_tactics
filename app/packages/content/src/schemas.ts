@@ -22,6 +22,7 @@ export const unitConfigSchema = z.object({
   camouflageMinCover: z.boolean().optional(),
   providesCamouflage: z.boolean().optional(),
   decoy: z.boolean().optional(),
+  preferredRange: z.number().int().min(0).optional(),
   timedLife: positiveDuration.optional(),
 }).strict();
 
