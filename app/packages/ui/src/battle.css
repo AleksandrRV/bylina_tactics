@@ -1370,3 +1370,49 @@
   border-color: var(--amber, #e0b34a);
   color: var(--amber, #e0b34a);
 }
+
+/* Кнопка «Далее» ознакомительного шага (0.20.2). */
+.training-continue {
+  align-self: flex-start;
+  margin-top: 6px;
+  padding: 4px 14px;
+  border: 1px solid rgba(224, 179, 74, 0.6);
+  border-radius: 10px;
+  background: rgba(224, 179, 74, 0.16);
+  color: var(--amber, #e0b34a);
+  font-size: 0.85rem;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background 160ms ease, color 160ms ease;
+}
+
+.training-continue:hover,
+.training-continue:focus-visible {
+  background: rgba(224, 179, 74, 0.3);
+}
+
+/* Точки-шаги прогресса обучения (0.20.2). */
+.training-step-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: 8px;
+  pointer-events: none;
+}
+
+.training-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(120, 140, 160, 0.35);
+  transition: background 200ms ease, transform 200ms ease;
+}
+
+.training-step-dot.is-done {
+  background: rgba(150, 200, 150, 0.8);
+}
+
+.training-step-dot.is-current {
+  background: var(--amber, #e0b34a);
+  transform: scale(1.3);
+}

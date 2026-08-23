@@ -92,13 +92,26 @@
     "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission.",
     "saved": "Saved",
     "controls": {
-      "weapons": "weapons and skills (press again to cancel)",
+      "weapons": "weapon and skill slots (select and use)",
       "defend": "defensive stance",
       "overwatch": "overwatch",
       "next": "next fighter",
       "pause": "pause",
-      "touch": "Touch: tap twice to confirm, pinch to zoom, long press for help."
-    }
+      "touch": "touch controls: tap to select and act, drag to pan the field"
+    },
+    "reject": {
+      "generic": "That action is unavailable right now.",
+      "ILLEGAL": "That action is unavailable right now.",
+      "NO_AP": "Not enough action points.",
+      "ON_COOLDOWN": "The skill is still recharging.",
+      "NO_USES": "No uses remain.",
+      "NOT_YOUR_TURN": "It is not your turn.",
+      "OCCUPIED": "The cell is occupied.",
+      "NOT_FOUND": "No available target.",
+      "NO_LOS": "The target is hidden behind an obstacle.",
+      "OUT_OF_RANGE": "Out of range."
+    },
+    "controlsTitle": "Controls"
   },
   "unit": {
     "bogatyr": {
@@ -236,7 +249,8 @@
   "common": {
     "ok": "OK",
     "close": "Close",
-    "notReady": "Unavailable"
+    "notReady": "Unavailable",
+    "back": "Back"
   },
   "skill": {
     "circular_sweep": {
@@ -401,7 +415,12 @@
     "wounded": "Wounded",
     "leveledUp": "Gained a level",
     "newRecruit": "New recruit",
-    "rewards": "Reward"
+    "rewards": "Reward",
+    "title": "Mission result",
+    "victoryHint": "Mission accomplished — the chronicle grows.",
+    "defeatHint": "The druzhina fell back. Gather strength and try again.",
+    "darknessGained": "Darkness: +{value}",
+    "toMap": "Back to the ship map"
   },
   "deployment": {
     "title": "Deployment",
@@ -580,21 +599,21 @@
       "hint2": "Approach the highlighted cell: click it.",
       "hint3": "End your turn with the button on the right.",
       "hint4": "Nice step! Now the dash: pick the farthest highlighted cell — a move for two action points.",
-      "hint5": "End your turn — and the enemy will move."
+      "hint5": "End the turn with the button on the right — a new turn begins."
     },
     "combat": {
       "title": "Combat",
       "description": "Attack, cover, height, hit chance and damage.",
       "intro": "Against Nav bravery alone is not enough: height, cover and a careful aim decide the outcome.",
-      "hint1": "Pick a weapon and attack the enemy.",
-      "hint2": "The enemy takes cover: cover lowers your hit chance by 25–50%, height changes it by 20%. Move closer or flank around."
+      "hint1": "Pick a weapon and attack the enemy: close in on it first.",
+      "hint2": "The upyr hides behind cover: cover subtracts 25–50 from your hit chance, height changes it by 20. Compare the numbers in the hit breakdown, move closer or flank around."
     },
     "skills": {
       "title": "Skills & statuses",
       "description": "Class skills, overwatch, poison and resurrection, summons, fog of war.",
-      "intro": "The Znaharka and the hero's skills: heal, cleanse and stand watch to the last.",
-      "hint1": "Use the selected fighter's skill.",
-      "hint2": "Use the defensive stance (key 9).",
+      "intro": "Three against Nav: the Bogatyr strikes, the Znaharka heals and summons, the Strelets shoots from afar. Try skills, the stance and overwatch.",
+      "hint1": "Use the selected fighter's skill: the Bogatyr's \"Circular Sweep\" or the Znaharka's \"Summon Beast\".",
+      "hint2": "Use the defensive stance (key 9): Nav strikes back — the stance reduces the damage.",
       "hint3": "Put a fighter on overwatch (key 0): they will answer an enemy entering their sector. The fog of war hides everything out of sight.",
       "notePoison": "A fighter is poisoned! The poison ticks at the start of a turn — cleanse it with the Znaharka's skill.",
       "noteResurrect": "The Kikimora raised a skeleton! Kill it again.",
@@ -612,6 +631,16 @@
     "exitHint": "Abandon training and return to mission selection.",
     "allDone": "Training completed",
     "allDoneHint": "All three missions are done. The Chronicler is pleased — the Quick Match awaits you.",
-    "toQuickMatch": "Go to Quick Match"
+    "toQuickMatch": "Go to Quick Match",
+    "continue": "Continue",
+    "reset": "Reset progress",
+    "resetHint": "Completed mission marks will be cleared.",
+    "battleLabel": "Training",
+    "objective": {
+      "movement": "Follow the Chronicler: a step, a dash and ending the turn.",
+      "combat": "Follow the Chronicler and defeat the upyr.",
+      "skills": "Try skills, the defensive stance and overwatch against Nav."
+    },
+    "offerOpen": "Start training"
   }
 }

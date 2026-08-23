@@ -103,6 +103,40 @@ export const NEEDLE: WeaponStats = {
   critBonus: 1,
 };
 
+export const MACE: WeaponStats = {
+  id: "mace",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: -5,
+  minDmg: 5,
+  maxDmg: 7,
+  crit: 10,
+  critBonus: 2,
+  envDmg: 1,
+};
+
+export const PISHCHAL: WeaponStats = {
+  id: "pishchal",
+  category: "ranged",
+  apCost: 2,
+  endsTurn: true,
+  range: 10,
+  requiresLOS: true,
+  aimMod: 10,
+  minDmg: 6,
+  maxDmg: 8,
+  crit: 20,
+  critBonus: 3,
+  envDmg: 1,
+  closeRangePenalty: { distHLessThan: 4, penalty: 30 },
+};
+
+// Запасные записи юнитов обучения (0.20.2: приведены в соответствие с
+// боевыми записями содержимого — оружие, умения и воля совпадают, чтобы
+// автономный прогон без файлов содержимого не менял поведение режима).
 export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
   bogatyr: {
     id: "bogatyr",
@@ -111,8 +145,10 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 70,
     defense: 10,
+    will: 40,
     vision: 12,
-    weapons: ["sword"],
+    weapons: ["sword", "mace"],
+    skills: ["circular_sweep", "breach", "shield_bash"],
   },
   strelets: {
     id: "strelets",
@@ -121,8 +157,10 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 85,
     defense: 0,
+    will: 30,
     vision: 14,
-    weapons: ["bow"],
+    weapons: ["bow", "pishchal"],
+    skills: ["aimed_eye"],
   },
   znaharka: {
     id: "znaharka",
@@ -131,8 +169,10 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 75,
     defense: 0,
+    will: 55,
     vision: 12,
     weapons: ["sling"],
+    skills: ["heal", "cleanse", "summon_forest_beast"],
   },
   upyr: {
     id: "upyr",
@@ -141,6 +181,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 60,
     defense: 0,
+    will: 20,
     vision: 10,
     weapons: ["claws"],
   },
@@ -151,8 +192,12 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 5,
     aim: 78,
     defense: 5,
+    will: 35,
     vision: 12,
     weapons: ["branch"],
+    skills: ["roots"],
+    camouflageMinCover: true,
+    providesCamouflage: true,
   },
   kikimora: {
     id: "kikimora",
@@ -161,8 +206,10 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     mobility: 6,
     aim: 68,
     defense: 0,
+    will: 25,
     vision: 10,
     weapons: ["needle"],
+    skills: ["poison_needles", "raise_skeleton"],
   },
 };
 
@@ -174,6 +221,8 @@ export function defaultTrainingWeapons(): Record<string, WeaponStats> {
     [CLAWS.id]: CLAWS,
     [BRANCH.id]: BRANCH,
     [NEEDLE.id]: NEEDLE,
+    [MACE.id]: MACE,
+    [PISHCHAL.id]: PISHCHAL,
   };
 }
 

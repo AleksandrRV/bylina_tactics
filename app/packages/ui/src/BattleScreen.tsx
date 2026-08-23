@@ -25,7 +25,7 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
-import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingPanelKey } from "./training-progress.js";
+import { hintCompletedByEvents, resolveTrainingHighlight, shouldAutoEndTurn, trainingActionAllowed, trainingHintsSorted, trainingPanelKey, trainingStepAfterAutoSkip } from "./training-progress.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -84,7 +84,7 @@ export function BattleScreen() {
   useI18nTick();
   const t = useT();
   const { session, content, debug } = useServices();
-  const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed } = useSessionState();
+  const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed, trainingDone: trainingDoneMissions } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -375,21 +375,36 @@ export function BattleScreen() {
   // зоны достижимости: шагу «клетка» без координат нужен список достижимых.
   const [trainingOver, setTrainingOver] = useState<"victory" | "defeat" | null>(null);
 
-  // Критерий завершения обучения — выполнение ВСЕХ шагов подсказки, а не
-  // уничтожение противников (доработка обучения). Окружение в обучении
-  // может не содержать врага (миссия перемещения), поэтому победа по
-  // правилам ядра (все противники уничтожены) здесь неприменима и могла бы
-  // сработать до начала действий. Поражение возможно лишь если сторона
-  // игрока потеряла всех бойцов — враги в обучении не ходят, иного пути нет.
+  // Автопропуск шагов, ставших невыполнимыми (0.20.2): шаг «приблизьтесь»
+  // с погибшей целью перескакивается — цель уже поражена. Пересчёт на каждое
+  // изменение снимка: цель могла погибнуть как действием игрока, так и
+  // событием чужого хода.
+  useEffect(() => {
+    if (!isTraining || trainingOver) return;
+    setHintStep((value) => trainingStepAfterAutoSkip(trainingHints, value, snapshot.entities));
+  }, [isTraining, trainingHints, snapshot.entities, trainingOver]);
+
+  // Завершение миссии обучения (0.19.0, доводка 0.20.2). Пути к победе:
+  // - миссия без противника («Первые шаги») завершается выполнением ВСЕХ
+  //   шагов подсказки: по правилам ядра такая партия «выиграна» с самого
+  //   начала, поэтому исход ядра здесь неприменим;
+  // - миссия с противником («Бой», «Умения и состояния») играется до итога
+  //   боя — уничтожения всех противников (roadmap: «проходима до итога»):
+  //   шаги подсказки ведут урок посреди боя, но не запирают победу, иначе
+  //   быстрые подсказки завершали бы миссию прежде, чем Навь успеет
+  //   отравить бойца или поднять костяка (реактивные плашки не сработали бы).
+  // Поражение — гибель всех бойцов игрока: Навь в обучении действует.
   const trainingDone = isTraining && trainingHints.length > 0 && hintStep >= trainingHints.length;
   useEffect(() => {
     if (!isTraining || busy || trainingOver) return;
-    if (trainingDone && trainingMission) {
-      session.completeTrainingMission(trainingMission.id);
+    const outcome = session.getBattleOutcome();
+    const missionHasEnemies = (trainingMission?.enemies.length ?? 0) > 0;
+    const complete = missionHasEnemies ? outcome === "victory" : trainingDone;
+    if (complete) {
+      if (trainingMission) session.completeTrainingMission(trainingMission.id);
       setTrainingOver("victory");
       return;
     }
-    const outcome = session.getBattleOutcome();
     if (outcome === "defeat") setTrainingOver("defeat");
   }, [snapshot.turnNumber, snapshot.entities, busy, isTraining, trainingDone, trainingHints.length, hintStep, trainingOver, trainingMission]);
 
@@ -637,11 +652,14 @@ export function BattleScreen() {
   };
 
   /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы.
-   *  Доступна только в отладочном режиме (?debug=1) и не действует в повторе (0.20.1). */
+   *  Доступна только в отладочном режиме (?debug=1) и не действует в повторе (0.20.1).
+   *  В обучении победа определяется шагами подсказки — автопобеда довершает
+   *  и их, чтобы итог действительно открылся (0.20.2). */
   const debugAutoWin = (): void => {
     if (paused || busy || isReplay || !debug) return;
     const result = session.debugAutoWinBattle();
     if (!result.ok) return;
+    if (isTraining) setHintStep(trainingHints.length);
     setPreview(null);
     setAimId(null);
     setSkillTargetPos(null);
@@ -661,7 +679,14 @@ export function BattleScreen() {
       return;
     }
     const result = session.applyBattleCommand(command);
-    if (!result.ok) return;
+    if (!result.ok) {
+      // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
+      // ограничены, и без отклика неясно, почему действие не сработало.
+      // Ключ `battle.reject.<причина>`; неизвестная причина — общий текст.
+      const key = `battle.reject.${result.reason}`;
+      setLog(t(key) === key ? t("battle.reject.generic") : t(key));
+      return;
+    }
     announce(result.events);
     // Подсказка обучения продвигается событиями действия самого игрока (0.19.1);
     // реактивные плашки (яд, воскрешение, призыв) показываются любыми событиями (0.20.1).
@@ -725,10 +750,12 @@ export function BattleScreen() {
   const runEnemyPhase = async (): Promise<void> => {
     setEnemyPhase(true);
     try {
-      // В обучении противник не ходит: окружение соответствует уроку, а ход
-      // врага только отвлекал бы и мог создать угрозу (доработка обучения).
-      // Завершаем ход Нави сразу, возвращая управление игроку.
-      if (isTraining) {
+      // В обучении без противника («Первые шаги») ход Нави отсутствует:
+      // завершаем его сразу, возвращая управление игроку. В миссиях с
+      // противником («Бой», «Умения и состояния», 0.20.2) Навь действует
+      // обычным алгоритмом — укрытия, стойка и дозор обретают смысл, а
+      // реактивные плашки (яд, воскрешение) реально срабатывают.
+      if (isTraining && (trainingMission?.enemies.length ?? 0) === 0) {
         session.applyBattleCommand({ type: "END_TURN", playerId: String(ENEMY_OWNER) });
         finishFromEvents([]);
         return;
@@ -1104,11 +1131,29 @@ export function BattleScreen() {
               <p className="training-coach-line">
                 {activeHint ? t(activeHint.textKey) : t(`training.${trainingMission.id}.intro`)}
               </p>
+              {activeHint && activeHint.until === "noop" ? (
+                <button type="button" className="training-continue" onClick={() => setHintStep((value) => value + 1)}>
+                  {t("training.continue")}
+                </button>
+              ) : null}
             </div>
-            {activeHint ? (
+            {/* Пропуск шага — только при повторном прохождении уже
+                пройденной миссии (0.20.2): первое прохождение ведётся
+                по шагам без пропуска (доводка обучения). */}
+            {activeHint && (trainingDoneMissions ?? []).includes(trainingMission.id) ? (
               <button type="button" className="training-skip" onClick={() => setHintStep((value) => value + 1)}>
                 {t("training.skip")}
               </button>
+            ) : null}
+            {activeHint ? (
+              <span className="training-step-dots" aria-hidden="true">
+                {trainingHints.map((item, index) => (
+                  <i
+                    key={item.step}
+                    className={`training-step-dot${index < hintStep ? " is-done" : index === hintStep ? " is-current" : ""}`}
+                  />
+                ))}
+              </span>
             ) : null}
           </div>
         ) : null}
@@ -1126,6 +1171,20 @@ export function BattleScreen() {
             hintId={activeBattleHint}
             variant={activeBattleHint === "first_battle" ? "modal" : "banner"}
             onClose={closeBattleHint}
+            action={
+              // Туториал «первый бой» предлагает режим обучения игроку,
+              // который его ещё не прошёл (0.20.2, доводка онбординга).
+              activeBattleHint === "first_battle" &&
+              !content.training.missions.every((mission) => (trainingDoneMissions ?? []).includes(mission.id))
+                ? {
+                    label: t("training.offerOpen"),
+                    run: () => {
+                      closeBattleHint();
+                      session.goTo("training");
+                    },
+                  }
+                : undefined
+            }
           />
         ) : null}
         {isReplay ? (
@@ -1150,7 +1209,7 @@ export function BattleScreen() {
                 type="button"
                 className="hud-btn hud-icon-btn training-exit"
                 onClick={() => session.goTo("training")}
-                title={t("training.exit")}
+                title={t("training.exitHint")}
                 aria-label={t("training.exit")}
               >
                 <ExitIcon />
@@ -1189,6 +1248,8 @@ export function BattleScreen() {
                 </>
               ) : battleKind === "pvp" ? (
                 t("menu.pvp")
+              ) : isTraining ? (
+                t("training.battleLabel")
               ) : (
                 t("menu.quickMatch")
               )}
@@ -1196,7 +1257,9 @@ export function BattleScreen() {
             <p>
               {battleKind === "campaign" && mission
                 ? t(`battle.objective.${mission.type}`)
-                : t("battle.objectiveQuick")}
+                : isTraining && trainingMission
+                  ? t(`training.objective.${trainingMission.id}`)
+                  : t("battle.objectiveQuick")}
             </p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
@@ -1678,7 +1741,7 @@ export function BattleScreen() {
           <div className="pause-card" role="dialog" aria-modal="true" aria-labelledby="pause-title">
             <h2 id="pause-title">{t("battle.pause")}</h2>
             <details className="controls-help">
-              <summary>{t("battle.controls")}</summary>
+              <summary>{t("battle.controlsTitle")}</summary>
               <ul>
                 <li><kbd>1–8</kbd> {t("battle.controls.weapons")}</li>
                 <li><kbd>9</kbd> {t("battle.controls.defend")}</li>

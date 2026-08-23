@@ -68,6 +68,12 @@ export interface AutoEndTurnConditions {
  * действий. Для стороны игрока единственный такой случай — нулевые запасы
  * ОД всех живых бойцов (стойка и дозор допустимы при любом ненулевом
  * остатке). В обучении авто-завершение отключается на шаге «завершите ход».
+ *
+ * Ограничение по исходу партии (не «в процессе») в обучении не применяется
+ * (0.20.2): миссия без противников по правилам ядра сразу «выиграна», а
+ * миссия с противниками становится «выигранной» после их гибели — пока шаги
+ * подсказки не выполнены, бой обучения продолжается, и авто-завершение хода
+ * обязано работать, чтобы сторона не застревала с нулевыми ОД.
  */
 export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (conditions.paused || conditions.busy || conditions.enemyPhase) return false;
@@ -76,7 +82,7 @@ export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (conditions.isTraining && conditions.activeHint?.until === "end_turn") return false;
   if (conditions.ownUnits.length === 0) return false;
   if (conditions.ownUnits.some((unit) => unit.ap > 0)) return false;
-  if (!conditions.isNetGuest && !conditions.outcomeOngoing) return false;
+  if (!conditions.isNetGuest && !conditions.outcomeOngoing && !conditions.isTraining) return false;
   return true;
 }
 
@@ -97,6 +103,12 @@ export type TrainingActionKind =
  * «перемещение» недоступны атака, умения, стойка, дозор и завершение хода.
  * Шаг «ознакомление» (noop) не допускает никаких действий, кроме клика
  * для подтверждения. Неизвестный тип шага не ограничивает (безопасный предел).
+ *
+ * Доводка 0.20.2: шаги «умение», «стойка» и «дозор» миссии с действующей
+ * Навью допускают также перемещение и атаку — шаг по-прежнему завершается
+ * только предписанным действием, но бой не «замораживается»: игрок
+ * сражается, а яд, воскрешение и ответный выстрел дозора становятся
+ * достижимыми событиями.
  */
 export function trainingActionAllowed(until: string | undefined, action: TrainingActionKind): boolean {
   switch (until) {
@@ -111,11 +123,11 @@ export function trainingActionAllowed(until: string | undefined, action: Trainin
     case "approach":
       return action === "move" || action === "attack";
     case "skill":
-      return action === "skill";
+      return action !== "endTurn";
     case "defend":
-      return action === "defend";
+      return action !== "endTurn";
     case "overwatch":
-      return action === "overwatch";
+      return action !== "endTurn";
     case "end_turn":
       return action === "endTurn";
     default:
@@ -126,23 +138,28 @@ export function trainingActionAllowed(until: string | undefined, action: Trainin
 /**
  * Подсветка обучающей подсказки на поле: клетка либо сущность. Шаг
  * «клетка/зона» без координат (карты миссий случайны) подсвечивает самую
- * дальнюю достижимую клетку выбранного бойца.
+ * дальнюю достижимую клетку выбранного бойца; если клеток обучаемой цены
+ * нет (боец прижат), подсвечивается самая дальняя достижимая клетка вообще —
+ * шаг не обязан «молчать» без маркера (0.20.2). Погибшая цель шага
+ * «сущность» не подсвечивается: такой шаг автопропускается вызывающим кодом.
  */
 export function resolveTrainingHighlight(
   activeHint: TrainingHintConfig | null,
   reachable: readonly ReachableCell[],
-  entities: readonly { configId: string; x: number; y: number }[],
+  entities: readonly { configId: string; x: number; y: number; dead?: boolean }[],
 ): { kind: "cell" | "entity"; x: number; y: number } | null {
   if (!activeHint) return null;
   if (activeHint.highlight === "cell" || activeHint.highlight === "zone") {
     if (activeHint.cell) return { kind: "cell", x: activeHint.cell.x, y: activeHint.cell.y };
     // Шаг «перемещение» подсвечивает дальнюю клетку за одно очко действия,
     // шаг «рывок» — дальнюю за два (0.20.1): подсветка соответствует цене
-    // обучаемого действия.
+    // обучаемого действия. Если таких клеток нет — дальняя из любых
+    // достижимых (0.20.2), чтобы маркер не исчезал молча.
     const pool = reachable.filter((cell) =>
       activeHint.until === "move" ? cell.apCost === 1 : activeHint.until === "dash" ? cell.apCost === 2 : true,
     );
-    const pick = pool.reduce<ReachableCell | null>(
+    const source = pool.length > 0 ? pool : [...reachable];
+    const pick = source.reduce<ReachableCell | null>(
       (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
       null,
     );
@@ -150,10 +167,36 @@ export function resolveTrainingHighlight(
     return null;
   }
   if (activeHint.highlight === "entity" && activeHint.targetUnitId) {
-    const entity = entities.find((candidate) => candidate.configId === activeHint.targetUnitId);
+    const entity = entities.find((candidate) => candidate.configId === activeHint.targetUnitId && !candidate.dead);
     if (entity) return { kind: "entity", x: entity.x, y: entity.y };
   }
   return null;
+}
+
+/**
+ * Автопропуск шагов, выполнение которых стало невозможным (0.20.2): шаг
+ * «приблизьтесь» с погибшей целью пропускается сразу (цель уже «достигнута»
+ * атакой). Возвращает индекс шага, с которого продолжать; шаги не меняются.
+ */
+export function trainingStepAfterAutoSkip(
+  hints: readonly TrainingHintConfig[],
+  step: number,
+  entities: readonly { configId: string; dead?: boolean }[],
+): number {
+  let next = step;
+  while (next < hints.length) {
+    const current = hints[next]!;
+    if (current.until === "approach" && current.targetUnitId) {
+      const target = entities.find((candidate) => candidate.configId === current.targetUnitId);
+      const alive = target !== undefined && !target.dead;
+      if (!alive) {
+        next += 1;
+        continue;
+      }
+    }
+    break;
+  }
+  return next;
 }
 
 /**

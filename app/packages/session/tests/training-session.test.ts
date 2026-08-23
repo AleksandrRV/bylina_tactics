@@ -154,4 +154,23 @@ describe("training missions run through the session (0.20.1 regression)", () => 
     const applied = session.applyBattleCommand({ type: "END_TURN", playerId: "1" });
     expect(applied.ok).toBe(false);
   });
+
+  it("fixes the mission seeds so the environment is stable (0.20.2)", () => {
+    const session = createSession("menu");
+    expect(session.startTrainingMission("movement")).toBe(true);
+    expect(session.get().matchSeed).toBe(101);
+    expect(session.startTrainingMission("combat")).toBe(true);
+    expect(session.get().matchSeed).toBe(46);
+    expect(session.startTrainingMission("skills")).toBe(true);
+    expect(session.get().matchSeed).toBe(303);
+  });
+
+  it("tracks completed missions and resets progress (0.20.2)", () => {
+    const session = createSession("menu");
+    session.completeTrainingMission("movement");
+    session.completeTrainingMission("combat");
+    expect(session.get().trainingDone).toEqual(["movement", "combat"]);
+    session.resetTrainingProgress();
+    expect(session.get().trainingDone).toEqual([]);
+  });
 });

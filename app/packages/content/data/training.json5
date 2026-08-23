@@ -15,7 +15,9 @@
         wallDensity: 0.02,
         edgeCoverChance: 0.3,
         halfCoverChance: 0.5,
-        heightMix: { z0: 0.25, z1: 0.6, z2: 0.15 },
+        // Доводка 0.20.2: доля верхнего яруса поднята — урок «ярусы»
+        // заметнее (прежняя карта имела лишь пару клеток z2).
+        heightMix: { z0: 0.2, z1: 0.55, z2: 0.25 },
       },
       playerSlots: ["bogatyr"],
       // «Первые шаги» учат перемещению и рывку: противник здесь ни к чему и
@@ -102,6 +104,8 @@
       // воскрешение костяка, знахарка — лечение, очищение и призыв зверя;
       // дозор и туман войны действуют как обычно. Состав соответствует
       // описанию миссии (base-design §3.5).
+      // Доводка 0.20.2: Навь в миссии действует, поэтому высадке дан и
+      // Стрелец — дистанционный боец делает бой посильным для новичка.
       id: "skills",
       titleKey: "training.skills.title",
       descriptionKey: "training.skills.description",
@@ -115,7 +119,7 @@
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
       },
-      playerSlots: ["bogatyr", "znaharka"],
+      playerSlots: ["bogatyr", "znaharka", "strelets"],
       enemies: [
         { unitId: "upyr", count: 1 },
         { unitId: "kikimora", count: 1 },

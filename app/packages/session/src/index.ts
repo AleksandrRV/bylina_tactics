@@ -215,6 +215,8 @@ export interface SessionApi {
   startTrainingMission(missionId: string): boolean;
   /** Отметить миссию обучения пройденной (0.19.0). */
   completeTrainingMission(missionId: string): void;
+  /** Сбросить прогресс обучения (0.20.2): все миссии снова считаются непройденными. */
+  resetTrainingProgress(): void;
   /** Был ли показан туториал кампании с данным идентификатором (0.20.0). */
   isCampaignHintShown(hintId: string): boolean;
   /** Отметить туториал кампании показанным — повторно не появляется (0.20.0). */
@@ -780,7 +782,10 @@ export function createSession(
       // Окружение обучения фиксировано: постоянный seed даёт одну и ту же
       // карту при каждом прохождении (base-design §3.5, доработка обучения).
       // Без фиксации генератор строил бы новое поле на каждом запуске.
-      const TRAINING_SEED = { movement: 101, combat: 202, skills: 303 } as const;
+      // «Бой» (0.20.2): подобрано окружение, где упырь действительно стоит
+      // за укрытием, а игрок появляется на возвышении — текст подсказки про
+      // укрытие и высоту соответствует полю (см. тесты обучения).
+      const TRAINING_SEED = { movement: 101, combat: 46, skills: 303 } as const;
       emit({
         ...idle,
         screen: "trainingBattle",
@@ -794,6 +799,9 @@ export function createSession(
       const done = state.trainingDone ?? [];
       if (done.includes(missionId)) return;
       emit({ ...state, trainingDone: [...done, missionId] });
+    },
+    resetTrainingProgress: () => {
+      emit({ ...state, trainingDone: [] });
     },
     isCampaignHintShown: (hintId) => (state.campaignHintsDone ?? []).includes(hintId),
     markCampaignHintShown: (hintId) => {

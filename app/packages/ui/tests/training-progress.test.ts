@@ -5,8 +5,10 @@ import {
   hintCompletedByEvents,
   resolveTrainingHighlight,
   shouldAutoEndTurn,
+  trainingActionAllowed,
   trainingHintsSorted,
   trainingPanelKey,
+  trainingStepAfterAutoSkip,
 } from "../src/training-progress.js";
 
 function hint(partial: Partial<TrainingHintConfig>): TrainingHintConfig {
@@ -110,6 +112,14 @@ describe("shouldAutoEndTurn", () => {
     expect(shouldAutoEndTurn({ ...base, outcomeOngoing: false })).toBe(false);
     expect(shouldAutoEndTurn({ ...base, ownUnits: [] })).toBe(false);
   });
+
+  it("ends in training even when the kernel outcome is already decided (0.20.2)", () => {
+    // Миссия без противника по правилам ядра сразу «выиграна»; миссия с
+    // противником становится «выигранной» после их гибели. Пока шаги
+    // подсказки не выполнены, бой обучения продолжается, и авто-завершение
+    // хода обязано работать, чтобы сторона не застревала с нулевыми ОД.
+    expect(shouldAutoEndTurn({ ...base, isTraining: true, outcomeOngoing: false })).toBe(true);
+  });
 });
 
 describe("resolveTrainingHighlight", () => {
@@ -155,6 +165,41 @@ describe("resolveTrainingHighlight", () => {
     expect(resolveTrainingHighlight(hint({ highlight: "entity", targetUnitId: "solovey" }), [], [])).toBeNull();
     expect(resolveTrainingHighlight(null, [], [])).toBeNull();
   });
+
+  it("does not highlight a dead target entity (0.20.2)", () => {
+    const entities = [{ configId: "upyr", x: 5, y: 5, dead: true }];
+    expect(resolveTrainingHighlight(hint({ highlight: "entity", targetUnitId: "upyr" }), [], entities)).toBeNull();
+  });
+
+  it("falls back to the farthest reachable cell of any cost when the taught cost is absent (0.20.2)", () => {
+    const reachable = [
+      { x: 1, y: 1, z: 1, mpCost: 1, apCost: 1 as const },
+      { x: 2, y: 2, z: 1, mpCost: 3, apCost: 1 as const },
+    ];
+    // Шаг «рывок» без клеток за два ОД: маркер не исчезает — дальняя из любых.
+    expect(resolveTrainingHighlight(hint({ highlight: "cell", until: "dash" }), reachable, []))
+      .toEqual({ kind: "cell", x: 2, y: 2 });
+  });
+});
+
+describe("trainingStepAfterAutoSkip (0.20.2)", () => {
+  const approach = hint({ step: 2, until: "approach", highlight: "entity", targetUnitId: "upyr", textKey: "approach" });
+  const other = hint({ step: 3, until: "attack", textKey: "attack" });
+
+  it("skips an approach step whose target is dead", () => {
+    const entities = [{ configId: "upyr", dead: true }];
+    expect(trainingStepAfterAutoSkip([approach, other], 0, entities)).toBe(1);
+  });
+
+  it("keeps an approach step whose target is alive", () => {
+    const entities = [{ configId: "upyr", dead: false }];
+    expect(trainingStepAfterAutoSkip([approach, other], 0, entities)).toBe(0);
+  });
+
+  it("does not skip non-approach steps", () => {
+    const entities = [{ configId: "upyr", dead: true }];
+    expect(trainingStepAfterAutoSkip([other], 0, entities)).toBe(0);
+  });
 });
 
 describe("trainingPanelKey", () => {
@@ -163,5 +208,42 @@ describe("trainingPanelKey", () => {
     expect(trainingPanelKey(hint({ highlight: "panel", panelKey: "ap" }))).toBe("ap");
     expect(trainingPanelKey(hint({ highlight: "cell" }))).toBeNull();
     expect(trainingPanelKey(null)).toBeNull();
+  });
+});
+
+describe("trainingActionAllowed (доводка 0.20.2)", () => {
+  it("restricts movement steps to the taught move/dash only", () => {
+    expect(trainingActionAllowed("move", "move")).toBe(true);
+    expect(trainingActionAllowed("move", "attack")).toBe(false);
+    expect(trainingActionAllowed("move", "endTurn")).toBe(false);
+    expect(trainingActionAllowed("dash", "dash")).toBe(true);
+    expect(trainingActionAllowed("dash", "move")).toBe(false);
+  });
+
+  it("lets approach/attack steps move and attack", () => {
+    expect(trainingActionAllowed("attack", "move")).toBe(true);
+    expect(trainingActionAllowed("attack", "attack")).toBe(true);
+    expect(trainingActionAllowed("attack", "defend")).toBe(false);
+    expect(trainingActionAllowed("approach", "move")).toBe(true);
+  });
+
+  it("skill/defend/overwatch steps fight freely but never end the turn manually", () => {
+    // Шаги миссии с действующей Навью: бой не замораживается — доступны
+    // перемещение, атака, умения, стойка и дозор; завершение хода — только
+    // автоматическое (по исчерпании ОД), чтобы урок не прерывался впустую.
+    for (const until of ["skill", "defend", "overwatch"] as const) {
+      expect(trainingActionAllowed(until, "move")).toBe(true);
+      expect(trainingActionAllowed(until, "attack")).toBe(true);
+      expect(trainingActionAllowed(until, "skill")).toBe(true);
+      expect(trainingActionAllowed(until, "defend")).toBe(true);
+      expect(trainingActionAllowed(until, "overwatch")).toBe(true);
+      expect(trainingActionAllowed(until, "endTurn")).toBe(false);
+    }
+  });
+
+  it("noop allows no action and unknown steps do not restrict", () => {
+    expect(trainingActionAllowed("noop", "move")).toBe(false);
+    expect(trainingActionAllowed("noop", "endTurn")).toBe(false);
+    expect(trainingActionAllowed("something-else", "move")).toBe(true);
   });
 });

@@ -13,10 +13,14 @@ export function CampaignHint({
   hintId,
   variant = "modal",
   onClose,
+  action,
 }: {
   hintId: CampaignHintId;
   variant?: "modal" | "banner";
   onClose: () => void;
+  /** Необязательное действие туториала (0.20.2): например, «Пройти обучение»
+   *  в туториале «первый бой» для игрока, не прошедшего режим обучения. */
+  action?: { label: string; run: () => void };
 }) {
   useI18nTick();
   const t = useT();
@@ -33,6 +37,11 @@ export function CampaignHint({
           <p className="muted">{t(`campaign.hints.${hintId}.text`)}</p>
         </div>
       </div>
+      {action ? (
+        <button type="button" className="hud-btn" onClick={action.run}>
+          {action.label}
+        </button>
+      ) : null}
       <button type="button" className="hud-btn hud-btn-primary" onClick={onClose}>
         {t("campaign.hints.ok")}
       </button>

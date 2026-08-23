@@ -118,6 +118,16 @@ export function TrainingScreen() {
           <BackIcon />
           {t("common.back")}
         </button>
+        {done.length > 0 ? (
+          <button
+            type="button"
+            className="btn btn-ghost training-reset"
+            title={t("training.resetHint")}
+            onClick={() => session.resetTrainingProgress()}
+          >
+            {t("training.reset")}
+          </button>
+        ) : null}
       </nav>
     </div>
   );
