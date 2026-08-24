@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.18", () => {
-    expect(APP_VERSION).toBe("0.20.18");
+  it("reports version 0.20.19", () => {
+    expect(APP_VERSION).toBe("0.20.19");
   });
 
   it("moves between menu and settings", () => {
@@ -415,7 +415,7 @@ describe("createSession campaign hints (0.20.0)", () => {
   });
 });
 
-describe("continueCampaign (0.20.18)", () => {
+describe("continueCampaign (0.20.19)", () => {
   const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
   };
@@ -470,7 +470,7 @@ describe("continueCampaign (0.20.18)", () => {
   });
 });
 
-describe("suspend/resume campaign battle (0.20.18)", () => {
+describe("suspend/resume campaign battle (0.20.17–0.20.19)", () => {
   const makeBattleSession = (): ReturnType<typeof createSession> => {
     const session = createSession("menu");
     const campaign = createCampaign(CAMPAIGN_CONFIG);
@@ -486,20 +486,122 @@ describe("suspend/resume campaign battle (0.20.18)", () => {
     return session;
   };
 
-  it("suspend keeps the mission and snapshot, then resumes the battle", () => {
+  it("suspend keeps the mission in the slot and resumes the battle", () => {
     const session = makeBattleSession();
     session.setPaused(true);
     session.suspendCampaignBattle();
     const suspended = session.get();
     expect(suspended.screen).toBe("menu");
     expect(suspended.paused).toBe(false);
-    expect(suspended.battleKind).toBe("campaign");
-    expect(suspended.activeMissionId).toBe("clearing_1");
-    expect(suspended.restoredMatch).toBeDefined();
-    // «Продолжить» возвращается в бой (снимок в состоянии сессии).
+    // Контекст миссии — в слоте; навигационные поля чистые (0.20.19).
+    expect(suspended.suspendedCampaign?.activeMissionId).toBe("clearing_1");
+    expect(suspended.suspendedCampaign?.restoredMatch).toBeDefined();
+    expect(suspended.battleKind).toBeNull();
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().activeMissionId).toBe("clearing_1");
+    expect(session.get().restoredMatch).toBeDefined();
+    expect(session.get().suspendedCampaign).toBeNull();
+  });
+
+  it("detours through other modes from the menu do not lose the mission (0.20.19)", () => {
+    // Регрессия: вход из меню в обучение/быстрый матч/настройки клал {...idle}
+    // и стирал контекст приостановленной миссии — «Продолжить» вело на карту.
+    const session = makeBattleSession();
+    session.suspendCampaignBattle();
+    expect(session.get().screen).toBe("menu");
+    session.openTraining();
+    session.startTrainingMission("movement");
+    session.goTo("menu");
+    session.openQuickMatch();
+    session.goTo("menu");
+    session.goTo("settings");
+    session.goTo("menu");
     session.resumeCampaign();
     expect(session.get().screen).toBe("battle");
     expect(session.get().restoredMatch).toBeDefined();
+  });
+
+  it("a quick battle in-between keeps the campaign mission in the slot", () => {
+    const session = makeBattleSession();
+    session.suspendCampaignBattle();
+    session.selectDifficulty("normal");
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("quick");
+    session.finishMatch("victory");
+    session.goTo("menu");
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("campaign");
+  });
+
+  it("a mission started in-session suspends and resumes repeatedly", () => {
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    expect(session.startCampaignMission("clearing_1")).toBe(true);
+    expect(session.confirmDeployment([1, 2, 3])).toBe(true);
+    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 7 }));
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      session.suspendCampaignBattle();
+      const suspended = session.get();
+      expect(suspended.screen).toBe("menu");
+      expect(suspended.suspendedCampaign?.activeMissionId).toBe("clearing_1");
+      expect(suspended.suspendedCampaign?.restoredMatch).toBeDefined();
+      session.resumeCampaign();
+      expect(session.get().screen).toBe("battle");
+      expect(session.get().activeMissionId).toBe("clearing_1");
+    }
+  });
+
+  it("suspend to the ship map keeps the mission; Continue returns to it", () => {
+    const session = makeBattleSession();
+    session.suspendCampaignMission();
+    const onMap = session.get();
+    expect(onMap.screen).toBe("campaign");
+    expect(onMap.suspendedCampaign?.activeMissionId).toBe("clearing_1");
+    expect(onMap.suspendedCampaign?.restoredMatch).toBeDefined();
+    session.campaignToMenu();
+    expect(session.get().screen).toBe("menu");
+    expect(session.get().suspendedCampaign?.activeMissionId).toBe("clearing_1");
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("battle");
+  });
+
+  it("a mission suspended before the battle resumes to deployment", () => {
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    session.startCampaignMission("clearing_1");
+    session.suspendCampaignMission();
+    expect(session.get().screen).toBe("campaign");
+    expect(session.get().suspendedCampaign?.activeMissionId).toBe("clearing_1");
+    session.openTraining();
+    session.goTo("menu");
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("deployment");
+    expect(session.get().activeMissionId).toBe("clearing_1");
+  });
+
+  it("abandoning or finishing the mission clears the slot; a new bylina clears it too", () => {
+    const session = makeBattleSession();
+    session.suspendCampaignBattle();
+    expect(session.get().suspendedCampaign).not.toBeNull();
+    session.resumeCampaign();
+    session.suspendCampaignMission();
+    session.leaveCampaignMission();
+    expect(session.get().suspendedCampaign).toBeNull();
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("campaign");
+    const second = makeBattleSession();
+    second.suspendCampaignBattle();
+    second.resumeCampaign();
+    second.finishCampaignMission("victory", [], []);
+    expect(second.get().suspendedCampaign).toBeNull();
+    const third = makeBattleSession();
+    third.suspendCampaignBattle();
+    third.clearSuspendedCampaign();
+    expect(third.get().suspendedCampaign).toBeNull();
   });
 
   it("resume falls back to the ship map when the mission is finished", () => {
@@ -508,69 +610,6 @@ describe("suspend/resume campaign battle (0.20.18)", () => {
     session.goTo("menu");
     session.resumeCampaign();
     expect(session.get().screen).toBe("campaign");
-    expect(session.get().restoredMatch).toBeUndefined();
-  });
-
-  it("a mission started in-session suspends and resumes repeatedly (0.20.18)", () => {
-    // Поток игрока: карта -> высадка -> бой -> «Выйти в меню» -> «Продолжить»,
-    // и так несколько раз подряд — миссия не теряется.
-    const session = createSession("menu");
-    const campaign = createCampaign(CAMPAIGN_CONFIG);
-    session.bindCampaign(campaign);
-    expect(session.startCampaignMission("clearing_1")).toBe(true);
-    expect(session.confirmDeployment([1, 2, 3])).toBe(true);
-    expect(session.get().screen).toBe("battle");
-    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 7 }));
-    for (let cycle = 0; cycle < 2; cycle += 1) {
-      session.suspendCampaignBattle();
-      const suspended = session.get();
-      expect(suspended.screen).toBe("menu");
-      expect(suspended.battleKind).toBe("campaign");
-      expect(suspended.activeMissionId).toBe("clearing_1");
-      expect(suspended.restoredMatch).toBeDefined();
-      session.resumeCampaign();
-      expect(session.get().screen).toBe("battle");
-      expect(session.get().activeMissionId).toBe("clearing_1");
-    }
-  });
-
-  it("suspend to the ship map keeps the mission; Continue returns to it (0.20.18)", () => {
-    // Поток: бой -> «К карте корабля» (пауза) -> «В меню» карты -> «Продолжить».
-    const session = createSession("menu");
-    const campaign = createCampaign(CAMPAIGN_CONFIG);
-    session.bindCampaign(campaign);
-    session.startCampaignMission("clearing_1");
-    session.confirmDeployment([1, 2, 3]);
-    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 9 }));
-    // «К карте корабля»: миссия приостановлена, не покинута.
-    session.suspendCampaignMission();
-    const onMap = session.get();
-    expect(onMap.screen).toBe("campaign");
-    expect(onMap.battleKind).toBe("campaign");
-    expect(onMap.activeMissionId).toBe("clearing_1");
-    expect(onMap.restoredMatch).toBeDefined();
-    // «В меню» с карты: контекст миссии сохраняется.
-    session.campaignToMenu();
-    expect(session.get().screen).toBe("menu");
-    expect(session.get().activeMissionId).toBe("clearing_1");
-    expect(session.get().restoredMatch).toBeDefined();
-    // «Продолжить» — снова бой миссии.
-    session.resumeCampaign();
-    expect(session.get().screen).toBe("battle");
-  });
-
-  it("a mission suspended before the battle resumes to deployment (0.20.18)", () => {
-    // Поток: высадка -> «Назад к карте» -> «Продолжить» — формирование высадки.
-    const session = createSession("menu");
-    const campaign = createCampaign(CAMPAIGN_CONFIG);
-    session.bindCampaign(campaign);
-    session.startCampaignMission("clearing_1");
-    session.suspendCampaignMission();
-    expect(session.get().screen).toBe("campaign");
-    expect(session.get().activeMissionId).toBe("clearing_1");
-    session.resumeCampaign();
-    expect(session.get().screen).toBe("deployment");
-    expect(session.get().activeMissionId).toBe("clearing_1");
   });
 
   it("suspend outside a campaign battle is a plain exit to menu", () => {

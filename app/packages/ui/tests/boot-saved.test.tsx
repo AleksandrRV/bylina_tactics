@@ -469,6 +469,46 @@ describe("app boot with a player save (0.20.15)", () => {
     }
   });
 
+  it("a detour into other modes between exit and Continue keeps the mission (0.20.19)", async () => {
+    await makeBattleSave();
+    const app = await mountInteractiveApp();
+    try {
+      // Продолжить — бой миссии; выход в меню.
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      await act(async () => {
+        buttonByText("Пауза").click();
+      });
+      await act(async () => {
+        buttonByText("Выйти в меню").click();
+      });
+      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      // Прогулка по меню: обучение и обратно.
+      await act(async () => {
+        buttonByText("Обучение").click();
+      });
+      expect(await waitFor(() => document.querySelector(".training-screen") !== null)).toBe(true);
+      await act(async () => {
+        buttonByText("Назад").click();
+      });
+      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      // «Продолжить» всё равно возвращает в бой миссии (регрессия 0.20.19:
+      // прежде заход в другой раздел стирал контекст приостановленной миссии).
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
+      expect(app.errors).toEqual([]);
+    } finally {
+      await act(async () => {
+        app.root.unmount();
+      });
+    }
+  });
+
   it("boots an installed PWA (standalone display mode)", async () => {
     standalone = true;
     const app = await mountInteractiveApp();

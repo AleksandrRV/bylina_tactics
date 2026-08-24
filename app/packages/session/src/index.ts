@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.18";
+export const APP_VERSION = "0.20.19";
 
 export type AppScreen =
   | "boot"
@@ -97,6 +97,19 @@ export interface SessionState {
   netDisconnected?: boolean | null;
   /** Журнал повтора для воспроизведения (0.17.0). */
   replayJournal?: ReplayJournal | null;
+  /**
+   * Приостановленная миссия кампании (0.20.19): контекст хранится отдельно
+   * от навигационных полей, и вход из меню в другие разделы (обучение,
+   * быстрый матч, настройки, повторы) его не стирает — «Продолжить»
+   * возвращает в миссию после любых прогулок по меню.
+   */
+  suspendedCampaign?: {
+    activeMissionId: string;
+    deployment: number[];
+    matchSeed: number;
+    restoredMatch?: MatchState;
+    restoredFog?: FogState;
+  } | null;
   /** Активная миссия обучения (0.19.0). */
   trainingMissionId?: string | null;
   /** Пройденные миссии обучения (0.19.0). */
@@ -161,6 +174,8 @@ export interface SessionApi {
    * на карту. Вне начатой миссии эквивалентен обычному переходу в меню.
    */
   campaignToMenu(): void;
+  /** Погасить слот приостановленной миссии (новая былина, 0.20.19). */
+  clearSuspendedCampaign(): void;
   /** Начать доступную миссию и открыть формирование высадки. */
   startCampaignMission(missionId: string): boolean;
   /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
@@ -264,7 +279,7 @@ export interface SessionApi {
  * обучения и туториалов постоянен — переходы между экранами не должны его
  * сбрасывать, а `emit` сохраняет значение из текущего состояния.
  */
-const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone"> = {
+const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" | "suspendedCampaign"> = {
   unavailableMode: null,
   paused: false,
   battleKind: null,
@@ -352,6 +367,12 @@ export function createSession(
       ...next,
       trainingDone: next.trainingDone ?? state.trainingDone ?? [],
       campaignHintsDone: next.campaignHintsDone ?? state.campaignHintsDone ?? [],
+      // Слот приостановленной миссии постоянен (0.20.19): навигация через
+      // idle его не несёт — сохраняется текущий; очищается только явно
+      // (null в next: покинута миссия, завершена, новая былина).
+      suspendedCampaign: Object.prototype.hasOwnProperty.call(next, "suspendedCampaign")
+        ? next.suspendedCampaign ?? null
+        : state.suspendedCampaign ?? null,
     };
     for (const listener of listeners) listener(state);
   };
@@ -533,6 +554,7 @@ export function createSession(
         battleKind: "campaign",
         activeMissionId: missionId,
         matchSeed: Date.now() >>> 0,
+        suspendedCampaign: null,
       });
       return true;
     },
@@ -557,49 +579,76 @@ export function createSession(
       if (state.battleKind !== "campaign" || active === null) return null;
       const result = requireCampaign().finishMission(active, outcome, participants, generalDeaths);
       if (!result) return null;
-      emit({ ...state, screen: "missionResult", paused: false, outcome });
+      emit({ ...state, screen: "missionResult", paused: false, outcome, suspendedCampaign: null });
       return result;
     },
     leaveCampaignMission: () => {
       requireCampaign().abandonMission();
-      emit({ ...idle, screen: "campaign" });
+      emit({ ...idle, screen: "campaign", suspendedCampaign: null });
+    },
+    clearSuspendedCampaign: () => {
+      // Новая былина (0.20.19): слот прошлая mission больше не относится
+      // к свежему автомату кампании.
+      emit({ ...state, suspendedCampaign: null });
     },
     suspendCampaignBattle: () => {
       if (state.battleKind !== "campaign" || state.activeMissionId === null) {
-        // Не бой кампании — обычный выход в меню без контекста миссии.
+        // Не бой кампании — обычный выход в меню; слот приостановленной
+        // миссии (если был) сохраняется — emit не стирает его.
         emit({ screen: "menu", ...idle });
         return;
       }
-      // Снимок партии и туман кладутся в состояние сессии — тот же механизм,
-      // что и при восстановлении сохранения: BattleScreen построит ядро из
-      // снимка при возврате, а замена ядра другим режимом ничего не затрёт.
-      // Экран меняется здесь же: сквозной goTo("menu") разложил бы idle и
-      // стёр контекст приостановленной миссии.
+      // Снимок партии и туман — в слот приостановленной миссии (0.20.19):
+      // навигационные поля обнуляются (idle), поэтому дальнейшие заходы в
+      // обучение/быстрый матч/настройки из меню контекст не потеряют.
       const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
       const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
       emit({
-        ...state,
         screen: "menu",
-        paused: false,
-        restoredMatch: snapshot ?? state.restoredMatch,
-        restoredFog: fog ?? state.restoredFog,
+        ...idle,
+        suspendedCampaign: {
+          activeMissionId: state.activeMissionId,
+          deployment: state.deployment,
+          matchSeed: state.matchSeed,
+          restoredMatch: snapshot ?? state.restoredMatch,
+          restoredFog: fog ?? state.restoredFog,
+        },
       });
     },
     resumeCampaign: () => {
+      const slot = state.suspendedCampaign ?? null;
       const active = requireCampaign().getState().activeMissionId;
-      // Миссия всё ещё начата в автомате и не завершена в сессии.
-      const missionPending =
-        state.activeMissionId !== null && state.activeMissionId === active && state.outcome === null;
-      if (missionPending && state.battleKind === "campaign" && state.restoredMatch) {
-        emit({ ...state, screen: "battle", paused: false });
+      // Слот действителен, только пока миссия начата в автомате кампании:
+      // завершённая либо покинутая миссия боем/высадкой не считается.
+      if (slot && slot.activeMissionId === active) {
+        if (slot.restoredMatch) {
+          emit({
+            ...idle,
+            screen: "battle",
+            battleKind: "campaign",
+            activeMissionId: slot.activeMissionId,
+            deployment: slot.deployment,
+            matchSeed: slot.matchSeed,
+            outcome: null,
+            restoredMatch: slot.restoredMatch,
+            restoredFog: slot.restoredFog,
+            suspendedCampaign: null,
+          });
+          return;
+        }
+        emit({
+          ...idle,
+          screen: "deployment",
+          battleKind: "campaign",
+          activeMissionId: slot.activeMissionId,
+          deployment: slot.deployment,
+          matchSeed: slot.matchSeed,
+          outcome: null,
+          suspendedCampaign: null,
+        });
         return;
       }
-      // Миссия начата, но бой ещё не начат/не приостановлен — высадка.
-      if (missionPending) {
-        emit({ ...state, screen: "deployment", paused: false });
-        return;
-      }
-      emit({ ...idle, screen: "campaign" });
+      emit({ ...idle, screen: "campaign", suspendedCampaign: null });
     },
     suspendCampaignMission: () => {
       if (state.battleKind !== "campaign" || state.activeMissionId === null) {
@@ -607,21 +656,26 @@ export function createSession(
         return;
       }
       // Боевой снимок берётся, пока ядро привязано; экран высадки снимка
-      // не имеет — миссия возобновится с формирования высадки.
+      // не имеет — миссия возобновится с формирования высадки. Контекст —
+      // в слоте (0.20.19), навигационные поля чистые.
       const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
       const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
       emit({
-        ...state,
+        ...idle,
         screen: "campaign",
-        paused: false,
-        restoredMatch: snapshot ?? state.restoredMatch,
-        restoredFog: fog ?? state.restoredFog,
+        suspendedCampaign: {
+          activeMissionId: state.activeMissionId,
+          deployment: state.deployment,
+          matchSeed: state.matchSeed,
+          restoredMatch: snapshot ?? state.restoredMatch,
+          restoredFog: fog ?? state.restoredFog,
+        },
       });
     },
     campaignToMenu: () => {
-      // Контекст начатой миссии сохраняется (idle разложил бы его):
-      // «Продолжить» главного меню вернёт в миссию.
-      emit({ ...state, screen: "menu", paused: false });
+      // Слот приостановленной миссии не зависит от навигации (0.20.19);
+      // здесь достаточно чистого перехода в меню.
+      emit({ screen: "menu", ...idle });
     },
     backToCampaign: () => {
       emit({ ...idle, screen: "campaign" });
