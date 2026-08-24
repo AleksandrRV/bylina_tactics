@@ -13,9 +13,9 @@ const OPTIONS: PvpMatchOptions = {
   seed: 99,
 };
 
-describe("replay journal (0.20.14)", () => {
+describe("replay journal (0.20.15)", () => {
   it("uses the current replay format version", () => {
-    expect(REPLAY_VERSION).toBe("0.20.14");
+    expect(REPLAY_VERSION).toBe("0.20.15");
   });
 
   it("records commands and serializes to a plain object", () => {

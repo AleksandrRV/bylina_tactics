@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.14";
+export const APP_VERSION = "0.20.15";
 
 export type AppScreen =
   | "boot"
@@ -128,6 +128,13 @@ export interface SessionApi {
   bindCampaign(campaign: CampaignApi): void;
   /** Открыть карту корабля (ветка «Новая былина»). */
   openCampaign(): void;
+  /**
+   * Продолжить былину из сохранения (0.20.15): перейти к сохранённому
+   * экрану ветки кампании (карта, высадка, итог миссии, бой); бой без
+   * снимка партии заменяется картой корабля. Глобальный прогресс
+   * (обучение, туториалы, трудность) сохраняется.
+   */
+  continueCampaign(entry: CampaignContinuation): void;
   /** Начать доступную миссию и открыть формирование высадки. */
   startCampaignMission(missionId: string): boolean;
   /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
@@ -252,6 +259,23 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone"> 
   replayDraft: null,
   trainingMissionId: null,
 };
+
+/**
+ * Продолжение былины из сохранения (0.20.15): контекст сессии, в котором
+ * игра была сохранена. Прикладывается при нажатии «Продолжить» в главном
+ * меню — до этого сессия стартует в меню, состояние кампании не загружено.
+ */
+export interface CampaignContinuation {
+  /** Сохранённый экран ветки кампании. */
+  screen: "campaign" | "deployment" | "missionResult" | "battle";
+  activeMissionId?: string | null;
+  deployment?: number[];
+  matchSeed?: number;
+  outcome?: MatchOutcome | null;
+  /** Восстановленная партия (для экрана сражения). */
+  restoredMatch?: MatchState;
+  restoredFog?: FogState;
+}
 
 /** Экран активного тактического боя: обычное сражение и сражение обучения. */
 function isBattleScreen(screen: string): boolean {
@@ -453,6 +477,26 @@ export function createSession(
     },
     openCampaign: () => {
       emit({ ...idle, screen: "campaign" });
+    },
+    continueCampaign: (entry) => {
+      // Бой восстанавливается только со снимком партии: без ядра и снимка
+      // BattleScreen не смонтируется — возвращаемся на карту корабля.
+      const screen =
+        entry.screen === "battle" && !entry.restoredMatch ? "campaign" : entry.screen;
+      emit({
+        ...idle,
+        screen,
+        battleKind: screen === "battle" ? "campaign" : null,
+        activeMissionId: entry.activeMissionId ?? null,
+        deployment: entry.deployment ?? [],
+        matchSeed: entry.matchSeed ?? 0,
+        outcome: entry.outcome ?? null,
+        difficulty: state.difficulty,
+        trainingDone: state.trainingDone ?? [],
+        campaignHintsDone: state.campaignHintsDone ?? [],
+        restoredMatch: screen === "battle" ? entry.restoredMatch : undefined,
+        restoredFog: screen === "battle" ? entry.restoredFog : undefined,
+      });
     },
     startCampaignMission: (missionId) => {
       const ok = requireCampaign().startMission(missionId);

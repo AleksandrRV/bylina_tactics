@@ -318,6 +318,44 @@ input[type="range"] {
   justify-content: center;
 }
 
+/* Ряд выбора в модалке (0.20.15): «Отмена» и подтверждение рядом. */
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.modal-actions .btn {
+  margin-top: 16px;
+  flex: 1 1 50%;
+}
+
+/* «Продолжить» (0.20.15): акцентная кнопка главного меню — сохранённая
+   былина ждёт решения игрока; янтарный градиент и мягкое пульсирующее
+   свечение делают её главной командой экрана. */
+.btn-continue {
+  border-color: var(--amber);
+  color: var(--amber);
+  font-weight: 600;
+  background: linear-gradient(180deg, rgba(224, 179, 74, 0.24), rgba(224, 179, 74, 0.08));
+  animation: continue-glow 2.4s ease-in-out infinite;
+}
+
+.btn-continue:hover,
+.btn-continue:focus-visible {
+  background: linear-gradient(180deg, rgba(224, 179, 74, 0.34), rgba(224, 179, 74, 0.16));
+  box-shadow: 0 0 26px rgba(224, 179, 74, 0.4);
+}
+
+@keyframes continue-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px rgba(224, 179, 74, 0.16);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(224, 179, 74, 0.36);
+  }
+}
+
 .content-error {
   max-width: 480px;
   margin: 12vh auto;

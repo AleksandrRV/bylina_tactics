@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.14", () => {
-    expect(APP_VERSION).toBe("0.20.14");
+  it("reports version 0.20.15", () => {
+    expect(APP_VERSION).toBe("0.20.15");
   });
 
   it("moves between menu and settings", () => {
@@ -412,5 +412,60 @@ describe("createSession campaign hints (0.20.0)", () => {
     session.openMode("campaign");
     expect(session.isCampaignHintShown("darkness")).toBe(true);
     expect(session.get().campaignHintsDone).toEqual(["darkness"]);
+  });
+});
+
+describe("continueCampaign (0.20.15)", () => {
+  const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
+    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+  };
+
+  it("restores the saved campaign-branch context (deployment)", () => {
+    const session = createSession("menu");
+    bindCampaignAutomaton(session);
+    session.completeTrainingMission("movement");
+    session.continueCampaign({
+      screen: "deployment",
+      activeMissionId: "lesnik",
+      deployment: [1, 2],
+      matchSeed: 77,
+    });
+    const state = session.get();
+    expect(state.screen).toBe("deployment");
+    expect(state.battleKind).toBeNull();
+    expect(state.activeMissionId).toBe("lesnik");
+    expect(state.deployment).toEqual([1, 2]);
+    expect(state.matchSeed).toBe(77);
+    // Глобальный прогресс переживает продолжение.
+    expect(state.trainingDone).toEqual(["movement"]);
+  });
+
+  it("restores a campaign battle only with a match snapshot", () => {
+    const session = createSession("menu");
+    bindCampaignAutomaton(session);
+    const match = createDebugMatch();
+    session.continueCampaign({
+      screen: "battle",
+      restoredMatch: match,
+    });
+    const state = session.get();
+    expect(state.screen).toBe("battle");
+    expect(state.battleKind).toBe("campaign");
+    expect(state.restoredMatch).toBe(match);
+    // Без снимка партии бой не восстанавливается — карта корабля.
+    session.goTo("menu");
+    session.continueCampaign({ screen: "battle" });
+    expect(session.get().screen).toBe("campaign");
+    expect(session.get().restoredMatch).toBeUndefined();
+  });
+
+  it("falls back to the ship map for unknown saved screens", () => {
+    const session = createSession("menu");
+    bindCampaignAutomaton(session);
+    session.continueCampaign({ screen: "campaign" });
+    expect(session.get().screen).toBe("campaign");
+    // Смена хода сессии не оставляет следов чужих веток.
+    expect(session.get().outcome).toBeNull();
+    expect(session.get().paused).toBe(false);
   });
 });

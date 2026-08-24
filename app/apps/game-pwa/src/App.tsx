@@ -5,6 +5,7 @@ import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
 import { createReplayStorage, createSaveSerializer, createSaveStorage, deserializeFog, SAVE_FORMAT_VERSION } from "@bylina/storage";
 import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
+import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
 import { loadAppContent } from "./content-files.js";
@@ -52,6 +53,38 @@ export function App() {
   const saved = useMemo(() => saveStorage.load(), [saveStorage]);
 
   const contentData = content?.ok ? content.data : null;
+
+  // Продолжение былины (0.20.15): сохранение кампании НЕ загружается при
+  // запуске — приложение всегда открывает главное меню. Состояние былины
+  // держится «на ожидании» до решения игрока: «Продолжить» загружает его,
+  // «Новая былина» (после предупреждения) запускает свежую кампанию.
+  // «На ожидании» лежит только осмысленный прогресс (Тьма, начатая либо
+  // пройденная миссия): пустое сохранение свежей установки эквивалентно
+  // отсутствию былины.
+  const savedCampaignHasProgress = saved?.campaign
+    ? saved.campaign.darkness > 0
+      || saved.campaign.activeMissionId !== null
+      || saved.campaign.missions.some((mission) => mission.status === "done")
+    : false;
+  const [campaignRestore, setCampaignRestore] = useState<CampaignState | "pending" | null>(
+    savedCampaignHasProgress ? "pending" : null,
+  );
+
+  // Сессия создаётся один раз за жизнь приложения и НЕ зависит от кампании:
+  // пересоздание теряло бы прогресс этой сессии (обучение, туториалы) и
+  // перемонтировало оболочку. Из сохранения восстанавливаются только
+  // глобальные поля; контекст ветки кампании применяет continueCampaign.
+  const session = useMemo(() => {
+    const entry = saved?.session;
+    return createSession("menu", {
+      difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
+      paused: false,
+      trainingDone: entry?.trainingDone ?? [],
+      campaignHintsDone: entry?.campaignHintsDone ?? [],
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const campaign = useMemo(() => {
     if (!content?.ok) return null;
     const unitStats: Record<string, { maxHealth: number }> = {};
@@ -60,52 +93,53 @@ export function App() {
     const classUnitIds = content.data.units
       .filter((unit) => unit.side === "druzhina" && unit.id !== content.data.campaign.recruitUnitId)
       .map((unit) => unit.id);
-    return createCampaign(content.data.campaign, {
+    // «pending» — решение игрока ещё не принято: автомат строится свежим,
+    // сохранённое состояние былины не трогается. Иначе — восстановление.
+    const created = createCampaign(content.data.campaign, {
       unitStats,
       items: content.data.items,
-      initialState: saved?.campaign,
+      initialState: campaignRestore !== "pending" && campaignRestore ? campaignRestore : undefined,
       classUnitIds,
     });
-  }, [content, saved]);
-
-  const session = useMemo(() => {
-    const entry = saved?.session;
-    // Экран сражения восстанавливается только для партии кампании: локальная
-    // и сетевая партии эфемерны (ядро/транспорт не сохраняются), повтор
-    // открывается из списка повторов. Иначе BattleScreen упадёт без ядра.
-    const inCampaignBattle = entry?.screen === "battle" && entry?.battleKind === "campaign";
-    const screen = inCampaignBattle
-      ? "battle"
-      : entry?.screen === "deployment" || entry?.screen === "campaign" || entry?.screen === "missionResult"
-        ? entry.screen
-        : "menu";
-    const restoredBattle = saved?.match && inCampaignBattle
-      ? { restoredMatch: saved.match, restoredFog: deserializeFog(saved.fog) }
-      : undefined;
-    const created = createSession(screen, {
-      battleKind: inCampaignBattle ? "campaign" : null,
-      activeMissionId: entry?.activeMissionId ?? null,
-      deployment: entry?.deployment ?? [],
-      matchSeed: entry?.matchSeed ?? 0,
-      outcome: entry?.outcome ?? null,
-      difficulty: (entry?.difficulty as DifficultyId | null) ?? null,
-      paused: false,
-      trainingDone: entry?.trainingDone ?? [],
-      campaignHintsDone: entry?.campaignHintsDone ?? [],
-      ...restoredBattle,
-    });
-    // Исправление (0.20.2): кампания привязывается СИНХРОННО при создании
-    // сессии, до первого рендера экранов. Восстановление сохранения на
-    // экранах кампании (карта корабля, высадка, итог миссии, бой кампании)
-    // читает кампанию в первом же рендере; привязка в эффекте запаздывала,
-    // и приложение падало «Campaign automaton is not bound» — пустой экран
-    // вместо меню при повторном открытии (на мобильных — при каждом
-    // обновлении PWA, перезагружающем страницу).
-    if (campaign) created.bindCampaign(campaign);
+    // Привязка СИНХРОННО, до первого рендера экранов (исправление 0.20.2):
+    // экраны кампании читают автомат в первом же рендере; мемо исполняется
+    // до рендера оболочки, поэтому и пересоздание автомата («Продолжить»/
+    // «Новая былина») остаётся синхронным — пустых экранов не возникает.
+    session.bindCampaign(created);
     return created;
-    // createSession создаётся один раз за жизнь приложения.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign]);
+  }, [content, campaignRestore, session]);
+
+  /** «Продолжить»: загрузить сохранённую былину и вернуться к сохранённому
+   *  экрану ветки кампании (карта, высадка, итог миссии либо бой). */
+  const continueSavedCampaign = (): void => {
+    if (campaignRestore !== "pending" || !saved) return;
+    const entry = saved.session;
+    const inCampaignBattle = entry.screen === "battle" && entry.battleKind === "campaign" && Boolean(saved.match);
+    if (inCampaignBattle && saved.match) {
+      lastMatchRef.current = { match: saved.match, fog: deserializeFog(saved.fog) };
+    }
+    setCampaignRestore(saved.campaign);
+    session.continueCampaign({
+      screen: inCampaignBattle
+        ? "battle"
+        : entry.screen === "deployment" || entry.screen === "missionResult" || entry.screen === "campaign"
+          ? entry.screen
+          : "campaign",
+      activeMissionId: entry.activeMissionId ?? null,
+      deployment: entry.deployment ?? [],
+      matchSeed: entry.matchSeed ?? 0,
+      outcome: entry.outcome ?? null,
+      restoredMatch: inCampaignBattle && saved.match ? saved.match : undefined,
+      restoredFog: inCampaignBattle ? deserializeFog(saved.fog) : undefined,
+    });
+  };
+
+  /** «Новая былина» после предупреждения: свежий автомат кампании. */
+  const startNewCampaign = (): void => {
+    setCampaignRestore(null);
+    session.openMode("campaign");
+  };
 
   const [, setLocaleTick] = useState(0);
 
@@ -151,6 +185,38 @@ export function App() {
       // Черновик очищается после записи: повтор не дублируется при следующем
       // автосохранении, а новый бой начинает журнал с нуля.
       session.setReplayDraft(null);
+    }
+    // Продолжение былины (0.20.15): пока решение не принято, сохранение
+    // былины не загружено и не должно затираться — в запись пишется
+    // исходное состояние кампании и её сессии (бой/высадка/итог), а также
+    // свежий глобальный прогресс (обучение, туториалы, трудность).
+    if (campaignRestore === "pending") {
+      if (!saved) return;
+      const pendingRequest = ++saveRequestRef.current;
+      void saveSerializer.serialize({
+        formatVersion: SAVE_FORMAT_VERSION,
+        version: APP_VERSION,
+        savedAt: Date.now(),
+        campaign: saved.campaign,
+        session: {
+          screen: saved.session.screen,
+          battleKind: saved.session.battleKind,
+          activeMissionId: saved.session.activeMissionId,
+          deployment: saved.session.deployment,
+          matchSeed: saved.session.matchSeed,
+          outcome: saved.session.outcome,
+          difficulty: state.difficulty ?? saved.session.difficulty,
+          trainingDone: state.trainingDone ?? [],
+          campaignHintsDone: state.campaignHintsDone ?? [],
+        },
+        match: saved.match,
+        fog: saved.fog ? deserializeFog(saved.fog) : undefined,
+      }).then((serialized) => {
+        if (pendingRequest === saveRequestRef.current) saveStorage.saveSerialized(serialized);
+      }).catch(() => {
+        /* рабочий поток может исчезнуть при закрытии — следующий автосейв повторит */
+      });
+      return;
     }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
     if (!inCampaignBattle) lastMatchRef.current = {};
@@ -235,7 +301,10 @@ export function App() {
       unBattle?.();
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
     };
-  }, [session]);
+    // Кампания входит в зависимости: содержимое грузится асинхронно, а без
+    // автомата сохранение не пишется; пересоздание автомата («Продолжить»,
+    // «Новая былина», 0.20.15) также переподписывает и сразу сохраняет.
+  }, [session, campaign]);
 
 
 
@@ -254,6 +323,26 @@ export function App() {
       (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
     [debugMode],
   );
+
+  // Контроллер ветки кампании для меню (0.20.15): «Продолжить» видно, пока
+  // сохранение не считано; «Новая былина» предупреждает, если прогресс есть
+  // (несчитанное сохранение либо текущая былина с продвинутыми миссиями).
+  const campaignFlow = useMemo(() => {
+    if (!campaign) return undefined;
+    const snapshot = campaign.getState();
+    const hasProgress =
+      campaignRestore === "pending"
+      || snapshot.darkness > 0
+      || snapshot.activeMissionId !== null
+      || snapshot.missions.some((mission) => mission.status === "done");
+    return {
+      canContinue: campaignRestore === "pending",
+      hasProgress,
+      continueCampaign: continueSavedCampaign,
+      startNewCampaign,
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign, campaignRestore]);
 
   if (!content) return <div className="content-error"><h1>Loading content…</h1></div>;
   if (!content.ok) {
@@ -274,7 +363,7 @@ export function App() {
 
   return (
     <ServicesProvider
-      value={{ i18n, settings, session, content: content.data, version: APP_VERSION, install, debug }}
+      value={{ i18n, settings, session, content: content.data, version: APP_VERSION, install, debug, campaignFlow }}
     >
       <Shell />
     </ServicesProvider>
