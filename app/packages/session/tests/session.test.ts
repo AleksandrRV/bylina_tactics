@@ -511,6 +511,29 @@ describe("suspend/resume campaign battle (0.20.17)", () => {
     expect(session.get().restoredMatch).toBeUndefined();
   });
 
+  it("a mission started in-session suspends and resumes repeatedly (0.20.17)", () => {
+    // Поток игрока: карта -> высадка -> бой -> «Выйти в меню» -> «Продолжить»,
+    // и так несколько раз подряд — миссия не теряется.
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    expect(session.startCampaignMission("clearing_1")).toBe(true);
+    expect(session.confirmDeployment([1, 2, 3])).toBe(true);
+    expect(session.get().screen).toBe("battle");
+    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 7 }));
+    for (let cycle = 0; cycle < 2; cycle += 1) {
+      session.suspendCampaignBattle();
+      const suspended = session.get();
+      expect(suspended.screen).toBe("menu");
+      expect(suspended.battleKind).toBe("campaign");
+      expect(suspended.activeMissionId).toBe("clearing_1");
+      expect(suspended.restoredMatch).toBeDefined();
+      session.resumeCampaign();
+      expect(session.get().screen).toBe("battle");
+      expect(session.get().activeMissionId).toBe("clearing_1");
+    }
+  });
+
   it("suspend outside a campaign battle is a plain exit to menu", () => {
     const session = createSession("menu");
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
