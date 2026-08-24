@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.15", () => {
-    expect(APP_VERSION).toBe("0.20.15");
+  it("reports version 0.20.16", () => {
+    expect(APP_VERSION).toBe("0.20.16");
   });
 
   it("moves between menu and settings", () => {
@@ -415,7 +415,7 @@ describe("createSession campaign hints (0.20.0)", () => {
   });
 });
 
-describe("continueCampaign (0.20.15)", () => {
+describe("continueCampaign (0.20.16)", () => {
   const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
   };
