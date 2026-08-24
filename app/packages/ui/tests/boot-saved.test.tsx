@@ -397,6 +397,20 @@ describe("app boot with a player save (0.20.15)", () => {
       });
       expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
+      // Второй цикл «выход в меню -> Продолжить» — по-прежнему бой: миссия
+      // не теряется сколько бы раз её ни покидали (0.20.17).
+      await act(async () => {
+        buttonByText("Пауза").click();
+      });
+      await act(async () => {
+        buttonByText("Выйти в меню").click();
+      });
+      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
