@@ -18,7 +18,12 @@
     "unavailableTitle": "This mode is not available yet",
     "unavailableBody": "This mode will open in version {version}.",
     "unavailableHint": "Quick Match, the staff clash, the grid trial, and settings are available.",
-    "replays": "Replays"
+    "replays": "Replays",
+    "continue": "Continue",
+    "newBylinaTitle": "Start a new bylina?",
+    "newBylinaBody": "The current bylina's progress will be lost: missions, retinue, supplies and the Darkness counter start over.",
+    "newBylinaNote": "Training, Quick Match and replays are not affected.",
+    "newBylinaConfirm": "Start anew"
   },
   "difficulty": {
     "title": "Difficulty",
@@ -250,7 +255,8 @@
     "ok": "OK",
     "close": "Close",
     "notReady": "Unavailable",
-    "back": "Back"
+    "back": "Back",
+    "cancel": "Cancel"
   },
   "skill": {
     "circular_sweep": {
