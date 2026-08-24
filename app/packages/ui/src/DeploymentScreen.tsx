@@ -246,7 +246,9 @@ export function DeploymentScreen() {
           <button
             type="button"
             className="btn btn-ghost"
-            onClick={() => session.leaveCampaignMission()}
+            // «Назад к карте» приостанавливает миссию, не покидая её
+            // (0.20.18): вернуться к формированию высадки можно с карты.
+            onClick={() => session.suspendCampaignMission()}
           >
             {t("deployment.back")}
           </button>

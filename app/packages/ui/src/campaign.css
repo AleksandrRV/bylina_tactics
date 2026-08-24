@@ -520,6 +520,32 @@
   margin-top: 4px;
 }
 
+.campaign-abandon-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mist);
+  padding: 11px 18px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+
+.campaign-abandon-btn:hover,
+.campaign-abandon-btn:focus-visible {
+  border-color: #c45c5c;
+  color: #d98080;
+  outline: none;
+}
+
+/* Подсказка о начатой миссии (0.20.18): старт других точек недоступен. */
+.mission-active-note {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mist);
+  opacity: 0.8;
+}
+
 .campaign-start-btn {
   appearance: none;
   border: 1px solid var(--amber-dim);

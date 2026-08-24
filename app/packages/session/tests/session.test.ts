@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.17", () => {
-    expect(APP_VERSION).toBe("0.20.17");
+  it("reports version 0.20.18", () => {
+    expect(APP_VERSION).toBe("0.20.18");
   });
 
   it("moves between menu and settings", () => {
@@ -415,7 +415,7 @@ describe("createSession campaign hints (0.20.0)", () => {
   });
 });
 
-describe("continueCampaign (0.20.17)", () => {
+describe("continueCampaign (0.20.18)", () => {
   const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
   };
@@ -470,7 +470,7 @@ describe("continueCampaign (0.20.17)", () => {
   });
 });
 
-describe("suspend/resume campaign battle (0.20.17)", () => {
+describe("suspend/resume campaign battle (0.20.18)", () => {
   const makeBattleSession = (): ReturnType<typeof createSession> => {
     const session = createSession("menu");
     const campaign = createCampaign(CAMPAIGN_CONFIG);
@@ -511,7 +511,7 @@ describe("suspend/resume campaign battle (0.20.17)", () => {
     expect(session.get().restoredMatch).toBeUndefined();
   });
 
-  it("a mission started in-session suspends and resumes repeatedly (0.20.17)", () => {
+  it("a mission started in-session suspends and resumes repeatedly (0.20.18)", () => {
     // Поток игрока: карта -> высадка -> бой -> «Выйти в меню» -> «Продолжить»,
     // и так несколько раз подряд — миссия не теряется.
     const session = createSession("menu");
@@ -532,6 +532,45 @@ describe("suspend/resume campaign battle (0.20.17)", () => {
       expect(session.get().screen).toBe("battle");
       expect(session.get().activeMissionId).toBe("clearing_1");
     }
+  });
+
+  it("suspend to the ship map keeps the mission; Continue returns to it (0.20.18)", () => {
+    // Поток: бой -> «К карте корабля» (пауза) -> «В меню» карты -> «Продолжить».
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    session.startCampaignMission("clearing_1");
+    session.confirmDeployment([1, 2, 3]);
+    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 9 }));
+    // «К карте корабля»: миссия приостановлена, не покинута.
+    session.suspendCampaignMission();
+    const onMap = session.get();
+    expect(onMap.screen).toBe("campaign");
+    expect(onMap.battleKind).toBe("campaign");
+    expect(onMap.activeMissionId).toBe("clearing_1");
+    expect(onMap.restoredMatch).toBeDefined();
+    // «В меню» с карты: контекст миссии сохраняется.
+    session.campaignToMenu();
+    expect(session.get().screen).toBe("menu");
+    expect(session.get().activeMissionId).toBe("clearing_1");
+    expect(session.get().restoredMatch).toBeDefined();
+    // «Продолжить» — снова бой миссии.
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("battle");
+  });
+
+  it("a mission suspended before the battle resumes to deployment (0.20.18)", () => {
+    // Поток: высадка -> «Назад к карте» -> «Продолжить» — формирование высадки.
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    session.startCampaignMission("clearing_1");
+    session.suspendCampaignMission();
+    expect(session.get().screen).toBe("campaign");
+    expect(session.get().activeMissionId).toBe("clearing_1");
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("deployment");
+    expect(session.get().activeMissionId).toBe("clearing_1");
   });
 
   it("suspend outside a campaign battle is a plain exit to menu", () => {
