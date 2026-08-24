@@ -247,6 +247,46 @@ describe("app boot with a player save (0.20.15)", () => {
     }
   });
 
+  it("Continue stays in the menu after leaving the campaign (0.20.16)", async () => {
+    await makeSave("campaign", 5);
+    const app = await mountInteractiveApp();
+    try {
+      // Продолжить былину.
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      });
+      expect(document.querySelector(".campaign-screen")).not.toBeNull();
+      // Выйти из кампании обратно в меню.
+      await act(async () => {
+        buttonByText("В меню").click();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      });
+      expect(document.querySelector(".menu-screen")).not.toBeNull();
+      // Кнопка «Продолжить» остаётся: былина начата и уже загружена.
+      expect(hasButton("Продолжить")).toBe(true);
+      // Нажатие возвращает на карту корабля той же былины.
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 80));
+      });
+      expect(document.querySelector(".campaign-screen")).not.toBeNull();
+      const darkness = document.querySelector(".campaign-darkness-value");
+      expect(darkness?.textContent).toContain("5");
+      expect(app.errors).toEqual([]);
+    } finally {
+      await act(async () => {
+        app.root.unmount();
+      });
+    }
+  });
+
   it("boots an installed PWA (standalone display mode)", async () => {
     standalone = true;
     const app = await mountInteractiveApp();

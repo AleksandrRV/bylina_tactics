@@ -110,10 +110,15 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, campaignRestore, session]);
 
-  /** «Продолжить»: загрузить сохранённую былину и вернуться к сохранённому
-   *  экрану ветки кампании (карта, высадка, итог миссии либо бой). */
+  /** «Продолжить»: несчитанное сохранение — загрузить былину и вернуться к
+   *  сохранённому экрану ветки кампании (карта, высадка, итог миссии либо
+   *  бой); уже загруженная былина — вернуться на карту корабля (кнопка
+   *  «Продолжить» доступна всегда, пока былина начата, 0.20.16). */
   const continueSavedCampaign = (): void => {
-    if (campaignRestore !== "pending" || !saved) return;
+    if (campaignRestore !== "pending" || !saved) {
+      if (campaignRestore !== "pending") session.openCampaign();
+      return;
+    }
     const entry = saved.session;
     const inCampaignBattle = entry.screen === "battle" && entry.battleKind === "campaign" && Boolean(saved.match);
     if (inCampaignBattle && saved.match) {
@@ -142,6 +147,10 @@ export function App() {
   };
 
   const [, setLocaleTick] = useState(0);
+  // Тик изменений кампании (0.20.16): миссии и Тьма, зарабатываемые уже
+  // после загрузки былины, обновляют «Продолжить» и предупреждение
+  // «Новой былины» при возврате в меню.
+  const [campaignTick, setCampaignTick] = useState(0);
 
   useEffect(() => {
     applyDocumentLocale(i18n);
@@ -151,6 +160,11 @@ export function App() {
       setLocaleTick((value) => value + 1);
     });
   }, [i18n, settings]);
+
+  useEffect(() => {
+    if (!campaign) return;
+    return campaign.subscribe(() => setCampaignTick((value) => value + 1));
+  }, [campaign]);
 
   // Автосохранение: кампания и активная партия пишутся при каждом изменении.
   // Пока ядро боя не привязано (экран «battle» смонтирован, BattleScreen ещё
@@ -324,25 +338,35 @@ export function App() {
     [debugMode],
   );
 
-  // Контроллер ветки кампании для меню (0.20.15): «Продолжить» видно, пока
-  // сохранение не считано; «Новая былина» предупреждает, если прогресс есть
-  // (несчитанное сохранение либо текущая былина с продвинутыми миссиями).
+  // Контроллер ветки кампании для меню (0.20.15; исправление 0.20.16):
+  // «Продолжить» доступен ВСЕГДА, когда былина начата, — не только пока
+  // сохранение не считано: выйдя из кампании в меню, игрок продолжает
+  // текущую былину той же кнопкой. Признак «начата» — прогресс: несчитанное
+  // сохранение (гейт загрузки уже отсеял пустые) либо Тьма, начатая либо
+  // пройденная миссия в текущем автомате. Тот же признак включает
+  // предупреждение «Новой былины».
+  const hasActiveBylina = useMemo(() => {
+    if (!campaign) return false;
+    if (campaignRestore === "pending") return true;
+    const snapshot = campaign.getState();
+    return (
+      snapshot.darkness > 0
+      || snapshot.activeMissionId !== null
+      || snapshot.missions.some((mission) => mission.status === "done")
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaign, campaignRestore, campaignTick]);
+
   const campaignFlow = useMemo(() => {
     if (!campaign) return undefined;
-    const snapshot = campaign.getState();
-    const hasProgress =
-      campaignRestore === "pending"
-      || snapshot.darkness > 0
-      || snapshot.activeMissionId !== null
-      || snapshot.missions.some((mission) => mission.status === "done");
     return {
-      canContinue: campaignRestore === "pending",
-      hasProgress,
+      canContinue: hasActiveBylina,
+      hasProgress: hasActiveBylina,
       continueCampaign: continueSavedCampaign,
       startNewCampaign,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [campaign, campaignRestore]);
+  }, [campaign, hasActiveBylina]);
 
   if (!content) return <div className="content-error"><h1>Loading content…</h1></div>;
   if (!content.ok) {
