@@ -53,6 +53,7 @@ Desktop.ini
 uploads/
 
 # Collect files module
+files-collector/
 collect_files/
 collect_files.bat
 collect_files.py
