@@ -1945,10 +1945,14 @@ export function BattleScreenView() {
               type="button"
               className="hud-btn"
               onClick={() => {
-                // Выход в меню из боя кампании отменяет начатую миссию:
-                // иначе автомат кампании останется с незакрытой миссией.
-                if (battleKind === "campaign") session.leaveCampaignMission();
-                session.goTo("menu");
+                // Выход в меню из боя кампании ПРИОСТАНАВЛИВАЕТ миссию
+                // (0.20.17): suspendCampaignBattle сам переводит в меню,
+                // сохраняя снимок партии в сессии — «Продолжить» главного
+                // меню возвращает в бой. Покинуть миссию можно осознанно —
+                // кнопкой «К карте корабля». Иные бои выходят в меню как
+                // прежде (их партия эфемерна).
+                if (battleKind === "campaign") session.suspendCampaignBattle();
+                else session.goTo("menu");
               }}
             >
               {t("battle.toMenu")}

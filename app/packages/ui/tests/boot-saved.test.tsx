@@ -1,7 +1,22 @@
 // @vitest-environment jsdom
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+
+// Рендер поля подменён заглушкой (PixiJS не работает в jsdom): тестам
+// продолжения нужны смонтированные экраны боя кампании (0.20.17).
+vi.mock("@bylina/render", () => {
+  const stub = {
+    mount: async () => undefined,
+    update: () => undefined,
+    play: async () => undefined,
+    pan: () => undefined,
+    destroy: () => undefined,
+    setOnActivate: () => undefined,
+    setOnHover: () => undefined,
+  };
+  return { createFieldRenderer: () => stub };
+});
 
 /**
  * Продолжение былины через главное меню (0.20.15). Прежнее поведение:
@@ -60,6 +75,18 @@ async function mountInteractiveApp(): Promise<{ root: Root; host: HTMLElement; e
   return { root, host, errors };
 }
 
+/** Ждать условия (монтаж экранов боя асинхронен: ядро + эффекты). */
+async function waitFor(predicate: () => boolean, timeoutMs = 2500): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (predicate()) return true;
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+  }
+  return predicate();
+}
+
 const buttonByText = (part: string): HTMLButtonElement => {
   const found = [...document.querySelectorAll("button")].find((button) =>
     (button.textContent ?? "").includes(part),
@@ -104,6 +131,55 @@ async function makeSave(screen: string, darkness = 5): Promise<void> {
       trainingDone: ["movement"],
       campaignHintsDone: [],
     },
+  };
+  window.localStorage.setItem("bylina.save.v1", JSON.stringify(save));
+}
+
+/** Сохранение посреди боя кампании (0.20.17): миссия начата, снимок партии в записи. */
+async function makeBattleSave(): Promise<void> {
+  const { createCampaign } = await import("../../campaign/src/index.js");
+  const { createMissionMatch } = await import("@bylina/core");
+  const { loadAppContent } = await import("../../../apps/game-pwa/src/content-files.js");
+  const content = loadAppContent();
+  if (!content.ok) throw new Error("content broken");
+  const unitStats: Record<string, { maxHealth: number }> = {};
+  for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
+  const campaign = createCampaign(content.data.campaign, {
+    unitStats,
+    items: content.data.items,
+    classUnitIds: content.data.units
+      .filter((unit) => unit.side === "druzhina" && unit.id !== content.data.campaign.recruitUnitId)
+      .map((unit) => unit.id),
+  });
+  const mission = campaign.getMissions()[0];
+  if (!mission) throw new Error("no campaign mission");
+  campaign.startMission(mission.id);
+  const state = campaign.getState();
+  state.darkness = 5;
+  const match = createMissionMatch({
+    units: content.data.units,
+    map: mission.map,
+    playerSlots: state.fighters.slice(0, 3).map((fighter) => fighter.unitId),
+    enemies: mission.enemies,
+    seed: 11,
+  });
+  const save = {
+    formatVersion: 2,
+    version: "0.20.17",
+    savedAt: Date.now(),
+    campaign: state,
+    session: {
+      screen: "battle",
+      battleKind: "campaign",
+      activeMissionId: mission.id,
+      deployment: state.fighters.slice(0, 3).map((fighter) => fighter.id),
+      matchSeed: 11,
+      outcome: null,
+      difficulty: null,
+      trainingDone: [],
+      campaignHintsDone: [],
+    },
+    match,
   };
   window.localStorage.setItem("bylina.save.v1", JSON.stringify(save));
 }
@@ -279,6 +355,48 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(document.querySelector(".campaign-screen")).not.toBeNull();
       const darkness = document.querySelector(".campaign-darkness-value");
       expect(darkness?.textContent).toContain("5");
+      expect(app.errors).toEqual([]);
+    } finally {
+      await act(async () => {
+        app.root.unmount();
+      });
+    }
+  });
+
+  it("a mission saved mid-battle is always resumed by Continue (0.20.17)", async () => {
+    await makeBattleSave();
+    const app = await mountInteractiveApp();
+    try {
+      // Первое продолжение — возврат в бой миссии.
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      // Пауза → «Выйти в меню»: миссия приостанавливается, не покидается.
+      await act(async () => {
+        buttonByText("Пауза").click();
+      });
+      await act(async () => {
+        buttonByText("Выйти в меню").click();
+      });
+      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(hasButton("Продолжить")).toBe(true);
+      // Автосохранение в меню хранит бой: и после перезапуска «Продолжить»
+      // вернёт в миссию (пишется с троттлом — дождаться записи).
+      expect(
+        await waitFor(() => {
+          const raw = window.localStorage.getItem("bylina.save.v1");
+          if (!raw) return false;
+          const save = JSON.parse(raw) as { session: { screen: string }; match?: unknown };
+          return save.session.screen === "battle" && save.match !== undefined;
+        }),
+      ).toBe(true);
+      // Повторное продолжение — снова бой, а не карта корабля (регрессия).
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {

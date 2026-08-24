@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.16", () => {
-    expect(APP_VERSION).toBe("0.20.16");
+  it("reports version 0.20.17", () => {
+    expect(APP_VERSION).toBe("0.20.17");
   });
 
   it("moves between menu and settings", () => {
@@ -415,7 +415,7 @@ describe("createSession campaign hints (0.20.0)", () => {
   });
 });
 
-describe("continueCampaign (0.20.16)", () => {
+describe("continueCampaign (0.20.17)", () => {
   const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
   };
@@ -467,5 +467,55 @@ describe("continueCampaign (0.20.16)", () => {
     // Смена хода сессии не оставляет следов чужих веток.
     expect(session.get().outcome).toBeNull();
     expect(session.get().paused).toBe(false);
+  });
+});
+
+describe("suspend/resume campaign battle (0.20.17)", () => {
+  const makeBattleSession = (): ReturnType<typeof createSession> => {
+    const session = createSession("menu");
+    const campaign = createCampaign(CAMPAIGN_CONFIG);
+    session.bindCampaign(campaign);
+    campaign.startMission("clearing_1");
+    const kernel = createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 5 });
+    session.bindTacticsHost(kernel);
+    session.continueCampaign({
+      screen: "battle",
+      activeMissionId: "clearing_1",
+      restoredMatch: createDebugMatch(),
+    });
+    return session;
+  };
+
+  it("suspend keeps the mission and snapshot, then resumes the battle", () => {
+    const session = makeBattleSession();
+    session.setPaused(true);
+    session.suspendCampaignBattle();
+    const suspended = session.get();
+    expect(suspended.screen).toBe("menu");
+    expect(suspended.paused).toBe(false);
+    expect(suspended.battleKind).toBe("campaign");
+    expect(suspended.activeMissionId).toBe("clearing_1");
+    expect(suspended.restoredMatch).toBeDefined();
+    // «Продолжить» возвращается в бой (снимок в состоянии сессии).
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().restoredMatch).toBeDefined();
+  });
+
+  it("resume falls back to the ship map when the mission is finished", () => {
+    const session = makeBattleSession();
+    session.finishCampaignMission("victory", [], []);
+    session.goTo("menu");
+    session.resumeCampaign();
+    expect(session.get().screen).toBe("campaign");
+    expect(session.get().restoredMatch).toBeUndefined();
+  });
+
+  it("suspend outside a campaign battle is a plain exit to menu", () => {
+    const session = createSession("menu");
+    session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
+    session.suspendCampaignBattle();
+    expect(session.get().screen).toBe("menu");
+    expect(session.get().battleKind).toBeNull();
   });
 });
