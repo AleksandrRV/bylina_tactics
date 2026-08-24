@@ -1937,7 +1937,10 @@ export function BattleScreenView() {
               {t("battle.resume")}
             </button>
             {battleKind === "campaign" ? (
-              <button type="button" className="hud-btn" onClick={() => session.leaveCampaignMission()}>
+              // «К карте корабля» приостанавливает миссию, не покидая её
+              // (0.20.18): на карте можно вернуться в миссию или осознанно
+              // покинуть её; «Продолжить» меню тоже возвращает в бой.
+              <button type="button" className="hud-btn" onClick={() => session.suspendCampaignMission()}>
                 {t("battle.toCampaignMap")}
               </button>
             ) : null}

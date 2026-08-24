@@ -413,7 +413,10 @@
         "title": "Kikimora",
         "text": "The Kikimora poisons — the poison ticks at the start of a turn — and raises fallen skeletons. Remove poison with the Znaharka's skill and kill the skeletons again."
       }
-    }
+    },
+    "resumeMission": "Return to the mission",
+    "abandonMission": "Abandon the mission",
+    "missionActiveHint": "Finish or abandon the started mission first."
   },
   "missionResult": {
     "rosterOutcomes": "Druzhina outcomes",

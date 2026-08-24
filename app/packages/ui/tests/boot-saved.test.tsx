@@ -135,6 +135,9 @@ async function makeSave(screen: string, darkness = 5): Promise<void> {
   window.localStorage.setItem("bylina.save.v1", JSON.stringify(save));
 }
 
+/** Id миссии из последнего makeBattleSave (для выбора точки на карте). */
+let battleMissionId = "";
+
 /** Сохранение посреди боя кампании (0.20.17): миссия начата, снимок партии в записи. */
 async function makeBattleSave(): Promise<void> {
   const { createCampaign } = await import("../../campaign/src/index.js");
@@ -153,6 +156,7 @@ async function makeBattleSave(): Promise<void> {
   });
   const mission = campaign.getMissions()[0];
   if (!mission) throw new Error("no campaign mission");
+  battleMissionId = mission.id;
   campaign.startMission(mission.id);
   const state = campaign.getState();
   state.darkness = 5;
@@ -404,6 +408,52 @@ describe("app boot with a player save (0.20.15)", () => {
       });
       await act(async () => {
         buttonByText("Выйти в меню").click();
+      });
+      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
+      expect(app.errors).toEqual([]);
+    } finally {
+      await act(async () => {
+        app.root.unmount();
+      });
+    }
+  });
+
+  it("leaving a mission to the ship map and menu still resumes by Continue (0.20.18)", async () => {
+    await makeBattleSave();
+    const app = await mountInteractiveApp();
+    try {
+      // Продолжить — в бой миссии.
+      await act(async () => {
+        buttonByText("Продолжить").click();
+      });
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      // Пауза -> «К карте корабля»: миссия приостановлена, карта корабля.
+      await act(async () => {
+        buttonByText("Пауза").click();
+      });
+      await act(async () => {
+        buttonByText("К карте корабля").click();
+      });
+      expect(await waitFor(() => document.querySelector(".campaign-screen") !== null)).toBe(true);
+      // Выбрать начатую точку на карте: миссия предлагает вернуться;
+      // покинуть — только явно.
+      await act(async () => {
+        const marker = [...document.querySelectorAll(".map-marker")].find((button) =>
+          (button.getAttribute("aria-label") ?? "").includes(battleMissionId),
+        );
+        if (!marker) throw new Error("mission marker not found");
+        (marker as HTMLButtonElement).click();
+      });
+      expect(hasButton("Вернуться в миссию")).toBe(true);
+      expect(hasButton("Покинуть миссию")).toBe(true);
+      // «В меню» карты -> «Продолжить» — снова бой, не карта.
+      await act(async () => {
+        (document.querySelector(".campaign-exit-btn") as HTMLButtonElement).click();
       });
       expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       await act(async () => {

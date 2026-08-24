@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.17";
+export const APP_VERSION = "0.20.18";
 
 export type AppScreen =
   | "boot"
@@ -147,6 +147,20 @@ export interface SessionApi {
    * корабля. Завершённая миссия боем не считается.
    */
   resumeCampaign(): void;
+  /**
+   * Приостановить начатую миссию кампании и вернуться на карту корабля,
+   * не покидая миссии (0.20.18): снимок партии (если бой идёт) и туман
+   * сохраняются в состоянии сессии. Используется кнопками «К карте
+   * корабля» паузы боя и «Назад к карте» экрана высадки — покинуть
+   * миссию можно только явно с карты.
+   */
+  suspendCampaignMission(): void;
+  /**
+   * Выход с карты корабля в главное меню с сохранением контекста начатой
+   * миссии (0.20.18): «Продолжить» возвращает в миссию и после захода
+   * на карту. Вне начатой миссии эквивалентен обычному переходу в меню.
+   */
+  campaignToMenu(): void;
   /** Начать доступную миссию и открыть формирование высадки. */
   startCampaignMission(missionId: string): boolean;
   /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
@@ -580,11 +594,34 @@ export function createSession(
         emit({ ...state, screen: "battle", paused: false });
         return;
       }
-      if (missionPending && state.deployment.length > 0) {
+      // Миссия начата, но бой ещё не начат/не приостановлен — высадка.
+      if (missionPending) {
         emit({ ...state, screen: "deployment", paused: false });
         return;
       }
       emit({ ...idle, screen: "campaign" });
+    },
+    suspendCampaignMission: () => {
+      if (state.battleKind !== "campaign" || state.activeMissionId === null) {
+        emit({ ...idle, screen: "campaign" });
+        return;
+      }
+      // Боевой снимок берётся, пока ядро привязано; экран высадки снимка
+      // не имеет — миссия возобновится с формирования высадки.
+      const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
+      const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
+      emit({
+        ...state,
+        screen: "campaign",
+        paused: false,
+        restoredMatch: snapshot ?? state.restoredMatch,
+        restoredFog: fog ?? state.restoredFog,
+      });
+    },
+    campaignToMenu: () => {
+      // Контекст начатой миссии сохраняется (idle разложил бы его):
+      // «Продолжить» главного меню вернёт в миссию.
+      emit({ ...state, screen: "menu", paused: false });
     },
     backToCampaign: () => {
       emit({ ...idle, screen: "campaign" });

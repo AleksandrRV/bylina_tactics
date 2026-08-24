@@ -337,7 +337,9 @@ export function CampaignScreen() {
         <button
           type="button"
           className="campaign-exit-btn"
-          onClick={() => session.goTo("menu")}
+          // Выход в меню сохраняет контекст начатой миссии (0.20.18):
+          // «Продолжить» возвращает в неё даже после захода на карту.
+          onClick={() => session.campaignToMenu()}
           title={t("campaign.toMenu")}
           aria-label={t("campaign.toMenu")}
         >
@@ -553,7 +555,38 @@ export function CampaignScreen() {
                     </dd>
                   </div>
                 </dl>
-                {selectedPoint.status === "open" ? (
+                {selectedPoint.status === "open" && state.activeMissionId === selected.id ? (
+                  // Начатая миссия (0.20.18): вернуться в неё либо осознанно
+                  // покинуть — молча миссия не теряется ни из боя, ни из меню.
+                  <div className="mission-actions">
+                    <button
+                      type="button"
+                      className="campaign-start-btn"
+                      onClick={() => session.resumeCampaign()}
+                    >
+                      {t("campaign.resumeMission")}
+                      <span aria-hidden="true">→</span>
+                    </button>
+                    <button
+                      type="button"
+                      className="campaign-abandon-btn"
+                      onClick={() => {
+                        session.leaveCampaignMission();
+                        setSelectedId(null);
+                      }}
+                    >
+                      {t("campaign.abandonMission")}
+                    </button>
+                  </div>
+                ) : selectedPoint.status === "open" && state.activeMissionId !== null ? (
+                  // Другая точка, пока миссия начата: старт недоступен.
+                  <div className="mission-actions">
+                    <button type="button" className="campaign-start-btn" disabled title={t("campaign.missionActiveHint")}>
+                      {t("campaign.start")}
+                    </button>
+                    <p className="mission-active-note">{t("campaign.missionActiveHint")}</p>
+                  </div>
+                ) : selectedPoint.status === "open" ? (
                   <div className="mission-actions">
                     <button
                       type="button"

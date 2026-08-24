@@ -235,14 +235,17 @@ export function App() {
       return;
     }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
-    // Приостановленный в меню бой кампании (0.20.17): миссия не покинута —
-    // сохранение обязано вернуть в бой и после перезапуска приложения.
-    const suspendedCampaignBattle =
-      state.screen === "menu"
+    // Приостановленная миссия кампании (0.20.17; расширено 0.20.18 на карту
+    // корабля): миссия не покинута — сохранение обязано вернуть в неё и
+    // после перезапуска приложения. Бой со снимком сохраняется как бой,
+    // начатая миссия без снимка (экран высадки) — как формирование высадки.
+    const missionSuspendedOutsideBattle =
+      (state.screen === "menu" || state.screen === "campaign")
       && state.battleKind === "campaign"
       && state.activeMissionId !== null
-      && state.outcome === null
-      && Boolean(state.restoredMatch);
+      && state.outcome === null;
+    const suspendedCampaignBattle = missionSuspendedOutsideBattle && Boolean(state.restoredMatch);
+    const suspendedCampaignDeployment = missionSuspendedOutsideBattle && !state.restoredMatch;
     if (!inCampaignBattle) lastMatchRef.current = {};
     let match = inCampaignBattle
       ? (session.getBattleFullSnapshot() ?? undefined)
@@ -261,9 +264,11 @@ export function App() {
     if (match) lastMatchRef.current = { match, fog };
     const screen = inCampaignBattle || suspendedCampaignBattle
       ? "battle"
-      : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
-        ? state.screen
-        : "menu";
+      : suspendedCampaignDeployment
+        ? "deployment"
+        : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
+          ? state.screen
+          : "menu";
     const request = ++saveRequestRef.current;
     // MatchState, fog conversion and JSON.stringify run in packages/storage's
     // worker. localStorage itself remains synchronous but receives ready JSON.
