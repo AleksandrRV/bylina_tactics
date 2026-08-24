@@ -116,7 +116,9 @@ export function App() {
    *  «Продолжить» доступна всегда, пока былина начата, 0.20.16). */
   const continueSavedCampaign = (): void => {
     if (campaignRestore !== "pending" || !saved) {
-      if (campaignRestore !== "pending") session.openCampaign();
+      // Былина уже загружена: вернуться к начатой миссии — в
+      // приостановленный бой (снимок в сессии), иначе на карту корабля.
+      if (campaignRestore !== "pending") session.resumeCampaign();
       return;
     }
     const entry = saved.session;
@@ -233,15 +235,31 @@ export function App() {
       return;
     }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
+    // Приостановленный в меню бой кампании (0.20.17): миссия не покинута —
+    // сохранение обязано вернуть в бой и после перезапуска приложения.
+    const suspendedCampaignBattle =
+      state.screen === "menu"
+      && state.battleKind === "campaign"
+      && state.activeMissionId !== null
+      && state.outcome === null
+      && Boolean(state.restoredMatch);
     if (!inCampaignBattle) lastMatchRef.current = {};
-    let match = inCampaignBattle ? (session.getBattleFullSnapshot() ?? undefined) : undefined;
-    let fog: FogState | undefined = match ? (session.getBattleFog() ?? undefined) : undefined;
+    let match = inCampaignBattle
+      ? (session.getBattleFullSnapshot() ?? undefined)
+      : suspendedCampaignBattle
+        ? state.restoredMatch
+        : undefined;
+    let fog: FogState | undefined = inCampaignBattle
+      ? (session.getBattleFog() ?? undefined)
+      : suspendedCampaignBattle
+        ? state.restoredFog
+        : undefined;
     if (!match && inCampaignBattle) {
       match = lastMatchRef.current.match;
       fog = lastMatchRef.current.fog;
     }
     if (match) lastMatchRef.current = { match, fog };
-    const screen = inCampaignBattle
+    const screen = inCampaignBattle || suspendedCampaignBattle
       ? "battle"
       : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
         ? state.screen

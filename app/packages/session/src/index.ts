@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.16";
+export const APP_VERSION = "0.20.17";
 
 export type AppScreen =
   | "boot"
@@ -135,6 +135,18 @@ export interface SessionApi {
    * (обучение, туториалы, трудность) сохраняется.
    */
   continueCampaign(entry: CampaignContinuation): void;
+  /**
+   * Приостановить бой кампании, не покидая миссии (0.20.17): снимок партии
+   * и туман сохраняются в состоянии сессии, экран меняет вызывающий код
+   * (обычно — выход в главное меню). «Продолжить» возвращает в бой.
+   */
+  suspendCampaignBattle(): void;
+  /**
+   * Вернуться к начатой миссии кампании (0.20.17): в приостановленный бой
+   * (со снимком партии), иначе — к формированию высадки, иначе — на карту
+   * корабля. Завершённая миссия боем не считается.
+   */
+  resumeCampaign(): void;
   /** Начать доступную миссию и открыть формирование высадки. */
   startCampaignMission(missionId: string): boolean;
   /** Подтвердить высадку (от 1 до 5 живых бойцов) и перейти в сражение. */
@@ -536,6 +548,42 @@ export function createSession(
     },
     leaveCampaignMission: () => {
       requireCampaign().abandonMission();
+      emit({ ...idle, screen: "campaign" });
+    },
+    suspendCampaignBattle: () => {
+      if (state.battleKind !== "campaign" || state.activeMissionId === null) {
+        // Не бой кампании — обычный выход в меню без контекста миссии.
+        emit({ screen: "menu", ...idle });
+        return;
+      }
+      // Снимок партии и туман кладутся в состояние сессии — тот же механизм,
+      // что и при восстановлении сохранения: BattleScreen построит ядро из
+      // снимка при возврате, а замена ядра другим режимом ничего не затрёт.
+      // Экран меняется здесь же: сквозной goTo("menu") разложил бы idle и
+      // стёр контекст приостановленной миссии.
+      const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
+      const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
+      emit({
+        ...state,
+        screen: "menu",
+        paused: false,
+        restoredMatch: snapshot ?? state.restoredMatch,
+        restoredFog: fog ?? state.restoredFog,
+      });
+    },
+    resumeCampaign: () => {
+      const active = requireCampaign().getState().activeMissionId;
+      // Миссия всё ещё начата в автомате и не завершена в сессии.
+      const missionPending =
+        state.activeMissionId !== null && state.activeMissionId === active && state.outcome === null;
+      if (missionPending && state.battleKind === "campaign" && state.restoredMatch) {
+        emit({ ...state, screen: "battle", paused: false });
+        return;
+      }
+      if (missionPending && state.deployment.length > 0) {
+        emit({ ...state, screen: "deployment", paused: false });
+        return;
+      }
       emit({ ...idle, screen: "campaign" });
     },
     backToCampaign: () => {

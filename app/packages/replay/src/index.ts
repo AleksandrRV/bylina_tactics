@@ -9,7 +9,7 @@ import type { Command, PvpMatchOptions } from "@bylina/core";
  * либо обрыве соединения.
  */
 
-export const REPLAY_VERSION = "0.20.16";
+export const REPLAY_VERSION = "0.20.17";
 
 export interface ReplayJournal {
   version: string;
