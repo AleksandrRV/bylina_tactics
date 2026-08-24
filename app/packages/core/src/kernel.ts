@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.18";
+export const CORE_VERSION = "0.20.19";
 
 export interface KernelOptions {
   initial?: MatchState;

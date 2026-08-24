@@ -142,9 +142,11 @@ export function App() {
     });
   };
 
-  /** «Новая былина» после предупреждения: свежий автомат кампании. */
+  /** «Новая былина» после предупреждения: свежий автомат кампании;
+   *  слот приостановленной миссии прежней былины гасится (0.20.19). */
   const startNewCampaign = (): void => {
     setCampaignRestore(null);
+    session.clearSuspendedCampaign();
     session.openMode("campaign");
   };
 
@@ -235,40 +237,60 @@ export function App() {
       return;
     }
     const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
-    // Приостановленная миссия кампании (0.20.17; расширено 0.20.18 на карту
-    // корабля): миссия не покинута — сохранение обязано вернуть в неё и
-    // после перезапуска приложения. Бой со снимком сохраняется как бой,
-    // начатая миссия без снимка (экран высадки) — как формирование высадки.
-    const missionSuspendedOutsideBattle =
-      (state.screen === "menu" || state.screen === "campaign")
-      && state.battleKind === "campaign"
-      && state.activeMissionId !== null
-      && state.outcome === null;
-    const suspendedCampaignBattle = missionSuspendedOutsideBattle && Boolean(state.restoredMatch);
-    const suspendedCampaignDeployment = missionSuspendedOutsideBattle && !state.restoredMatch;
+    const inCampaignDeployment = state.screen === "deployment" && state.battleKind === "campaign";
+    // Приостановленная миссия кампании (0.20.17–0.20.19): контекст — в слоте,
+    // не зависящем от навигации (заход в обучение/быстрый матч/настройки из
+    // меню его не стирает). Сохранение обязано вернуть в миссию и после
+    // перезапуска приложения: бой со снимком — как бой, миссия без снимка —
+    // как формирование высадки.
+    const slot = state.suspendedCampaign ?? null;
+    const suspendedCampaign = slot !== null && !inCampaignBattle && !inCampaignDeployment;
     if (!inCampaignBattle) lastMatchRef.current = {};
     let match = inCampaignBattle
       ? (session.getBattleFullSnapshot() ?? undefined)
-      : suspendedCampaignBattle
-        ? state.restoredMatch
+      : suspendedCampaign
+        ? slot!.restoredMatch
         : undefined;
     let fog: FogState | undefined = inCampaignBattle
       ? (session.getBattleFog() ?? undefined)
-      : suspendedCampaignBattle
-        ? state.restoredFog
+      : suspendedCampaign
+        ? slot!.restoredFog
         : undefined;
     if (!match && inCampaignBattle) {
       match = lastMatchRef.current.match;
       fog = lastMatchRef.current.fog;
     }
     if (match) lastMatchRef.current = { match, fog };
-    const screen = inCampaignBattle || suspendedCampaignBattle
+    const screen = inCampaignBattle
       ? "battle"
-      : suspendedCampaignDeployment
-        ? "deployment"
+      : suspendedCampaign
+        ? slot!.restoredMatch
+          ? "battle"
+          : "deployment"
         : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
           ? state.screen
           : "menu";
+    // Контекст ветки кампании в записи — из боя либо из слота.
+    const campaignSession = inCampaignBattle || inCampaignDeployment
+      ? {
+          activeMissionId: state.activeMissionId,
+          deployment: state.deployment,
+          matchSeed: state.matchSeed,
+          outcome: state.outcome,
+        }
+      : suspendedCampaign
+        ? {
+            activeMissionId: slot!.activeMissionId,
+            deployment: slot!.deployment,
+            matchSeed: slot!.matchSeed,
+            outcome: null,
+          }
+        : {
+            activeMissionId: null,
+            deployment: [],
+            matchSeed: 0,
+            outcome: null,
+          };
     const request = ++saveRequestRef.current;
     // MatchState, fog conversion and JSON.stringify run in packages/storage's
     // worker. localStorage itself remains synchronous but receives ready JSON.
@@ -279,11 +301,15 @@ export function App() {
       campaign: campaign.getState(),
       session: {
         screen,
-        battleKind: state.battleKind,
-        activeMissionId: state.activeMissionId,
-        deployment: state.deployment,
-        matchSeed: state.matchSeed,
-        outcome: state.outcome,
+        battleKind: inCampaignBattle || inCampaignDeployment
+          ? state.battleKind
+          : suspendedCampaign
+            ? "campaign"
+            : state.battleKind,
+        activeMissionId: campaignSession.activeMissionId,
+        deployment: campaignSession.deployment,
+        matchSeed: campaignSession.matchSeed,
+        outcome: campaignSession.outcome,
         difficulty: state.difficulty,
         trainingDone: state.trainingDone ?? [],
         campaignHintsDone: state.campaignHintsDone ?? [],
