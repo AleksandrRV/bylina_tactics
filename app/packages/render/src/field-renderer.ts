@@ -10,6 +10,7 @@ import {
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
+import { needsTrainingFocus, trainingGlideOffset, type Point } from "./camera.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -647,6 +648,14 @@ export function createFieldRenderer(): FieldRenderer {
   let holdDisplay = false;
   let terrainSeed: number | null = null;
   const jobs: Array<{ events: GameEvent[]; done: () => void }> = [];
+
+  // Подводка камеры к цели обучающего указания (0.20.14): срабатывает при
+  // смене цели шага и при изменении размеров холста; исполнение отложено до
+  // простоя (между воспроизведениями событий), ручное панорамирование
+  // игрока подводка не перебивает непрерывно — только один раз на шаг.
+  let trainingHighlightKey: string | null = null;
+  let pendingTrainingFocus: Point | null = null;
+  let trainingGlide = false;
 
   let drag = false;
   let dragged = false;
@@ -1735,6 +1744,73 @@ export function createFieldRenderer(): FieldRenderer {
     });
   };
 
+  /* ---------- подводка камеры к цели обучающего указания (0.20.14) ---------- */
+
+  /** Мировая точка центра клетки-цели указания (клетка либо сущность). */
+  const trainingHighlightPoint = (highlight: NonNullable<FieldView["trainingHighlight"]>): Point | null => {
+    if (!view) return null;
+    const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === highlight.x && candidate.y === highlight.y);
+    if (!tile) return null;
+    const { cx, cy } = centerOf(tile.x, tile.y, visualLevel(tile));
+    return { x: cx, y: cy };
+  };
+
+  const mapPlane = (): { width: number; height: number } => {
+    const cols = view?.snapshot.grid.width ?? 0;
+    const rows = view?.snapshot.grid.height ?? 0;
+    // Те же границы, что использует fit(): включая поля и нижние откосы.
+    return { width: cols * CELL_SIZE + PAD * 2, height: rows * CELL_SIZE + PAD * 2 + RISE * 4 };
+  };
+
+  /**
+   * Плавный сдвиг камеры к цели указания: цель приходит в видимую зону
+   * (центр по горизонтали, чуть выше середины по вертикали), камера не
+   * выходит за границы поля. Границы экрана берутся из фактического холста,
+   * поэтому правило одинаково для десктопа и телефонов в любой ориентации.
+   */
+  const glideToTrainingTarget = async (point: Point): Promise<void> => {
+    if (!mounted || destroyed) return;
+    const screen = { width: app.renderer.width, height: app.renderer.height };
+    if (screen.width <= 0 || screen.height <= 0) return;
+    const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
+    const target = trainingGlideOffset(point, plane, screen, mapPlane());
+    const fromX = world.x;
+    const fromY = world.y;
+    if (Math.abs(target.x - fromX) + Math.abs(target.y - fromY) < 1) return;
+    userMoved = true;
+    await tween(320, (t) => {
+      const e = easeInOut(t);
+      world.x = fromX + (target.x - fromX) * e;
+      world.y = fromY + (target.y - fromY) * e;
+    });
+  };
+
+  /** Исполняет отложенную подводку в простое (не во время анимаций событий). */
+  const driveTrainingFocus = (): void => {
+    if (destroyed || trainingGlide || playing || !mounted) return;
+    const point = pendingTrainingFocus;
+    if (!point) return;
+    pendingTrainingFocus = null;
+    const screen = { width: app.renderer.width, height: app.renderer.height };
+    const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
+    if (!needsTrainingFocus(point, plane, screen)) return;
+    trainingGlide = true;
+    void glideToTrainingTarget(point).finally(() => {
+      trainingGlide = false;
+    });
+  };
+
+  /** Смена цели шага: запланировать подводку, если цель у края экрана. */
+  const armTrainingFocus = (next: FieldView): void => {
+    const highlight = next.trainingFocus ? next.trainingHighlight : null;
+    const key = highlight ? `${highlight.kind}:${highlight.x},${highlight.y}` : null;
+    if (key === trainingHighlightKey) return;
+    trainingHighlightKey = key;
+    // Мировая точка центра клетки-цели (view уже назначен = next).
+    const point = highlight ? trainingHighlightPoint(highlight) : null;
+    pendingTrainingFocus = point;
+  };
+
   const shake = async (strength: number): Promise<void> => {
     const ox = world.x;
     const oy = world.y;
@@ -2056,11 +2132,20 @@ export function createFieldRenderer(): FieldRenderer {
     event.preventDefault();
   };
 
+  /** Холст сменил размер (поворот устройства, окно): цель шага обучения
+   * перепланируется к подводке по новым границам экрана. */
+  const onCanvasResize = (): void => {
+    if (!view?.trainingFocus || !view.trainingHighlight) return;
+    const point = trainingHighlightPoint(view.trainingHighlight);
+    if (point) pendingTrainingFocus = point;
+  };
+
   const animLoop = (): void => {
     if (destroyed) return;
     if (!playing && view?.visibleCells) {
       paintFx();
     }
+    driveTrainingFocus();
     animFrame = requestAnimationFrame(animLoop);
   };
 
@@ -2091,6 +2176,9 @@ export function createFieldRenderer(): FieldRenderer {
       canvas.style.touchAction = "none";
       element.appendChild(canvas);
       app.stage.addChild(world);
+      // Поворот экрана или изменение окна: цель урока может оказаться за
+      // пределами новой «зоны комфорта» — перепланировать подводку.
+      app.renderer.on("resize", onCanvasResize);
       world.on("pointerdown", onDown);
       world.on("pointermove", onMove);
       world.on("pointerup", onUp);
@@ -2105,6 +2193,9 @@ export function createFieldRenderer(): FieldRenderer {
     },
     update(next) {
       view = next;
+      // Подводка камеры (0.20.14): новая цель указания планируется здесь;
+      // исполняется в простое между анимациями событий (driveTrainingFocus).
+      armTrainingFocus(next);
       for (const entity of next.snapshot.entities) {
         const shown = display.get(entity.id);
         if (!shown || !holdDisplay) {
@@ -2144,6 +2235,7 @@ export function createFieldRenderer(): FieldRenderer {
       cancelAnimationFrame(animFrame);
       jobs.length = 0;
       if (mounted) {
+        app.renderer.off("resize", onCanvasResize);
         world.off("pointerdown", onDown);
         world.off("pointermove", onMove);
         world.off("pointerup", onUp);
