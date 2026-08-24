@@ -315,7 +315,7 @@ describe("spawnKind controls the spawn cause (§2.9 review)", () => {
     expect(result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON")).toBe(true);
     const spawned = game.getSnapshot().entities.find((entity) => entity.configId === "upyr" && !entity.dead);
     // Обычный призыв появляется с полным запасом здоровья записи, а не с 1,
-    // и не заменяет основного бойца при проверке поражения стороны (§5 base-design).
+    // и не заменяет основного бойца при проверке поражения стороны (§5 game-design).
     expect(spawned?.hp).toBe(UPYR.maxHealth);
     expect(spawned?.countsForElimination).toBe(false);
   });

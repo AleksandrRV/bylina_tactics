@@ -12,7 +12,7 @@ export interface MapGenConfig {
   edgeCoverChance: number;
   halfCoverChance: number;
   heightMix: { z0: number; z1: number; z2: number };
-  /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки, §3.2 base-design). */
+  /** Карта содержит зону эвакуации у края поля (миссии спасения и разведки, §3.2 game-design). */
   extract?: boolean;
   /** Минимальное число целоклеточных укрытий (0.20.1): генератор доводит
    *  количество укрытий до этого значения. Гарантия для обучающих карт. */
@@ -89,7 +89,7 @@ function reservedSet(players: SpawnPoint[], enemies: SpawnPoint[]): Set<string> 
 }
 
 export function playerSpawns(height: number): SpawnPoint[] {
-  // До пяти клеток высадки: кампания допускает отряд до deployMax = 5 (§3.1 base-design).
+  // До пяти клеток высадки: кампания допускает отряд до deployMax = 5 (§3.1 game-design).
   // Для любой карты высотой ≥ 8 (нижняя граница схемы) пять клеток помещаются в полосе 1 … height−2.
   const mid = Math.floor(height / 2);
   const ys = [mid - 2, mid - 1, mid, mid + 1, mid + 2].map((y) => Math.max(1, Math.min(height - 2, y)));
@@ -155,7 +155,7 @@ export function generateBattlefield(
   enemies: SpawnPoint[],
 ): { grid: Grid; covers: EntityState[] } {
   const reserved = reservedSet(players, enemies);
-  // Зона эвакуации — колонка у западного края поля (base-design §3.2: «у края карты»).
+  // Зона эвакуации — колонка у западного края поля (game-design §3.2: «у края карты»).
   // Клетки зоны не получают ям и стен; укрытия ставятся только в x ∈ [2, width−3].
   const extractZone = new Set<string>();
   if (config.extract) {

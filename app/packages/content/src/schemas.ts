@@ -107,7 +107,7 @@ export const skillConfigSchema = z.object({
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["willPower"], message: "willPower is required for will resolution" });
   }
   // Умение обязано иметь следствия, кроме умения с признаком извлечения:
-  // эвакуация сама по себе является следствием (удаление с поля, §6 math).
+  // эвакуация сама по себе является следствием (удаление с поля, §6 game-rules).
   if (value.effects.length === 0 && !value.extract) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ["effects"], message: "effects must not be empty for non-extract skills" });
   }
@@ -206,7 +206,7 @@ export const missionConfigSchema = z.object({
       message: "rescue missions require escorteeUnitId",
     });
   }
-  // Зона эвакуации нужна спасению и разведке (base-design §3.2).
+  // Зона эвакуации нужна спасению и разведке (game-design §3.2).
   if ((value.type === "rescue" || value.type === "recon") && value.map.extract !== true) {
     context.addIssue({
       code: z.ZodIssueCode.custom,

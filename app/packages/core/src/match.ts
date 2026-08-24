@@ -103,7 +103,7 @@ export interface MissionMatchOptions {
   enemies: readonly { unitId: string; count: number }[];
   /** Цель миссии: уничтожение объекта, спасение лица, разведка (0.13.0). */
   objective?: MissionObjective;
-  /** Генералы миссии (0.18.0): записи из конфигурации сценария (base-design §6.2). */
+  /** Генералы миссии (0.18.0): записи из конфигурации сценария (game-design §6.2). */
   generals?: readonly string[];
   /** Генералы, погибшие ранее в кампании: не появляются вновь (0.18.0). */
   excludedGenerals?: readonly string[];
@@ -218,7 +218,7 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
   });
 
   // Разведка: сценарий даёт бойцам высадки действие эвакуации — любой из них
-  // может покинуть поле из зоны эвакуации (base-design §3.2, тип «Разведка»).
+  // может покинуть поле из зоны эвакуации (game-design §3.2, тип «Разведка»).
   if (options.objective?.kind === "recon") {
     for (const entity of state.entities) {
       if (entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !(entity.skillIds ?? []).includes("evacuate")) {
@@ -310,7 +310,7 @@ export interface PvpMatchOptions {
 }
 
 /**
- * Сражение состязательного режима «Потешные бои» (base-design §7, roadmap 0.14.0).
+ * Сражение состязательного режима «Потешные бои» (game-design §7, roadmap 0.14.0).
  * Две стороны на одном поле: сторона 1 появляется у западного края, сторона 2 —
  * у восточного. Условие победы — уничтожение всех юнитов противника либо вынос
  * предмета «молодильное яблоко» на клетку домашнего края своей стороны (math §17).

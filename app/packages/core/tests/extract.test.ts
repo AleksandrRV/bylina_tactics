@@ -36,7 +36,7 @@ function gridWithZone(): MatchState["grid"] {
   return grid;
 }
 
-describe("extraction (§6 math, §3.2 base-design)", () => {
+describe("extraction (§6 game-rules, §3.2 game-design)", () => {
   it("rejects the extract skill outside an evacuation zone", () => {
     const outside = fighter({ x: 3, y: 3 });
     const kernel = createTacticsKernel({

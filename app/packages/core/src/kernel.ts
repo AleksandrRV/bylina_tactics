@@ -88,7 +88,7 @@ function cloneState(state: MatchState): MatchState {
 function nextOwner(state: MatchState, current: number): number {
   // Порядок хода строится по фактическим владельцам живых юнитов, а не по
   // фиксированной паре сторон: состязательный режим допускает произвольное
-  // число участников (base-design §7).
+  // число участников (game-design §7).
   const living = new Set(
     state.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.maxAp > 0).map((entity) => entity.owner),
   );
@@ -556,7 +556,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const enemies = [...livingOwners].some((owner) => owner !== PLAYER_OWNER);
 
     // Уничтожение объекта: победа при гибели указанного идола/строения,
-    // независимо от оставшихся противников (base-design §3.2).
+    // независимо от оставшихся противников (game-design §3.2).
     if (objective?.kind === "destroy") {
       const targetAlive = state.entities.some((entity) => !entity.dead && entity.configId === objective.unitId);
       if (!targetAlive) {
@@ -848,7 +848,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (skill.maxUsesPerBattle !== undefined && (actor.skillUses?.[skill.id] ?? 0) >= skill.maxUsesPerBattle) {
       return { available: false, reason: "NO_USES" };
     }
-    // §6 math: умение с признаком извлечения допустимо только в клетке зоны эвакуации.
+    // §6 game-rules: умение с признаком извлечения допустимо только в клетке зоны эвакуации.
     if (skill.extract) {
       const tile = tileAt(state.grid, actor.x, actor.y);
       if (!tile?.extract) return { available: false, reason: "ILLEGAL" };
@@ -1271,16 +1271,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         let success = false;
         const weapon = skillWeapon(skill);
 
-        // §6 math: извлечение — умение с признаком extract; юнит покидает поле
+        // §6 game-rules: извлечение — умение с признаком extract; юнит покидает поле
         // из клетки зоны эвакуации. Событие ENTITY_REMOVED (EXTRACTED).
         // Исход миссии: спасение — эвакуация указанного лица, разведка —
-        // эвакуация бойца высадки (base-design §3.2).
+        // эвакуация бойца высадки (game-design §3.2).
         if (skill.extract) {
           const tile = tileAt(state.grid, actor.x, actor.y);
           if (!tile?.extract) return { ok: false, reason: "ILLEGAL" };
           // Эвакуация бойца высадки фиксируется в состоянии: при учёте исходов
           // миссии эвакуированный считается выжившим с запасом здоровья на
-          // момент ухода (разведка; base-design §3.2).
+          // момент ухода (разведка; game-design §3.2).
           if (actor.rosterIndex !== undefined) {
             state.extracted = [...(state.extracted ?? []), { rosterIndex: actor.rosterIndex, hp: actor.hp }];
           }

@@ -6,7 +6,7 @@ import type { TacticsKernel } from "./kernel.js";
 import type { CellPos, Command, EntityState } from "./types.js";
 
 /**
- * Строгий сценарий Нави в режиме обучения (0.20.13, base-design §3.5).
+ * Строгий сценарий Нави в режиме обучения (0.20.13, game-design §3.5).
  *
  * Прежде игрок мог отклониться от урока, а противник действовал общим
  * алгоритмом `pickEnemyCommand`: сценарий обучения не был зафиксирован ни за

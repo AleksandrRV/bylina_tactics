@@ -34,7 +34,7 @@ function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly Ent
   for (const skillId of actor.skillIds ?? []) {
     const skill = kernel.getSkillDefinition(skillId);
     if (!skill) continue;
-    // Извлечение: юнит в зоне эвакуации покидает поле (§6 math).
+    // Извлечение: юнит в зоне эвакуации покидает поле (§6 game-rules).
     if (skill.extract) {
       if (kernel.getSkillPreview(actor.id, skillId).available) {
         return { type: "USE_SKILL", actorId: actor.id, skillId };

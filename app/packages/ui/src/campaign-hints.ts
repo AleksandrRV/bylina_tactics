@@ -23,7 +23,7 @@ export type CampaignHintId =
 
 export type PersonaId = "znaharka" | "kuznets" | "volkhv" | "chronicler";
 
-/** Кто подаёт каждый туториал (base-design §3.1: знахарка — лечение и ранения,
+/** Кто подаёт каждый туториал (game-design §3.1: знахарка — лечение и ранения,
  *  кузнец — снаряжение, волхв — умения, летописец — Тьму и миссию «Игла»). */
 export const CAMPAIGN_HINT_PERSONAS: Record<CampaignHintId, PersonaId> = {
   darkness: "chronicler",

@@ -756,7 +756,7 @@ export function createSession(
       // события и снимок стороны ведомого уходят по каналу.
       transport.subscribe((message) => {
         if (message.type === "SYNC_REQUEST") {
-          // Роль подключающегося определяет сам участник (tech-stack §1):
+          // Роль подключающегося определяет сам участник (technology §1):
           // наблюдатель запускает приложение с ролью наблюдателя.
           const requested = (message.payload as { role?: string } | null)?.role;
           if (requested === "spectator" || requested === "guest") {
@@ -966,7 +966,7 @@ export function createSession(
     startTrainingMission: (missionId) => {
       if (!["movement", "combat", "skills"].includes(missionId)) return false;
       // Окружение обучения фиксировано: постоянный seed даёт одну и ту же
-      // карту при каждом прохождении (base-design §3.5, доработка обучения).
+      // карту при каждом прохождении (game-design §3.5, доработка обучения).
       // Без фиксации генератор строил бы новое поле на каждом запуске.
       // «Бой» (0.20.2): подобрано окружение, где упырь действительно стоит
       // за укрытием, а игрок появляется на возвышении — текст подсказки про

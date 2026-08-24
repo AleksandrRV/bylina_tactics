@@ -98,7 +98,7 @@ export function PvpRoomScreen() {
   );
 }
 
-/** Очерёдный выбор бойцов (base-design §7, roadmap 0.16.0). */
+/** Очерёдный выбор бойцов (game-design §7, roadmap 0.16.0). */
 function Draft({
   pool,
   n,
@@ -162,7 +162,7 @@ function LocalSetup({
 }) {
   const t = useT();
   // Число мест N ограничено сверху вместимостью набора, снизу — полем
-  // nMin конфигурации (content-schema §6, base-design §7).
+  // nMin конфигурации (content-schema §6, game-design §7).
   const maxN = Math.min(5, Math.floor(pool.length / 2));
   const minN = Math.max(1, Math.min(nMin, maxN));
   const [objective, setObjective] = useState<Objective>("elimination");

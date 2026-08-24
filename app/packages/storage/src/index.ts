@@ -2,7 +2,7 @@ import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 
 /**
- * Хранилище прогресса (module-storage, tech-core §3.4).
+ * Хранилище прогресса (module-storage, architecture §3.4).
  *
  * Выпуск 0.13.0: запись и чтение кампании и активной партии кампании.
  * Носитель — локальное хранилище обозревателя (браузерный localStorage либо
