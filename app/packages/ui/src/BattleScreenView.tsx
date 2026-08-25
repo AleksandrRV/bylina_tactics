@@ -108,6 +108,10 @@ export function BattleScreenView() {
   const reducedMotion = usePrefersReducedMotion();
 
   const [debugMovement, setDebugMovement] = useState(false);
+  const [fastMode, setFastMode] = useState(false);
+  const playbackSpeed: 1 | 2 = fastMode ? 2 : 1;
+  const playbackSpeedRef = useRef<1 | 2>(playbackSpeed);
+  playbackSpeedRef.current = playbackSpeed;
 
   const weapons = useMemo(() => {
     const base: Record<string, WeaponStats> = defaultTrainingWeapons();
@@ -340,12 +344,15 @@ export function BattleScreenView() {
         return;
       }
       const command = commands[index];
-      if (command) kernel.apply(command);
+      if (command) {
+        const applied = kernel.apply(command);
+        if (applied.ok) void rendererRef.current?.play(applied.events);
+      }
       setReplayIndex(index + 1);
-    }, 480);
+    }, 480 / playbackSpeed);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
+  }, [isReplay, replayJournal, kernel, replayIndex, replayDone, playbackSpeed]);
 
 
   // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
@@ -641,6 +648,17 @@ export function BattleScreenView() {
     };
   }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
 
+  const areaPreview = useMemo(() => {
+    if (action?.type !== "skill" || selectedId === null) return null;
+    const skill = skills[action.id];
+    const hasAreaTarget = (skill?.radius ?? 0) > 0 || Boolean(skill?.effects.some((effect) => effect.type === "spawn" || effect.type === "displace"));
+    if (!skill || !hasAreaTarget) return null;
+    const center = skill.category === "self" ? selected : skillTargetPos;
+    return center
+      ? { center: { x: center.x, y: center.y, z: center.z }, radius: skill.radius ?? 0 }
+      : null;
+  }, [action, selectedId, selected, skillTargetPos, skills]);
+
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
     if (combat && combat.type === "COMBAT_RESOLVED") {
@@ -883,7 +901,7 @@ export function BattleScreenView() {
         finishFromEvents([]);
         return;
       }
-      await sleep(430);
+      await sleep(430 / playbackSpeedRef.current);
       for (let guard = 0; guard < 96; guard += 1) {
         const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
@@ -910,7 +928,7 @@ export function BattleScreenView() {
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
-        await sleep(190);
+        await sleep(190 / playbackSpeedRef.current);
       }
     } finally {
       setEnemyPhase(false);
@@ -1011,6 +1029,11 @@ export function BattleScreenView() {
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
     const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
     const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
+    const selfAreaTargeting = Boolean(selectedSkill?.category === "self" && (selectedSkill.radius ?? 0) > 0);
+    if (selfAreaTargeting && action?.type === "skill") {
+      useSelfSkill(action.id);
+      return;
+    }
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
     if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
       // Обучение: выбор иного бойца запрещён — действует только исполнитель
@@ -1141,6 +1164,10 @@ export function BattleScreenView() {
     };
   }, []);
 
+  useEffect(() => {
+    rendererRef.current?.setPlaybackSpeed(playbackSpeed);
+  }, [playbackSpeed]);
+
   const aimBreakCell = useMemo(() => {
     if (!hit || !selected || !aimed) return null;
     // breakCell теперь вычисляется ядром в previewAttack (§7, §9.3).
@@ -1185,8 +1212,11 @@ export function BattleScreenView() {
       hoverCell,
       trainingHighlight,
       trainingFocus,
+      areaPreview,
+      flanked: Boolean(hit?.flanked),
+      combatLabels: { miss: t("combat.miss") },
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, hit?.flanked, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, areaPreview, t]);
 
   const centerOnEntity = (entity: EntityState): void => {
     rendererRef.current?.centerOn(entity.x, entity.y, entity.z);
@@ -1211,6 +1241,10 @@ export function BattleScreenView() {
         return;
       }
       if (paused || busy) return;
+      if (event.key === "f" || event.key === "F") {
+        setFastMode((value) => !value);
+        return;
+      }
       if (event.key === "Tab") {
         event.preventDefault();
         // Обучение: перебор бойцов запрещён — действует исполнитель указания.
@@ -1265,7 +1299,7 @@ export function BattleScreenView() {
           const uses = selected.skillUses?.[chosen.id] ?? 0;
           if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
         }
-        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
+        if (chosen.type === "skill" && skills[chosen.id]?.category === "self" && (skills[chosen.id]?.radius ?? 0) <= 0) {
           useSelfSkill(chosen.id);
         } else {
           const active = action?.type === chosen.type && action.id === chosen.id;
@@ -1415,6 +1449,17 @@ export function BattleScreenView() {
           <div className="top-controls">
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
               {t("battle.pause")}
+            </button>
+            <button
+              type="button"
+              className={`hud-btn speed-toggle${fastMode ? " is-on" : ""}`}
+              onClick={() => setFastMode((value) => !value)}
+              aria-pressed={fastMode}
+              aria-keyshortcuts="F"
+              aria-label={t(fastMode ? "battle.speedFast" : "battle.speedNormal")}
+              title={t("battle.speedHint")}
+            >
+              <span aria-hidden="true">»</span> {fastMode ? "2×" : "1×"}
             </button>
             {isTraining ? (
               <button
@@ -1793,7 +1838,7 @@ export function BattleScreenView() {
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
                   disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId)}
                   onClick={() => {
-                    if (skill?.category === "self") useSelfSkill(skillId);
+                    if (skill?.category === "self" && (skill.radius ?? 0) <= 0) useSelfSkill(skillId);
                     else {
                       setAction(active ? null : { type: "skill", id: skillId });
                       setSkillTargetPos(null);

@@ -15,6 +15,7 @@ vi.mock("@bylina/render", () => {
     destroy: () => undefined,
     setOnActivate: () => undefined,
     setOnHover: () => undefined,
+    setPlaybackSpeed: () => undefined,
   };
   return { createFieldRenderer: () => stub };
 });

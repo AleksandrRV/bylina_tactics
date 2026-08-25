@@ -22,7 +22,13 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.20";
+export const CORE_VERSION = "0.20.21";
+
+/** Presentation data is derived by the rules layer; the renderer never invents a global shake force. */
+function impactShake(result: string, actionType: string, damage: number): number {
+  const base = result === "MISS" ? 0.8 : 1 + damage * 0.65 + (result === "CRIT" ? 1.5 : 0);
+  return Math.min(7, base + (actionType === "MELEE" ? 1 : 0));
+}
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -326,6 +332,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   };
 
   const damageCover = (cover: EntityState, events: GameEvent[]): void => {
+    const previousCoverType = cover.coverType;
     cover.coverType = Math.max(0, cover.coverType - 1) as 0 | 1 | 2;
     if (cover.coverType === 0) {
       cover.obstacle = false;
@@ -335,6 +342,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       type: "COVER_DESTROYED",
       gridPos: cellPos(cover),
       newStatus: cover.coverType === 0 ? "NONE" : "HALF",
+      shake: previousCoverType === 2 ? 5 : 3,
     });
   };
 
@@ -647,6 +655,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         damageDealt: resolved.damage,
         isFlanked: resolved.flanked,
         heightMod: resolved.heightMod,
+        shake: resolved.result === "MISS" ? 0 : impactShake(resolved.result, resolved.actionType, resolved.damage),
       });
       applyDamage(mover, resolved.damage, events);
     }
@@ -695,7 +704,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     target.y = y;
     target.z = tile.z;
     const fall = tile.pit && !target.flying;
-    events.push({ type: "ENTITY_DISPLACED", entityId: target.id, from, to: cellPos(target), cause: fall ? "FALL" : "KNOCKBACK" });
+    events.push({ type: "ENTITY_DISPLACED", entityId: target.id, from, to: cellPos(target), cause: fall ? "FALL" : "KNOCKBACK", shake: fall ? 4 : 3 });
     refresh();
     revealAdjacent(events);
     if (fall) {
@@ -980,6 +989,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       damageDealt: resolved.damage,
       isFlanked: resolved.flanked,
       heightMod: resolved.heightMod,
+      shake: resolved.result === "MISS" ? 0 : impactShake(resolved.result, resolved.actionType, resolved.damage),
     });
     applyDamage(target, resolved.damage, events);
     return resolved.result !== "MISS";

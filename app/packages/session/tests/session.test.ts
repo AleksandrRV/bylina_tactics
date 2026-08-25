@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.20", () => {
-    expect(APP_VERSION).toBe("0.20.20");
+  it("reports version 0.20.21", () => {
+    expect(APP_VERSION).toBe("0.20.21");
   });
 
   it("moves between menu and settings", () => {
@@ -415,7 +415,7 @@ describe("createSession campaign hints (0.20.0)", () => {
   });
 });
 
-describe("continueCampaign (0.20.20)", () => {
+describe("continueCampaign (0.20.21)", () => {
   const bindCampaignAutomaton = (session: ReturnType<typeof createSession>): void => {
     session.bindCampaign(createCampaign(CAMPAIGN_CONFIG));
   };
@@ -470,7 +470,7 @@ describe("continueCampaign (0.20.20)", () => {
   });
 });
 
-describe("suspend/resume campaign battle (0.20.17–0.20.20)", () => {
+describe("suspend/resume campaign battle (0.20.17–0.20.21)", () => {
   const makeBattleSession = (): ReturnType<typeof createSession> => {
     const session = createSession("menu");
     const campaign = createCampaign(CAMPAIGN_CONFIG);
@@ -493,7 +493,7 @@ describe("suspend/resume campaign battle (0.20.17–0.20.20)", () => {
     const suspended = session.get();
     expect(suspended.screen).toBe("menu");
     expect(suspended.paused).toBe(false);
-    // Контекст миссии — в слоте; навигационные поля чистые (0.20.20).
+    // Контекст миссии — в слоте; навигационные поля чистые (0.20.21).
     expect(suspended.suspendedCampaign?.activeMissionId).toBe("clearing_1");
     expect(suspended.suspendedCampaign?.restoredMatch).toBeDefined();
     expect(suspended.battleKind).toBeNull();
@@ -504,7 +504,7 @@ describe("suspend/resume campaign battle (0.20.17–0.20.20)", () => {
     expect(session.get().suspendedCampaign).toBeNull();
   });
 
-  it("detours through other modes from the menu do not lose the mission (0.20.20)", () => {
+  it("detours through other modes from the menu do not lose the mission (0.20.21)", () => {
     // Регрессия: вход из меню в обучение/быстрый матч/настройки клал {...idle}
     // и стирал контекст приостановленной миссии — «Продолжить» вело на карту.
     const session = makeBattleSession();

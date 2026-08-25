@@ -84,6 +84,20 @@
   opacity: 0.52;
 }
 
+/* Переключатель темпа доступен мышью, клавиатурой и скринридером. */
+.speed-toggle {
+  min-width: 48px;
+  padding-inline: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.speed-toggle.is-on {
+  border-color: var(--warning);
+  color: var(--warning);
+  box-shadow: 0 0 14px rgba(255, 210, 104, 0.24);
+}
+
 .hud-btn-primary {
   background: linear-gradient(180deg, var(--primary-surface-top), var(--primary-surface-bottom));
   color: var(--white);
