@@ -1340,7 +1340,7 @@ export function createFieldRenderer(): FieldRenderer {
     const height = app.renderer.height;
     const darkness = view.darkness;
     const ratio = darkness ? Math.min(1, Math.max(0, darkness.current / Math.max(1, darkness.max))) : 0;
-    const signature = `${width}:${height}:${darkness?.current ?? "none"}:${darkness?.max ?? "none"}:${reducedMotion}:${lowPowerDevice}`;
+    const signature = `${width}:${height}:${view.matchSeed}:${darkness?.current ?? "none"}:${darkness?.max ?? "none"}:${reducedMotion}:${lowPowerDevice}`;
     if (signature === atmosphereSignature) return;
     atmosphereSignature = signature;
     atmosphereLayer.clear();
