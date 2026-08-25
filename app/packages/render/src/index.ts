@@ -13,5 +13,5 @@ export {
   type ScreenSize,
 } from "./camera.js";
 
-export { RENDER_COLORS, RENDER_CSS_VARIABLES, applyRenderColorVariables } from "./colors.js";
+export { BIOME_PALETTES, RENDER_COLORS, RENDER_CSS_VARIABLES, applyRenderColorVariables } from "./colors.js";
 export type { RenderColors } from "./colors.js";

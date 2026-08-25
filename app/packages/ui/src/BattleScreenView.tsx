@@ -512,6 +512,19 @@ export function BattleScreenView() {
   const mission = battleKind === "campaign" && activeMissionId
     ? session.getCampaign().getMission(activeMissionId)
     : undefined;
+  // Тьма — только презентационная метаинформация кампании: в MatchState и
+  // правила боя она не попадает. В быстрых/PvP/обучающих боях слой отсутствует.
+  const campaignAtmosphere = battleKind === "campaign"
+    ? (() => {
+        const state = session.getCampaign().getState();
+        return { current: state.darkness, max: state.darknessMax };
+      })()
+    : undefined;
+  const presentationBiome = mission?.map.biome
+    ?? trainingMission?.map.biome
+    ?? replayJournal?.options.map.biome
+    ?? content.pvp.map?.biome
+    ?? content.quickMatch.map.biome;
 
   // Боевые туториалы кампании (0.20.0/0.20.1): «первый бой», «первый леший»,
   // «первая кикимора», «появление генерала». Показываются один раз, отключаются
@@ -1196,6 +1209,8 @@ export function BattleScreenView() {
   useEffect(() => {
     rendererRef.current?.update({
       matchSeed,
+      biome: presentationBiome,
+      darkness: campaignAtmosphere,
       snapshot,
       selectedId,
       aimId,
@@ -1216,7 +1231,7 @@ export function BattleScreenView() {
       flanked: Boolean(hit?.flanked),
       combatLabels: { miss: t("combat.miss") },
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, hit?.flanked, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, areaPreview, t]);
+  }, [matchSeed, presentationBiome, campaignAtmosphere?.current, campaignAtmosphere?.max, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, hit?.flanked, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, areaPreview, t]);
 
   const centerOnEntity = (entity: EntityState): void => {
     rendererRef.current?.centerOn(entity.x, entity.y, entity.z);

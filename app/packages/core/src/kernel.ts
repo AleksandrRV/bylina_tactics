@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.21";
+export const CORE_VERSION = "0.21.0";
 
 /** Presentation data is derived by the rules layer; the renderer never invents a global shake force. */
 function impactShake(result: string, actionType: string, damage: number): number {

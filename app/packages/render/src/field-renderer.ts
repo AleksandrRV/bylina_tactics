@@ -8,11 +8,12 @@ import {
   type GameEvent,
   type MatchState,
   type ReachableCell,
+  type BiomeId,
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
 import { centerCameraOn, needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, zoomAroundPoint, type Point } from "./camera.js";
-import { RENDER_COLORS as COLORS } from "./colors.js";
+import { BIOME_PALETTES, RENDER_COLORS as COLORS } from "./colors.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -22,6 +23,10 @@ const PAD = 26;
 export interface FieldView {
   /** Seed identifies the generated terrain; it changes only when a new map is created. */
   matchSeed: number;
+  /** Visual-only map biome. Legacy maps omit it and use meadow. */
+  biome?: BiomeId;
+  /** Campaign darkness, kept out of the combat snapshot and rules engine. */
+  darkness?: { current: number; max: number };
   snapshot: MatchState;
   selectedId: number | null;
   aimId: number | null;
@@ -111,10 +116,40 @@ function easeInOut(t: number): number {
 
 /* ---------- рельеф ---------- */
 
-/** Верхние грани по уровням: низ — холодный мох, земля — луг, верх — светлая выжженная трава. */
-const Z_FACE = COLORS.terrain.face;
-/** Откос (южная стена скалы) по уровням: тёмная земляная огранка. */
-const Z_RISER = COLORS.terrain.riser;
+/** Визуальная палитра поля. У каждого яруса три близких оттенка:
+ * хеш выбирает один из них, поэтому поверхность не выглядит плоской,
+ * но и не превращается в шумную текстуру. */
+const DEFAULT_BIOME: BiomeId = "meadow";
+
+/** Небольшой куст состоит только из замкнутых эллипсов — без «шумных»
+ * линий, которые раньше спорили с сеткой и фишками. */
+function drawBush(g: Graphics, x: number, y: number, scale: number, base: number, light: number): void {
+  g.ellipse(x, y + 3 * scale, 6 * scale, 2 * scale).fill({ color: COLORS.overlay.shadow, alpha: 0.16 });
+  g.ellipse(x - 4 * scale, y, 4.5 * scale, 4 * scale).fill(base);
+  g.ellipse(x + 1 * scale, y - 1.5 * scale, 5 * scale, 4.5 * scale).fill(light);
+  g.ellipse(x + 5 * scale, y + 1 * scale, 3.8 * scale, 3.5 * scale).fill(base);
+}
+
+function drawRareDecoration(g: Graphics, x: number, y: number, biome: BiomeId, colors: readonly [number, number, number], scale: number): void {
+  if (biome === "swamp") {
+    // Гриб: три закрытые формы, редкий и сразу отличимый силуэт.
+    g.ellipse(x, y + 4 * scale, 2.2 * scale, 3.5 * scale).fill(colors[2]);
+    g.ellipse(x, y - 0.5 * scale, 5 * scale, 2.8 * scale).fill(colors[0]);
+    g.ellipse(x - 1.5 * scale, y - 1.2 * scale, 1 * scale, 0.7 * scale).fill(colors[1]);
+    return;
+  }
+  if (biome === "thicket") {
+    // Поваленная ветка — короткая закрытая овальная форма, а не линия.
+    g.ellipse(x, y, 8 * scale, 2.5 * scale).fill(colors[0]);
+    g.ellipse(x - 3 * scale, y - 0.5 * scale, 2 * scale, 1.5 * scale).fill(colors[1]);
+    g.ellipse(x + 5 * scale, y + 0.5 * scale, 1.8 * scale, 1.4 * scale).fill(colors[2]);
+    return;
+  }
+  // Камешек на выжженной земле или маленький цветок на лугу.
+  g.ellipse(x, y + 1.5 * scale, 4 * scale, 2.5 * scale).fill(colors[0]);
+  g.ellipse(x - 1.2 * scale, y, 2 * scale, 1.5 * scale).fill(colors[1]);
+  g.ellipse(x + 2 * scale, y + 0.6 * scale, 1.8 * scale, 1.3 * scale).fill(colors[2]);
+}
 
 function visualLevel(tile: Tile): number {
   return tile.pit ? 0 : tile.z;
@@ -441,13 +476,59 @@ const HALF = C / 2;
  * Граневое укрытие: бревна вдоль всей грани клетки.
  * N/S — горизонтальные, E/W — вертикальные.
  */
+function drawLowPalisade(g: Graphics, cx: number, cy: number, coverType: 1 | 2, edge: 0 | 1 | 2 | 3, color: number, stroke: number): void {
+  // Низкий частокол поверх линии грани: короткие стойки читаются даже в
+  // полуукрытии, а иконка щита по-прежнему остаётся главным знаком защиты.
+  const count = coverType === 2 ? 4 : 3;
+  const span = C - 12;
+  for (let i = 0; i < count; i += 1) {
+    const along = -span / 2 + ((span * i) / (count - 1));
+    const height = coverType === 2 ? 8 : 6;
+    if (edge === 0 || edge === 2) {
+      const x = cx + along;
+      const y = edge === 0 ? cy - HALF - height / 2 : cy + HALF - height / 2;
+      g.roundRect(x - 1.7, y - height, 3.4, height + 4, 1.2).fill(color);
+      g.poly([x - 1.7, y - height, x, y - height - 3, x + 1.7, y - height]).fill(color);
+      g.roundRect(x - 1.7, y - height, 3.4, height + 4, 1.2).stroke({ width: 0.5, color: stroke });
+    } else {
+      const y = cy + along;
+      const x = edge === 1 ? cx + HALF - height / 2 : cx - HALF - height / 2;
+      g.roundRect(x, y - 1.7, height + 4, 3.4, 1.2).fill(color);
+      g.poly([x + height, y - 1.7, x + height + 3, y, x + height, y + 1.7]).fill(color);
+      g.roundRect(x, y - 1.7, height + 4, 3.4, 1.2).stroke({ width: 0.5, color: stroke });
+    }
+  }
+}
+
 function drawEdgeCover(
   g: Graphics,
   cx: number,
   cy: number,
   coverType: 1 | 2,
   edge: 0 | 1 | 2 | 3,
+  biome: BiomeId = DEFAULT_BIOME,
 ): void {
+  if (biome !== "thicket") {
+    const horizontal = edge === 0 || edge === 2;
+    const span = C - 12;
+    const base = biome === "scorched" ? 0x70604e : biome === "swamp" ? 0x365846 : 0x3f6a3c;
+    const light = biome === "scorched" ? 0xa08c6b : biome === "swamp" ? 0x6b8761 : 0x6d914f;
+    const count = coverType === 2 ? 3 : 2;
+    for (let i = 0; i < count; i += 1) {
+      const along = -span / 2 + (span * i / (count - 1));
+      const x = horizontal ? cx + along : cx + (edge === 1 ? HALF - 8 : -HALF + 8);
+      const y = horizontal ? cy + (edge === 0 ? -HALF + 5 : HALF - 5) : cy + along;
+      if (biome === "scorched") {
+        g.ellipse(x, y, 7 + coverType, 5 + coverType * 0.4).fill(base);
+        g.ellipse(x - 1.5, y - 1.5, 3.5, 2).fill(light);
+        g.ellipse(x, y, 7 + coverType, 5 + coverType * 0.4).stroke({ width: 0.8, color: 0x35291f });
+      } else {
+        drawBush(g, x, y, 0.65 + coverType * 0.08, base, light);
+      }
+    }
+    drawLowPalisade(g, cx, cy, coverType, edge, shade(base, -15), shade(base, -35));
+    return;
+  }
   const isHorizontal = edge === 0 || edge === 2;
   const length = C - 4; // длина бревна (чуть меньше клетки)
   const thick = coverType === 2 ? 10 : 6; // толщина
@@ -507,6 +588,7 @@ function drawEdgeCover(
       g.circle(bx2 + thick / 2, by + bh - er - 0.5, er).stroke({ width: 0.6, color: endStroke });
     }
   }
+  drawLowPalisade(g, cx, cy, coverType, edge, coverType === 2 ? 0x6b4b2a : 0x8c6a3d, 0x2e2419);
 }
 
 function drawCover(
@@ -517,9 +599,10 @@ function drawCover(
   edge?: 0 | 1 | 2 | 3,
   seedX = 0,
   seedY = 0,
+  biome: BiomeId = DEFAULT_BIOME,
 ): void {
   if (edge !== undefined) {
-    drawEdgeCover(g, cx, cy, coverType, edge);
+    drawEdgeCover(g, cx, cy, coverType, edge, biome);
     if (coverType === 1) {
       const side = hashCell(seedX, seedY, 157) > 0.5 ? 1 : -1;
       if (edge === 0 || edge === 2) {
@@ -540,6 +623,27 @@ function drawCover(
   const px = cx;
   const py = cy;
   g.ellipse(px, py + 11, 15, 4.5).fill({ color: COLORS.overlay.shadow, alpha: 0.3 });
+
+  if (biome !== "thicket") {
+    if (biome === "scorched") {
+      const stoneColors = [0x665647, 0x86715b, 0x4e4238];
+      for (let i = 0; i < (coverType === 2 ? 4 : 3); i += 1) {
+        const ox = (i - 1.5) * 7 + (hashCell(seedX, seedY, 301 + i) - 0.5) * 3;
+        const oy = (hashCell(seedX, seedY, 307 + i) - 0.5) * 5;
+        g.ellipse(px + ox, py + oy, 7 + (i % 2), 5 + coverType).fill(stoneColors[i % stoneColors.length]);
+        g.ellipse(px + ox - 1.5, py + oy - 1.5, 2.8, 1.8).fill(0xa08b6c);
+      }
+    } else {
+      drawBush(g, px - 6, py + 2, 0.9, biome === "swamp" ? 0x2b503e : 0x3f6b3b, biome === "swamp" ? 0x63815a : 0x73954f);
+      drawBush(g, px + 6, py + 1, 0.82, biome === "swamp" ? 0x244638 : 0x355e35, biome === "swamp" ? 0x58765a : 0x628648);
+    }
+    // Повреждение остаётся контрастным, но не меняет силу укрытия.
+    if (coverType === 1) {
+      const side = hashCell(seedX, seedY, 131) > 0.5 ? 1 : -1;
+      g.ellipse(px + side * 5, py - 2, 1.2, 3.5).fill({ color: 0x2e2419, alpha: 0.8 });
+    }
+    return;
+  }
 
   if (coverType === 1) {
     const ly = py + 4;
@@ -696,14 +800,20 @@ export function createFieldRenderer(): FieldRenderer {
   // Туман не смешан с частицами: базовая пелена перестраивается только при
   // смене видимости, а медленные пятна — отдельным слоем не чаще 15 Гц.
   const fogBaseLayer = new Graphics();
+  // Переходная полоса и короткое «схлопывание» открытия клетки — отдельные
+  // динамические слои поверх кэшируемой основы тумана.
+  const fogTransitionLayer = new Graphics();
   const fogDriftLayer = new Graphics();
+  const fogRevealLayer = new Graphics();
   const fxLayer = new Graphics();
   // Magic is deliberately isolated so additive effects do not muddy physical FX.
   const magicLayer = new Graphics();
   magicLayer.blendMode = "add";
   const floatingTextLayer = new Container();
   const debugLayer = new Container();
-  world.addChild(terrain, fogBaseLayer, fogDriftLayer, fxLayer, magicLayer, floatingTextLayer, debugLayer);
+  const atmosphereLayer = new Graphics();
+  atmosphereLayer.eventMode = "none";
+  world.addChild(terrain, fogBaseLayer, fogTransitionLayer, fogDriftLayer, fogRevealLayer, fxLayer, magicLayer, floatingTextLayer, debugLayer);
   world.eventMode = "static";
   world.hitArea = new Rectangle(-4000, -4000, 12000, 12000);
 
@@ -727,9 +837,17 @@ export function createFieldRenderer(): FieldRenderer {
   let holdDisplay = false;
   let reducedMotion = false;
   let playbackSpeed: 1 | 2 = 1;
-  let terrainSeed: number | null = null;
+  let terrainSeed: string | null = null;
   let fogSignature: string | null = null;
+  let lastVisibleCells: Set<string> | null = null;
+  let lastFogMatchSeed: number | null = null;
+  const fogReveals = new Map<string, number>();
   let lastFogDriftPaint = -Infinity;
+  let atmosphereSignature: string | null = null;
+  const lowPowerDevice = typeof navigator !== "undefined"
+    && ((navigator.hardwareConcurrency ?? 8) <= 4
+      || (navigator as Navigator & { deviceMemory?: number }).deviceMemory !== undefined
+        && (navigator as Navigator & { deviceMemory?: number }).deviceMemory! <= 4);
   const jobs: Array<{ events: GameEvent[]; done: () => void }> = [];
 
   // Подводка камеры к цели обучающего указания (0.20.14): срабатывает при
@@ -936,13 +1054,17 @@ export function createFieldRenderer(): FieldRenderer {
     const { fy } = faceOf(tile.x, tile.y, z);
     const tiles = snapshot?.grid.tiles ?? [];
     const C = CELL_SIZE;
+    const biome = view?.biome ?? DEFAULT_BIOME;
+    const palette = BIOME_PALETTES[biome];
+    const mapSeed = view?.matchSeed ?? 0;
+    const seeded = (salt: number): number => hashCell(tile.x, tile.y, salt + mapSeed);
 
     // Откосы тянутся вниз от грани до уровня южного соседа (или до основания на краю карты).
     const southLevel = neighborLevel(tiles, tile.x, tile.y + 1);
     const dropSouth = southLevel === null ? z : Math.max(0, z - southLevel);
     if (dropSouth > 0 && !tile.pit) {
       const h = dropSouth * RISE;
-      const riser = Z_RISER[z] ?? 0x23291a;
+      const riser = palette.riser[z] ?? palette.riser[1];
       g.rect(0, C, C, h).fill(mix(riser, 0x1a140c, 0.35));
       g.rect(0, C, C, 2).fill(shade(riser, 26));
       for (let i = 0; i < dropSouth; i += 1) {
@@ -950,19 +1072,23 @@ export function createFieldRenderer(): FieldRenderer {
       }
       g.rect(0, C, 3, h).fill({ color: COLORS.overlay.shadow, alpha: 0.16 });
       g.rect(C - 3, C, 3, h).fill({ color: COLORS.overlay.shadow, alpha: 0.16 });
-      // Камни-выступы на откосе.
-      const stones = 1 + Math.floor(hashCell(tile.x, tile.y, 5) * 2);
+      // Нарисованная осыпь смягчает переход яруса: несколько закрытых
+      // камешков с координатным seed, без частиц и без обновления кадр за кадром.
+      const stones = 2 + Math.floor(seeded(5) * 3);
       for (let i = 0; i < stones; i += 1) {
-        const sx = 6 + hashCell(tile.x, tile.y, 11 + i) * (C - 14);
-        const sy = C + 3 + hashCell(tile.x, tile.y, 17 + i) * Math.max(1, h - 6);
-        g.circle(sx, sy, 1.3).fill(shade(riser, 30));
+        const sx = 5 + seeded(11 + i) * (C - 12);
+        const sy = C + 3 + seeded(17 + i) * Math.max(1, h - 6);
+        const radius = 1.2 + seeded(19 + i) * 1.2;
+        const stone = palette.scree[i % palette.scree.length] ?? palette.scree[0];
+        g.ellipse(sx, sy, radius * 1.45, radius).fill(stone);
+        g.ellipse(sx - radius * 0.25, sy - radius * 0.25, radius * 0.55, radius * 0.35).fill(shade(stone, 18));
       }
     }
 
     // Грань.
-    const jitter = (hashCell(tile.x, tile.y, 1) - 0.5) * 14;
-    const base = tile.pit ? 0x141a12 : tile.blockLOS ? 0x3c332a : (Z_FACE[z] ?? Z_FACE[1]);
-    const fill = tile.pit || tile.blockLOS ? base : shade(base, jitter);
+    const shadeIndex = Math.min(2, Math.floor(seeded(1) * 3));
+    const base = tile.pit ? 0x141a12 : tile.blockLOS ? 0x3c332a : (palette.face[z]?.[shadeIndex] ?? palette.face[1][1]);
+    const fill = base;
     g.rect(0, 0, C, C).fill(fill);
     if (!tile.pit && !tile.blockLOS) {
       // Мягкий перелив: светлее к северной кромке, темнее к южной.
@@ -1037,30 +1163,20 @@ export function createFieldRenderer(): FieldRenderer {
       g.circle(33, 16, 1.2).fill(0x6b5b48);
     }
 
-    // Травяной декор: стабилен (хеш от координат), не портит читаемость.
+    // Биомный декор: кустик — 2–3 замкнутые формы, полностью детерминированные
+    // координатами и seed карты. Отдельная ветка > 97% даёт редкий декор (~3%).
     if (!tile.pit && !tile.blockLOS) {
-      const blades = 1 + Math.floor(hashCell(tile.x, tile.y, 29) * 3);
-      for (let i = 0; i < blades; i += 1) {
-        const bx = 5 + hashCell(tile.x, tile.y, 31 + i * 2) * (C - 10);
-        const by = 5 + hashCell(tile.x, tile.y, 32 + i * 2) * (C - 10);
-        const lean = (hashCell(tile.x, tile.y, 41 + i) - 0.5) * 4;
-        g.moveTo(bx, by)
-          .lineTo(bx - 1.6 + lean, by - 4.4)
-          .stroke({ width: 1.1, color: shade(fill, z === 2 ? -18 : 22) });
-        g.moveTo(bx, by)
-          .lineTo(bx + 1.8 + lean, by - 3.6)
-          .stroke({ width: 1, color: shade(fill, z === 2 ? -10 : 30) });
+      const bushRoll = seeded(29);
+      if (bushRoll > (biome === "thicket" ? 0.12 : 0.26)) {
+        const bx = 7 + seeded(31) * (C - 14);
+        const by = 9 + seeded(32) * (C - 18);
+        const scale = 0.55 + seeded(33) * 0.25;
+        drawBush(g, bx, by, scale, palette.bush, palette.bushLight);
       }
-      if (hashCell(tile.x, tile.y, 47) > 0.82) {
-        const fx0 = 8 + hashCell(tile.x, tile.y, 53) * (C - 16);
-        const fy0 = 8 + hashCell(tile.x, tile.y, 59) * (C - 16);
-        g.ellipse(fx0, fy0, 2.6, 1.5).fill(shade(fill, -24));
-      }
-      if (hashCell(tile.x, tile.y, 61) > 0.9 && z >= 1) {
-        const fx0 = 7 + hashCell(tile.x, tile.y, 67) * (C - 14);
-        const fy0 = 7 + hashCell(tile.x, tile.y, 71) * (C - 14);
-        g.circle(fx0, fy0, 1.3).fill(0xd8ce9a);
-        g.circle(fx0 + 2, fy0 + 1, 1).fill(0xc9b26a);
+      if (seeded(61) >= 0.97) {
+        const rx = 7 + seeded(67) * (C - 14);
+        const ry = 8 + seeded(71) * (C - 16);
+        drawRareDecoration(g, rx, ry, biome, palette.rare, 0.7 + seeded(79) * 0.25);
       }
     }
 
@@ -1078,7 +1194,7 @@ export function createFieldRenderer(): FieldRenderer {
       terrain.addChild(drawTile(tile));
     }
     terrain.sortableChildren = true;
-    terrainSeed = view.matchSeed;
+    terrainSeed = `${view.matchSeed}:${view.biome ?? DEFAULT_BIOME}`;
   };
 
   const fogSignatureOf = (next: FieldView): string | null => {
@@ -1091,15 +1207,21 @@ export function createFieldRenderer(): FieldRenderer {
   /** Неподвижная часть тумана: полное скрытие и затемнение разведанных клеток. */
   const paintFogBase = (): void => {
     fogBaseLayer.clear();
+    fogTransitionLayer.clear();
     fogDriftLayer.clear();
+    fogRevealLayer.clear();
     lastFogDriftPaint = -Infinity;
     if (!view?.visibleCells) {
       fogBaseLayer.visible = false;
+      fogTransitionLayer.visible = false;
       fogDriftLayer.visible = false;
+      fogRevealLayer.visible = false;
       return;
     }
     fogBaseLayer.visible = true;
+    fogTransitionLayer.visible = true;
     fogDriftLayer.visible = true;
+    fogRevealLayer.visible = true;
     for (const tile of view.snapshot.grid.tiles) {
       const key = `${tile.x},${tile.y}`;
       const isVisible = view.visibleCells.has(key);
@@ -1110,7 +1232,14 @@ export function createFieldRenderer(): FieldRenderer {
       if (!isExplored) {
         fogBaseLayer.rect(fx, fy, CELL_SIZE, CELL_SIZE).fill(COLORS.overlay.fogHidden);
       } else {
-        fogBaseLayer.rect(fx, fy, CELL_SIZE, CELL_SIZE).fill({ color: COLORS.overlay.fogExplored, alpha: 0.6 });
+        // Мягче прежнего прямоугольника: края остаются читаемой переходной зоной.
+        fogBaseLayer.rect(fx, fy, CELL_SIZE, CELL_SIZE).fill({ color: COLORS.overlay.fogExplored, alpha: 0.5 });
+        fogTransitionLayer.ellipse(
+          fx + CELL_SIZE / 2,
+          fy + CELL_SIZE / 2,
+          CELL_SIZE * 0.64,
+          CELL_SIZE * 0.58,
+        ).fill({ color: COLORS.overlay.fogMist, alpha: 0.085 });
       }
     }
   };
@@ -1134,19 +1263,62 @@ export function createFieldRenderer(): FieldRenderer {
         const cx = fx + h1 * CELL_SIZE + drift;
         const cy = fy + h2 * CELL_SIZE + driftY;
         const radius = 10 + h1 * 16;
-        const alpha = 0.05 + 0.03 * Math.sin(phase * 1.3 + i * 2.1);
-        fogDriftLayer.circle(cx, cy, radius).fill({ color: COLORS.overlay.fogMist, alpha });
+        const alpha = 0.035 + 0.022 * Math.sin(phase * 1.3 + i * 2.1);
+        // Перекрывающиеся эллипсы дают мягкую дымку без текстурной нагрузки.
+        fogDriftLayer.ellipse(cx, cy, radius * 1.35, radius * 0.62).fill({ color: COLORS.overlay.fogMist, alpha });
+        fogDriftLayer.ellipse(cx - radius * 0.22, cy + radius * 0.1, radius * 0.8, radius * 0.42).fill({ color: COLORS.overlay.fogMist, alpha: alpha * 0.7 });
       }
+    }
+  };
+
+  /** Короткое схлопывание тумана над клеткой, ставшей видимой. */
+  const paintFogReveal = (now: number): void => {
+    fogRevealLayer.clear();
+    if (!view?.visibleCells || reducedMotion) {
+      fogReveals.clear();
+      return;
+    }
+    fogRevealLayer.visible = true;
+    for (const [key, started] of fogReveals) {
+      const t = Math.min(1, (now - started) / 420);
+      if (t >= 1) {
+        fogReveals.delete(key);
+        continue;
+      }
+      const [xs, ys] = key.split(",");
+      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === Number(xs) && candidate.y === Number(ys));
+      if (!tile) continue;
+      const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
+      const cx = fx + CELL_SIZE / 2;
+      const cy = fy + CELL_SIZE / 2;
+      const collapse = 1 - easeOut(t);
+      const alpha = 0.62 * collapse;
+      // Несколько эллипсов схлопываются к центру, а не просто исчезают.
+      fogRevealLayer.ellipse(cx, cy, (CELL_SIZE * 0.7) * collapse + 2, (CELL_SIZE * 0.55) * collapse + 2).fill({ color: COLORS.overlay.fogMist, alpha });
+      fogRevealLayer.ellipse(cx + 3 * collapse, cy - 2 * collapse, (CELL_SIZE * 0.43) * collapse + 1, (CELL_SIZE * 0.3) * collapse + 1).fill({ color: COLORS.overlay.fogHidden, alpha: alpha * 0.75 });
     }
   };
 
   const paintFog = (next: FieldView): void => {
     const signature = fogSignatureOf(next);
     if (signature !== fogSignature) {
+      const previous = lastVisibleCells;
+      const sameMap = lastFogMatchSeed === next.matchSeed;
+      if (sameMap && previous && next.visibleCells) {
+        for (const key of next.visibleCells) {
+          if (!previous.has(key)) fogReveals.set(key, performance.now());
+        }
+      } else {
+        // Новая карта не должна анимировать сразу весь стартовый обзор.
+        fogReveals.clear();
+      }
+      lastVisibleCells = next.visibleCells ? new Set(next.visibleCells) : null;
+      lastFogMatchSeed = next.matchSeed;
       fogSignature = signature;
       paintFogBase();
     }
     const now = performance.now();
+    paintFogReveal(now);
     if (now - lastFogDriftPaint >= 1000 / 15) {
       paintFogDrift(now);
       lastFogDriftPaint = now;
@@ -1154,9 +1326,53 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   const paintFogDriftIfDue = (now: number): void => {
+    paintFogReveal(now);
     if (!view?.visibleCells || reducedMotion || now - lastFogDriftPaint < 1000 / 15) return;
     paintFogDrift(now);
     lastFogDriftPaint = now;
+  };
+
+  /** Лёгкий общий тон сцены, виньетка и редкое матовое зерно. Этот слой
+   * находится над world, но не участвует в боевом snapshot. */
+  const paintAtmosphere = (): void => {
+    if (!mounted || !view) return;
+    const width = app.renderer.width;
+    const height = app.renderer.height;
+    const darkness = view.darkness;
+    const ratio = darkness ? Math.min(1, Math.max(0, darkness.current / Math.max(1, darkness.max))) : 0;
+    const signature = `${width}:${height}:${darkness?.current ?? "none"}:${darkness?.max ?? "none"}:${reducedMotion}:${lowPowerDevice}`;
+    if (signature === atmosphereSignature) return;
+    atmosphereSignature = signature;
+    atmosphereLayer.clear();
+    atmosphereLayer.visible = true;
+
+    if (darkness) {
+      const coldAlpha = (reducedMotion ? 0.025 : 0.04) + ratio * (reducedMotion ? 0.08 : 0.15);
+      atmosphereLayer.rect(0, 0, width, height).fill({ color: 0x829bb7, alpha: coldAlpha });
+      // Нейтральная вуаль снижает насыщенность по мере роста Тьмы,
+      // холодный слой сверху сохраняет ощущение зимнего воздуха.
+      atmosphereLayer.rect(0, 0, width, height).fill({ color: 0xa0a8aa, alpha: ratio * (reducedMotion ? 0.02 : 0.06) });
+      atmosphereLayer.rect(0, 0, width, height).fill({ color: 0x101a29, alpha: ratio * (reducedMotion ? 0.035 : 0.075) });
+    }
+
+    const vignetteAlpha = lowPowerDevice || reducedMotion ? 0.045 : 0.075;
+    for (let i = 0; i < 3; i += 1) {
+      const inset = i * 12;
+      atmosphereLayer.rect(inset, inset, Math.max(1, width - inset * 2), Math.max(1, height - inset * 2))
+        .stroke({ width: 18, color: 0x05080a, alpha: vignetteAlpha / (i + 1) });
+    }
+
+    // Зерно строится один раз на размер/режим и не перерисовывается каждый кадр.
+    if (!lowPowerDevice && !reducedMotion) {
+      const cell = 17;
+      for (let y = 0; y < height; y += cell) {
+        for (let x = 0; x < width; x += cell) {
+          const grain = hashCell(Math.floor(x / cell), Math.floor(y / cell), 701 + view.matchSeed);
+          if (grain < 0.48) continue;
+          atmosphereLayer.rect(x + grain * 5, y + (1 - grain) * 5, 1, 1).fill({ color: grain > 0.74 ? 0xffffff : 0x050708, alpha: 0.025 });
+        }
+      }
+    }
   };
 
   const paintDebug = (): void => {
@@ -1223,7 +1439,7 @@ export function createFieldRenderer(): FieldRenderer {
       : Math.max(0.25, 1 - ((now - dieStart) / 700) * 0.75);
 
     if (entity.coverType > 0) {
-      drawCover(g, cx, cy, entity.coverType as 1 | 2, entity.edge, entity.x, entity.y);
+      drawCover(g, cx, cy, entity.coverType as 1 | 2, entity.edge, entity.x, entity.y, view?.biome ?? DEFAULT_BIOME);
       return;
     }
 
@@ -1680,6 +1896,16 @@ export function createFieldRenderer(): FieldRenderer {
       const { fx, fy } = faceOf(tile.x, tile.y, z);
       g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: 0xe8c96a, alpha: 0.08 + extractPulse * 0.07 });
       g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({ width: 1.4, color: 0xe8c96a, alpha: 0.3 + extractPulse * 0.35 });
+      // Портальный контур поверх подсветки: арка и порог явно обозначают
+      // выход, не конкурируя с иконкой щита и не меняя семантику ядра.
+      const portalColor = COLORS.ui.success;
+      g.moveTo(fx + 11, fy + C - 7)
+        .lineTo(fx + 11, fy + 23)
+        .quadraticCurveTo(fx + C / 2, fy + 8, fx + C - 11, fy + 23)
+        .lineTo(fx + C - 11, fy + C - 7)
+        .stroke({ width: 2.4, color: portalColor, alpha: 0.72 + extractPulse * 0.22 });
+      g.moveTo(fx + 7, fy + C - 6).lineTo(fx + C - 7, fy + C - 6)
+        .stroke({ width: 2, color: portalColor, alpha: 0.58 + extractPulse * 0.18 });
       // Стрелка выхода по центру клетки.
       g.poly([
         fx + CELL_SIZE / 2, fy + 5,
@@ -2524,6 +2750,8 @@ export function createFieldRenderer(): FieldRenderer {
   /** Холст сменил размер (поворот устройства, окно): цель шага обучения
    * перепланируется к подводке по новым границам экрана. */
   const onCanvasResize = (): void => {
+    atmosphereSignature = null;
+    paintAtmosphere();
     if (!view?.trainingFocus || !view.trainingHighlight) return;
     const point = trainingHighlightPoint(view.trainingHighlight);
     if (point) pendingTrainingFocus = point;
@@ -2566,7 +2794,7 @@ export function createFieldRenderer(): FieldRenderer {
       canvas.style.height = "100%";
       canvas.style.touchAction = "none";
       element.appendChild(canvas);
-      app.stage.addChild(world);
+      app.stage.addChild(world, atmosphereLayer);
       // Поворот экрана или изменение окна: цель урока может оказаться за
       // пределами новой «зоны комфорта» — перепланировать подводку.
       app.renderer.on("resize", onCanvasResize);
@@ -2582,6 +2810,7 @@ export function createFieldRenderer(): FieldRenderer {
       paintStatic();
       if (view) paintFog(view);
       paintFx();
+      paintAtmosphere();
       animFrame = requestAnimationFrame(animLoop);
     },
     update(next) {
@@ -2607,10 +2836,12 @@ export function createFieldRenderer(): FieldRenderer {
       }
       // The map seed changes only when a battlefield is generated. State updates
       // redraw overlays/tokens, never the cached terrain graphics.
-      if (terrainSeed !== next.matchSeed) paintStatic();
+      const nextTerrainSeed = `${next.matchSeed}:${next.biome ?? DEFAULT_BIOME}`;
+      if (terrainSeed !== nextTerrainSeed) paintStatic();
       paintFog(next);
       paintDebug();
       fit();
+      paintAtmosphere();
       paint();
     },
     play(events) {

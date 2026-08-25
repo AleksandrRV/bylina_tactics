@@ -129,7 +129,11 @@ export const skillConfigSchema = z.object({
   });
 });
 
+export const biomeIdSchema = z.enum(["meadow", "swamp", "thicket", "scorched"]);
+
 export const mapGenConfigSchema = z.object({
+  /** Визуальный биом; отсутствует в старых конфигурациях и означает meadow. */
+  biome: biomeIdSchema.optional(),
   width: z.number().int().min(8).max(64),
   height: z.number().int().min(8).max(64),
   pitChance: z.number().min(0).max(1),
