@@ -102,7 +102,7 @@ const hasButton = (part: string): boolean =>
 async function makeSave(screen: string, darkness = 5): Promise<void> {
   const { createCampaign } = await import("../../campaign/src/index.js");
   const { loadAppContent } = await import("../../../apps/game-pwa/src/content-files.js");
-  const content = loadAppContent();
+  const content = await Promise.resolve(loadAppContent());
   if (!content.ok) throw new Error("content broken");
   const unitStats: Record<string, { maxHealth: number }> = {};
   for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };
@@ -143,7 +143,7 @@ async function makeBattleSave(): Promise<void> {
   const { createCampaign } = await import("../../campaign/src/index.js");
   const { createMissionMatch } = await import("@bylina/core");
   const { loadAppContent } = await import("../../../apps/game-pwa/src/content-files.js");
-  const content = loadAppContent();
+  const content = await Promise.resolve(loadAppContent());
   if (!content.ok) throw new Error("content broken");
   const unitStats: Record<string, { maxHealth: number }> = {};
   for (const unit of content.data.units) unitStats[unit.id] = { maxHealth: unit.maxHealth };

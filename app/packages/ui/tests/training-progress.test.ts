@@ -19,7 +19,7 @@ const hint = (fields: Partial<TrainingHintConfig>): TrainingHintConfig => ({
 });
 
 const moved = (isDash = false): GameEvent[] => [
-  { type: "ENTITY_MOVED", entityId: 1, from: { x: 0, y: 0, z: 0 }, to: { x: 1, y: 0, z: 0 }, path: [], mpCost: 1, apCost: 1, isDash, dir: 0 },
+  { type: "ENTITY_MOVED", entityId: 1, path: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }], isDash, apSpent: 1 },
 ];
 
 describe("hintCompletedByEvents", () => {

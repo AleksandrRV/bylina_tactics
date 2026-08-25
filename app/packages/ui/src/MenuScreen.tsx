@@ -1,14 +1,12 @@
 import { useState } from "react";
-import { MODE_OPENS_IN, type GameMode } from "@bylina/session";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState } from "./hooks.js";
+import { useI18nTick } from "./hooks.js";
 import { Mark } from "./Mark.js";
 
 export function MenuScreen() {
   useI18nTick();
   const t = useT();
   const { session, version, install, campaignFlow } = useServices();
-  const { unavailableMode } = useSessionState();
   // Предупреждение «Новой былины» (0.20.15): подтверждение потери прогресса.
   const [confirmNewBylina, setConfirmNewBylina] = useState(false);
   const startBylina = (): void => {
@@ -105,24 +103,6 @@ export function MenuScreen() {
         </div>
       ) : null}
 
-      {unavailableMode ? (
-        <div className="modal-root" role="presentation" onClick={() => session.dismissUnavailable()}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="unavailable-title"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h2 id="unavailable-title">{t("menu.unavailableTitle")}</h2>
-            <p>{t("menu.unavailableBody", { version: MODE_OPENS_IN[unavailableMode] })}</p>
-            <p className="muted">{t("menu.unavailableHint")}</p>
-            <button type="button" className="btn btn-primary" onClick={() => session.dismissUnavailable()}>
-              {t("common.ok")}
-            </button>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 }

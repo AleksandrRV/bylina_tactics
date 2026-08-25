@@ -10,7 +10,7 @@ import {
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
-import { needsTrainingFocus, trainingGlideOffset, type Point } from "./camera.js";
+import { needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, type Point } from "./camera.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -1729,8 +1729,10 @@ export function createFieldRenderer(): FieldRenderer {
     if (w <= 0 || h <= 0) return;
     const sx = world.x + cxw * scale;
     const sy = world.y + cyw * scale;
-    const needX = sx < w * 0.26 || sx > w * 0.74;
-    const needY = sy < h * 0.32 || sy > h * 0.72;
+    // Единая «зона комфорта» из модуля камеры (прежде здесь жил свой набор
+    // порогов, расходившийся с обучающей подводкой).
+    const needX = sx < w * TRAINING_COMFORT.x0 || sx > w * TRAINING_COMFORT.x1;
+    const needY = sy < h * TRAINING_COMFORT.y0 || sy > h * TRAINING_COMFORT.y1;
     if (!needX && !needY) return;
     const tx = world.x + (w * 0.5 - sx) * 0.6;
     const ty = world.y + (h * 0.52 - sy) * 0.6;
@@ -2121,6 +2123,15 @@ export function createFieldRenderer(): FieldRenderer {
     if (cell) onActivate?.(cell.x, cell.y);
   };
 
+  /** Системный срыв жеста: указатель убирается из карты, но клетка не
+   * активируется — жест не завершился. Без обработки карта указателей
+   * «залипает», и пинч остаётся сломанным до следующего pointerup. */
+  const onCancel = (event: FederatedPointerEvent): void => {
+    pointers.delete(event.pointerId);
+    if (pointers.size < 2) pinch = 0;
+    drag = false;
+  };
+
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
     world.x -= event.deltaX;
@@ -2183,6 +2194,7 @@ export function createFieldRenderer(): FieldRenderer {
       world.on("pointermove", onMove);
       world.on("pointerup", onUp);
       world.on("pointerupoutside", onUp);
+      world.on("pointercancel", onCancel);
       canvas.addEventListener("wheel", onWheel, { passive: false });
       canvas.addEventListener("contextmenu", onContext);
       mounted = true;
@@ -2240,6 +2252,7 @@ export function createFieldRenderer(): FieldRenderer {
         world.off("pointermove", onMove);
         world.off("pointerup", onUp);
         world.off("pointerupoutside", onUp);
+        world.off("pointercancel", onCancel);
         try {
           app.canvas.removeEventListener("wheel", onWheel);
           app.canvas.removeEventListener("contextmenu", onContext);

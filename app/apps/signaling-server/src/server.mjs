@@ -11,12 +11,25 @@ const MAX_NAME = 48;
 const MAX_SIGNAL_BYTES = 64 * 1024;
 const HEARTBEAT_MS = 30_000;
 const ROOM_ID = /^[A-Za-z0-9_-]{1,64}$/;
+/**
+ * Значение `Access-Control-Allow-Origin` для HTTP-эндпоинтов (`/rooms`,
+ * `/health`): клиент комнаты лежит на другом источнике (порт/домен),
+ * без заголовка «Обновить комнаты» падает с ошибкой CORS. По умолчанию
+ * источник не ограничивается; развёртывание может сузить его опцией
+ * `corsOrigin` либо переменной окружения `RELAY_ALLOW_ORIGIN`.
+ */
+const DEFAULT_CORS_ORIGIN = "*";
 
 export function createRelayServer(options = {}) {
   const rooms = new Map();
   const heartbeatMs = options.heartbeatMs ?? HEARTBEAT_MS;
+  const corsOrigin = options.corsOrigin ?? process.env.RELAY_ALLOW_ORIGIN ?? DEFAULT_CORS_ORIGIN;
   const server = http.createServer((req, res) => {
     const url = req.url ?? "/";
+    res.setHeader("Access-Control-Allow-Origin", corsOrigin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+    if (req.method === "OPTIONS") { res.writeHead(204); return void res.end(); }
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     if (url === "/health") return void res.end(JSON.stringify({ ok: true, rooms: rooms.size }));
     if (url === "/rooms" || url.startsWith("/rooms?")) return void res.end(JSON.stringify({ rooms: [...rooms.values()].map(roomInfo) }));

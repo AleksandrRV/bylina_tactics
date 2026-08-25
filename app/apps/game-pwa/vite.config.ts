@@ -90,9 +90,14 @@ export default defineConfig({
         start_url: basePath,
         scope: basePath,
         lang: "ru",
+        // «any» и «maskable» — раздельные записи: объединённое значение
+        // отклоняется проверками установки (маскируемый вариант рисуется
+        // с безопасным полем и без него картинка обрезалась бы).
         icons: [
-          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any maskable" },
-          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any maskable" },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icons/icon-192.png", sizes: "192x192", type: "image/png", purpose: "maskable" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "icons/icon-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
         ],
       },
     }),

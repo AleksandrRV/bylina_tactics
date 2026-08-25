@@ -188,12 +188,32 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   // с уже существующими.
   let nextFighterId = options.initialState ? Math.max(0, ...options.initialState.fighters.map((fighter) => fighter.id)) + 1 : 1;
   let nameCursor = options.initialState?.fighters.length ?? 0;
+  // Имена, занятые живыми бойцами: при восстановлении курсор имён может
+  // отстать от уже выданных имён (состав записи меняется от боя к бою),
+  // а при вместимости дружины больше списка имён — зациклиться. Новое имя
+  // подбирается первым свободным среди живых, поэтому два живых бойца
+  // никогда не носят одно имя.
+  const usedNames = new Set(
+    (options.initialState?.fighters ?? []).filter((fighter) => fighter.alive).map((fighter) => fighter.name),
+  );
+
+  const nextRecruitName = (): string => {
+    for (let step = 0; step < RECRUIT_NAMES.length; step += 1) {
+      const candidate = RECRUIT_NAMES[nameCursor % RECRUIT_NAMES.length];
+      nameCursor += 1;
+      if (candidate !== undefined && !usedNames.has(candidate)) {
+        usedNames.add(candidate);
+        return candidate;
+      }
+    }
+    return `Рекрут ${nextFighterId}`;
+  };
 
   const makeFighter = (unitId: string, level: number, hp?: number): FighterState => {
     const maxHp = hpOf(unitId);
     const fighter: FighterState = {
       id: nextFighterId,
-      name: RECRUIT_NAMES[nameCursor % RECRUIT_NAMES.length] ?? `Рекрут ${nextFighterId}`,
+      name: nextRecruitName(),
       unitId,
       level,
       hp: hp ?? maxHp,
@@ -203,7 +223,6 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       equippedItemId: null,
     };
     nextFighterId += 1;
-    nameCursor += 1;
     return fighter;
   };
 

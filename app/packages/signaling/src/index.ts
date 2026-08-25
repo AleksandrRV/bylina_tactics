@@ -98,8 +98,8 @@ export function createSignalingSession(options: {
       for (const value of Array.isArray(message.peers) ? message.peers : []) if (isPeer(value)) peers.set(value.id, value);
       emitState("signaling-connected");
       // The host initiates one addressed channel per peer. A guest creates its
-      // answering peer eagerly as well: simple-peer waits for the offer, while
-      // deterministic test channels can become connected without an SDP roundtrip.
+      // answering peer eagerly as well: the WebRTC channel waits for the offer,
+      // while deterministic test channels can become connected without an SDP roundtrip.
       if (role === "host") for (const peer of peers.values()) createChannel(peer.id, true);
       else for (const peer of peers.values()) if (peer.role === "host") createChannel(peer.id, false);
     } else if (message.type === "PEER_JOINED" && isPeer(message.peer)) {
@@ -120,12 +120,24 @@ export function createSignalingSession(options: {
   };
   const connect = (): void => {
     if (closed) return;
-    try { socket = openSocket(options.url); }
-    catch (error) { report(error instanceof Error ? error.message : String(error)); beginReconnect(); return; }
-    socket.on("open", () => join());
-    socket.on("message", handleMessage);
-    socket.on("close", () => beginReconnect());
-    socket.on("error", (error) => report(error instanceof Error ? error.message : String(error)));
+    // Открытие сокета асинхронно: в Node/ESM модуль `ws` подгружается
+    // динамически (глобального `require` там нет). Ошибка открытия —
+    // та же ветка, что и обрыв соединения: переподключение.
+    void openSocket(options.url).then((opened) => {
+      if (closed) {
+        try { opened.close(); } catch { /* уже закрыт */ }
+        return;
+      }
+      socket = opened;
+      opened.on("open", () => join());
+      opened.on("message", handleMessage);
+      opened.on("close", () => beginReconnect());
+      opened.on("error", (error) => report(error instanceof Error ? error.message : String(error)));
+    }).catch((error: unknown) => {
+      if (closed) return;
+      report(error instanceof Error ? error.message : String(error));
+      beginReconnect();
+    });
   };
 
   const transport: Transport = {
@@ -159,10 +171,16 @@ export async function listRooms(url: string): Promise<RoomSummary[]> {
 }
 
 type SocketLike = { send(data: string): void; close(): void; on(event: "open" | "close" | "error" | "message", listener: (data?: unknown) => void): void; };
-function openSocket(url: string): SocketLike {
+async function openSocket(url: string): Promise<SocketLike> {
   if (typeof process !== "undefined" && typeof process.versions?.node === "string") {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { WebSocket: NodeWebSocket } = require("ws") as typeof import("ws");
+    // Node/ESM: глобального `require` нет — выводим его из URL модуля.
+    // Спецификатор передаётся переменной, чтобы обозревательный сборщик не
+    // разрешал `node:module` статически (ветка недостижима из обозревателя,
+    // но статический импорт сломал бы сборку).
+    const nodeModuleSpec = "node:module";
+    const { createRequire } = (await import(/* @vite-ignore */ nodeModuleSpec)) as typeof import("node:module");
+    const nodeRequire = createRequire(import.meta.url);
+    const { WebSocket: NodeWebSocket } = nodeRequire("ws") as typeof import("ws");
     return new NodeWebSocket(url) as unknown as SocketLike;
   }
   const socket = new WebSocket(url);

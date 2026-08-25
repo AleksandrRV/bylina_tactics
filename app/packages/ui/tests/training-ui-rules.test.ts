@@ -46,7 +46,8 @@ describe("the scenario gate rejects every non-prescribed action (0.20.13)", () =
             ? { type: "USE_SKILL", actorId: d.actorId, skillId: d.skillId, targetId: wrong.id }
             : null;
         }
-        if (d.kind === "move" || d.kind === "defend" || d.kind === "overwatch") return null;
+        // «move» уже обработано выше и всегда возвращает значение.
+        if (d.kind === "defend" || d.kind === "overwatch") return null;
         return { type: "DEFEND", actorId: 1 };
       },
     });

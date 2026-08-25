@@ -23,10 +23,11 @@ describe("resolveTrainingDirective (0.20.13)", () => {
     const view = resolveTrainingDirective(hint, refreshDeps(rig))!;
     expect(view.directive.kind).toBe("move");
     if (view.directive.kind !== "move") return;
+    const directive = view.directive;
     const actor = rig.kernel.getSnapshot().entities.find((e) => e.configId === "bogatyr")!;
     // Клетка указания достижима и стоит одно очко действия.
     const reach = rig.kernel.getReachable(actor.id);
-    const cell = reach.find((c) => c.x === view.directive.cell.x && c.y === view.directive.cell.y)!;
+    const cell = reach.find((c) => c.x === directive.cell.x && c.y === directive.cell.y)!;
     expect(cell.apCost).toBe(1);
     // Это самая дальняя из клеток за одно очко.
     const maxMp = Math.max(...reach.filter((c) => c.apCost === 1).map((c) => c.mpCost));
@@ -41,9 +42,10 @@ describe("resolveTrainingDirective (0.20.13)", () => {
     // Уменьшаем ОД богатыря до 2 (начало хода) — рывок доступен сразу.
     const view = resolveTrainingDirective(hint, refreshDeps(rig))!;
     if (view.directive.kind !== "move") throw new Error("expected move directive");
+    const directive = view.directive;
     const actor = rig.kernel.getSnapshot().entities.find((e) => e.configId === "bogatyr")!;
     const reach = rig.kernel.getReachable(actor.id);
-    const cell = reach.find((c) => c.x === view.directive.cell.x && c.y === view.directive.cell.y)!;
+    const cell = reach.find((c) => c.x === directive.cell.x && c.y === directive.cell.y)!;
     expect(cell.apCost).toBe(2);
   });
 
@@ -52,9 +54,10 @@ describe("resolveTrainingDirective (0.20.13)", () => {
     const hint = rig.hints.find((h) => h.until === "approach")!;
     const view = resolveTrainingDirective(hint, refreshDeps(rig))!;
     if (view.directive.kind !== "move") throw new Error("expected move directive");
+    const directive = view.directive;
     const upyr = rig.kernel.getSnapshot().entities.find((e) => e.configId === "upyr" && !e.dead)!;
-    const dx = Math.abs(view.directive.cell.x - upyr.x);
-    const dy = Math.abs(view.directive.cell.y - upyr.y);
+    const dx = Math.abs(directive.cell.x - upyr.x);
+    const dy = Math.abs(directive.cell.y - upyr.y);
     expect(Math.max(dx, dy)).toBe(1);
     // Подсветка — маркер клетки, шаг «приблизьтесь».
     expect(view.highlight?.kind).toBe("cell");
@@ -84,14 +87,16 @@ describe("resolveTrainingDirective (0.20.13)", () => {
     const defendView = resolveTrainingDirective(defend, refreshDeps(rig))!;
     expect(defendView.directive.kind).toBe("defend");
     if (defendView.directive.kind === "defend") {
-      const actor = rig.kernel.getSnapshot().entities.find((e) => e.id === defendView.directive.actorId)!;
+      const directive = defendView.directive;
+      const actor = rig.kernel.getSnapshot().entities.find((e) => e.id === directive.actorId)!;
       expect(actor.configId).toBe("bogatyr");
     }
     const overwatch = rig.hints.find((h) => h.until === "overwatch")!;
     const overwatchView = resolveTrainingDirective(overwatch, refreshDeps(rig))!;
     expect(overwatchView.directive.kind).toBe("overwatch");
     if (overwatchView.directive.kind === "overwatch") {
-      const actor = rig.kernel.getSnapshot().entities.find((e) => e.id === overwatchView.directive.actorId)!;
+      const directive = overwatchView.directive;
+      const actor = rig.kernel.getSnapshot().entities.find((e) => e.id === directive.actorId)!;
       expect(actor.configId).toBe("strelets");
     }
   });
@@ -103,16 +108,17 @@ describe("trainingCommandAllowed: only the prescribed command passes (0.20.13)",
     const hint = rig.hints.find((h) => h.until === "move")!;
     const view = resolveTrainingDirective(hint, refreshDeps(rig))!;
     if (view.directive.kind !== "move") throw new Error("expected move directive");
-    const allowed = { type: "MOVE", actorId: view.directive.actorId, to: view.directive.cell } as const;
+    const directive = view.directive;
+    const allowed = { type: "MOVE", actorId: directive.actorId, to: directive.cell } as const;
     expect(trainingCommandAllowed(view, allowed)).toBe(true);
     // Другая достижимая клетка — запрещена.
-    const reach = rig.kernel.getReachable(view.directive.actorId);
-    const other = reach.find((c) => !(c.x === view.directive!.cell.x && c.y === view.directive!.cell.y))!;
-    expect(trainingCommandAllowed(view, { type: "MOVE", actorId: view.directive.actorId, to: other })).toBe(false);
+    const reach = rig.kernel.getReachable(directive.actorId);
+    const other = reach.find((c) => !(c.x === directive.cell.x && c.y === directive.cell.y))!;
+    expect(trainingCommandAllowed(view, { type: "MOVE", actorId: directive.actorId, to: other })).toBe(false);
     // Чужой исполнитель и иные категории — запрещены.
-    expect(trainingCommandAllowed(view, { type: "MOVE", actorId: 999, to: view.directive.cell })).toBe(false);
+    expect(trainingCommandAllowed(view, { type: "MOVE", actorId: 999, to: directive.cell })).toBe(false);
     expect(trainingCommandAllowed(view, { type: "END_TURN", playerId: "1" })).toBe(false);
-    expect(trainingCommandAllowed(view, { type: "DEFEND", actorId: view.directive.actorId })).toBe(false);
+    expect(trainingCommandAllowed(view, { type: "DEFEND", actorId: directive.actorId })).toBe(false);
   });
 
   it("attack directive rejects wrong weapon, wrong target and wrong actor", () => {

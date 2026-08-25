@@ -45,12 +45,6 @@ export type DifficultyId = "easy" | "normal" | "hard";
 
 export type MatchOutcome = "victory" | "defeat";
 
-export const MODE_OPENS_IN: Record<GameMode, string> = {
-  quickMatch: "0.5.0",
-  campaign: "0.10.0",
-  pvp: "0.14.0",
-};
-
 export interface CampaignFinishInfo {
   darknessGained: number;
   campaignLost: boolean;
@@ -62,7 +56,6 @@ export interface CampaignFinishInfo {
 
 export interface SessionState {
   screen: AppScreen;
-  unavailableMode: GameMode | null;
   paused: boolean;
   battleKind: BattleKind | null;
   difficulty: DifficultyId | null;
@@ -135,7 +128,6 @@ export interface SessionApi {
   finishMatch(outcome: MatchOutcome): void;
   playAgain(): void;
   openMode(mode: GameMode): void;
-  dismissUnavailable(): void;
   setPaused(paused: boolean): void;
   /** Регистрирует единственный автомат кампании локальной партии. */
   bindCampaign(campaign: CampaignApi): void;
@@ -280,7 +272,6 @@ export interface SessionApi {
  * сбрасывать, а `emit` сохраняет значение из текущего состояния.
  */
 const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" | "suspendedCampaign"> = {
-  unavailableMode: null,
   paused: false,
   battleKind: null,
   difficulty: null,
@@ -507,10 +498,7 @@ export function createSession(
         emit({ ...idle, screen: "pvpRoom" });
         return;
       }
-      emit({ screen: "menu", ...idle, unavailableMode: mode });
-    },
-    dismissUnavailable: () => {
-      emit({ ...state, unavailableMode: null });
+      // Все режимы перечислены выше; иных значений у `GameMode` нет.
     },
     openPvpRoom: () => {
       emit({ ...idle, screen: "pvpRoom" });

@@ -328,17 +328,33 @@ export function App() {
   useEffect(() => {
     let unBattle: (() => void) | undefined;
     let retryTimer: number | undefined;
+    let pendingTimer: number | undefined;
     let lastSave = 0;
-    const throttledPersist = (): void => {
+    // Трейлинг-дебаунс: частые изменения боя не пишутся чаще раза в окно,
+    // но изменение, попавшее в окно, НЕ отбрасывается, а откладывается до его
+    // закрытия — последний ход всегда будет сохранён (исправление 0.20.20).
+    const debouncedPersist = (): void => {
       const now = Date.now();
-      if (now - lastSave < 400) return;
-      lastSave = now;
-      persistRef.current();
+      if (now - lastSave >= 400) {
+        if (pendingTimer !== undefined) {
+          window.clearTimeout(pendingTimer);
+          pendingTimer = undefined;
+        }
+        lastSave = now;
+        persistRef.current();
+        return;
+      }
+      if (pendingTimer !== undefined) return;
+      pendingTimer = window.setTimeout(() => {
+        pendingTimer = undefined;
+        lastSave = Date.now();
+        persistRef.current();
+      }, 400 - (now - lastSave));
     };
     const subscribeBattle = (): void => {
       if (unBattle || session.get().screen !== "battle") return;
       try {
-        unBattle = session.subscribeBattle(throttledPersist);
+        unBattle = session.subscribeBattle(debouncedPersist);
       } catch {
         // Ядро боя ещё не привязано (экран сменился, BattleScreen монтируется):
         // повторяем попытку на следующем тике.
@@ -356,13 +372,19 @@ export function App() {
       }
       subscribeBattle();
     };
-    throttledPersist();
+    debouncedPersist();
     const unSession = session.subscribe(resub);
     subscribeBattle();
     return () => {
       unSession();
       unBattle?.();
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
+      if (pendingTimer !== undefined) {
+        // Отложенная запись не должна потеряться при переподписании.
+        window.clearTimeout(pendingTimer);
+        pendingTimer = undefined;
+        persistRef.current();
+      }
     };
     // Кампания входит в зависимости: содержимое грузится асинхронно, а без
     // автомата сохранение не пишется; пересоздание автомата («Продолжить»,
@@ -417,11 +439,11 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign, hasActiveBylina]);
 
-  if (!content) return <div className="content-error"><h1>Loading content…</h1></div>;
+  if (!content) return <div className="content-error"><h1>{i18n.t("app.loadingContent")}</h1></div>;
   if (!content.ok) {
     return (
       <div className="content-error">
-        <h1>Configuration error</h1>
+        <h1>{i18n.t("app.configError")}</h1>
         <ul>
           {content.issues.map((issue) => (
             <li key={issue.file}>

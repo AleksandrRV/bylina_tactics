@@ -167,7 +167,7 @@ export function DeploymentScreen() {
         <h1 className="display-title">{t("deployment.title")}</h1>
         <p className="muted">
           {t("deployment.hint", { min: deployMin, max: deployMax })}
-          {mission ? ` — ${t("campaign.type.purge")}` : ""}
+          {mission ? ` — ${t(`campaign.type.${mission.type}`)}` : ""}
         </p>
       </header>
 

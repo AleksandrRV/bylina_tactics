@@ -113,7 +113,10 @@ function Draft({
   onPick: (unitId: string) => void;
 }) {
   const t = useT();
-  const selected = new Set([...picks[1], ...picks[2]]);
+  // Запись занята, когда её выбрала ТЕКУЩАЯ выбирающая сторона: одинаковые
+  // записи допускаются у обеих сторон — как в сетевых ветках, где каждая
+  // сторона получает полный набор (единые правила состава для всех вкладок).
+  const selected = current !== null ? new Set(picks[current]) : new Set<string>();
   const done = current === null && picks[1].length === n && picks[2].length === n;
   return (
     <div className="draft">
@@ -162,8 +165,10 @@ function LocalSetup({
 }) {
   const t = useT();
   // Число мест N ограничено сверху вместимостью набора, снизу — полем
-  // nMin конфигурации (content-schema §6, game-design §7).
-  const maxN = Math.min(5, Math.floor(pool.length / 2));
+  // nMin конфигурации (content-schema §6, game-design §7). Записи могут
+  // повторяться у обеих сторон, поэтому вместимость не делится пополам —
+  // сетевые ветки используют те же пять записей пула на сторону.
+  const maxN = Math.min(5, pool.length);
   const minN = Math.max(1, Math.min(nMin, maxN));
   const [objective, setObjective] = useState<Objective>("elimination");
   const [n, setN] = useState<number>(Math.max(minN, Math.min(3, maxN)));
@@ -283,10 +288,24 @@ function NetworkSetup({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
-  const transportRef = useMemo(() => ({ current: null as (Transport & { receiveSignal(data: unknown): void }) | null }), []);
+  const transportRef = useMemo(() => ({ current: null as (Transport & { receiveSignal(data: unknown): void; close?(): void }) | null }), []);
   const qrInputRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
 
+  /** Смена роли рвёт начатое соединение: канал и коды принадлежат паре. */
+  const switchRole = (next: "host" | "guest"): void => {
+    if (role === next) return;
+    transportRef.current?.close?.();
+    transportRef.current = null;
+    setRole(next);
+    setCode("");
+    setQr(null);
+    setPeerCode("");
+    setConnected(false);
+    setError(null);
+  };
+
   const createChannel = (initiator: boolean): Transport | null => {
+    if (transportRef.current) return transportRef.current;
     try {
       const channel = createWebRtcChannel({
         initiator,
@@ -342,10 +361,10 @@ function NetworkSetup({
   return (
     <div className="net-setup">
       <div className="net-role-switch" role="tablist" aria-label={t("pvp.tabNetwork")}>
-        <button type="button" role="tab" aria-selected={role === "host"} className={`pvp-tab${role === "host" ? " is-active" : ""}`} onClick={() => { setRole("host"); setConnected(false); setError(null); }}>
+        <button type="button" role="tab" aria-selected={role === "host"} className={`pvp-tab${role === "host" ? " is-active" : ""}`} onClick={() => switchRole("host")}>
           {t("net.host")}
         </button>
-        <button type="button" role="tab" aria-selected={role === "guest"} className={`pvp-tab${role === "guest" ? " is-active" : ""}`} onClick={() => { setRole("guest"); setConnected(false); setError(null); }}>
+        <button type="button" role="tab" aria-selected={role === "guest"} className={`pvp-tab${role === "guest" ? " is-active" : ""}`} onClick={() => switchRole("guest")}>
           {t("net.guest")}
         </button>
       </div>
@@ -366,7 +385,7 @@ function NetworkSetup({
             <input type="checkbox" checked={omniscient} onChange={(event) => { setOmniscient(event.target.checked); onOmniscientChange(event.target.checked); }} />
             {t("net.omniscient")}
           </label>
-          {!connected ? (
+          {!code ? (
             <button type="button" className="btn btn-primary" onClick={() => { setError(null); createChannel(true); }}>
               {t("net.create")}
             </button>
@@ -378,20 +397,25 @@ function NetworkSetup({
               <p className="muted">{t("net.hostWait")}</p>
             </div>
           ) : null}
-          {connected ? (
+          {/* Ввод кода ведомого доступен сразу после создания предложения:
+              без ответа ведомого соединение не откроется, и ждать «подключено»
+              для показа ввода было бы взаимной блокировкой рукопожатия. */}
+          {code && !connected ? (
             <>
               <label className="net-input-label" htmlFor="net-peer-code">{t("net.peerCode")}</label>
               <input id="net-peer-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.peerCodePlaceholder")} />
               <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>{t("net.apply")}</button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => transportRef.current && onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), objective, peerRole, omniscient, transportRef.current)}
-                disabled={pool.length === 0}
-              >
-                {t("net.startBattle")}
-              </button>
             </>
+          ) : null}
+          {connected ? (
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => transportRef.current && onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), objective, peerRole, omniscient, transportRef.current)}
+              disabled={pool.length === 0}
+            >
+              {t("net.startBattle")}
+            </button>
           ) : null}
         </div>
       ) : (
@@ -446,6 +470,16 @@ function NetworkSetup({
           >
             {t("net.connect")}
           </button>
+          {/* Ответ ведомого (описание сессии) отдаётся ведущему тем же
+              офлайн-способом: код и изображение показываются ведомому,
+              ведущий вводит их на своей стороне. */}
+          {code ? (
+            <div className="net-code-box">
+              {qr ? <img className="net-qr" src={qr} alt={t("net.qrAlt")} draggable={false} /> : null}
+              <code className="net-code">{code}</code>
+              <p className="muted">{t("net.guestAnswerHint")}</p>
+            </div>
+          ) : null}
           {connected ? <p className="net-connected">{t("net.connected")}</p> : null}
           <div className="pvp-option-group">
             <span className="pvp-option-title">{t("net.peerRole")}</span>
@@ -479,6 +513,10 @@ function PublicSetup({
   const t = useT();
   const { content } = useServices();
   const pool = content.pvp.pool;
+  // Условие победы задаёт конфигурация; значение «выбор» отдаёт решение
+  // ведущему комнаты (как в остальных вкладках) — до создания комнаты.
+  const objectiveFixed = content.pvp.objective === "choice" ? null : content.pvp.objective;
+  const [objective, setObjective] = useState<Objective>("elimination");
   const [relayUrl, setRelayUrl] = useState("http://localhost:8080");
   const [rooms, setRooms] = useState<RoomSummary[]>([]);
   const [roomId, setRoomId] = useState("");
@@ -511,7 +549,7 @@ function PublicSetup({
       if (role === "host") {
         // Сторона 1 ограничена пятью клетками высадки (createPvpMatch): сетевой
         // бой использует не более пяти записей пула на сторону.
-        onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), content.pvp.objective === "apple" ? "apple" : "elimination", signaling.transport);
+        onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), objectiveFixed ?? objective, signaling.transport);
       } else {
         // Сторона 2; экран боя получит снимок по каналу.
         onGuestJoin(2, signaling.transport);
@@ -543,6 +581,17 @@ function PublicSetup({
                 </button>
               </div>
             ))}
+          </div>
+        ) : null}
+        {objectiveFixed === null ? (
+          <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
+            <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
+            <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+              {t("pvp.objectiveElimination")}
+            </button>
+            <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+              {t("pvp.objectiveApple")}
+            </button>
           </div>
         ) : null}
         <div className="pvp-start-row">

@@ -53,4 +53,23 @@ describe("signaling relay server", () => {
     await closed;
     expect(serverSocket.readyState).not.toBe(WebSocket.OPEN);
   });
+
+  it("serves /rooms and /health with CORS headers for a foreign-origin client", async () => {
+    relay = await createRelayServer({ port: 0, heartbeatMs: 10_000 });
+    for (const path of ["/rooms", "/health"]) {
+      const response = await fetch(`http://127.0.0.1:${relay!.port}${path}`);
+      expect(response.status).toBe(200);
+      expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    }
+    // Предзапрос OPTIONS отвечает без тела и с заголовками.
+    const preflight = await fetch(`http://127.0.0.1:${relay!.port}/rooms`, { method: "OPTIONS" });
+    expect(preflight.status).toBe(204);
+    expect(preflight.headers.get("access-control-allow-origin")).toBe("*");
+  });
+
+  it("honours a configured CORS origin", async () => {
+    relay = await createRelayServer({ port: 0, heartbeatMs: 10_000, corsOrigin: "https://game.example" });
+    const response = await fetch(`http://127.0.0.1:${relay!.port}/rooms`);
+    expect(response.headers.get("access-control-allow-origin")).toBe("https://game.example");
+  });
 });

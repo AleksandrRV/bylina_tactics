@@ -72,7 +72,12 @@ describe("app boot", () => {
   });
 
   it("relaunch with an existing save still renders the menu", async () => {
-    // Сохранение уже создано предыдущим тестом (как на устройстве игрока).
+    // Сохранение создаётся первым запуском. Если тест исполняется изолированно
+    // (хранилище не заполнено предыдущим тестом), первичный запуск выполняется
+    // здесь же — тест не зависит от порядка и параллельности исполнения.
+    if (window.localStorage.getItem("bylina.save.v1") === null) {
+      await mountApp();
+    }
     expect(window.localStorage.getItem("bylina.save.v1")).not.toBeNull();
     const { html, errors } = await mountApp();
     expect(errors, `unhandled errors during relaunch: ${String(errors[0])}`).toEqual([]);

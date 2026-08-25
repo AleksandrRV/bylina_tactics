@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { parseContent } from "@bylina/content";
+import { missionConfigSchema, parseContent } from "@bylina/content";
 
 /**
  * Полнота словарей (0.20.2): каждый статический ключ, используемый
@@ -53,6 +53,13 @@ function usedStaticKeys(): Set<string> {
     const text = readFileSync(file, "utf8");
     for (const match of text.matchAll(/\bt\("([^"]+)"/g)) keys.add(match[1]!);
     for (const match of text.matchAll(/\bt\(`([^`$]+)`\)/g)) keys.add(match[1]!);
+    // Условные вызовы: t(flag ? "a" : "b") — обе ветви обязаны быть в словарях
+    // (раньше сканер видел только литерал сразу после `t(` — так потерялся
+    // ключ battle.debugMovementHint).
+    for (const match of text.matchAll(/\bt\(\s*[^()?]*\?\s*"([^"]+)"\s*:\s*"([^"]+)"\s*\)/g)) {
+      keys.add(match[1]!);
+      keys.add(match[2]!);
+    }
   }
   return keys;
 }
@@ -123,6 +130,18 @@ describe("i18n catalogs cover every static key used by the UI (0.20.2)", () => {
     for (const locale of ["ru", "en"]) {
       for (const lock of locks) {
         expect(catalogs[locale]!.has(`training.locked.${lock}`), `${locale}: training.locked.${lock}`).toBe(true);
+      }
+    }
+  });
+
+  it("covers every campaign mission type label derived from the schema", () => {
+    // Ключ строится динамически: `campaign.type.${mission.type}` на экране
+    // высадки — каждый тип миссии из схемы контента обязан быть в словарях.
+    // Схема обёрнута в `superRefine` (ZodEffects), потому берём внутренний тип.
+    const types = missionConfigSchema.innerType().shape.type.options;
+    for (const locale of ["ru", "en"]) {
+      for (const type of types) {
+        expect(catalogs[locale]!.has(`campaign.type.${type}`), `${locale}: campaign.type.${type}`).toBe(true);
       }
     }
   });

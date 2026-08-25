@@ -3,7 +3,9 @@
     "title": "Bylina",
     "fullTitle": "Bylina: Koschei's Darkness",
     "subtitle": "Koschei's Darkness",
-    "version": "Version {version}"
+    "version": "Version {version}",
+    "loadingContent": "Loading content…",
+    "configError": "Configuration error"
   },
   "boot": {
     "loading": "Loading…"
@@ -15,9 +17,6 @@
     "training": "Training",
     "settings": "Settings",
     "install": "Install game",
-    "unavailableTitle": "This mode is not available yet",
-    "unavailableBody": "This mode will open in version {version}.",
-    "unavailableHint": "Quick Match, the staff clash, the grid trial, and settings are available.",
     "replays": "Replays",
     "continue": "Continue",
     "newBylinaTitle": "Start a new bylina?",
@@ -85,6 +84,7 @@
     "overwatch": "Overwatch",
     "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
     "debugMovement": "Movement cost",
+    "debugMovementHint": "Hide movement cost",
     "defend": "Defensive stance",
     "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
     "statuses": "Statuses",
@@ -334,7 +334,8 @@
       "purge": "Purge",
       "destroy": "Destroy the idol",
       "rescue": "Rescue",
-      "recon": "Reconnaissance"
+      "recon": "Reconnaissance",
+      "needle": "The Needle's Eye"
     },
     "foes": "Enemies",
     "reward": "Reward",
@@ -547,6 +548,7 @@
     "apply": "Apply",
     "startBattle": "Start battle",
     "guestHint": "Enter the host code or load an image with the code.",
+    "guestAnswerHint": "Send this code or image back to the host — entering it completes the connection.",
     "enterCode": "Host code",
     "enterCodePlaceholder": "Paste the code from the host room",
     "scanQr": "Scan image",
