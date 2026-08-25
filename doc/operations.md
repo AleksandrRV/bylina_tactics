@@ -38,11 +38,14 @@ Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
 
 ```powershell
 corepack enable
-corepack prepare pnpm@9.15.0 --activate
+corepack prepare pnpm@10.34.5 --activate
 pnpm -v
 ```
 
-Если `corepack` недоступен: `npm install -g pnpm`.
+Версия закреплена полем `packageManager` в `app/package.json`. Если Corepack
+показывает другую версию, повторите команду выше; это снижает риск отличий
+в lockfile и поведении workspace-команд. Если `corepack` недоступен:
+`npm install -g pnpm@10.34.5`.
 
 ---
 
@@ -70,6 +73,16 @@ pnpm install
 | `pnpm preview` | Просмотр сборки (`http://127.0.0.1:4173/`) |
 
 Остановка: `Ctrl+C`. Если порт занят — открывать адрес из вывода сборщика.
+
+Проверка версии и окружения:
+
+```powershell
+pnpm check:versions
+node --version       # должен быть >= 20
+pnpm --version       # должен соответствовать packageManager
+```
+
+Команду `check:versions` полезно выполнять до `build` и перед публикацией.
 
 ---
 

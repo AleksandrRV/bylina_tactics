@@ -49,7 +49,15 @@ function contentAssetsPlugin(): Plugin {
       server.middlewares.use("/content/", (req, res, next) => {
         const relative = decodeURIComponent(req.url ?? "").replace(/^\/+/, "");
         const target = path.resolve(contentRoot, relative);
-        if (!target.startsWith(contentRoot) || !names.includes(relative)) return next();
+        // Проверяем границу каталога через relative(), а не startsWith():
+        // путь вроде "../data-copy/file" не должен считаться дочерним
+        // каталогом только потому, что его строковый префикс совпал.
+        const relativeTarget = path.relative(contentRoot, target);
+        if (
+          relativeTarget.startsWith("..")
+          || path.isAbsolute(relativeTarget)
+          || !names.includes(relative)
+        ) return next();
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.end(readFileSync(target));
       });

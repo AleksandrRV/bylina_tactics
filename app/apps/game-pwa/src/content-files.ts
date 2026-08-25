@@ -21,7 +21,11 @@ async function loadFetchedContent(): Promise<ContentLoadResult> {
   try {
     const manifestResponse = await fetch(`${base}content-manifest.json`);
     if (!manifestResponse.ok) throw new Error(`content manifest: ${manifestResponse.status}`);
-    const files = await manifestResponse.json() as string[];
+    const manifest = await manifestResponse.json() as unknown;
+    if (!Array.isArray(manifest) || !manifest.every((file) => typeof file === "string")) {
+      throw new Error("content manifest: expected an array of file names");
+    }
+    const files = manifest;
     const entries = await Promise.all(files.map(async (file) => {
       const response = await fetch(`${base}${file}`);
       if (!response.ok) throw new Error(`${file}: ${response.status}`);

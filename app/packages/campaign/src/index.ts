@@ -258,6 +258,20 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     : freshState;
   const listeners = new Set<() => void>();
 
+  // Снимок является публичным значением API: вложенные объекты тоже должны
+  // быть независимыми от автомата. Иначе вызывающий код мог изменить
+  // `lastResult.rewards` через результат getState() и обойти emit().
+  const cloneLastResult = (result: CampaignState["lastResult"]): CampaignState["lastResult"] =>
+    result
+      ? {
+          ...result,
+          rewards: { ...result.rewards },
+          fallen: [...result.fallen],
+          wounded: [...result.wounded],
+          leveledUp: [...result.leveledUp],
+        }
+      : null;
+
   const emit = (): void => {
     for (const listener of listeners) listener();
   };
@@ -292,6 +306,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       shipPosition: { ...state.shipPosition },
       missions: state.missions.map((mission) => ({ ...mission })),
       fighters: state.fighters.map((fighter) => ({ ...fighter })),
+      lastResult: cloneLastResult(state.lastResult),
     }),
     getMissions: () => missions.map((mission) => ({ ...mission })),
     getMission: (id) => missions.find((mission) => mission.id === id),
