@@ -63,7 +63,7 @@
   margin: 0;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
   font-size: clamp(1.5rem, 4vw, 2rem);
-  color: #f3ecdc;
+  color: var(--white);
   letter-spacing: 0.05em;
 }
 
@@ -89,7 +89,7 @@
 .campaign-darkness-value {
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 0.95rem;
-  color: #f3ecdc;
+  color: var(--white);
   white-space: nowrap;
 }
 
@@ -238,7 +238,7 @@
   margin: 7px auto 0;
   border-radius: 50%;
   border: 2px solid #5d6b76;
-  background: radial-gradient(circle at 32% 28%, #2a333c, #1b2229);
+  background: radial-gradient(circle at 32% 28%, var(--backdrop-highlight), #1b2229);
   color: #8fa1ad;
   font-size: 0.9rem;
   line-height: 1;
@@ -259,7 +259,7 @@
 }
 
 .map-marker.is-selected .marker-medallion {
-  border-color: #f3ecdc;
+  border-color: var(--white);
   outline: 3px solid rgba(224, 179, 74, 0.28);
   outline-offset: 3px;
 }
@@ -421,7 +421,7 @@
   margin: 0;
   font-family: Palatino, "Palatino Linotype", serif;
   font-size: 1.35rem;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .mission-id {
@@ -533,7 +533,7 @@
 
 .campaign-abandon-btn:hover,
 .campaign-abandon-btn:focus-visible {
-  border-color: #c45c5c;
+  border-color: var(--danger);
   color: #d98080;
   outline: none;
 }
@@ -885,14 +885,14 @@
   height: 18px;
   border-radius: 50%;
   background: #a03a4e;
-  border: 2px solid #14181c;
+  border: 2px solid var(--ink);
   display: grid;
   place-items: center;
 }
 
 .wound-badge::after {
   content: "✚";
-  color: #f3ecdc;
+  color: var(--white);
   font-size: 0.7rem;
   line-height: 1;
 }
@@ -906,7 +906,7 @@
 
 .deploy-name {
   font-weight: 600;
-  color: #f3ecdc;
+  color: var(--white);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1006,7 +1006,7 @@
   margin: 0;
   font-family: Palatino, "Palatino Linotype", serif;
   font-size: 1.3rem;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .fighter-list {
@@ -1077,7 +1077,7 @@
   align-items: center;
   gap: 8px;
   font-weight: 600;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .fallen-tag,
@@ -1174,7 +1174,7 @@
   border-radius: 50%;
   display: grid;
   place-items: center;
-  color: #14181c;
+  color: var(--ink);
   background: #5d7d44;
   font-size: 0.72rem;
   font-weight: 700;
@@ -1257,7 +1257,7 @@
   padding: 0 4px;
   border-radius: 9px;
   background: #a03a4e;
-  color: #f3ecdc;
+  color: var(--white);
   font-size: 0.68rem;
   line-height: 18px;
   text-align: center;
@@ -1325,7 +1325,7 @@
 
 .outcome-names {
   margin: 2px 0 0;
-  color: #f3ecdc;
+  color: var(--white);
   font-size: 0.95rem;
 }
 
@@ -1538,7 +1538,7 @@
   border: 1px solid rgba(224, 179, 74, 0.5);
   border-radius: 6px;
   background: rgba(16, 22, 16, 0.92);
-  color: #f3ecdc;
+  color: var(--white);
   font-size: 0.85rem;
   z-index: 6;
   pointer-events: none;
@@ -1644,7 +1644,7 @@
 
 .forge-name {
   font-weight: 600;
-  color: #f3ecdc;
+  color: var(--white);
   font-size: 0.95rem;
 }
 
@@ -1826,7 +1826,7 @@
 
 .equip-item-name {
   font-weight: 600;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .equip-item-effects {
@@ -2087,7 +2087,7 @@
 }
 
 .pvp-side-card.is-side1 {
-  border-top: 3px solid #e0b34a;
+  border-top: 3px solid var(--amber);
   animation-delay: 60ms;
 }
 
@@ -2116,7 +2116,7 @@
 }
 
 .is-side1 .pvp-side-title {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
 }
 
 .is-side2 .pvp-side-title {
@@ -2177,7 +2177,7 @@
   padding: 2px 10px;
   border: 1px solid rgba(224, 179, 74, 0.5);
   border-radius: 10px;
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-family: monospace;
   font-size: 0.8rem;
 }
@@ -2288,7 +2288,7 @@
 }
 
 .pvp-tab.is-active {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   border-color: rgba(224, 179, 74, 0.65);
   background: rgba(58, 49, 32, 0.5);
   box-shadow: inset 0 -2px 0 rgba(224, 179, 74, 0.7);
@@ -2384,7 +2384,7 @@
   border: 1px solid rgba(120, 140, 160, 0.3);
   border-radius: 4px;
   background: rgba(0, 0, 0, 0.35);
-  color: #f3ecdc;
+  color: var(--white);
   font-family: monospace;
   font-size: 0.8rem;
   transition: border-color 180ms ease;
@@ -2482,7 +2482,7 @@
 
 .pvp-radio.is-on {
   border-color: rgba(224, 179, 74, 0.7);
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   background: rgba(58, 49, 32, 0.45);
 }
 
@@ -2509,7 +2509,7 @@
 
 .pvp-n-btn.is-on {
   border-color: rgba(224, 179, 74, 0.7);
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   background: rgba(58, 49, 32, 0.45);
   box-shadow: 0 0 10px rgba(224, 179, 74, 0.25);
 }
@@ -2524,7 +2524,7 @@
 }
 
 .pvp-check input {
-  accent-color: #e0b34a;
+  accent-color: var(--amber);
 }
 
 .draft {
@@ -2552,7 +2552,7 @@
 }
 
 .draft-side.is-side1 {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
 }
 
 .draft-side.is-side2 {
@@ -2790,7 +2790,7 @@
 
 .room-id {
   font-family: monospace;
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.85rem;
 }
 
@@ -2830,7 +2830,7 @@
 }
 
 .training-mentor-row b {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-weight: 600;
 }
 
@@ -2894,7 +2894,7 @@
   height: 46px;
   border-radius: 50%;
   border: 1px solid rgba(224, 179, 74, 0.5);
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   background: radial-gradient(circle at 32% 28%, #3a3120, #241d12);
 }
 
@@ -2913,7 +2913,7 @@
 .training-card-title {
   font-family: Palatino, "Palatino Linotype", serif;
   font-size: 1.15rem;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .training-card-desc {
@@ -2927,7 +2927,7 @@
 }
 
 .training-start {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.85rem;
   letter-spacing: 0.06em;
 }

@@ -24,7 +24,7 @@ import {
 } from "@bylina/core";
 import type { TrainingMissionConfig } from "@bylina/content";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
@@ -39,7 +39,7 @@ import {
   type TrainingDirectiveView,
 } from "./training-scenario.js";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
+import { useI18nTick, usePrefersReducedMotion, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { unitPortrait } from "./portraits.js";
@@ -103,7 +103,9 @@ export function BattleScreenView() {
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
+  const portraitTapRef = useRef<{ id: number; at: number } | null>(null);
   const inputRef = useBattleInput();
+  const reducedMotion = usePrefersReducedMotion();
 
   const [debugMovement, setDebugMovement] = useState(false);
 
@@ -467,6 +469,13 @@ export function BattleScreenView() {
 
   const isOwn = (entity: EntityState): boolean =>
     !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+
+  const noActionPoints = useMemo(() => {
+    const fighters = snapshot.entities.filter(
+      (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
+    );
+    return fighters.length > 0 && fighters.every((entity) => entity.ap <= 0);
+  }, [snapshot.entities, viewOwner]);
 
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
   // локальный — на одном устройстве, сетевой — ведомому от ведущего.
@@ -976,6 +985,7 @@ export function BattleScreenView() {
       isSpectator,
       isTraining,
       activeHint,
+      autoEndTurn: hintSettings.autoEndTurn,
       activeOwner: snapshot.activeOwner,
       viewOwner,
       ownUnits,
@@ -984,7 +994,7 @@ export function BattleScreenView() {
     })) return;
     endTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint]);
+  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint, hintSettings.autoEndTurn]);
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== viewOwner) return;
@@ -1148,6 +1158,14 @@ export function BattleScreenView() {
     return { x, y, z: tile?.z ?? 0 };
   }, [preview, skillTargetPos, snapshot.grid]);
 
+  const aimStatus = aimId === null
+    ? undefined
+    : hit === null
+      ? "selected" as const
+      : hit.available
+        ? "ready" as const
+        : "blocked" as const;
+
   useEffect(() => {
     rendererRef.current?.update({
       matchSeed,
@@ -1157,7 +1175,9 @@ export function BattleScreenView() {
       reachable,
       path: previewPath,
       aimOk: Boolean(hit?.available),
+      aimStatus,
       heightMod: hit?.heightMod ?? 0,
+      reducedMotion,
       debugMovement,
       visibleCells,
       exploredCells,
@@ -1166,7 +1186,23 @@ export function BattleScreenView() {
       trainingHighlight,
       trainingFocus,
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
+
+  const centerOnEntity = (entity: EntityState): void => {
+    rendererRef.current?.centerOn(entity.x, entity.y, entity.z);
+  };
+
+  const handlePortraitPointerUp = (event: ReactPointerEvent, entity: EntityState): void => {
+    if (event.pointerType !== "touch" || entity.dead) return;
+    const now = performance.now();
+    const previous = portraitTapRef.current;
+    if (previous && previous.id === entity.id && now - previous.at < 360) {
+      portraitTapRef.current = null;
+      centerOnEntity(entity);
+    } else {
+      portraitTapRef.current = { id: entity.id, at: now };
+    }
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -1516,6 +1552,10 @@ export function BattleScreenView() {
                   key={entity.id}
                   type="button"
                   className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
+                  onDoubleClick={() => {
+                    if (!entity.dead) centerOnEntity(entity);
+                  }}
+                  onPointerUp={(event) => handlePortraitPointerUp(event, entity)}
                   onClick={() => {
                     if (entity.dead) return;
                     // Обучение: выбор иного бойца запрещён — действует только
@@ -1676,7 +1716,14 @@ export function BattleScreenView() {
             {selected ? (
               <div className="sel-row">
                 {unitPortrait(selected.configId) ? (
-                  <img className="sel-face" src={unitPortrait(selected.configId)} alt="" draggable={false} />
+                  <img
+                    className="sel-face"
+                    src={unitPortrait(selected.configId)}
+                    alt=""
+                    draggable={false}
+                    onDoubleClick={() => centerOnEntity(selected)}
+                    onPointerUp={(event) => handlePortraitPointerUp(event, selected)}
+                  />
                 ) : null}
                 <div className="sel-info">
                   <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
@@ -1809,7 +1856,7 @@ export function BattleScreenView() {
           </div>
           <button
             type="button"
-            className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
+            className={`hud-btn hud-btn-primary end-turn-btn${noActionPoints && snapshot.activeOwner === viewOwner ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
             disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn")}
             onClick={() => endTurn()}
           >

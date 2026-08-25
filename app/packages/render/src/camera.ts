@@ -53,6 +53,59 @@ export function worldToScreen(point: Point, plane: CameraPlane): Point {
 }
 
 /**
+ * Меняет масштаб вокруг экранной точки. Мировая точка под курсором остаётся
+ * на том же пикселе — в отличие от простого изменения `scale`, которое
+ * выглядит как сдвиг поля. Функция чистая, поэтому правило одинаково для
+ * колеса мыши и pinch-жеста и легко проверяется без PixiJS.
+ */
+export function zoomAroundPoint(
+  screenPoint: Point,
+  plane: CameraPlane,
+  factor: number,
+  minScale = 0.55,
+  maxScale = 1.8,
+): CameraPlane {
+  if (!Number.isFinite(factor) || factor <= 0 || plane.scale <= 0) return plane;
+  const scale = Math.min(maxScale, Math.max(minScale, plane.scale * factor));
+  const worldPoint = {
+    x: (screenPoint.x - plane.offset.x) / plane.scale,
+    y: (screenPoint.y - plane.offset.y) / plane.scale,
+  };
+  return {
+    scale,
+    offset: {
+      x: screenPoint.x - worldPoint.x * scale,
+      y: screenPoint.y - worldPoint.y * scale,
+    },
+  };
+}
+
+/** Ограничение камеры по одной оси: поле не уводится за край экрана. */
+function clampAxis(target: number, mapSpan: number, screenSpan: number): number {
+  // Поле уже вмещается в экран — выровнять по центру оси.
+  if (mapSpan <= screenSpan) return (screenSpan - mapSpan) / 2;
+  // Иначе окно камеры лежит в пределах поля: [screenSpan − mapSpan, 0].
+  return Math.min(0, Math.max(screenSpan - mapSpan, target));
+}
+
+/** Центрирует мировую точку, не показывая пустоту за границами карты. */
+export function centerCameraOn(
+  point: Point,
+  plane: CameraPlane,
+  screen: ScreenSize,
+  map: MapPlane,
+): CameraPlane {
+  if (screen.width <= 0 || screen.height <= 0 || plane.scale <= 0) return plane;
+  return {
+    scale: plane.scale,
+    offset: {
+      x: clampAxis(screen.width * 0.5 - point.x * plane.scale, map.width * plane.scale, screen.width),
+      y: clampAxis(screen.height * 0.5 - point.y * plane.scale, map.height * plane.scale, screen.height),
+    },
+  };
+}
+
+/**
  * Нужна ли подводка: цель за пределами «зоны комфорта» — то есть за краем
  * экрана или вплотную к нему (в пределах полос перекрытия интерфейсом).
  */
@@ -65,14 +118,6 @@ export function needsTrainingFocus(point: Point, plane: CameraPlane, screen: Scr
     at.y < screen.height * TRAINING_COMFORT.y0 ||
     at.y > screen.height * TRAINING_COMFORT.y1
   );
-}
-
-/** Ограничение камеры по одной оси: поле не уводится за край экрана. */
-function clampAxis(target: number, mapSpan: number, screenSpan: number): number {
-  // Поле уже вмещается в экран — выровнять по центру оси.
-  if (mapSpan <= screenSpan) return (screenSpan - mapSpan) / 2;
-  // Иначе окно камеры лежит в пределах поля: [screenSpan − mapSpan, 0].
-  return Math.min(0, Math.max(screenSpan - mapSpan, target));
 }
 
 /**

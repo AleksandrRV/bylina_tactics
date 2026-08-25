@@ -10,7 +10,8 @@ import {
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
-import { needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, type Point } from "./camera.js";
+import { centerCameraOn, needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, zoomAroundPoint, type Point } from "./camera.js";
+import { RENDER_COLORS as COLORS } from "./colors.js";
 
 export const RENDER_STATUS = "pixi" as const;
 export const CELL_SIZE = 52;
@@ -26,7 +27,11 @@ export interface FieldView {
   reachable: ReachableCell[];
   path: CellPos[];
   aimOk: boolean;
+  /** Состояние кольца выбранной цели: до предпросмотра, готово, либо заблокировано. */
+  aimStatus?: "selected" | "ready" | "blocked";
   heightMod: -1 | 0 | 1;
+  /** Уважение к системной prefers-reduced-motion для Pixi-анимаций. */
+  reducedMotion?: boolean;
   debugMovement?: boolean;
   /** Клетки, которые сторона наблюдает сейчас (ключи «x,y»). Пустое множество = без тумана. */
   visibleCells?: Set<string>;
@@ -51,6 +56,8 @@ export interface FieldRenderer {
   update(view: FieldView): void;
   play(events: GameEvent[]): Promise<void>;
   pan(dx: number, dy: number): void;
+  /** Центрирует камеру на бойце после двойного клика/касания его портрета. */
+  centerOn(x: number, y: number, z: number): void;
   destroy(): void;
   setOnActivate(handler: (x: number, y: number) => void): void;
   setOnHover(handler: (x: number, y: number) => void): void;
@@ -93,25 +100,12 @@ function easeInOut(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
 }
 
-/**
- * Локальный шум для визуальных эффектов (тряска камеры). Начальное значение
- * зависит от времени запуска, поэтому эффект не повторяется кадр в кадр,
- * но не использует стандартный генератор среды (§1 math: источник случайности
- * тактического слоя — только Mulberry32; средство отображения состояния не меняет).
- */
-let shakeSeed = (Date.now() >>> 0) || 0x9e3779b9;
-
-function shakeNoise(): number {
-  shakeSeed = (Math.imul(shakeSeed, 1664525) + 1013904223) >>> 0;
-  return shakeSeed / 4294967296;
-}
-
 /* ---------- рельеф ---------- */
 
 /** Верхние грани по уровням: низ — холодный мох, земля — луг, верх — светлая выжженная трава. */
-const Z_FACE = [0x2c3a2c, 0x43603f, 0x74925f] as const;
+const Z_FACE = COLORS.terrain.face;
 /** Откос (южная стена скалы) по уровням: тёмная земляная огранка. */
-const Z_RISER = [0x171a12, 0x23291a, 0x38432a] as const;
+const Z_RISER = COLORS.terrain.riser;
 
 function visualLevel(tile: Tile): number {
   return tile.pit ? 0 : tile.z;
@@ -131,8 +125,16 @@ interface FactionLook {
   disc: number;
 }
 
-const DRUZHINA: FactionLook = { ring: 0xe8b64c, ringDark: 0x57431a, disc: 0x241c12 };
-const NAV: FactionLook = { ring: 0x8bc34a, ringDark: 0x1e3311, disc: 0x131b10 };
+const DRUZHINA: FactionLook = {
+  ring: COLORS.faction.druzhinaRing,
+  ringDark: COLORS.faction.druzhinaRingDark,
+  disc: COLORS.faction.druzhinaDisc,
+};
+const NAV: FactionLook = {
+  ring: COLORS.faction.navRing,
+  ringDark: COLORS.faction.navRingDark,
+  disc: COLORS.faction.navDisc,
+};
 
 interface TokenCtx {
   g: Graphics;
@@ -393,7 +395,32 @@ const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   solovey: drawSolovey,
 };
 
-const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: 0x6d9a3a };
+const FALLBACK_ART: Record<"druzhina" | "nav", number> = { druzhina: 0xc9a24b, nav: COLORS.faction.navFallback };
+
+/**
+ * Подставка стороны: круг дружины и шестиугольник Нави. Форма повторяет
+ * смысл цвета и остаётся различимой даже когда фишки уменьшены камерой.
+ */
+function drawTokenBase(g: Graphics, cx: number, cy: number, faction: FactionLook, hexagonal: boolean): void {
+  if (!hexagonal) {
+    g.circle(cx, cy, 17.5).fill(faction.ring);
+    g.circle(cx, cy, 17.5).stroke({ width: 1, color: faction.ringDark });
+    g.circle(cx, cy, 14.6).fill(faction.disc);
+    return;
+  }
+  const points: number[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / 3;
+    points.push(cx + Math.cos(angle) * 18.5, cy + Math.sin(angle) * 18.5);
+  }
+  g.poly(points).fill(faction.ring).stroke({ width: 1, color: faction.ringDark });
+  const inner: number[] = [];
+  for (let i = 0; i < 6; i += 1) {
+    const angle = -Math.PI / 2 + (i * Math.PI) / 3;
+    inner.push(cx + Math.cos(angle) * 15.2, cy + Math.sin(angle) * 15.2);
+  }
+  g.poly(inner).fill(faction.disc);
+}
 
 /** Деревянная завала-укрытие: полубрус (1) или высокий сруб (2). */
 /** Смещение для граневых укрытий: N=0, E=1, S=2, W=3. */
@@ -487,7 +514,7 @@ function drawCover(
   // Целоклеточное укрытие.
   const px = cx;
   const py = cy;
-  g.ellipse(px, py + 11, 15, 4.5).fill({ color: 0x000000, alpha: 0.3 });
+  g.ellipse(px, py + 11, 15, 4.5).fill({ color: COLORS.overlay.shadow, alpha: 0.3 });
 
   if (coverType === 1) {
     const ly = py + 4;
@@ -540,7 +567,7 @@ function drawShieldIcon(
 
   const hw = shieldW / 2;
   const hh = shieldH / 2;
-  const color = coverType === 2 ? 0xe8b64c : 0x60c8ff;
+  const color = coverType === 2 ? COLORS.ui.amberBright : COLORS.ui.movementBright;
   const darkColor = coverType === 2 ? 0x8a6a24 : 0x3080b0;
 
   // Форма щита: верх — прямоугольник, низ — треугольник (заострение).
@@ -585,7 +612,7 @@ function drawShieldIcon(
 
 /** Могильная отметина павшего: камешки и череп. */
 function drawFallen(g: Graphics, cx: number, cy: number): void {
-  g.ellipse(cx, cy + 7, 12, 4).fill({ color: 0x000000, alpha: 0.3 });
+  g.ellipse(cx, cy + 7, 12, 4).fill({ color: COLORS.overlay.shadow, alpha: 0.3 });
   g.ellipse(cx - 5, cy + 5, 5, 3.2).fill(0x4a4d48);
   g.ellipse(cx + 5.5, cy + 6, 4, 2.6).fill(0x3c3f3a);
   g.ellipse(cx + 1, cy + 3, 3.4, 2.2).fill(0x555850);
@@ -623,9 +650,13 @@ export function createFieldRenderer(): FieldRenderer {
   const world = new Container();
   // Terrain is immutable for a generated map and remains outside dynamic overlays.
   const terrain = new Container();
+  // Туман не смешан с частицами: базовая пелена перестраивается только при
+  // смене видимости, а медленные пятна — отдельным слоем не чаще 15 Гц.
+  const fogBaseLayer = new Graphics();
+  const fogDriftLayer = new Graphics();
   const fxLayer = new Graphics();
   const debugLayer = new Container();
-  world.addChild(terrain, fxLayer, debugLayer);
+  world.addChild(terrain, fogBaseLayer, fogDriftLayer, fxLayer, debugLayer);
   world.eventMode = "static";
   world.hitArea = new Rectangle(-4000, -4000, 12000, 12000);
 
@@ -646,7 +677,10 @@ export function createFieldRenderer(): FieldRenderer {
 
   let playing = false;
   let holdDisplay = false;
+  let reducedMotion = false;
   let terrainSeed: number | null = null;
+  let fogSignature: string | null = null;
+  let lastFogDriftPaint = -Infinity;
   const jobs: Array<{ events: GameEvent[]; done: () => void }> = [];
 
   // Подводка камеры к цели обучающего указания (0.20.14): срабатывает при
@@ -785,7 +819,7 @@ export function createFieldRenderer(): FieldRenderer {
       if (dist > CELL_SIZE * 0.8) continue; // слишком далеко от луча
 
       // Найти точку пересечения с гранью укрытия.
-      const color = cover.coverType === 2 ? 0xe8b64c : 0x60c8ff;
+      const color = cover.coverType === 2 ? COLORS.ui.amberBright : COLORS.ui.movementBright;
       const markerSize = 4;
       // Рисуем ромб в точке проекции.
       g.moveTo(projX, projY - markerSize)
@@ -831,6 +865,19 @@ export function createFieldRenderer(): FieldRenderer {
     world.y = (h - bh * scale) / 2;
   };
 
+  /** Зум с якорем под курсором/между пальцами. */
+  const zoomAt = (screenX: number, screenY: number, factor: number): void => {
+    const next = zoomAroundPoint(
+      { x: screenX, y: screenY },
+      { scale: world.scale.x, offset: { x: world.x, y: world.y } },
+      factor,
+    );
+    world.scale.set(next.scale);
+    world.x = next.offset.x;
+    world.y = next.offset.y;
+    userMoved = true;
+  };
+
   /* ---------- статичный слой: рельеф ---------- */
 
   const drawTile = (tile: Tile): Graphics => {
@@ -850,10 +897,10 @@ export function createFieldRenderer(): FieldRenderer {
       g.rect(0, C, C, h).fill(mix(riser, 0x1a140c, 0.35));
       g.rect(0, C, C, 2).fill(shade(riser, 26));
       for (let i = 0; i < dropSouth; i += 1) {
-        g.rect(0, C + (i + 1) * RISE - 1.5, C, 1.5).fill({ color: 0x000000, alpha: 0.22 });
+        g.rect(0, C + (i + 1) * RISE - 1.5, C, 1.5).fill({ color: COLORS.overlay.shadow, alpha: 0.22 });
       }
-      g.rect(0, C, 3, h).fill({ color: 0x000000, alpha: 0.16 });
-      g.rect(C - 3, C, 3, h).fill({ color: 0x000000, alpha: 0.16 });
+      g.rect(0, C, 3, h).fill({ color: COLORS.overlay.shadow, alpha: 0.16 });
+      g.rect(C - 3, C, 3, h).fill({ color: COLORS.overlay.shadow, alpha: 0.16 });
       // Камни-выступы на откосе.
       const stones = 1 + Math.floor(hashCell(tile.x, tile.y, 5) * 2);
       for (let i = 0; i < stones; i += 1) {
@@ -871,9 +918,9 @@ export function createFieldRenderer(): FieldRenderer {
     if (!tile.pit && !tile.blockLOS) {
       // Мягкий перелив: светлее к северной кромке, темнее к южной.
       g.rect(0, 0, C, 8).fill({ color: 0xffffff, alpha: 0.05 });
-      g.rect(0, C - 9, C, 9).fill({ color: 0x000000, alpha: 0.08 });
+      g.rect(0, C - 9, C, 9).fill({ color: COLORS.overlay.shadow, alpha: 0.08 });
     }
-    g.rect(0, 0, C, C).stroke({ width: 1, color: 0x0c120c, alpha: 0.32 });
+    g.rect(0, 0, C, C).stroke({ width: 1, color: COLORS.terrain.outline, alpha: 0.32 });
 
     // Тени от более высоких соседей и световые канты над низкими — для всех четырёх сторон,
     // поэтому перепад высот читается и по горизонтали, и по вертикали.
@@ -894,21 +941,21 @@ export function createFieldRenderer(): FieldRenderer {
         for (let i = 0; i < steps; i += 1) {
           const frac = i / steps;
           const alpha = (0.3 - frac * 0.22) * Math.min(1, diff * 0.75);
-          if (side.edge === "n") g.rect(0, frac * width, C, width / steps).fill({ color: 0x081008, alpha });
-          if (side.edge === "s") g.rect(0, C - width + frac * width, C, width / steps).fill({ color: 0x081008, alpha });
-          if (side.edge === "e") g.rect(C - width + frac * width, 0, width / steps, C).fill({ color: 0x081008, alpha });
-          if (side.edge === "w") g.rect(frac * width, 0, width / steps, C).fill({ color: 0x081008, alpha });
+          if (side.edge === "n") g.rect(0, frac * width, C, width / steps).fill({ color: COLORS.terrain.shadow, alpha });
+          if (side.edge === "s") g.rect(0, C - width + frac * width, C, width / steps).fill({ color: COLORS.terrain.shadow, alpha });
+          if (side.edge === "e") g.rect(C - width + frac * width, 0, width / steps, C).fill({ color: COLORS.terrain.shadow, alpha });
+          if (side.edge === "w") g.rect(frac * width, 0, width / steps, C).fill({ color: COLORS.terrain.shadow, alpha });
         }
       } else if (diff < 0 && side.edge !== "s") {
         // Световой кант по кромке над обрывом (южную кромку подчёркивает откос).
         const strength = Math.min(0.4, 0.22 + -diff * 0.1);
-        if (side.edge === "n") g.rect(0, 0, C, 2).fill({ color: 0xe8f0d0, alpha: strength });
-        if (side.edge === "e") g.rect(C - 2, 0, 2, C).fill({ color: 0xe8f0d0, alpha: strength });
-        if (side.edge === "w") g.rect(0, 0, 2, C).fill({ color: 0xe8f0d0, alpha: strength });
+        if (side.edge === "n") g.rect(0, 0, C, 2).fill({ color: COLORS.terrain.edgeLight, alpha: strength });
+        if (side.edge === "e") g.rect(C - 2, 0, 2, C).fill({ color: COLORS.terrain.edgeLight, alpha: strength });
+        if (side.edge === "w") g.rect(0, 0, 2, C).fill({ color: COLORS.terrain.edgeLight, alpha: strength });
       }
     }
     if (dropSouth > 0 && !tile.pit) {
-      g.rect(0, C - 2, C, 2).fill({ color: 0xe8f0d0, alpha: 0.3 });
+      g.rect(0, C - 2, C, 2).fill({ color: COLORS.terrain.edgeLight, alpha: 0.3 });
     }
 
     // Яма: глубокий овал с краями-крошкой.
@@ -927,7 +974,7 @@ export function createFieldRenderer(): FieldRenderer {
 
     // Камень-глыба (блокирует обзор): валун с гранями.
     if (tile.blockLOS) {
-      g.ellipse(C / 2, C - 9, 16, 5).fill({ color: 0x000000, alpha: 0.28 });
+      g.ellipse(C / 2, C - 9, 16, 5).fill({ color: COLORS.overlay.shadow, alpha: 0.28 });
       g.poly([6, C - 12, 10, 16, 24, 8, 38, 10, 46, 18, 44, C - 10, 26, C - 6, 12, C - 8]).fill(0x7a6a56);
       g.poly([10, 16, 24, 8, 38, 10, 34, 22, 16, 24]).fill(0x94836b);
       g.poly([12, C - 8, 26, C - 6, 44, C - 10, 40, C - 16, 18, C - 14]).fill(0x584a3a);
@@ -985,6 +1032,84 @@ export function createFieldRenderer(): FieldRenderer {
     terrainSeed = view.matchSeed;
   };
 
+  const fogSignatureOf = (next: FieldView): string | null => {
+    if (!next.visibleCells) return null;
+    const visible = [...next.visibleCells].sort().join("|");
+    const explored = [...(next.exploredCells ?? [])].sort().join("|");
+    return `${next.matchSeed}:${visible}::${explored}`;
+  };
+
+  /** Неподвижная часть тумана: полное скрытие и затемнение разведанных клеток. */
+  const paintFogBase = (): void => {
+    fogBaseLayer.clear();
+    fogDriftLayer.clear();
+    lastFogDriftPaint = -Infinity;
+    if (!view?.visibleCells) {
+      fogBaseLayer.visible = false;
+      fogDriftLayer.visible = false;
+      return;
+    }
+    fogBaseLayer.visible = true;
+    fogDriftLayer.visible = true;
+    for (const tile of view.snapshot.grid.tiles) {
+      const key = `${tile.x},${tile.y}`;
+      const isVisible = view.visibleCells.has(key);
+      const isExplored = view.exploredCells?.has(key) ?? false;
+      if (isVisible) continue;
+      const z = visualLevel(tile);
+      const { fx, fy } = faceOf(tile.x, tile.y, z);
+      if (!isExplored) {
+        fogBaseLayer.rect(fx, fy, CELL_SIZE, CELL_SIZE).fill(COLORS.overlay.fogHidden);
+      } else {
+        fogBaseLayer.rect(fx, fy, CELL_SIZE, CELL_SIZE).fill({ color: COLORS.overlay.fogExplored, alpha: 0.6 });
+      }
+    }
+  };
+
+  /** Анимированная часть тумана. Перерисовывается отдельно и не чаще 15 Гц. */
+  const paintFogDrift = (now: number): void => {
+    fogDriftLayer.clear();
+    if (!view?.visibleCells || reducedMotion) return;
+    const slowT = now * 0.0003;
+    for (const tile of view.snapshot.grid.tiles) {
+      const key = `${tile.x},${tile.y}`;
+      if (view.visibleCells.has(key) || !(view.exploredCells?.has(key) ?? false)) continue;
+      const z = visualLevel(tile);
+      const { fx, fy } = faceOf(tile.x, tile.y, z);
+      for (let i = 0; i < 3; i += 1) {
+        const h1 = hashCell(tile.x + i * 17, tile.y - i * 11, 73 + i);
+        const h2 = hashCell(tile.x - i * 13, tile.y + i * 19, 89 + i);
+        const phase = slowT + h1 * Math.PI * 2;
+        const drift = Math.sin(phase) * 4;
+        const driftY = Math.cos(phase * 0.7 + i) * 3;
+        const cx = fx + h1 * CELL_SIZE + drift;
+        const cy = fy + h2 * CELL_SIZE + driftY;
+        const radius = 10 + h1 * 16;
+        const alpha = 0.05 + 0.03 * Math.sin(phase * 1.3 + i * 2.1);
+        fogDriftLayer.circle(cx, cy, radius).fill({ color: COLORS.overlay.fogMist, alpha });
+      }
+    }
+  };
+
+  const paintFog = (next: FieldView): void => {
+    const signature = fogSignatureOf(next);
+    if (signature !== fogSignature) {
+      fogSignature = signature;
+      paintFogBase();
+    }
+    const now = performance.now();
+    if (now - lastFogDriftPaint >= 1000 / 15) {
+      paintFogDrift(now);
+      lastFogDriftPaint = now;
+    }
+  };
+
+  const paintFogDriftIfDue = (now: number): void => {
+    if (!view?.visibleCells || reducedMotion || now - lastFogDriftPaint < 1000 / 15) return;
+    paintFogDrift(now);
+    lastFogDriftPaint = now;
+  };
+
   const paintDebug = (): void => {
     debugLayer.removeChildren().forEach((child) => child.destroy());
     if (!view?.debugMovement) return;
@@ -998,7 +1123,7 @@ export function createFieldRenderer(): FieldRenderer {
           fontFamily: "monospace",
           fontSize: 9,
           fill: 0xaaaaaa,
-          stroke: { color: 0x000000, width: 2 },
+          stroke: { color: COLORS.overlay.shadow, width: 2 },
         },
       });
       coordLabel.position.set(fx + 2, fy + 1);
@@ -1013,8 +1138,8 @@ export function createFieldRenderer(): FieldRenderer {
             fontFamily: "monospace",
             fontSize: 12,
             fontWeight: "700",
-            fill: 0xf3ecdc,
-            stroke: { color: 0x0c120c, width: 3 },
+            fill: COLORS.ui.white,
+            stroke: { color: COLORS.terrain.outline, width: 3 },
           },
         });
         mpLabel.anchor.set(1, 1);
@@ -1032,9 +1157,20 @@ export function createFieldRenderer(): FieldRenderer {
     const shown = display.get(entity.id);
     const deadNow = shown?.dead ?? entity.dead;
     if (deadNow) return;
-    const { cx, cy } = entityPixel(entity);
+    const ground = entityPixel(entity);
+    const selected = entity.id === view?.selectedId;
+    // Небольшое «дыхание» живых фишек. Фаза вычисляется из id сущности,
+    // поэтому декор стабилен и не вмешивается в воспроизводимость партии.
+    const now = performance.now();
+    const breath = !reducedMotion && !playing
+      ? Math.sin(now * (Math.PI * 2 / 2000) + hashCell(entity.id, 0, 101) * Math.PI * 2) * 1.35
+      : 0;
+    const cx = ground.cx;
+    const cy = ground.cy - (selected ? 3 : 0) + breath;
     const dieStart = dying.get(entity.id);
-    const fade = dieStart === undefined ? 1 : Math.max(0.25, 1 - ((performance.now() - dieStart) / 430) * 0.75);
+    const fade = dieStart === undefined || reducedMotion
+      ? 1
+      : Math.max(0.25, 1 - ((now - dieStart) / 430) * 0.75);
 
     if (entity.coverType > 0) {
       drawCover(g, cx, cy, entity.coverType as 1 | 2, entity.edge);
@@ -1061,32 +1197,35 @@ export function createFieldRenderer(): FieldRenderer {
         cy + forwardY * depth - sideY * width,
         cx + forwardX * depth + sideX * width,
         cy + forwardY * depth + sideY * width,
-      ]).fill({ color: 0xe8b64c, alpha: 0.08 });
+      ]).fill({ color: COLORS.ui.amberBright, alpha: 0.08 });
     }
 
-    g.ellipse(cx, cy + 15, 15, 5).fill({ color: 0x000000, alpha: 0.32 * fade });
-    g.circle(cx, cy, 17.5).fill(faction.ring);
-    g.circle(cx, cy, 17.5).stroke({ width: 1, color: faction.ringDark });
-    g.circle(cx, cy, 14.6).fill(faction.disc);
+    // Чем выше ярус, тем длиннее и светлее тень. Выбранная фишка чуть
+    // приподнята, поэтому её тень становится заметнее и отделяет её от поля.
+    const shadowWidth = 15 + Math.min(2, Math.max(0, entity.z)) * 3 + (selected ? 2 : 0);
+    const shadowY = ground.cy + 15 + Math.min(2, Math.max(0, entity.z)) * 3 + (selected ? 2 : 0);
+    const shadowAlpha = Math.max(0.12, 0.32 - Math.min(2, Math.max(0, entity.z)) * 0.07) * fade + (selected ? 0.08 : 0);
+    g.ellipse(ground.cx, shadowY, shadowWidth, 5).fill({ color: COLORS.overlay.shadow, alpha: shadowAlpha });
+    drawTokenBase(g, cx, cy, faction, entity.owner === 2);
 
     const art = CLASS_ART[entity.configId];
     if (art) art({ g, cx, cy });
     else g.circle(cx, cy, 10).fill(FALLBACK_ART[entity.owner === 2 ? "nav" : "druzhina"]);
 
-    const statusTime = performance.now() * 0.004;
+    const statusTime = (reducedMotion ? 0 : now) * 0.004;
     if (entity.poison) {
       for (let i = 0; i < 4; i += 1) {
         const angle = statusTime + (i * Math.PI * 2) / 4;
         const radius = 20 + Math.sin(statusTime * 1.7 + i) * 2;
         g.circle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius - 2, 2.2 + (i % 2) * 0.7)
-          .fill({ color: 0x78d83d, alpha: 0.8 });
+          .fill({ color: COLORS.status.poison, alpha: 0.8 });
         g.circle(cx + Math.cos(angle) * radius - 0.6, cy + Math.sin(angle) * radius - 2.8, 0.7)
           .fill({ color: 0xd7ff8a, alpha: 0.9 });
       }
     }
     if (entity.panic) {
       const pulse = 0.55 + Math.sin(statusTime * 2.4) * 0.25;
-      g.circle(cx, cy, 22 + pulse * 3).stroke({ width: 2, color: 0xb94cff, alpha: pulse });
+      g.circle(cx, cy, 22 + pulse * 3).stroke({ width: 2, color: COLORS.status.panic, alpha: pulse });
       g.poly([cx - 2, cy - 27, cx + 2, cy - 27, cx + 1, cy - 18, cx - 1, cy - 18]).fill(0xff5e7a);
       g.circle(cx, cy - 14.5, 1.8).fill(0xff5e7a);
     }
@@ -1097,24 +1236,24 @@ export function createFieldRenderer(): FieldRenderer {
         const y0 = cy + Math.sin(angle) * 8 + 9;
         g.moveTo(x0, y0)
           .quadraticCurveTo(cx + Math.cos(angle + 0.5) * 19, cy + 14, cx + Math.cos(angle) * 24, cy + 12)
-          .stroke({ width: 2, color: 0x6f8f3d, alpha: 0.9 });
+          .stroke({ width: 2, color: COLORS.status.immobile, alpha: 0.9 });
       }
     }
     if (entity.hidden) {
-      g.circle(cx, cy, 24).stroke({ width: 1.5, color: 0x8fd3bc, alpha: 0.5 + Math.sin(statusTime) * 0.2 });
+      g.circle(cx, cy, 24).stroke({ width: 1.5, color: COLORS.status.hidden, alpha: 0.5 + Math.sin(statusTime) * 0.2 });
     }
     if (entity.flying) {
       const wing = 7 + Math.sin(statusTime * 2) * 3;
       g.moveTo(cx - 13, cy - 2).quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2)
-        .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+        .stroke({ width: 2, color: COLORS.status.flying, alpha: 0.8 });
       g.moveTo(cx + 13, cy - 2).quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2)
-        .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+        .stroke({ width: 2, color: COLORS.status.flying, alpha: 0.8 });
     }
     if (entity.timedLife !== undefined) {
       const dots = Math.max(1, Math.min(6, entity.timedLife));
       for (let i = 0; i < dots; i += 1) {
         const angle = -Math.PI / 2 + (i / Math.max(1, dots)) * Math.PI * 2;
-        g.circle(cx + Math.cos(angle) * 22, cy + Math.sin(angle) * 22, 1.8).fill(0x5fd6e8);
+        g.circle(cx + Math.cos(angle) * 22, cy + Math.sin(angle) * 22, 1.8).fill(COLORS.status.timed);
       }
     }
     if (entity.camouflageMinCover && view?.snapshot.entities.some((other) =>
@@ -1129,7 +1268,7 @@ export function createFieldRenderer(): FieldRenderer {
 
     if (fade < 1) {
       // Угасание павшего: фигура темнеет к моменту смены на могильную отметину.
-      g.circle(cx, cy, 17.5).fill({ color: 0x101410, alpha: (1 - fade) * 0.85 });
+      g.circle(cx, cy, 17.5).fill({ color: COLORS.ui.fieldBackground, alpha: (1 - fade) * 0.85 });
     }
 
     // Клин взгляда по направлению (0 — север, далее по часовой).
@@ -1144,15 +1283,24 @@ export function createFieldRenderer(): FieldRenderer {
     ]).fill(faction.ring);
 
     if (entity.id === view?.selectedId) {
-      g.circle(cx, cy, 22).stroke({ width: 2.6, color: 0xe8b64c });
-      g.circle(cx, cy, 25.2).stroke({ width: 1, color: 0xe8b64c, alpha: 0.5 });
+      g.circle(cx, cy, 22).stroke({ width: 2.6, color: COLORS.ui.amberBright });
+      g.circle(cx, cy, 25.2).stroke({ width: 1, color: COLORS.ui.amberBright, alpha: 0.5 });
     }
     if (entity.id === view?.aimId) {
-      g.circle(cx, cy, 22).stroke({ width: 2.4, color: 0xaed581 });
+      const aimStatus = view?.aimStatus ?? (view?.aimOk ? "ready" : "selected");
+      const aimColor = aimStatus === "ready"
+        ? COLORS.targeting.ready
+        : aimStatus === "blocked"
+          ? COLORS.targeting.blocked
+          : COLORS.targeting.selected;
+      // Белый — предварительный выбор, янтарный — подтверждаемая атака,
+      // красный — цель сейчас недоступна. Цвет не смешивается с кольцом Нави.
+      g.circle(cx, cy, 22).stroke({ width: 2.8, color: aimColor });
+      g.circle(cx, cy, 25.2).stroke({ width: 1, color: aimColor, alpha: 0.42 });
     }
 
     if (flash > 0) {
-      g.circle(cx, cy, 20 + (1 - flash) * 6).stroke({ width: 2.6, color: 0xf3ecdc, alpha: flash });
+      g.circle(cx, cy, 20 + (1 - flash) * 6).stroke({ width: 2.6, color: COLORS.ui.white, alpha: flash });
     }
 
     const hp = shown?.hp ?? entity.hp;
@@ -1167,7 +1315,7 @@ export function createFieldRenderer(): FieldRenderer {
     for (let i = 0; i < entity.maxAp; i += 1) {
       const px0 = cx - ((entity.maxAp - 1) * 8) / 2 + i * 8;
       g.poly([px0, cy + 21.5, px0 + 2.9, cy + 24.4, px0, cy + 27.3, px0 - 2.9, cy + 24.4]).fill(
-        i < pips ? 0xe8b64c : 0x3a382e,
+        i < pips ? COLORS.ui.amberBright : 0x3a382e,
       );
     }
 
@@ -1175,20 +1323,20 @@ export function createFieldRenderer(): FieldRenderer {
     if (entity.defending) {
       const sx = cx + 16;
       const sy = cy - 18;
-      g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
+      g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(COLORS.ui.movement);
       g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
-      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
-      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
+      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: COLORS.ui.white });
+      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: COLORS.ui.white });
     }
 
     // Дозор: глаз-индикатор.
     if (entity.overwatch) {
       const ox = cx - 16;
       const oy = cy - 18;
-      g.circle(ox, oy, 5.5).fill({ color: 0xe8b64c, alpha: 0.9 });
+      g.circle(ox, oy, 5.5).fill({ color: COLORS.ui.amberBright, alpha: 0.9 });
       g.circle(ox, oy, 5.5).stroke({ width: 1, color: 0x57431a });
       g.circle(ox, oy, 2.2).fill(0x1c1a20);
-      g.circle(ox + 0.8, oy - 0.8, 0.7).fill(0xf3ecdc);
+      g.circle(ox + 0.8, oy - 0.8, 0.7).fill(COLORS.ui.white);
     }
   };
 
@@ -1233,7 +1381,7 @@ export function createFieldRenderer(): FieldRenderer {
           g.circle(fx.x, fx.y, 8 + t * 16).stroke({ width: 2, color: 0xb9b4a4, alpha: 0.65 * (1 - t) });
           continue;
         }
-        const color = fx.crit ? 0xffd268 : 0xf3ecdc;
+        const color = fx.crit ? 0xffd268 : COLORS.ui.white;
         g.circle(fx.x, fx.y, 5 + t * (fx.crit ? 26 : 18)).stroke({ width: 2.6, color, alpha: 0.85 * (1 - t) });
         if (fx.crit) {
           g.circle(fx.x, fx.y, 3 + t * 14).stroke({ width: 1.4, color: 0xff9e4a, alpha: 0.8 * (1 - t) });
@@ -1257,18 +1405,18 @@ export function createFieldRenderer(): FieldRenderer {
           heal: [0x74e071, 0xd8ffd0],
           cleanse: [0x55ddea, 0xe5ffff],
           summon_forest_beast: [0x73b64b, 0xd8ef8a],
-          aimed_eye: [0xe8b64c, 0xfff0a0],
+          aimed_eye: [COLORS.ui.amberBright, 0xfff0a0],
           roots: [0x769845, 0x49351f],
           poison_needles: [0x83d632, 0xd6ff62],
           raise_skeleton: [0x66b849, 0xd9d5b5],
           panic: [0xa648e8, 0xff5e7a],
           create_illusion: [0x55d5e8, 0xc4f8ff],
           teleport_ally: [0x5398ff, 0x9ee9ff],
-          circular_sweep: [0xe8b64c, 0xffe8a0],
+          circular_sweep: [COLORS.ui.amberBright, 0xffe8a0],
           breach: [0xd47b39, 0xf1d19a],
           shield_bash: [0x78aee8, 0xe8f5ff],
         };
-        let [primary, secondary] = palette[fx.style] ?? [0x9ad27a, 0xf3ecdc];
+        let [primary, secondary] = palette[fx.style] ?? [0x9ad27a, COLORS.ui.white];
         if (!fx.success) [primary, secondary] = [0x6f7470, 0xb0b4ae];
         const px = fx.x0 + (fx.x1 - fx.x0) * easeOut(Math.min(1, t * 1.35));
         const py = fx.y0 + (fx.y1 - fx.y0) * easeOut(Math.min(1, t * 1.35));
@@ -1315,10 +1463,10 @@ export function createFieldRenderer(): FieldRenderer {
           continue;
         }
         const colors: Record<string, number> = {
-          POISON: 0x78d83d, PANIC: 0xb94cff, IMMOBILE: 0x709343, HIDDEN: 0x78c9b2,
-          FLYING: 0x9edfff, TIMED: 0x5fd6e8, DEFENDING: 0x68aee8, OVERWATCH: 0xe8b64c,
+          POISON: COLORS.status.poison, PANIC: COLORS.status.panic, IMMOBILE: 0x709343, HIDDEN: 0x78c9b2,
+          FLYING: 0x9edfff, TIMED: COLORS.status.timed, DEFENDING: COLORS.status.defending, OVERWATCH: COLORS.ui.amberBright,
         };
-        const color = colors[fx.status] ?? 0xf3ecdc;
+        const color = colors[fx.status] ?? COLORS.ui.white;
         const radius = 12 + t * 20;
         g.circle(fx.x, fx.y, radius).stroke({ width: fx.applied ? 2.5 : 1.5, color, alpha: 1 - t });
         for (let p = 0; p < 8; p += 1) {
@@ -1360,13 +1508,15 @@ export function createFieldRenderer(): FieldRenderer {
     const g = fxLayer;
     g.clear();
     const now = performance.now();
+    const motionNow = reducedMotion ? 0 : now;
+    if (reducedMotion) fxs.length = 0;
 
     // Movement and route previews are dynamic UI, not part of cached terrain.
     for (const cell of view.reachable) {
       const tile = tileAt(view.snapshot.grid, cell.x, cell.y);
       if (!tile) continue;
       const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
-      const tint = cell.apCost === 1 ? 0x388cdc : 0xe0b34a;
+      const tint = cell.apCost === 1 ? COLORS.ui.movement : COLORS.ui.amber;
       g.rect(fx + 1, fy + 1, CELL_SIZE - 2, CELL_SIZE - 2).fill({ color: tint, alpha: 0.32 });
       g.rect(fx + 2.5, fy + 2.5, CELL_SIZE - 5, CELL_SIZE - 5).stroke({ width: 1.8, color: tint, alpha: 0.9 });
     }
@@ -1380,7 +1530,7 @@ export function createFieldRenderer(): FieldRenderer {
 
     // Зона эвакуации: пульсирующее свечение у края поля (0.13.0).
     // Рисуется под туманом войны: разведанные клетки зоны читаются как «выход».
-    const extractPulse = 0.5 + Math.sin(now * 0.0022) * 0.25;
+    const extractPulse = 0.5 + Math.sin(motionNow * 0.0022) * 0.25;
     for (const tile of view.snapshot.grid.tiles) {
       if (!tile.extract) continue;
       const z = visualLevel(tile);
@@ -1401,8 +1551,8 @@ export function createFieldRenderer(): FieldRenderer {
       if (tile.homeOwner === undefined) continue;
       const z = visualLevel(tile);
       const { fx, fy } = faceOf(tile.x, tile.y, z);
-      const color = tile.homeOwner === 1 ? 0xe0b34a : 0x6aa9d9;
-      const pulse = 0.5 + Math.sin(now * 0.0028 + tile.homeOwner) * 0.25;
+      const color = tile.homeOwner === 1 ? COLORS.ui.amber : 0x6aa9d9;
+      const pulse = 0.5 + Math.sin(motionNow * 0.0028 + tile.homeOwner) * 0.25;
       g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({
         width: 1.6,
         color,
@@ -1424,11 +1574,11 @@ export function createFieldRenderer(): FieldRenderer {
         const { fx, fy } = faceOf(tile.x, tile.y, z);
         const cx = fx + CELL_SIZE / 2;
         const cy = fy + CELL_SIZE / 2 + 4;
-        const pulse = 0.5 + Math.sin(now * 0.003) * 0.25;
+        const pulse = 0.5 + Math.sin(motionNow * 0.003) * 0.25;
         // Свечение.
         g.circle(cx, cy, 10 + pulse * 3).fill({ color: 0xe06a4a, alpha: 0.18 + pulse * 0.1 });
         // Тень.
-        g.ellipse(cx, cy + 7, 5, 2).fill({ color: 0x000000, alpha: 0.35 });
+        g.ellipse(cx, cy + 7, 5, 2).fill({ color: COLORS.overlay.shadow, alpha: 0.35 });
         // Яблоко.
         g.circle(cx, cy, 5.5 + pulse * 0.5).fill(0xd94a3a).stroke({ width: 1, color: 0x8a2a1e });
         // Блик.
@@ -1439,47 +1589,13 @@ export function createFieldRenderer(): FieldRenderer {
       }
     }
 
-    // Туман войны: анимированный оверлей поверх рельефа.
-    if (view.visibleCells) {
-      const C = CELL_SIZE;
-      const slowT = now * 0.0003; // медленная анимация
-      for (const tile of view.snapshot.grid.tiles) {
-        const key = `${tile.x},${tile.y}`;
-        const isVisible = view.visibleCells.has(key);
-        const isExplored = view.exploredCells?.has(key) ?? false;
-        const z = visualLevel(tile);
-        const { fx, fy } = faceOf(tile.x, tile.y, z);
-
-        if (!isVisible && !isExplored) {
-          // Неразведанная клетка: полностью скрыта.
-          g.rect(fx, fy, C, C).fill({ color: 0x080a0c, alpha: 1.0 });
-        } else if (!isVisible && isExplored) {
-          // Ранее виденная: затемнение + анимированный туман.
-          g.rect(fx, fy, C, C).fill({ color: 0x0c1218, alpha: 0.6 });
-          const fogSeed = tile.x * 7919 + tile.y * 6271;
-          for (let i = 0; i < 3; i += 1) {
-            const h1 = ((fogSeed * (i + 1) * 2654435761) >>> 0) / 4294967296;
-            const h2 = (((fogSeed + 31) * (i + 7) * 2246822519) >>> 0) / 4294967296;
-            const phase = slowT + h1 * 6.28;
-            const drift = Math.sin(phase) * 4;
-            const driftY = Math.cos(phase * 0.7 + i) * 3;
-            const cx = fx + h1 * C + drift;
-            const cy = fy + h2 * C + driftY;
-            const fr = 10 + h1 * 16;
-            const alpha = 0.05 + 0.03 * Math.sin(phase * 1.3 + i * 2.1);
-            g.circle(cx, cy, fr).fill({ color: 0x8a9aaa, alpha });
-          }
-        }
-      }
-    }
-
     // Линия прицеливания: всегда прямая от A к Ц, меняет стиль в точке препятствия.
     const selected = view.snapshot.entities.find((entity) => entity.id === view?.selectedId);
     const aimed = view.snapshot.entities.find((entity) => entity.id === view?.aimId);
     if (selected && aimed && !selected.dead && !aimed.dead) {
       const a = entityPixel(selected);
       const b = entityPixel(aimed);
-      const color = view.aimOk ? 0xe8b64c : 0xc45c5c;
+      const color = view.aimOk ? COLORS.ui.amberBright : COLORS.ui.danger;
 
       // Вычислить точку разрыва на прямой A→Ц.
       let breakRatio = 1; // 1 = нет разрыва
@@ -1587,7 +1703,7 @@ export function createFieldRenderer(): FieldRenderer {
 
     // Подсветка обучающего указания (0.19.0; строгий сценарий 0.20.13):
     // поле приглушается «прожектором», а цель указания — единственный яркий
-    // элемент. Прежде золотистая рамка (0xe0b34a) была почти неотличима на
+    // элемент. Прежде золотистая рамка (COLORS.ui.amber) была почти неотличима на
     // жёлтой подсветке клеток рывка — теперь ледяной голубо-белый маркер
     // контрастен и янтарным, и синим клеткам достижимости.
     if (view.trainingFocus || view.trainingHighlight) {
@@ -1625,7 +1741,7 @@ export function createFieldRenderer(): FieldRenderer {
         g.rect(inside.x1, inside.y0, outside.x1 - inside.x1, inside.y1 - inside.y0).fill({ color: dimColor, alpha });
       };
       if (view.trainingFocus) {
-        const pulseDim = 0.5 + Math.sin(now * 0.0021) * 0.04;
+        const pulseDim = 0.5 + Math.sin(motionNow * 0.0021) * 0.04;
         if (cellRect) {
           const clamp = (r: { x0: number; y0: number; x1: number; y1: number }) => ({
             x0: Math.max(r.x0, outer.x0),
@@ -1638,17 +1754,19 @@ export function createFieldRenderer(): FieldRenderer {
           const hole2 = clamp({ x0: cellRect.fx - m2, y0: cellRect.fy - m2, x1: cellRect.fx + CELL_SIZE + m2, y1: cellRect.fy + CELL_SIZE + m2 });
           const hole1 = clamp({ x0: cellRect.fx - m1, y0: cellRect.fy - m1, x1: cellRect.fx + CELL_SIZE + m1, y1: cellRect.fy + CELL_SIZE + m1 });
           const hole = clamp({ x0: cellRect.fx - 2, y0: cellRect.fy - 2, x1: cellRect.fx + CELL_SIZE + 2, y1: cellRect.fy + CELL_SIZE + 2 });
-          frameRects(outer, hole2, 0.5 * pulseDim + 0.14);
-          frameRects(hole2, hole1, 0.28 * pulseDim + 0.06);
-          frameRects(hole1, hole, 0.12 * pulseDim);
+          // Около трети непрозрачности: поле сохраняет контекст, а цель
+          // всё ещё доминирует без прежней тяжёлой пелены.
+          frameRects(outer, hole2, 0.34 * pulseDim + 0.12);
+          frameRects(hole2, hole1, 0.16 * pulseDim + 0.04);
+          frameRects(hole1, hole, 0.08 * pulseDim);
         } else {
-          frameRects(outer, { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 }, 0.38 * pulseDim + 0.06);
+          frameRects(outer, { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 }, 0.24 * pulseDim + 0.08);
         }
       }
 
       // Яркий маркер цели указания: рамка со свечением, уголки и маяк.
       if (highlight && cellRect && tile) {
-        const pulse = 0.5 + Math.sin(now * 0.005) * 0.5;
+        const pulse = 0.5 + Math.sin(motionNow * 0.005) * 0.5;
         const fx = cellRect.fx;
         const fy = cellRect.fy;
         const C = CELL_SIZE;
@@ -1671,7 +1789,7 @@ export function createFieldRenderer(): FieldRenderer {
         corner(fx + inset, fy + C - inset, 1, -1);
         corner(fx + C - inset, fy + C - inset, -1, -1);
         // Маяк над клеткой: покачивающийся треугольник «сюда».
-        const bob = Math.sin(now * 0.006) * 3;
+        const bob = Math.sin(motionNow * 0.006) * 3;
         const bx = fx + C / 2;
         const by = fy - 12 - bob;
         g.poly([bx, by + 8, bx - 6, by - 2, bx + 6, by - 2]).fill({ color: 0xf4feff, alpha: 0.65 + pulse * 0.35 });
@@ -1690,7 +1808,7 @@ export function createFieldRenderer(): FieldRenderer {
       drawAimIntersections(g, view);
     }
 
-    drawFxList(g, now);
+    if (!reducedMotion) drawFxList(g, now);
   };
 
   const paint = (): void => {
@@ -1699,13 +1817,20 @@ export function createFieldRenderer(): FieldRenderer {
 
   /* ---------- хореография событий ---------- */
 
-  const wait = (ms: number): Promise<void> =>
-    new Promise((resolve) => {
+  const wait = (ms: number): Promise<void> => {
+    if (reducedMotion || ms <= 0) return Promise.resolve();
+    return new Promise((resolve) => {
       window.setTimeout(resolve, ms);
     });
+  };
 
   const tween = (ms: number, step: (t: number) => void): Promise<void> =>
     new Promise((resolve) => {
+      if (reducedMotion || ms <= 0) {
+        step(1);
+        resolve();
+        return;
+      }
       const started = performance.now();
       const frame = (): void => {
         if (destroyed) {
@@ -1814,14 +1939,15 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   const shake = async (strength: number): Promise<void> => {
+    if (reducedMotion) return;
     const ox = world.x;
     const oy = world.y;
     await tween(150, (t) => {
       const amp = (1 - t) * strength;
-      // Локальный шум тряски камеры: визуальный эффект не использует
-      // стандартный генератор среды и не влияет на тактическое состояние.
-      world.x = ox + (shakeNoise() * 2 - 1) * amp;
-      world.y = oy + (shakeNoise() * 2 - 1) * amp;
+      // Периодический профиль тряски детерминирован временем анимации:
+      // источник случайности партии и системный генератор не используются.
+      world.x = ox + Math.sin(t * Math.PI * 12) * amp;
+      world.y = oy + Math.cos(t * Math.PI * 10 + 0.7) * amp;
     });
     world.x = ox;
     world.y = oy;
@@ -2089,9 +2215,9 @@ export function createFieldRenderer(): FieldRenderer {
       const b = pts[1];
       if (!a || !b) return;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      world.scale.set(Math.min(1.8, Math.max(0.55, world.scale.x * (dist / pinch))));
+      const midpoint = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      zoomAt(midpoint.x, midpoint.y, dist / pinch);
       pinch = dist;
-      userMoved = true;
       return;
     }
     if (!drag) {
@@ -2134,9 +2260,11 @@ export function createFieldRenderer(): FieldRenderer {
 
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
-    world.x -= event.deltaX;
-    world.y -= event.deltaY;
-    userMoved = true;
+    // Колесо масштабирует вокруг курсора: точка поля под указателем не
+    // «убегает» в сторону. Диапазон оставлен прежним (pinch: 0.55–1.8).
+    if (event.deltaY === 0) return;
+    const factor = Math.pow(1.0018, -event.deltaY);
+    zoomAt(event.offsetX, event.offsetY, factor);
   };
 
   const onContext = (event: Event): void => {
@@ -2153,9 +2281,11 @@ export function createFieldRenderer(): FieldRenderer {
 
   const animLoop = (): void => {
     if (destroyed) return;
-    if (!playing && view?.visibleCells) {
-      paintFx();
-    }
+    const now = performance.now();
+    // Туман имеет собственный редкий ритм, независимый от частоты кадров
+    // основной сцены; эффекты и фишки по-прежнему рисуются на каждом кадре.
+    paintFogDriftIfDue(now);
+    if (!playing) paintFx();
     driveTrainingFocus();
     animFrame = requestAnimationFrame(animLoop);
   };
@@ -2164,7 +2294,7 @@ export function createFieldRenderer(): FieldRenderer {
     async mount(element) {
       if (destroyed) return;
       const common = {
-        background: 0x101410,
+        background: COLORS.ui.fieldBackground,
         antialias: true,
         resolution: Math.min(window.devicePixelRatio || 1, 2),
         autoDensity: true,
@@ -2200,11 +2330,13 @@ export function createFieldRenderer(): FieldRenderer {
       mounted = true;
       fit();
       paintStatic();
+      if (view) paintFog(view);
       paintFx();
       animFrame = requestAnimationFrame(animLoop);
     },
     update(next) {
       view = next;
+      reducedMotion = Boolean(next.reducedMotion);
       // Подводка камеры (0.20.14): новая цель указания планируется здесь;
       // исполняется в простое между анимациями событий (driveTrainingFocus).
       armTrainingFocus(next);
@@ -2226,6 +2358,7 @@ export function createFieldRenderer(): FieldRenderer {
       // The map seed changes only when a battlefield is generated. State updates
       // redraw overlays/tokens, never the cached terrain graphics.
       if (terrainSeed !== next.matchSeed) paintStatic();
+      paintFog(next);
       paintDebug();
       fit();
       paint();
@@ -2240,6 +2373,21 @@ export function createFieldRenderer(): FieldRenderer {
     pan(dx, dy) {
       world.x += dx;
       world.y += dy;
+      userMoved = true;
+    },
+    centerOn(x, y, z) {
+      if (!mounted || !view) return;
+      const point = centerOf(x, y, z);
+      const screen = { width: app.renderer.width, height: app.renderer.height };
+      const map = mapPlane();
+      const next = centerCameraOn(
+        { x: point.cx, y: point.cy },
+        { scale: world.scale.x, offset: { x: world.x, y: world.y } },
+        screen,
+        map,
+      );
+      world.x = next.offset.x;
+      world.y = next.offset.y;
       userMoved = true;
     },
     destroy() {

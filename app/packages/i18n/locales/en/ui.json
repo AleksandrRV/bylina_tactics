@@ -247,6 +247,8 @@
     "sfxVolume": "Actions",
     "showHints": "Show hints",
     "showHintsHint": "First-time tutorials in the campaign. Turning them off does not block progress.",
+    "autoEndTurn": "Auto-end turn",
+    "autoEndTurnHint": "Pass to the Nav when all living fighters have spent their AP.",
     "debugMode": "Debug mode",
     "debugModeHint": "Inspection tools (movement-cost overlay, auto-win) in battle. For developers and QA.",
     "back": "Back to menu"

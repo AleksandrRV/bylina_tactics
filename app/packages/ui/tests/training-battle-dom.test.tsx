@@ -26,6 +26,7 @@ const rendererStub: FieldRenderer = {
   }),
   play: vi.fn(async () => undefined),
   pan: vi.fn(),
+  centerOn: vi.fn(),
   destroy: vi.fn(),
   setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
     activate = handler;
