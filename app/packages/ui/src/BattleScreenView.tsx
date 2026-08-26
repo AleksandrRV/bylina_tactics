@@ -62,6 +62,20 @@ function unitNameKey(configId: string): string {
   return `unit.${configId}.name`;
 }
 
+/**
+ * Этап 1.5: у всех живых бойцов стороны игрока исчерпаны очки действия —
+ * кнопка «Завершить ход» подсвечивается янтарной заливкой.
+ */
+function allOwnApSpent(entities: readonly EntityState[], owner: number): boolean {
+  let fighters = 0;
+  for (const entity of entities) {
+    if (entity.dead || entity.coverType !== 0 || entity.owner !== owner || entity.maxAp === 0) continue;
+    fighters += 1;
+    if (entity.ap > 0) return false;
+  }
+  return fighters > 0;
+}
+
 /** Иконка автопобеды: молния как знак мгновенного разрешения. */
 function AutoWinIcon() {
   return (
@@ -629,6 +643,7 @@ export function BattleScreenView() {
       cover: result.cover,
       heightMod: result.heightMod,
       flanked: result.flanked,
+      areaCells: result.areaCells,
     };
   }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
 
@@ -964,7 +979,9 @@ export function BattleScreenView() {
   // В обучении автозавершение отключается на шаге «завершите ход» — этот
   // шаг учит нажимать кнопку. Повторы и наблюдатель ход не завершают.
   // Условие — чистая функция (training-progress.ts), покрыта тестами.
+  // Этап 1.5: вне обучения автозавершение включается настройкой игры.
   useEffect(() => {
+    if (!isTraining && !hintSettings.autoEndTurn) return;
     const ownUnits = snapshot.entities.filter(
       (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
     );
@@ -984,7 +1001,7 @@ export function BattleScreenView() {
     })) return;
     endTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint]);
+  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint, hintSettings.autoEndTurn]);
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== viewOwner) return;
@@ -1001,6 +1018,14 @@ export function BattleScreenView() {
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
     const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
     const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
+    // Этап 2.6 (правка): умение «на себя» с областью (круговой взмах) не
+    // требует цели — пока выбрано, клик по любой клетке применяет его,
+    // а область уже подсвечена областным прицелом.
+    const selfAreaTargeting = Boolean(selectedSkill?.category === "self" && (selectedSkill.radius ?? 0) > 0);
+    if (selfAreaTargeting && action?.type === "skill") {
+      useSelfSkill(action.id);
+      return;
+    }
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
     if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
       // Обучение: выбор иного бойца запрещён — действует только исполнитель
@@ -1148,6 +1173,61 @@ export function BattleScreenView() {
     return { x, y, z: tile?.z ?? 0 };
   }, [preview, skillTargetPos, snapshot.grid]);
 
+  // Этап 3.1: биом карты — из конфигурации режима, который создал матч.
+  const battleBiome = useMemo(() => {
+    if (isTraining && trainingMission) return trainingMission.map.biome;
+    if (battleKind === "campaign" && activeMissionId) {
+      return session.getCampaign().getMission(activeMissionId)?.map.biome;
+    }
+    if (battleKind === "pvp" || battleKind === "pvpNet") {
+      return content.pvp.map?.biome ?? content.quickMatch.map.biome;
+    }
+    if (battleKind === "replay") return replayJournal?.options.map.biome;
+    return content.quickMatch.map.biome;
+  }, [isTraining, trainingMission, battleKind, activeMissionId, session, content, replayJournal]);
+
+  // Этап 3.6: доля счётчика Тьмы кампании — холодный слой поверх сцены.
+  const darknessRatio = useMemo(() => {
+    if (battleKind !== "campaign") return 0;
+    const state = session.getCampaign().getState();
+    if (!state || state.darknessMax <= 0) return 0;
+    return Math.min(1, Math.max(0, state.darkness / state.darknessMax));
+  }, [battleKind, session]);
+
+  // Этап 2.6 (правка по ревью): областной прицел виден сразу при выборе
+  // умения с областью, включая «круговой взмах» богатыря (self + радиус):
+  // центр — сам боец, для позиционных — выбранная клетка.
+  const areaPreview = useMemo(() => {
+    if (action?.type !== "skill" || selectedId === null || paused || busy) return null;
+    const skill = skills[action.id];
+    if (!skill) return null;
+    const hasArea = (skill.radius ?? 0) > 0
+      || skill.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
+    if (!hasArea) return null;
+    const center = skill.category === "self" ? selected : skillTargetPos ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z } : undefined;
+    return center ? { center, radius: skill.radius ?? 0 } : null;
+  }, [action, selectedId, selected, skillTargetPos, skills, paused, busy]);
+
+  // Этап 4.8: карточка прицеливания подтягивается к цели (доли экрана).
+  const [aimCardPos, setAimCardPos] = useState<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    if (aimId === null || !hit) {
+      setAimCardPos(null);
+      return;
+    }
+    const position = rendererRef.current?.getEntityScreenPosition?.(aimId) ?? null;
+    if (!position) {
+      setAimCardPos(null);
+      return;
+    }
+    // Удержание в пределах экрана; карточка не перекрывает саму цель —
+    // смещается вправо-вниз от точки прицеливания.
+    setAimCardPos({
+      x: Math.min(88, Math.max(14, position.x * 100 + 9)),
+      y: Math.min(66, Math.max(12, position.y * 100 + 8)),
+    });
+  }, [aimId, hit, snapshot]);
+
   useEffect(() => {
     rendererRef.current?.update({
       matchSeed,
@@ -1157,6 +1237,20 @@ export function BattleScreenView() {
       reachable,
       path: previewPath,
       aimOk: Boolean(hit?.available),
+      // Этап 1.4: состояние кольца цели — белое (предварительно выбрана),
+      // янтарное (атака готова), красное (невозможно).
+      aimState: aimId === null ? undefined : !hit ? "preselect" : hit.available ? "ready" : "blocked",
+      // Этап 2.7: цель открыта с фланга — красные уголки-скобки.
+      aimFlanked: Boolean(hit?.available && hit.flanked),
+      // Этап 2.6 (правка): областной прицел — центр и радиус из определения
+      // умения; для умений «на себя» центр — сам боец (круговой взмах).
+      areaPreview,
+      // Этап 2.1: локализованная строка «Промах» для всплывающего числа.
+      missLabel: t("combat.miss"),
+      // Этап 3.1: биом карты (палитра поверхности, стиль укрытий, декор).
+      biome: battleBiome,
+      // Этап 3.6: доля Тьмы кампании для холодного слоя атмосферы.
+      darkness: darknessRatio,
       heightMod: hit?.heightMod ?? 0,
       debugMovement,
       visibleCells,
@@ -1166,7 +1260,27 @@ export function BattleScreenView() {
       trainingHighlight,
       trainingFocus,
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, action, t, battleBiome, darknessRatio, areaPreview]);
+
+  // Этап 2.10: переключатель темпа боя — двойная скорость для всех пауз,
+  // перемещений и эффектов поля, а также автоматического проигрывания
+  // повторов (повторы идут через тот же конвейер play() рендерера).
+  const [fastPace, setFastPace] = useState(false);
+  useEffect(() => {
+    rendererRef.current?.setSpeed(fastPace ? 2 : 1);
+  }, [fastPace]);
+
+  // Этап 1.7: системная настройка «уменьшить движение» распространяется на
+  // боевой экран — тряска камеры, «дыхание» фишек и дрейф тумана отключаются.
+  useEffect(() => {
+    // jsdom (автотесты) не реализует matchMedia — считаем настройку выключенной.
+    if (typeof window.matchMedia !== "function") return;
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const apply = (): void => rendererRef.current?.setReducedMotion(query.matches);
+    apply();
+    query.addEventListener("change", apply);
+    return () => query.removeEventListener("change", apply);
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -1230,7 +1344,19 @@ export function BattleScreenView() {
           if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
         }
         if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
-          useSelfSkill(chosen.id);
+          // Этап-правка: self-умение с областью (круговой взмах) на хоткей
+          // работает как кнопка — первый тап подсвечивает, второй применяет.
+          const hotkeySkill = skills[chosen.id]!;
+          if ((hotkeySkill.radius ?? 0) > 0 && action?.type === "skill" && action.id === chosen.id) {
+            useSelfSkill(chosen.id);
+          } else if ((hotkeySkill.radius ?? 0) > 0) {
+            setAction({ type: "skill", id: chosen.id });
+            setSkillTargetPos(null);
+            setAimId(null);
+            setPreview(null);
+          } else {
+            useSelfSkill(chosen.id);
+          }
         } else {
           const active = action?.type === chosen.type && action.id === chosen.id;
           setAction(active ? null : chosen);
@@ -1379,6 +1505,21 @@ export function BattleScreenView() {
           <div className="top-controls">
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
               {t("battle.pause")}
+            </button>
+            {/* Этап 2.10: переключатель темпа боя — обычная и двойная скорость.
+                Состояние подписано подсказкой, доступно с клавиатуры,
+                помечено атрибутом нажатости. */}
+            <button
+              type="button"
+              className={`hud-btn hud-icon-btn pace-toggle${fastPace ? " is-on" : ""}`}
+              onClick={() => setFastPace((value) => !value)}
+              aria-pressed={fastPace}
+              title={t(fastPace ? "battle.fastPaceHint" : "battle.fastPace")}
+              aria-label={t("battle.fastPace")}
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M5 5l7 7-7 7M13 5l7 7-7 7" />
+              </svg>
             </button>
             {isTraining ? (
               <button
@@ -1558,7 +1699,10 @@ export function BattleScreenView() {
             </p>
           ) : null}
           {hit ? (
-            <div className="aim-card">
+            <div
+              className={`aim-card${aimCardPos ? " is-floating" : ""}`}
+              style={aimCardPos ? { left: `${aimCardPos.x}%`, top: `${aimCardPos.y}%` } : undefined}
+            >
               <div className="aim-header">
                 <span className={`aim-chance${hit.available ? "" : " blocked"}`}>
                   {hit.available
@@ -1746,8 +1890,22 @@ export function BattleScreenView() {
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
                   disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId)}
                   onClick={() => {
-                    if (skill?.category === "self") useSelfSkill(skillId);
-                    else {
+                    // Этап-правка: умение «на себя» с областью (круговой взмах)
+                    // подтверждается вторым тапом — первый показывает область.
+                    if (skill?.category === "self") {
+                      if ((skill.radius ?? 0) > 0) {
+                        const alreadyArmed = action?.type === "skill" && action.id === skillId;
+                        if (alreadyArmed) useSelfSkill(skillId);
+                        else {
+                          setAction({ type: "skill", id: skillId });
+                          setSkillTargetPos(null);
+                          setAimId(null);
+                          setPreview(null);
+                        }
+                      } else {
+                        useSelfSkill(skillId);
+                      }
+                    } else {
                       setAction(active ? null : { type: "skill", id: skillId });
                       setSkillTargetPos(null);
                       setAimId(null);
@@ -1809,7 +1967,7 @@ export function BattleScreenView() {
           </div>
           <button
             type="button"
-            className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
+            className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
             disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn")}
             onClick={() => endTurn()}
           >

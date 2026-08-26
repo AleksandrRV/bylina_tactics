@@ -38,6 +38,7 @@
       y: 50,
       rewards: { gold: 10, herbs: 3, artifacts: 0 },
       map: {
+              biome: "meadow",
         width: 12,
         height: 10,
         pitChance: 0.04,
@@ -59,6 +60,7 @@
       y: 38,
       rewards: { gold: 12, herbs: 3, artifacts: 0 },
       map: {
+              biome: "thicket",
         width: 12,
         height: 10,
         pitChance: 0.05,
@@ -83,6 +85,7 @@
       y: 62,
       rewards: { gold: 14, herbs: 4, artifacts: 1 },
       map: {
+              biome: "swamp",
         width: 14,
         height: 10,
         pitChance: 0.05,
@@ -107,6 +110,7 @@
       y: 52,
       rewards: { gold: 16, herbs: 5, artifacts: 1 },
       map: {
+              biome: "scorched",
         width: 14,
         height: 10,
         pitChance: 0.05,
@@ -132,6 +136,7 @@
       y: 40,
       rewards: { gold: 18, herbs: 6, artifacts: 1 },
       map: {
+              biome: "swamp",
         width: 14,
         height: 10,
         pitChance: 0.04,
@@ -159,6 +164,7 @@
       y: 92,
       rewards: { gold: 14, herbs: 5, artifacts: 1 },
       map: {
+              biome: "meadow",
         width: 14,
         height: 10,
         pitChance: 0.05,
@@ -185,6 +191,7 @@
       y: 99,
       rewards: { gold: 16, herbs: 4, artifacts: 1 },
       map: {
+              biome: "thicket",
         width: 14,
         height: 10,
         pitChance: 0.06,
@@ -212,6 +219,7 @@
       y: 98,
       rewards: { gold: 18, herbs: 5, artifacts: 2 },
       map: {
+              biome: "thicket",
         width: 14,
         height: 10,
         pitChance: 0.06,

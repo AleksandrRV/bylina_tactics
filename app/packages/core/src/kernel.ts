@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.19";
+export const CORE_VERSION = "0.21.5";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -842,6 +842,21 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     .sort((a, b) => a.id - b.id);
 
   const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
+    // Клетки области действия для предпросмотра (0.21.5, этап 2.6):
+    // та же геометрия, что у areaTargets — дистанция по горизонтали и
+    // перепад ярусов не более единицы; непроходимые клетки исключаются.
+    const previewAreaCells = (center: CellPos): CellPos[] => {
+      const radius = skill.radius ?? 0;
+      if (radius <= 0) return [{ x: center.x, y: center.y, z: center.z }];
+      const cells: CellPos[] = [];
+      for (const tile of state.grid.tiles) {
+        if (tile.blockLOS) continue;
+        if (distH(center.x, center.y, tile.x, tile.y) > radius) continue;
+        if (Math.abs(center.z - tile.z) > 1) continue;
+        cells.push({ x: tile.x, y: tile.y, z: tile.z });
+      }
+      return cells;
+    };
     if (actor.dead || actor.panic || actor.owner !== state.activeOwner || (actor.decoy && skill.resolution === "attack")) return { available: false, reason: "ILLEGAL" };
     if (actor.ap < skill.apCost) return { available: false, reason: "NO_AP" };
     if ((actor.skillCooldowns?.[skill.id] ?? 0) > 0) return { available: false, reason: "ON_COOLDOWN" };
@@ -852,9 +867,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (skill.extract) {
       const tile = tileAt(state.grid, actor.x, actor.y);
       if (!tile?.extract) return { available: false, reason: "ILLEGAL" };
-      return { available: true, targetPos: cellPos(actor) };
+      return { available: true, targetPos: cellPos(actor), areaCells: [cellPos(actor)] };
     }
-    if (skill.category === "self") return { available: true, targetPos: cellPos(actor) };
+    if (skill.category === "self") return { available: true, targetPos: cellPos(actor), areaCells: previewAreaCells(cellPos(actor)) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
     // §15.7: погибшая сущность не является допустимой целью.
     if (target && target.dead) return { available: false, reason: "ILLEGAL" };
@@ -928,6 +943,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         available: true,
         targetPos: pos,
         chance: clampChance((skill.willPower ?? 0) - (target.will ?? 0)),
+        areaCells: previewAreaCells(pos),
       };
     }
     if (target && target.coverType === 0 && skill.resolution === "attack") {
@@ -956,10 +972,17 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           cover: combat.cover,
           heightMod: combat.heightMod,
           flanked: combat.flanked,
+          areaCells: previewAreaCells(pos),
         };
       }
     }
-    return { available: true, targetPos: normalizedTargetPos ?? pos };
+    const chosen = normalizedTargetPos ?? pos;
+    // Перенос союзника затрагивает и клетку цели, и клетку назначения.
+    if (skill.effects.some((effect) => effect.type === "displace") && target) {
+      const from = cellPos(target);
+      return { available: true, targetPos: chosen, areaCells: [from, chosen] };
+    }
+    return { available: true, targetPos: chosen, areaCells: previewAreaCells(chosen) };
   };
 
   const resolveCombatAgainst = (
@@ -1312,6 +1335,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           // полная грань запрещает обычную ближнюю атаку, неполная сохраняет свой
           // вычет, разрушающее оружие ближнего боя пробивает грань, как при одиночном ударе.
           for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
+            // Круговой взмах бьёт вокруг бойца; сам кастер не задевается,
+            // даже когда фильтр «all» допускает союзников (0.21.5).
+            if (areaTarget.id === actor.id) continue;
             const breach = edgeBreach(actor, areaTarget, weapon);
             if (weapon.category === "melee" && edgeCoverOnLine(actor, areaTarget)?.coverType === 2 && !breach) continue;
             const edgeOptions = breach?.options ?? currentEdgeOptions(actor, areaTarget, weapon);

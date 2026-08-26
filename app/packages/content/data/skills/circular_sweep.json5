@@ -8,7 +8,9 @@
   resolution: "attack",
   envDmg: 0,
   radius: 1,
-  filter: "enemies",
+  // Этап-правка: круговой взмах задевает всех вокруг богатыря, включая
+  // союзников (сам кастер исключён ядром); подсветка предупреждает о них.
+  filter: "all",
   cooldownTurns: 3,
   effects: [
     { type: "damage", minDmg: 3, maxDmg: 5, crit: 10, critBonus: 2 },

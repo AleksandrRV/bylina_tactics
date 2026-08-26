@@ -27,6 +27,17 @@ describe("parseContent", () => {
     const result = parseContent(readDataTree());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
+    // Этап 3.1 + ревью: биомы миссий кампании заданы и идут в порядке точек.
+    expect(result.data.campaign.missions.map((mission) => mission.map.biome)).toEqual([
+      "meadow",
+      "thicket",
+      "swamp",
+      "scorched",
+      "swamp",
+      "meadow",
+      "thicket",
+      "thicket",
+    ]);
     expect(result.data.units.map((unit) => unit.id).sort()).toEqual([
       "baba_yaga",
       "bogatyr",
@@ -207,6 +218,19 @@ describe("parseContent", () => {
     const rosterResult = parseContent(brokenRoster);
     expect(rosterResult.ok).toBe(false);
     expect(rosterResult.ok || rosterResult.issues.some((issue) => issue.message.includes("unknown initial roster unit"))).toBe(true);
+  });
+
+  it("accepts legacy maps without a biome (backward compatibility)", () => {
+    const files = readDataTree();
+    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));
+    expect(campaignKey).toBeDefined();
+    if (!campaignKey) return;
+    files[campaignKey] = files[campaignKey]!.replace(/^\s*biome:.*\r?\n/gm, "");
+    const result = parseContent(files);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.data.campaign.missions.every((mission) => mission.map.biome === undefined)).toBe(true);
+    }
   });
 
   it("rejects an inconsistent needle mission", () => {
