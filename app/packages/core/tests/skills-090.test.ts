@@ -243,6 +243,7 @@ describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
     resolution: "attack", envDmg: 0, radius: 1, filter: "enemies", cooldownTurns: 3,
     effects: [{ type: "damage", minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0 }],
   };
+  const SWEEP_ALL: SkillStats = { ...SWEEP, filter: "all" };
 
   const coverEntity = (id: number, coverType: 1 | 2, edge: 0 | 1 | 2 | 3): EntityState => ({
     ...fighter({ id, owner: 0, x: 3, y: 3 }),
@@ -259,6 +260,33 @@ describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
       // это попадание, а сквозь полугрань (шанс 75) — промах.
       seed: 43,
     });
+
+  it("previews all eight neighbours and may resolve the configured friendly-fire hit", () => {
+    const sweeper = fighter({ id: 1, configId: "bogatyr", x: 3, y: 3, weaponIds: [SWORD.id], skillIds: [SWEEP_ALL.id] });
+    const ally = fighter({ id: 2, owner: 1, x: 4, y: 4, hp: 10 });
+    const enemy = fighter({ id: 3, owner: 2, x: 2, y: 3, hp: 10 });
+    const game = createTacticsKernel({
+      initial: state(sweeper, ally, enemy),
+      weapons: { [SWORD.id]: SWORD },
+      skills: { [SWEEP_ALL.id]: SWEEP_ALL },
+      seed: 43,
+    });
+
+    const preview = game.getSkillPreview(1, SWEEP_ALL.id);
+    expect(preview.areaCells).toHaveLength(9); // центр + все восемь соседей
+    expect(preview.areaCells).toEqual(expect.arrayContaining([
+      { x: 2, y: 2, z: 1 },
+      { x: 4, y: 4, z: 1 },
+      { x: 2, y: 4, z: 1 },
+      { x: 4, y: 2, z: 1 },
+    ]));
+
+    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: SWEEP_ALL.id });
+    expect(result.ok).toBe(true);
+    expect(result.ok && result.events.some((event) => event.type === "COMBAT_RESOLVED" && event.targetId === ally.id)).toBe(true);
+    expect(game.getSnapshot().entities.find((entity) => entity.id === ally.id)?.hp).toBe(7);
+    expect(game.getSnapshot().entities.find((entity) => entity.id === sweeper.id)?.hp).toBe(sweeper.hp);
+  });
 
   it("does not damage a neighbour behind a full edge and keeps the cover intact", () => {
     const sweeper = fighter({ id: 1, configId: "bogatyr", x: 3, y: 3, weaponIds: [SWORD.id], skillIds: [SWEEP.id] });

@@ -26,8 +26,8 @@ type ShipFlight = {
 };
 
 /**
- * Этап 4.1 (правка по ревью): перелёт идёт по прямой поверх линии маршрута;
- * путь отдаётся в SVG для следа.
+ * Этап 4.1 (правка по ревью): прямой путь корабля совпадает с линией
+ * маршрута; путь отдаётся в SVG для следа.
  */
 function flightArc(flight: ShipFlight): { path: string } {
   return {
@@ -275,8 +275,8 @@ export function CampaignScreen() {
   const lockedCount = state.missions.filter((point) => point.status === "locked").length;
 
   const shipPosition = state.shipPosition;
-  // Этап 4.1: перелёт корабля к новой точке — плавная дуга с затухающим
-  // следом вместо телепорта. Ключевой момент прогресса кампании.
+  // Этап 4.1: перелёт корабля к новой точке запускается кнопкой «В бой»;
+  // marker двигается по прямой вместе с отдельным затухающим SVG-следом.
   const [flight, setFlight] = useState<{
     from: { x: number; y: number };
     to: { x: number; y: number };
@@ -436,7 +436,7 @@ export function CampaignScreen() {
           </div>
 
           <div
-            className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}`}
+            className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}${flight ? " is-flying" : ""}`}
             role="region"
             aria-label={t("campaign.mapLabel")}
             style={{ "--ship-x": `${shipPosition.x}%`, "--ship-y": `${shipPosition.y}%` } as CSSProperties}
@@ -516,8 +516,8 @@ export function CampaignScreen() {
               );
             })}
 
-            {/* Этап 4.1 (правка): след перелёта — затухающая дуга в SVG
-                (свечение + линия), прорисовывается синхронно с полётом. */}
+            {/* Этап 4.1: прямой след остаётся отдельным SVG-слоем и
+                синхронен с движением самого marker. */}
             {flight ? (
               <svg className="ship-flight-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path className="ship-flight-trail-glow" d={flightArc(flight).path} pathLength={100} />
@@ -525,34 +525,31 @@ export function CampaignScreen() {
               </svg>
             ) : null}
 
-            {/* Этап 4.1: перелёт корабля по дуге с затухающим следом. */}
-            {flight ? (
-              <div
-                key={flight.key}
-                className="ship-flight"
-                aria-hidden="true"
-                style={
-                  {
-                    "--x0": `${flight.from.x}%`,
-                    "--y0": `${flight.from.y}%`,
-                    "--x1": `${flight.to.x}%`,
-                    "--y1": `${flight.to.y}%`,
-                    "--fly-angle": `${(Math.atan2(flight.to.y - flight.from.y, flight.to.x - flight.from.x) * 180) / Math.PI}deg`,
-                  } as CSSProperties
-                }
-              >
-                <span className="ship-flight-trail" />
-                <span className="ship-flight-body">
-                  <ShipIcon />
-                </span>
-              </div>
-            ) : null}
-
+            {/* Экспертская схема: анимируется настоящий ship-marker, а не
+                нулевая по размеру обёртка с абсолютно позиционированным телом.
+                Средняя точка лежит на прямом маршруте, поэтому корабль
+                совпадает с сохранённым прямым следом. */}
             <div
+              key={flight?.key ?? "ship-marker"}
               className={`ship-marker${flight ? " is-flying" : ""}`}
               aria-hidden="true"
               title={t("campaign.ship")}
-              style={{ left: `${shipPosition.x}%`, top: `${shipPosition.y}%` }}
+              style={
+                {
+                  left: `${flight?.from.x ?? shipPosition.x}%`,
+                  top: `${flight?.from.y ?? shipPosition.y}%`,
+                  ...(flight
+                    ? {
+                        "--ship-from-x": `${flight.from.x}%`,
+                        "--ship-from-y": `${flight.from.y}%`,
+                        "--ship-mid-x": `${(flight.from.x + flight.to.x) / 2}%`,
+                        "--ship-mid-y": `${(flight.from.y + flight.to.y) / 2}%`,
+                        "--ship-to-x": `${flight.to.x}%`,
+                        "--ship-to-y": `${flight.to.y}%`,
+                      }
+                    : {}),
+                } as CSSProperties
+              }
             >
               <span className="ship-glyph">
                 <ShipIcon />
