@@ -30,9 +30,3 @@ jobs:
 
       - name: Check release versions
         run: pnpm check:versions
-
-      - name: Check visual-state baselines
-        run: pnpm visual:regression
-
-      - name: Run visual accessibility audit
-        run: pnpm audit:visual

@@ -84,8 +84,9 @@ node --version       # должен быть >= 20
 pnpm --version       # должен соответствовать packageManager
 ```
 
-Команды `visual:regression` и `audit:visual` входят в prebuild/pretest;
-`check:versions` полезно выполнять до `build` и перед публикацией.
+Команды `visual:regression` и `audit:visual` входят в prebuild/pretest и
+вызываются из `check:versions`; последний полезно выполнять до `build` и
+перед публикацией.
 
 ---
 
