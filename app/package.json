@@ -1,7 +1,7 @@
 {
   "name": "bylina",
   "private": true,
-  "version": "0.20.19",
+  "version": "0.21.2",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",
@@ -9,6 +9,8 @@
     "preview": "pnpm --filter @bylina/game-pwa preview --host 0.0.0.0",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
+    "screens:capture": "node scripts/capture-screens.mjs capture",
+    "screens:compare": "node scripts/capture-screens.mjs compare",
     "check:versions": "node scripts/check-version-consistency.mjs"
   },
   "engines": {

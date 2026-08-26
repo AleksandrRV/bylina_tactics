@@ -14,8 +14,10 @@ vi.mock("@bylina/render", () => {
     destroy: () => undefined,
     setOnActivate: () => undefined,
     setOnHover: () => undefined,
+    setReducedMotion: () => undefined,
+    setSpeed: () => undefined,
   };
-  return { createFieldRenderer: () => stub };
+  return { createFieldRenderer: () => stub, applyPaletteCssVariables: () => undefined };
 });
 
 /**
