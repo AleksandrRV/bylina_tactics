@@ -22,7 +22,7 @@ export {
 } from "./defaults.js";
 export type { SpawnUnitConfig } from "./defaults.js";
 export { QUICK_MATCH_MAP, enemySpawns, generateBattlefield, playerSpawns } from "./mapgen.js";
-export type { MapGenConfig, SpawnPoint } from "./mapgen.js";
+export type { BiomeId, MapGenConfig, SpawnPoint } from "./mapgen.js";
 export { createMissionMatch, createPvpMatch, createQuickMatch } from "./match.js";
 export type { MissionMatchOptions, PvpMatchOptions, QuickMatchOptions, RosterMods, RosterSlot } from "./match.js";
 export { isCombatant, livingOf, matchOutcome } from "./outcome.js";

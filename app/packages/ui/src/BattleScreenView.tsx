@@ -24,7 +24,7 @@ import {
 } from "@bylina/core";
 import type { TrainingMissionConfig } from "@bylina/content";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
@@ -39,7 +39,7 @@ import {
   type TrainingDirectiveView,
 } from "./training-scenario.js";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
+import { useI18nTick, usePrefersReducedMotion, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { unitPortrait } from "./portraits.js";
@@ -101,11 +101,18 @@ export function BattleScreenView() {
   const { session, content, debug } = useServices();
   const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed, trainingDone: trainingDoneMissions } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
+  const aimCardRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
+  const portraitTapRef = useRef<{ id: number; at: number } | null>(null);
   const inputRef = useBattleInput();
+  const reducedMotion = usePrefersReducedMotion();
 
   const [debugMovement, setDebugMovement] = useState(false);
+  const [fastMode, setFastMode] = useState(false);
+  const playbackSpeed: 1 | 2 = fastMode ? 2 : 1;
+  const playbackSpeedRef = useRef<1 | 2>(playbackSpeed);
+  playbackSpeedRef.current = playbackSpeed;
 
   const weapons = useMemo(() => {
     const base: Record<string, WeaponStats> = defaultTrainingWeapons();
@@ -259,6 +266,7 @@ export function BattleScreenView() {
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
   const [aimId, setAimId] = useState<number | null>(null);
+  const [aimCardPosition, setAimCardPosition] = useState<{ left: number; top: number } | null>(null);
   const [skillTargetPos, setSkillTargetPos] = useState<CellPos | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [log, setLog] = useState<string | null>(null);
@@ -338,12 +346,15 @@ export function BattleScreenView() {
         return;
       }
       const command = commands[index];
-      if (command) kernel.apply(command);
+      if (command) {
+        const applied = kernel.apply(command);
+        if (applied.ok) void rendererRef.current?.play(applied.events);
+      }
       setReplayIndex(index + 1);
-    }, 480);
+    }, 480 / playbackSpeed);
     return () => window.clearInterval(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
+  }, [isReplay, replayJournal, kernel, replayIndex, replayDone, playbackSpeed]);
 
 
   // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
@@ -379,7 +390,6 @@ export function BattleScreenView() {
   const snapshot = usesNetSnapshot
     ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
     : session.getBattleSnapshot(viewOwner);
-
   // Завершение миссии обучения: итоговая плашка вместо мгновенного возврата
   // (ui-design §3: «…→ итог → экран обучения»). Пройденной считается только
   // победа (0.19.1).
@@ -468,6 +478,13 @@ export function BattleScreenView() {
   const isOwn = (entity: EntityState): boolean =>
     !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
 
+  const noActionPoints = useMemo(() => {
+    const fighters = snapshot.entities.filter(
+      (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
+    );
+    return fighters.length > 0 && fighters.every((entity) => entity.ap <= 0);
+  }, [snapshot.entities, viewOwner]);
+
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
   // локальный — на одном устройстве, сетевой — ведомому от ведущего.
   useEffect(() => {
@@ -496,6 +513,19 @@ export function BattleScreenView() {
   const mission = battleKind === "campaign" && activeMissionId
     ? session.getCampaign().getMission(activeMissionId)
     : undefined;
+  // Тьма — только презентационная метаинформация кампании: в MatchState и
+  // правила боя она не попадает. В быстрых/PvP/обучающих боях слой отсутствует.
+  const campaignAtmosphere = battleKind === "campaign"
+    ? (() => {
+        const state = session.getCampaign().getState();
+        return { current: state.darkness, max: state.darknessMax };
+      })()
+    : undefined;
+  const presentationBiome = mission?.map.biome
+    ?? trainingMission?.map.biome
+    ?? replayJournal?.options.map.biome
+    ?? content.pvp.map?.biome
+    ?? content.quickMatch.map.biome;
 
   // Боевые туториалы кампании (0.20.0/0.20.1): «первый бой», «первый леший»,
   // «первая кикимора», «появление генерала». Показываются один раз, отключаются
@@ -631,6 +661,17 @@ export function BattleScreenView() {
       flanked: result.flanked,
     };
   }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+
+  const areaPreview = useMemo(() => {
+    if (action?.type !== "skill" || selectedId === null) return null;
+    const skill = skills[action.id];
+    const hasAreaTarget = (skill?.radius ?? 0) > 0 || Boolean(skill?.effects.some((effect) => effect.type === "spawn" || effect.type === "displace"));
+    if (!skill || !hasAreaTarget) return null;
+    const center = skill.category === "self" ? selected : skillTargetPos;
+    return center
+      ? { center: { x: center.x, y: center.y, z: center.z }, radius: skill.radius ?? 0 }
+      : null;
+  }, [action, selectedId, selected, skillTargetPos, skills]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -874,7 +915,7 @@ export function BattleScreenView() {
         finishFromEvents([]);
         return;
       }
-      await sleep(430);
+      await sleep(430 / playbackSpeedRef.current);
       for (let guard = 0; guard < 96; guard += 1) {
         const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
@@ -901,7 +942,7 @@ export function BattleScreenView() {
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
-        await sleep(190);
+        await sleep(190 / playbackSpeedRef.current);
       }
     } finally {
       setEnemyPhase(false);
@@ -976,6 +1017,7 @@ export function BattleScreenView() {
       isSpectator,
       isTraining,
       activeHint,
+      autoEndTurn: hintSettings.autoEndTurn,
       activeOwner: snapshot.activeOwner,
       viewOwner,
       ownUnits,
@@ -984,7 +1026,7 @@ export function BattleScreenView() {
     })) return;
     endTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint]);
+  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint, hintSettings.autoEndTurn]);
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || snapshot.activeOwner !== viewOwner) return;
@@ -1001,6 +1043,11 @@ export function BattleScreenView() {
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
     const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
     const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
+    const selfAreaTargeting = Boolean(selectedSkill?.category === "self" && (selectedSkill.radius ?? 0) > 0);
+    if (selfAreaTargeting && action?.type === "skill") {
+      useSelfSkill(action.id);
+      return;
+    }
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
     if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
       // Обучение: выбор иного бойца запрещён — действует только исполнитель
@@ -1131,6 +1178,10 @@ export function BattleScreenView() {
     };
   }, []);
 
+  useEffect(() => {
+    rendererRef.current?.setPlaybackSpeed(playbackSpeed);
+  }, [playbackSpeed]);
+
   const aimBreakCell = useMemo(() => {
     if (!hit || !selected || !aimed) return null;
     // breakCell теперь вычисляется ядром в previewAttack (§7, §9.3).
@@ -1148,16 +1199,81 @@ export function BattleScreenView() {
     return { x, y, z: tile?.z ?? 0 };
   }, [preview, skillTargetPos, snapshot.grid]);
 
+  const aimStatus = aimId === null
+    ? undefined
+    : hit === null
+      ? "selected" as const
+      : hit.available
+        ? "ready" as const
+        : "blocked" as const;
+  const aimTarget = aimId === null ? undefined : snapshot.entities.find((entity) => entity.id === aimId);
+
+  // Карточка шанса живёт в DOM-слое, а цель — на Pixi-холсте. Позиция
+  // пересчитывается коротким, ограниченным ритмом прицеливания: она остаётся
+  // рядом с целью и после панорамирования/поворота экрана, но не создаёт
+  // бесконечный поток рендеров.
+  useEffect(() => {
+    if (aimId === null || !aimTarget) {
+      setAimCardPosition(null);
+      return;
+    }
+    const updatePosition = (): void => {
+      const host = hostRef.current;
+      const card = aimCardRef.current;
+      const renderer = rendererRef.current;
+      const root = host?.closest(".battle-screen");
+      if (!host || !card || !renderer?.screenPosition || !root) return;
+      const point = renderer.screenPosition(aimTarget.x, aimTarget.y, aimTarget.z);
+      if (!point) return;
+      const rootRect = root.getBoundingClientRect();
+      const stageRect = host.getBoundingClientRect();
+      const targetX = stageRect.left - rootRect.left + point.x;
+      const targetY = stageRect.top - rootRect.top + point.y;
+      const padding = 8;
+      const targetRadius = 30;
+      const gap = 12;
+      const cardWidth = card.offsetWidth;
+      const cardHeight = card.offsetHeight;
+      // left — это левый край карточки: цель остаётся её горизонтальным
+      // центром, но сама карточка не выходит за границы root.
+      const left = Math.max(
+        padding,
+        Math.min(rootRect.width - padding - cardWidth, targetX - cardWidth / 2),
+      );
+      const above = targetY - targetRadius - gap - cardHeight;
+      const below = targetY + targetRadius + gap;
+      const top = above >= padding || below + cardHeight > rootRect.height - padding
+        ? Math.max(padding, Math.min(rootRect.height - padding - cardHeight, above))
+        : below;
+      setAimCardPosition((previous) =>
+        previous && Math.abs(previous.left - left) < 0.5 && Math.abs(previous.top - top) < 0.5
+          ? previous
+          : { left, top },
+      );
+    };
+    updatePosition();
+    const timer = window.setInterval(updatePosition, 100);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("resize", updatePosition);
+    };
+  }, [aimId, aimTarget?.x, aimTarget?.y, aimTarget?.z, hit?.available, hit?.chance, hit?.dmgMin, hit?.dmgMax, hit?.reason]);
+
   useEffect(() => {
     rendererRef.current?.update({
       matchSeed,
+      biome: presentationBiome,
+      darkness: campaignAtmosphere,
       snapshot,
       selectedId,
       aimId,
       reachable,
       path: previewPath,
       aimOk: Boolean(hit?.available),
+      aimStatus,
       heightMod: hit?.heightMod ?? 0,
+      reducedMotion,
       debugMovement,
       visibleCells,
       exploredCells,
@@ -1165,8 +1281,27 @@ export function BattleScreenView() {
       hoverCell,
       trainingHighlight,
       trainingFocus,
+      areaPreview,
+      flanked: Boolean(hit?.flanked),
+      combatLabels: { miss: t("combat.miss") },
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus]);
+  }, [matchSeed, presentationBiome, campaignAtmosphere?.current, campaignAtmosphere?.max, snapshot, selectedId, aimId, reachable, previewPath, hit?.available, hit?.heightMod, hit?.flanked, aimStatus, reducedMotion, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, areaPreview, t]);
+
+  const centerOnEntity = (entity: EntityState): void => {
+    rendererRef.current?.centerOn(entity.x, entity.y, entity.z);
+  };
+
+  const handlePortraitPointerUp = (event: ReactPointerEvent, entity: EntityState): void => {
+    if (event.pointerType !== "touch" || entity.dead) return;
+    const now = performance.now();
+    const previous = portraitTapRef.current;
+    if (previous && previous.id === entity.id && now - previous.at < 360) {
+      portraitTapRef.current = null;
+      centerOnEntity(entity);
+    } else {
+      portraitTapRef.current = { id: entity.id, at: now };
+    }
+  };
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -1175,6 +1310,10 @@ export function BattleScreenView() {
         return;
       }
       if (paused || busy) return;
+      if (event.key === "f" || event.key === "F") {
+        setFastMode((value) => !value);
+        return;
+      }
       if (event.key === "Tab") {
         event.preventDefault();
         // Обучение: перебор бойцов запрещён — действует исполнитель указания.
@@ -1229,7 +1368,7 @@ export function BattleScreenView() {
           const uses = selected.skillUses?.[chosen.id] ?? 0;
           if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
         }
-        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
+        if (chosen.type === "skill" && skills[chosen.id]?.category === "self" && (skills[chosen.id]?.radius ?? 0) <= 0) {
           useSelfSkill(chosen.id);
         } else {
           const active = action?.type === chosen.type && action.id === chosen.id;
@@ -1380,6 +1519,17 @@ export function BattleScreenView() {
             <button type="button" className="hud-btn" onClick={() => session.setPaused(true)}>
               {t("battle.pause")}
             </button>
+            <button
+              type="button"
+              className={`hud-btn speed-toggle${fastMode ? " is-on" : ""}`}
+              onClick={() => setFastMode((value) => !value)}
+              aria-pressed={fastMode}
+              aria-keyshortcuts="F"
+              aria-label={t(fastMode ? "battle.speedFast" : "battle.speedNormal")}
+              title={t("battle.speedHint")}
+            >
+              <span aria-hidden="true">»</span> {fastMode ? "2×" : "1×"}
+            </button>
             {isTraining ? (
               <button
                 type="button"
@@ -1516,6 +1666,12 @@ export function BattleScreenView() {
                   key={entity.id}
                   type="button"
                   className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
+                  aria-label={t(unitNameKey(entity.configId))}
+                  title={t(unitNameKey(entity.configId))}
+                  onDoubleClick={() => {
+                    if (!entity.dead) centerOnEntity(entity);
+                  }}
+                  onPointerUp={(event) => handlePortraitPointerUp(event, entity)}
                   onClick={() => {
                     if (entity.dead) return;
                     // Обучение: выбор иного бойца запрещён — действует только
@@ -1558,7 +1714,11 @@ export function BattleScreenView() {
             </p>
           ) : null}
           {hit ? (
-            <div className="aim-card">
+            <div
+              ref={aimCardRef}
+              className="aim-card"
+              style={aimCardPosition ? { left: aimCardPosition.left, top: aimCardPosition.top, transform: "none" } : undefined}
+            >
               <div className="aim-header">
                 <span className={`aim-chance${hit.available ? "" : " blocked"}`}>
                   {hit.available
@@ -1676,7 +1836,14 @@ export function BattleScreenView() {
             {selected ? (
               <div className="sel-row">
                 {unitPortrait(selected.configId) ? (
-                  <img className="sel-face" src={unitPortrait(selected.configId)} alt="" draggable={false} />
+                  <img
+                    className="sel-face"
+                    src={unitPortrait(selected.configId)}
+                    alt=""
+                    draggable={false}
+                    onDoubleClick={() => centerOnEntity(selected)}
+                    onPointerUp={(event) => handlePortraitPointerUp(event, selected)}
+                  />
                 ) : null}
                 <div className="sel-info">
                   <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
@@ -1707,7 +1874,8 @@ export function BattleScreenView() {
               <p>{t("battle.empty")}</p>
             )}
           </div>
-          <div className="skill-row">
+          <div className="skill-row-wrap">
+            <div className="skill-row">
             {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => (
               <button
                 key={`weapon-${weaponId}`}
@@ -1746,7 +1914,7 @@ export function BattleScreenView() {
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
                   disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId)}
                   onClick={() => {
-                    if (skill?.category === "self") useSelfSkill(skillId);
+                    if (skill?.category === "self" && (skill.radius ?? 0) <= 0) useSelfSkill(skillId);
                     else {
                       setAction(active ? null : { type: "skill", id: skillId });
                       setSkillTargetPos(null);
@@ -1806,10 +1974,14 @@ export function BattleScreenView() {
               <kbd>0</kbd>
               {t("battle.overwatch")}
             </button>
+            </div>
+            {((selected?.weaponIds?.length ?? (selected?.weaponId ? 1 : 0)) + (selected?.skillIds?.length ?? 0) + 2) > 4 ? (
+              <span className="skill-row-hint" aria-hidden="true">{t("battle.skillScrollHint")}</span>
+            ) : null}
           </div>
           <button
             type="button"
-            className={`hud-btn hud-btn-primary${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
+            className={`hud-btn hud-btn-primary end-turn-btn${noActionPoints && snapshot.activeOwner === viewOwner ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
             disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn")}
             onClick={() => endTurn()}
           >
