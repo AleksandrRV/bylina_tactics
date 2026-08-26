@@ -69,10 +69,8 @@ pnpm install
 | `pnpm dev` | Сервер разработки (`http://127.0.0.1:5173/`) |
 | `pnpm test` | Автоматические проверки |
 | `pnpm typecheck` | Проверка типов |
-| `pnpm build` | Производственная сборка PWA с визуальным regression-gate |
+| `pnpm build` | Производственная сборка PWA |
 | `pnpm preview` | Просмотр сборки (`http://127.0.0.1:4173/`) |
-| `pnpm visual:regression` | Сверка шести визуальных эталонов |
-| `pnpm audit:visual` | Контрастный, семантический и performance-аудит |
 
 Остановка: `Ctrl+C`. Если порт занят — открывать адрес из вывода сборщика.
 
@@ -84,9 +82,7 @@ node --version       # должен быть >= 20
 pnpm --version       # должен соответствовать packageManager
 ```
 
-Команды `visual:regression` и `audit:visual` входят в prebuild/pretest и
-вызываются из `check:versions`; последний полезно выполнять до `build` и
-перед публикацией.
+Команду `check:versions` полезно выполнять до `build` и перед публикацией.
 
 ---
 

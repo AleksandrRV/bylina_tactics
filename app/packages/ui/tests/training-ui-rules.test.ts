@@ -84,7 +84,6 @@ describe("auto end turn stays behind the lesson (0.20.6/0.20.13)", () => {
       isSpectator: false,
       isTraining,
       activeHint: activeHint as never,
-      autoEndTurn: true,
       activeOwner: PLAYER_OWNER,
       viewOwner: PLAYER_OWNER,
       ownUnits: [{ ap: 0 }],

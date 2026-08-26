@@ -1,10 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   TRAINING_COMFORT,
-  centerCameraOn,
   needsTrainingFocus,
   trainingGlideOffset,
-  zoomAroundPoint,
   worldToScreen,
   type CameraPlane,
 } from "../src/camera.js";
@@ -19,27 +17,6 @@ import {
 const MAP = { width: 572, height: 516 };
 
 const plane = (scale: number, x: number, y: number): CameraPlane => ({ scale, offset: { x, y } });
-
-describe("camera anchors (stage 1)", () => {
-  it("keeps the world point under the cursor during zoom", () => {
-    const before = plane(1, 40, -20);
-    const cursor = { x: 260, y: 180 };
-    const after = zoomAroundPoint(cursor, before, 1.5);
-    expect(after.scale).toBe(1.5);
-    expect(worldToScreen({ x: (cursor.x - before.offset.x) / before.scale, y: (cursor.y - before.offset.y) / before.scale }, after)).toEqual(cursor);
-  });
-
-  it("clamps zoom to the existing range", () => {
-    expect(zoomAroundPoint({ x: 0, y: 0 }, plane(1, 0, 0), 0.01).scale).toBe(0.55);
-    expect(zoomAroundPoint({ x: 0, y: 0 }, plane(1, 0, 0), 100).scale).toBe(1.8);
-  });
-
-  it("centers a fighter without exposing space beyond the map", () => {
-    const centered = centerCameraOn({ x: 300, y: 260 }, plane(1.2, -100, -20), { width: 390, height: 844 }, MAP);
-    expect(worldToScreen({ x: 300, y: 260 }, centered).x).toBeCloseTo(195, 5);
-    expect(centered.offset.x).toBeLessThanOrEqual(0);
-  });
-});
 
 describe("needsTrainingFocus (0.20.14)", () => {
   it("comfort zone is a proper band widened for HUD at top and bottom", () => {

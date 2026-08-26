@@ -1,20 +1,15 @@
 {
   "name": "bylina",
   "private": true,
-  "version": "0.21.2",
+  "version": "0.20.19",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",
-    "visual:regression": "node scripts/check-visual-regression.mjs",
-    "visual:regression:update": "node scripts/check-visual-regression.mjs --update",
-    "audit:visual": "node scripts/visual-audit.mjs",
-    "prebuild": "pnpm visual:regression && pnpm audit:visual",
-    "pretest": "pnpm visual:regression && pnpm audit:visual",
     "build": "pnpm --filter @bylina/game-pwa build",
     "preview": "pnpm --filter @bylina/game-pwa preview --host 0.0.0.0",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "check:versions": "node scripts/check-version-consistency.mjs && pnpm visual:regression && pnpm audit:visual"
+    "check:versions": "node scripts/check-version-consistency.mjs"
   },
   "engines": {
     "node": ">=20"

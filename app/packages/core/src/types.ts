@@ -150,7 +150,7 @@ export type GameEvent =
       isDash: boolean;
       apSpent: number;
     }
-  | { type: "ENTITY_DISPLACED"; entityId: number; from: CellPos; to: CellPos; cause: "KNOCKBACK" | "TELEPORT" | "FALL"; shake?: number }
+  | { type: "ENTITY_DISPLACED"; entityId: number; from: CellPos; to: CellPos; cause: "KNOCKBACK" | "TELEPORT" | "FALL" }
   | { type: "STAT_CHANGED"; entityId: number; stat: "AP" | "HP"; newValue: number; delta: number }
   | {
       type: "COMBAT_RESOLVED";
@@ -161,8 +161,6 @@ export type GameEvent =
       damageDealt: number;
       isFlanked: boolean;
       heightMod: -1 | 0 | 1;
-      /** Presentation-only impact amplitude; zero for a miss. */
-      shake?: number;
     }
   | { type: "SKILL_RESOLVED"; sourceId: number; skillId: string; targetId?: number; targetPos?: CellPos; success: boolean }
   | { type: "SKILL_RESOURCE_CHANGED"; entityId: number; skillId: string; cooldown: number; uses: number; usesLeft?: number }
@@ -176,7 +174,7 @@ export type GameEvent =
       sourceId?: number;
     }
   | { type: "ENTITY_SPAWNED"; entity: EntityState; cause: "SUMMON" | "ILLUSION" | "RESURRECTION" }
-  | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE"; shake?: number }
+  | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE" }
   | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON" }
   | { type: "ENTITY_REMOVED"; entityId: number; reason: "FLED" | "EXPIRED" | "EXTRACTED" }
   | { type: "OVERWATCH_FIRED"; watcherId: number; triggerId: number; at: CellPos }

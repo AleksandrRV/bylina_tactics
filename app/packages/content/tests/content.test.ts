@@ -122,20 +122,6 @@ describe("parseContent", () => {
     expect(result.data.quickMatch.playerSlots).toEqual(["bogatyr", "strelets", "znaharka"]);
     expect(result.data.quickMatch.difficulties).toHaveLength(3);
     expect(result.data.campaign.needleMissionId).toBe("needle");
-    expect(result.data.campaign.missions.map((mission) => mission.map.biome)).toEqual([
-      "meadow", "thicket", "swamp", "scorched", "meadow", "thicket", "scorched", "thicket",
-    ]);
-  });
-
-  it("accepts legacy maps without a biome", () => {
-    const files = readDataTree();
-    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));
-    expect(campaignKey).toBeDefined();
-    if (!campaignKey) return;
-    files[campaignKey] = files[campaignKey]!.replace(/^\s*biome:.*\n/gm, "");
-    const result = parseContent(files);
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.data.campaign.missions.every((mission) => mission.map.biome === undefined)).toBe(true);
   });
 
   it("rejects unknown fields and broken references", () => {

@@ -27,11 +27,6 @@ describe("sanitizeSettings", () => {
     expect(sanitizeSettings({ showHints: false }, ["ru"]).showHints).toBe(false);
     expect(sanitizeSettings({ showHints: true }, ["ru"]).showHints).toBe(true);
   });
-
-  it("keeps auto-end-turn enabled by default and allows opting out (stage 1)", () => {
-    expect(sanitizeSettings({}, ["ru"]).autoEndTurn).toBe(true);
-    expect(sanitizeSettings({ autoEndTurn: false }, ["ru"]).autoEndTurn).toBe(false);
-  });
 });
 
 describe("createSettings", () => {

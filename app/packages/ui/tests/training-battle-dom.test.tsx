@@ -26,13 +26,10 @@ const rendererStub: FieldRenderer = {
   }),
   play: vi.fn(async () => undefined),
   pan: vi.fn(),
-  centerOn: vi.fn(),
-  screenPosition: vi.fn(() => ({ x: 900, y: 10 })),
   destroy: vi.fn(),
   setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
     activate = handler;
   }),
-  setPlaybackSpeed: vi.fn(),
   setOnHover: vi.fn((handler: (x: number, y: number) => void) => {
     hover = handler;
   }),
@@ -127,7 +124,6 @@ describe("training battle DOM (0.20.13)", () => {
       await act(async () => {
         await tick(60);
       });
-      expect(document.querySelector(".training-edge-hint"), "off-screen training direction hint").not.toBeNull();
 
       // Шаг 2 — переход: указание разрешает ровно одну клетку (та же, что
       // вычисляет чистый модуль на том же семени).

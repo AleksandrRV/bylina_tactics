@@ -119,22 +119,6 @@ describe("createCampaign: points and darkness", () => {
     ]);
   });
 
-  it("exposes the presentation-only flight from the previous ship position", () => {
-    const automaton = campaign();
-    const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
-    expect(automaton.getLastFlight()).toBeNull();
-    automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
-    expect(automaton.getLastFlight()).toEqual({
-      id: 0,
-      from: { x: 20, y: 50 },
-      to: { x: 20, y: 50 },
-    });
-    const flight = automaton.getLastFlight();
-    if (flight) flight.from.x = 99;
-    expect(automaton.getLastFlight()?.from.x).toBe(20);
-  });
-
   it("defeat adds more darkness but does not end the campaign", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);

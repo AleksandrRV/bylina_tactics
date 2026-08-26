@@ -77,14 +77,6 @@ export interface ScanResult {
   opened: string[];
 }
 
-/** Визуальное событие перелёта корабля, не влияющее на правила кампании. */
-export interface ShipFlight {
-  /** Уникальный номер события в жизни автомата. */
-  id: number;
-  from: { x: number; y: number };
-  to: { x: number; y: number };
-}
-
 export interface CampaignState {
   darkness: number;
   darknessMax: number;
@@ -142,8 +134,6 @@ export interface CampaignApi {
   abandonMission(): void;
   /** Сканирование окрестности корабля: открывает точки в радиусе за стоимость. */
   scan(): ScanResult | null;
-  /** Последний перелёт корабля для анимации карты; это не часть сохранения. */
-  getLastFlight(): ShipFlight | null;
   /** Изготовить предмет в Кузне (один экземпляр каждой записи). */
   craftItem(itemId: string): boolean;
   /** Надеть предмет на бойца; `null` снимает снаряжение. */
@@ -267,11 +257,6 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       }
     : freshState;
   const listeners = new Set<() => void>();
-  // Полёт — одноразовое событие представления. Оно намеренно не входит в
-  // CampaignState и не сериализуется: загрузка сохранения не должна повторно
-  // запускать старую анимацию и не меняет правила кампании.
-  let flightSequence = 0;
-  let lastFlight: ShipFlight | null = null;
 
   // Снимок является публичным значением API: вложенные объекты тоже должны
   // быть независимыми от автомата. Иначе вызывающий код мог изменить
@@ -324,9 +309,6 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       lastResult: cloneLastResult(state.lastResult),
     }),
     getMissions: () => missions.map((mission) => ({ ...mission })),
-    getLastFlight: () => lastFlight
-      ? { id: lastFlight.id, from: { ...lastFlight.from }, to: { ...lastFlight.to } }
-      : null,
     getMission: (id) => missions.find((mission) => mission.id === id),
     getItems: () => items.map((item) => ({ ...item, cost: { ...item.cost } })),
     getDeployLimits: () => ({ min: config.deployMin, max: config.deployMax }),
@@ -384,11 +366,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         if (!state.deadGenerals.includes(generalId)) state.deadGenerals.push(generalId);
       }
       // Корабль перелетает к завершённой точке; дальнейшие точки открываются сканированием.
-      // Координаты перелёта — часть представления, а не новая механика кампании.
-      const from = { ...state.shipPosition };
-      const to = { x: mission.x, y: mission.y };
-      state.shipPosition = to;
-      lastFlight = { id: flightSequence++, from, to };
+      state.shipPosition = { x: mission.x, y: mission.y };
 
       let newRecruit: string | null = null;
       if (outcome === "victory" && livingCount() > 0 && state.fighters.length < config.rosterCap) {

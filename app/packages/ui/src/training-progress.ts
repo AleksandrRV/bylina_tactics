@@ -56,8 +56,6 @@ export interface AutoEndTurnConditions {
   isSpectator: boolean;
   isTraining: boolean;
   activeHint: TrainingHintConfig | null;
-  /** Настройка игрока; по умолчанию включена для обратной совместимости. */
-  autoEndTurn: boolean;
   activeOwner: number;
   viewOwner: number;
   /** Живые бойцы активной стороны (coverType 0, maxAp > 0). */
@@ -84,7 +82,6 @@ export interface AutoEndTurnConditions {
  */
 export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (conditions.paused || conditions.busy || conditions.enemyPhase) return false;
-  if (!conditions.autoEndTurn) return false;
   if (conditions.isReplay || conditions.isSpectator) return false;
   if (conditions.activeOwner !== conditions.viewOwner) return false;
   // A training step is a contract with the player. The scenario prescribes

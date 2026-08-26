@@ -59,7 +59,6 @@ describe("shouldAutoEndTurn in training (0.20.13)", () => {
       isSpectator: false,
       isTraining: true,
       activeHint: hint({ until: "move" }),
-      autoEndTurn: true,
       activeOwner: 1,
       viewOwner: 1,
       ownUnits: [{ ap: 0 }],
@@ -82,6 +81,5 @@ describe("shouldAutoEndTurn in training (0.20.13)", () => {
     expect(conditions({ activeHint: null, busy: true })).toBe(false);
     expect(conditions({ activeHint: null, enemyPhase: true })).toBe(false);
     expect(conditions({ activeHint: null, isTraining: false, outcomeOngoing: false })).toBe(false);
-    expect(conditions({ activeHint: null, autoEndTurn: false })).toBe(false);
   });
 });

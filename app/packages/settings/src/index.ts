@@ -9,8 +9,6 @@ export interface SettingsState {
   highContrast: boolean;
   /** Показывать подсказки и туториалы «первого раза» (0.20.0); по умолчанию включено. */
   showHints: boolean;
-  /** Автоматически передавать ход, когда у живых бойцов не осталось ОД. */
-  autoEndTurn: boolean;
   /**
    * Отладочный режим (0.20.1, doc/debug-mode.md): включает средства QA
    * (оверлей стоимости, автопобеда) в боевом интерфейсе. Помимо адреса с
@@ -28,8 +26,6 @@ export const defaultSettings: SettingsState = {
   fontScale: 1,
   highContrast: false,
   showHints: true,
-  // Сохраняет прежнее поведение автоматического перехода хода.
-  autoEndTurn: true,
   debugMode: false,
 };
 
@@ -61,7 +57,6 @@ export function sanitizeSettings(
     fontScale: clamp(Number(raw?.fontScale ?? defaultSettings.fontScale), 0.85, 1.4),
     highContrast: Boolean(raw?.highContrast),
     showHints: raw?.showHints !== false,
-    autoEndTurn: raw?.autoEndTurn !== false,
     debugMode: Boolean(raw?.debugMode),
   };
 }
