@@ -54,6 +54,13 @@ export interface SkillPreview {
   cover?: 0 | 1 | 2;
   heightMod?: -1 | 0 | 1;
   flanked?: boolean;
+  /**
+   * Клетки области действия (0.20.21, этап 2.6): для умений с радиусом —
+   * все клетки в радиусе с допустимым перепадом ярусов (§ areaTargets);
+   * для точечных — клетка цели либо пара «цель + назначение» у переноса.
+   * Чистая информация для предпросмотра интерфейсом, на правила не влияет.
+   */
+  areaCells?: CellPos[];
 }
 
 export type SpawnEffect = Extract<SkillEffect, { type: "spawn" }>;

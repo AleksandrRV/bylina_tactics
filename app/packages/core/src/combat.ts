@@ -45,6 +45,8 @@ export interface HitPreview {
    *  разрушается (§10.4 math). Позволяет интерфейсу показать «разрушить
    *  укрытие» вместо чисел вероятности/урона. */
   coverTarget?: boolean;
+  /** Клетки области действия умения (0.20.21, этап 2.6) — для предпросмотра. */
+  areaCells?: CellPos[];
 }
 
 export interface AttackResolution {
