@@ -2,8 +2,8 @@
   position: relative;
   height: 100dvh;
   overflow: hidden;
-  background: #101410;
-  color: #d5cfc0;
+  background: var(--field-background);
+  color: var(--mist);
   touch-action: none;
 }
 
@@ -63,23 +63,59 @@
 
 .hud-btn {
   appearance: none;
-  border: 1px solid #3a4550;
-  background: #1c2320;
-  color: #d5cfc0;
+  border: 1px solid var(--line);
+  background: var(--button-surface);
+  color: var(--mist);
   padding: 10px 12px;
   min-height: 44px;
   cursor: pointer;
 }
 
-.hud-btn:hover,
-.hud-btn:focus-visible {
-  border-color: #e0b34a;
+.hud-btn:hover:not(:disabled),
+.hud-btn:focus-visible:not(:disabled) {
+  border-color: var(--amber);
   outline: none;
+  /* Общее мягкое янтарное свечение для основных боевых команд. */
+  box-shadow: 0 0 14px rgba(224, 179, 74, 0.22);
+}
+
+.hud-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
+}
+
+/* Переключатель темпа доступен мышью, клавиатурой и скринридером. */
+.speed-toggle {
+  min-width: 48px;
+  padding-inline: 9px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.speed-toggle.is-on {
+  border-color: var(--warning);
+  color: var(--warning);
+  box-shadow: 0 0 14px rgba(255, 210, 104, 0.24);
 }
 
 .hud-btn-primary {
-  background: linear-gradient(180deg, #222a32, #1a2026);
-  color: #f3ecdc;
+  background: linear-gradient(180deg, var(--primary-surface-top), var(--primary-surface-bottom));
+  color: var(--white);
+}
+
+/* «Завершить ход» — главная команда, когда все ОД потрачены. */
+.end-turn-btn.is-ready {
+  border-color: var(--amber);
+  color: var(--ink);
+  font-weight: 700;
+  background: linear-gradient(180deg, rgba(224, 179, 74, 0.98), rgba(224, 179, 74, 0.78));
+  box-shadow: 0 0 18px rgba(224, 179, 74, 0.28);
+}
+
+.end-turn-btn.is-ready:hover:not(:disabled),
+.end-turn-btn.is-ready:focus-visible:not(:disabled) {
+  background: linear-gradient(180deg, rgba(246, 210, 117, 0.98), rgba(224, 179, 74, 0.86));
+  box-shadow: 0 0 24px rgba(224, 179, 74, 0.45);
 }
 
 .roster {
@@ -97,17 +133,17 @@
   gap: 8px;
   min-width: 108px;
   min-height: 48px;
-  border: 1px solid #3a4550;
-  background: #161c18;
-  color: #d5cfc0;
+  border: 1px solid var(--line);
+  background: var(--roster-surface);
+  color: var(--mist);
   padding: 5px 9px 5px 5px;
   text-align: left;
   cursor: pointer;
 }
 
 .roster-card.is-on {
-  border-color: #e0b34a;
-  background: #1d231b;
+  border-color: var(--amber);
+  background: var(--roster-selected);
 }
 
 .roster-card.is-dead {
@@ -124,7 +160,7 @@
 }
 
 .roster-card.is-on .roster-face {
-  border-color: #e0b34a;
+  border-color: var(--amber);
 }
 
 .roster-card.is-dead .roster-face {
@@ -156,13 +192,13 @@
   height: 30px;
   border-radius: 50%;
   object-fit: cover;
-  border: 2px solid #6d9a3a;
-  background: #131b10;
+  border: 2px solid var(--nav);
+  background: var(--nav-surface);
 }
 
 .enemy-face.is-dead {
   filter: grayscale(1) brightness(0.5);
-  border-color: #3a4550;
+  border-color: var(--line);
 }
 
 .diamonds {
@@ -175,12 +211,12 @@
   width: 10px;
   height: 10px;
   transform: rotate(45deg);
-  border: 2px solid #e0b34a;
+  border: 2px solid var(--amber);
   background: transparent;
 }
 
 .diamond.is-on {
-  background: #e0b34a;
+  background: var(--amber);
 }
 
 .battle-selected {
@@ -199,7 +235,7 @@
   height: 52px;
   border-radius: 8px;
   object-fit: cover;
-  border: 1px solid #e0b34a;
+  border: 1px solid var(--amber);
   flex: 0 0 auto;
 }
 
@@ -218,7 +254,7 @@
   transform: translateX(-50%);
   padding: 8px 26px;
   background: linear-gradient(180deg, rgba(26, 36, 19, 0.96), rgba(15, 21, 10, 0.96));
-  border: 1px solid #8bc34a;
+  border: 1px solid var(--nav);
   border-radius: 4px;
   color: #cfe8a0;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
@@ -304,6 +340,13 @@
   transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
 }
 
+.skill-slot:hover:not(:disabled),
+.skill-slot:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  outline: none;
+  box-shadow: 0 0 12px rgba(224, 179, 74, 0.2);
+}
+
 .skill-slot::before {
   content: "";
   position: absolute;
@@ -320,9 +363,9 @@
 .skill-slot.is-active,
 .skill-slot[aria-pressed="true"],
 .skill-slot:active:not(:disabled) {
-  border-color: #e0b34a;
+  border-color: var(--amber);
   background: linear-gradient(180deg, #4a3b1e, #2d2819);
-  color: #fff2c4;
+  color: var(--bright-text);
   box-shadow: 0 0 0 1px rgba(224, 179, 74, 0.25), 0 0 14px rgba(224, 179, 74, 0.2);
 }
 
@@ -330,7 +373,7 @@
 .skill-slot[aria-pressed="true"]::before,
 .skill-slot:active:not(:disabled)::before {
   border-color: #ffe49a;
-  background: #e0b34a;
+  background: var(--amber);
   box-shadow: 0 0 7px rgba(224, 179, 74, 0.8);
 }
 
@@ -369,7 +412,7 @@
 .skill-slot kbd {
   display: block;
   font-size: 0.68rem;
-  color: #9a9384;
+  color: var(--mist-dim);
   margin-bottom: 2px;
 }
 
@@ -384,7 +427,7 @@
   font-size: 0.82rem;
   font-variant-numeric: tabular-nums;
   background: rgba(28, 35, 32, 0.94);
-  border: 1px solid #3a4550;
+  border: 1px solid var(--line);
   pointer-events: auto;
   max-width: 360px;
 }
@@ -399,7 +442,7 @@
 .aim-chance {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .aim-chance.blocked {
@@ -409,17 +452,17 @@
 
 .aim-dmg {
   font-size: 0.78rem;
-  color: #9a9384;
+  color: var(--mist-dim);
 }
 
 .aim-copy-btn {
   margin-left: auto;
   background: rgba(58, 69, 80, 0.4);
-  border: 1px solid #3a4550;
+  border: 1px solid var(--line);
   border-radius: 4px;
   padding: 4px 6px;
   cursor: pointer;
-  color: #9a9384;
+  color: var(--mist-dim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -427,8 +470,8 @@
 }
 
 .aim-copy-btn:hover {
-  border-color: #e0b34a;
-  color: #e0b34a;
+  border-color: var(--amber);
+  color: var(--amber);
   background: rgba(224, 179, 74, 0.1);
 }
 
@@ -444,7 +487,7 @@
 }
 
 .bd-item {
-  color: #9a9384;
+  color: var(--mist-dim);
 }
 
 .bd-item.pos {
@@ -465,7 +508,7 @@
 .bd-details-title {
   display: block;
   font-size: 0.68rem;
-  color: #9a9384;
+  color: var(--mist-dim);
   margin-bottom: 2px;
   font-weight: 600;
 }
@@ -476,7 +519,7 @@
   color: #c0b898;
   line-height: 1.3;
   padding-left: 6px;
-  border-left: 2px solid #3a4550;
+  border-left: 2px solid var(--line);
   margin-bottom: 2px;
 }
 
@@ -486,9 +529,9 @@
   font-size: 0.88rem;
   font-variant-numeric: tabular-nums;
   background: rgba(28, 35, 32, 0.92);
-  border: 1px solid #3a4550;
+  border: 1px solid var(--line);
   pointer-events: none;
-  color: #e0b34a;
+  color: var(--amber);
 }
 
 .battle-mid {
@@ -513,8 +556,8 @@
 
 .pause-card {
   width: min(100%, 360px);
-  background: #1c232a;
-  border: 1px solid #3a4550;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
   padding: 22px 20px 18px;
 }
 
@@ -566,7 +609,7 @@
   background: rgba(16, 22, 16, 0.94);
   border: 1px solid rgba(224, 179, 74, 0.55);
   border-radius: 8px;
-  color: #f3ecdc;
+  color: var(--white);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   z-index: 72;
   animation: campaign-hint-in-banner 320ms ease-out both;
@@ -623,7 +666,7 @@
 .pause-card h2 {
   margin: 0 0 14px;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .pause-card .hud-btn {
@@ -864,9 +907,9 @@
   display: inline-block;
   margin-right: 8px;
   padding: 1px 8px;
-  border: 1px solid var(--amber-dim, #8a6a24);
+  border: 1px solid var(--amber-dim);
   border-radius: 2px;
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.68rem;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -875,14 +918,14 @@
 
 /* Отладочная автопобеда: янтарная молния, отличная от жука-переключателя */
 .debug-win {
-  color: var(--amber, #e0b34a);
-  border-color: var(--amber-dim, #8a6a24);
+  color: var(--amber);
+  border-color: var(--amber-dim);
 }
 
 .debug-win:hover,
 .debug-win:focus-visible {
-  border-color: var(--amber, #e0b34a);
-  color: #f3ecdc;
+  border-color: var(--amber);
+  color: var(--white);
   box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
 }
 
@@ -924,7 +967,7 @@
 
 .objective-name {
   font-size: 0.72rem;
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   letter-spacing: 0.04em;
 }
 
@@ -1041,11 +1084,11 @@
 
 .pvp-side-emblem.is-active {
   transform: scale(1.18);
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .pvp-side-emblem.is-side1.is-active {
-  border-color: var(--amber, #e0b34a);
+  border-color: var(--amber);
   box-shadow: 0 0 14px rgba(224, 179, 74, 0.55);
   animation: emblem-pulse 1.8s ease-in-out infinite;
 }
@@ -1086,7 +1129,7 @@
   width: 26px;
   height: 26px;
   border: 2px solid rgba(224, 179, 74, 0.25);
-  border-top-color: var(--amber, #e0b34a);
+  border-top-color: var(--amber);
   border-radius: 50%;
   animation: net-spin 0.9s linear infinite;
 }
@@ -1193,7 +1236,7 @@
   border: 1px solid rgba(224, 179, 74, 0.45);
   border-bottom: 2px solid rgba(224, 179, 74, 0.55);
   border-radius: 10px;
-  color: #f3ecdc;
+  color: var(--white);
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   z-index: 69;
   pointer-events: none;
@@ -1225,7 +1268,7 @@
 }
 
 .training-coach-name {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.72rem;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -1329,7 +1372,7 @@
   padding: 2px 10px;
   border-radius: 10px;
   background: rgba(224, 179, 74, 0.15);
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-family: monospace;
   font-size: 0.75rem;
   letter-spacing: 0.06em;
@@ -1346,7 +1389,7 @@
 
 .controls-help summary {
   cursor: pointer;
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.85rem;
   letter-spacing: 0.05em;
   text-transform: uppercase;
@@ -1367,14 +1410,45 @@
   min-width: 22px;
   padding: 1px 6px;
   margin-right: 8px;
-  border: 1px solid #3a4550;
+  border: 1px solid var(--line);
   border-bottom-width: 2px;
   border-radius: 4px;
   background: rgba(28, 35, 32, 0.9);
-  color: #f3ecdc;
+  color: var(--white);
   font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
   font-size: 0.75rem;
   text-align: center;
+}
+
+/* Целевая клетка обучения за пределами видимой области: стрелка на кромке
+   остаётся доступной без наведения и направлена к цели. */
+.training-edge-hint {
+  position: absolute;
+  z-index: 72;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(191, 240, 255, 0.78);
+  border-radius: 50%;
+  background: rgba(7, 20, 25, 0.9);
+  color: #d8f8ff;
+  font-size: 1.5rem;
+  line-height: 1;
+  pointer-events: none;
+  box-shadow: 0 0 0 3px rgba(96, 200, 255, 0.16), 0 0 18px rgba(96, 200, 255, 0.48);
+  animation: training-edge-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes training-edge-pulse {
+  0%,
+  100% {
+    opacity: 0.78;
+  }
+  50% {
+    opacity: 1;
+    box-shadow: 0 0 0 5px rgba(96, 200, 255, 0.08), 0 0 24px rgba(96, 200, 255, 0.65);
+  }
 }
 
 /* Плашка реактивной подсказки обучения (0.20.1): у нижнего края, над
@@ -1402,7 +1476,7 @@
 }
 
 .training-note-mark {
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   flex: none;
 }
 
@@ -1425,8 +1499,8 @@
 
 .training-skip:hover,
 .training-skip:focus-visible {
-  border-color: var(--amber, #e0b34a);
-  color: var(--amber, #e0b34a);
+  border-color: var(--amber);
+  color: var(--amber);
 }
 
 /* Кнопка «Далее» ознакомительного шага (0.20.2). */
@@ -1437,7 +1511,7 @@
   border: 1px solid rgba(224, 179, 74, 0.6);
   border-radius: 10px;
   background: rgba(224, 179, 74, 0.16);
-  color: var(--amber, #e0b34a);
+  color: var(--amber);
   font-size: 0.85rem;
   cursor: pointer;
   pointer-events: auto;
@@ -1473,6 +1547,258 @@
 }
 
 .training-step-dot.is-current {
-  background: var(--amber, #e0b34a);
+  background: var(--amber);
   transform: scale(1.3);
+}
+
+/* Уважение к системной настройке «уменьшить движение» (Этап 1.7).
+   Сама логика Pixi также получает этот флаг из BattleScreenView. */
+@media (prefers-reduced-motion: reduce) {
+  .battle-screen,
+  .battle-screen *,
+  .battle-screen *::before,
+  .battle-screen *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   Этап 4: мобильная панель и привязанная карточка шанса
+   ============================================================ */
+
+/* DOM-позиция подсказки рассчитывается от экранной позиции цели в рендерере.
+   battle-hud становится её containing block, поэтому панель не выпадает за
+   границы поля при панорамировании и на узком экране. */
+.battle-mid {
+  position: static;
+}
+
+.aim-card {
+  position: absolute;
+  z-index: 24;
+  left: 50%;
+  top: 50%;
+  max-width: min(360px, calc(100% - 16px));
+  margin: 0;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.42);
+  animation: aim-card-in var(--ui-motion-duration) var(--ui-motion-ease) both;
+}
+
+@keyframes aim-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(5px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.skill-row-wrap {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.skill-row {
+  min-width: 0;
+  flex-wrap: nowrap;
+  justify-content: flex-start;
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  overscroll-behavior-inline: contain;
+  padding: 2px 1px;
+}
+
+.skill-row::-webkit-scrollbar,
+.roster::-webkit-scrollbar {
+  display: none;
+}
+
+.skill-row-hint {
+  display: none;
+  align-self: center;
+  color: var(--mist-dim);
+  font-size: 0.62rem;
+  letter-spacing: 0.06em;
+  opacity: 0.82;
+}
+
+/* Круглые аватары не теряют ОД: ромбики остаются отдельным слоем внутри
+   кнопки, а полное имя доступно через aria-label/title. */
+@media (max-width: 640px) {
+  .battle-bottom {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .roster {
+    order: 1;
+    flex: 0 1 auto;
+    max-width: 42%;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overflow-y: visible;
+    justify-content: flex-start;
+    padding: 3px 3px 5px;
+  }
+
+  .roster-card {
+    position: relative;
+    flex: 0 0 46px;
+    width: 46px;
+    min-width: 46px;
+    height: 46px;
+    min-height: 46px;
+    padding: 4px;
+    border-radius: 50%;
+    justify-content: center;
+    background: radial-gradient(circle at 35% 28%, #26352b, #141b18);
+  }
+
+  .roster-card.is-on {
+    box-shadow: 0 0 0 2px rgba(224, 179, 74, 0.24), 0 0 12px rgba(224, 179, 74, 0.18);
+  }
+
+  .roster-face {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+  }
+
+  .roster-meta {
+    position: absolute;
+    inset: auto 0 -2px;
+    align-items: center;
+    pointer-events: none;
+  }
+
+  .roster-card .name {
+    display: none;
+  }
+
+  .roster-card .diamonds {
+    gap: 3px;
+    margin: 0;
+    padding: 2px 4px;
+    border-radius: 7px;
+    background: rgba(9, 12, 10, 0.9);
+  }
+
+  .roster-card .diamond {
+    width: 7px;
+    height: 7px;
+    border-width: 1px;
+  }
+
+  .skill-row-wrap {
+    order: 2;
+    flex: 1 1 52%;
+    max-width: none;
+  }
+
+  .skill-row {
+    justify-content: flex-start;
+  }
+
+  .skill-row-hint {
+    display: block;
+  }
+
+  .skill-slot {
+    flex: 0 0 auto;
+    min-width: 76px;
+  }
+
+  .battle-selected {
+    order: 3;
+    flex: 1 1 100%;
+  }
+
+  .end-turn-btn {
+    order: 4;
+  }
+}
+
+@media (max-width: 420px) and (orientation: portrait) {
+  .roster {
+    max-width: 100%;
+    flex-basis: 100%;
+    order: 1;
+  }
+
+  .skill-row-wrap {
+    flex-basis: 100%;
+    order: 2;
+  }
+}
+
+/* 4.10: all transient panels use the same entrance rhythm as modal windows. */
+.modal-root,
+.pause-root,
+.pass-device-root {
+  animation: ui-overlay-in var(--ui-motion-duration) var(--ui-motion-ease) both;
+}
+
+.modal,
+.pause-card,
+.pass-device-card,
+.campaign-hint-card {
+  animation: ui-panel-in var(--ui-motion-duration) var(--ui-motion-ease) both;
+}
+
+.phase-banner,
+.campaign-hint-banner,
+.training-coach,
+.training-note,
+.replay-bar,
+.scan-toast,
+.loss-banner {
+  animation-duration: var(--ui-motion-duration);
+  animation-timing-function: var(--ui-motion-ease);
+}
+
+@keyframes ui-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes ui-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aim-card,
+  .training-edge-hint,
+  .modal-root,
+  .pause-root,
+  .pass-device-root,
+  .modal,
+  .pause-card,
+  .pass-device-card,
+  .campaign-hint-card,
+  .phase-banner,
+  .campaign-hint-banner,
+  .training-coach,
+  .training-note,
+  .replay-bar,
+  .loss-banner {
+    animation: none !important;
+  }
 }

@@ -1,14 +1,11 @@
 :root {
   color-scheme: dark;
-  --ink: #14181c;
-  --ink-2: #1c232a;
-  --ink-3: #262f38;
-  --line: #3a4550;
-  --mist: #d5cfc0;
-  --mist-dim: #9a9384;
-  --amber: #e0b34a;
-  --amber-dim: #8a6a24;
+  /* Цветовые custom properties устанавливаются из @bylina/render до
+     первого рендера. PixiJS и CSS поэтому используют один справочник. */
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
+  /* Единый ритм появления модалок, плашек и баннеров (Этап 4.10). */
+  --ui-motion-duration: 300ms;
+  --ui-motion-ease: cubic-bezier(0.22, 1, 0.36, 1);
   font-family: "Segoe UI", "PT Sans", "Noto Sans", system-ui, sans-serif;
   font-size: 17px;
   line-height: 1.45;
@@ -42,7 +39,7 @@ body {
       transparent 0 27px,
       rgba(224, 179, 74, 0.035) 27px 28px
     ),
-    radial-gradient(1200px 600px at 50% -10%, #2a333c, var(--ink));
+    radial-gradient(1200px 600px at 50% -10%, var(--backdrop-highlight), var(--ink));
 }
 
 button,
@@ -77,11 +74,30 @@ input {
 .display-title {
   margin: 0;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", "Times New Roman", serif;
-  font-weight: 600;
+  font-weight: 700;
   font-size: clamp(2.6rem, 10vw, 4rem);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.055em;
   line-height: 0.95;
-  color: #f3ecdc;
+  color: var(--white);
+  text-wrap: balance;
+  font-kerning: normal;
+  text-shadow: 0 1px 0 rgba(8, 10, 12, 0.9), 0 0 1px rgba(255, 242, 196, 0.35);
+}
+
+/* 4.11: типографическая обработка системного serif вместо внешнего шрифта.
+   Так мы не встраиваем непроверенный файл, сохраняем кириллицу и применяем
+   display-акцент только к крупным заголовкам, не ухудшая плотность HUD. */
+.campaign-title-block h1,
+.settings-head h1,
+.mission-title,
+.pause-card h2,
+.modal h2 {
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", "Times New Roman", serif;
+  font-weight: 700;
+  letter-spacing: 0.045em;
+  text-wrap: balance;
+  font-kerning: normal;
+  text-shadow: 0 1px 0 rgba(8, 10, 12, 0.9), 0 0 1px rgba(255, 242, 196, 0.3);
 }
 
 .muted {
@@ -157,7 +173,7 @@ input {
 }
 
 .btn-primary {
-  background: linear-gradient(180deg, #222a32, #1a2026);
+  background: linear-gradient(180deg, var(--primary-surface-top), var(--primary-surface-bottom));
 }
 
 .btn-ghost {
@@ -184,7 +200,7 @@ input {
   margin: 0;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
   font-size: 2.2rem;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .panel {
@@ -248,7 +264,7 @@ input {
   width: 44px;
   height: 24px;
   border-radius: 12px;
-  border: 1px solid #3a4550;
+  border: 1px solid var(--line);
   background: rgba(28, 35, 32, 0.9);
   position: relative;
   cursor: pointer;
@@ -275,7 +291,7 @@ input {
 
 .toggle-row input[type="checkbox"]:checked::after {
   transform: translateX(20px);
-  background: var(--amber, #e0b34a);
+  background: var(--amber);
 }
 
 .volume-value {
@@ -309,7 +325,7 @@ input[type="range"] {
 .modal h2 {
   margin: 0 0 10px;
   font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
-  color: #f3ecdc;
+  color: var(--white);
 }
 
 .modal .btn {

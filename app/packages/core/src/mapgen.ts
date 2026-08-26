@@ -3,7 +3,11 @@ import { findPath } from "./pathfinding.js";
 import type { Rng } from "./rng.js";
 import type { EntityState, Grid, Tile } from "./types.js";
 
+export type BiomeId = "meadow" | "swamp" | "thicket" | "scorched";
+
 export interface MapGenConfig {
+  /** Visual-only biome; omitted by legacy maps and treated as meadow. */
+  biome?: BiomeId;
   width: number;
   height: number;
   pitChance: number;

@@ -20,3 +20,26 @@ export function useSettingsState() {
   useEffect(() => settings.subscribe(setState), [settings]);
   return state;
 }
+
+/** Системная настройка доступности: едина для DOM и Pixi-слоя боя. */
+export function usePrefersReducedMotion(): boolean {
+  const read = (): boolean =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(prefers-reduced-motion: reduce)").matches
+      : false;
+  const [reduced, setReduced] = useState(read);
+
+  useEffect(() => {
+    const query = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const update = (): void => setReduced(query.matches);
+    update();
+    if (typeof query.addEventListener === "function") {
+      query.addEventListener("change", update);
+      return () => query.removeEventListener("change", update);
+    }
+    query.addListener(update);
+    return () => query.removeListener(update);
+  }, []);
+
+  return reduced;
+}

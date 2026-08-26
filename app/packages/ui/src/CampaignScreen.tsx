@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ItemConfig, MissionConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
+import { useI18nTick, usePrefersReducedMotion, useSessionState, useSettingsState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
@@ -11,8 +11,68 @@ const CLASS_IDS: readonly string[] = ["bogatyr", "strelets", "znaharka", "volkhv
 
 type CampTab = "map" | "roster" | "chamber" | "forge";
 
-/** Геометрические знаки-руны отметок: плоские формы вместо орнамента (ui-design §1). */
-const RUNES: readonly string[] = ["✦", "▲", "◆", "⬢", "✶", "✵"];
+type ShipFlight = {
+  id: number;
+  from: { x: number; y: number };
+  to: { x: number; y: number };
+};
+
+/**
+ * Путь для дороги строится только по открытым точкам. Отдельные серии
+ * позволяют не соединять видимые миссии с закрытыми участками карты.
+ */
+function roadPath(missions: readonly MissionConfig[]): string {
+  return missions.map((mission) => `${mission.x},${mission.y}`).join(" ");
+}
+
+function openRoadSegments(
+  missions: readonly MissionConfig[],
+  statuses: ReadonlyMap<string, string>,
+): MissionConfig[][] {
+  const segments: MissionConfig[][] = [];
+  let current: MissionConfig[] = [];
+  for (const mission of missions) {
+    if (statuses.get(mission.id) !== "locked") {
+      current.push(mission);
+      continue;
+    }
+    if (current.length > 1) segments.push(current);
+    current = [];
+  }
+  if (current.length > 1) segments.push(current);
+  return segments;
+}
+
+function flightArc(flight: ShipFlight): { midX: number; midY: number; arc: number; path: string } {
+  const dx = flight.to.x - flight.from.x;
+  const dy = flight.to.y - flight.from.y;
+  const distance = Math.hypot(dx, dy);
+  const arc = Math.min(12, Math.max(5, distance * 0.18));
+  const midX = (flight.from.x + flight.to.x) / 2;
+  const midY = (flight.from.y + flight.to.y) / 2;
+  const controlX = midX - (dy / Math.max(distance, 1)) * arc;
+  const controlY = midY + (dx / Math.max(distance, 1)) * arc;
+  return {
+    midX,
+    midY,
+    arc,
+    path: `M ${flight.from.x} ${flight.from.y} Q ${controlX} ${controlY} ${flight.to.x} ${flight.to.y}`,
+  };
+}
+
+function missionIcon(type: MissionConfig["type"]) {
+  switch (type) {
+    case "destroy":
+      return <IdolIcon />;
+    case "rescue":
+      return <ShieldIcon />;
+    case "recon":
+    case "needle":
+      return <ReconIcon />;
+    default:
+      return <SwordsIcon />;
+  }
+}
 
 function unitName(unitId: string): string {
   return `unit.${unitId}.name`;
@@ -20,10 +80,6 @@ function unitName(unitId: string): string {
 
 function itemName(itemId: string): string {
   return `item.${itemId}.name`;
-}
-
-function roadPath(missions: readonly MissionConfig[]): string {
-  return missions.map((mission) => `${mission.x},${mission.y}`).join(" ");
 }
 
 /** Строка эффекта предмета для карточки Кузни и снаряжения. */
@@ -218,8 +274,12 @@ export function CampaignScreen() {
   const items = campaign.getItems();
   const settings = useSettingsState();
   const { campaignHintsDone } = useSessionState();
+  const reducedMotion = usePrefersReducedMotion();
   const [tab, setTab] = useState<CampTab>("map");
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const initialFlight = campaign.getLastFlight();
+  const [shipFlight, setShipFlight] = useState<ShipFlight | null>(initialFlight);
+  const flightSeenRef = useRef<number | null>(initialFlight?.id ?? null);
   const [trainingId, setTrainingId] = useState<number | null>(null);
   const [scanKey, setScanKey] = useState<number>(0);
   const [justOpened, setJustOpened] = useState<string[]>([]);
@@ -236,6 +296,20 @@ export function CampaignScreen() {
       }),
     [campaign],
   );
+
+  const lastFlight = campaign.getLastFlight();
+  const lastFlightId = lastFlight?.id ?? null;
+  useEffect(() => {
+    if (!lastFlight || lastFlight.id === flightSeenRef.current) return;
+    flightSeenRef.current = lastFlight.id;
+    setShipFlight(lastFlight);
+  }, [lastFlightId]);
+
+  useEffect(() => {
+    if (!shipFlight) return;
+    const timer = window.setTimeout(() => setShipFlight(null), 1_050);
+    return () => window.clearTimeout(timer);
+  }, [shipFlight?.id]);
 
   const byId = useMemo(() => {
     const map = new Map<string, MissionConfig>();
@@ -256,6 +330,15 @@ export function CampaignScreen() {
   const lockedCount = state.missions.filter((point) => point.status === "locked").length;
 
   const shipPosition = state.shipPosition;
+  const activeVisualFlight = shipFlight && !reducedMotion ? shipFlight : null;
+  const missionStatuses = useMemo(
+    () => new Map(state.missions.map((point) => [point.id, point.status] as const)),
+    [state.missions],
+  );
+  const roadSegments = useMemo(
+    () => openRoadSegments(missions, missionStatuses),
+    [missions, missionStatuses],
+  );
   const woundedFighters = state.fighters.filter((fighter) => fighter.alive && fighter.wounded);
   const training = trainingId !== null ? state.fighters.find((fighter) => fighter.id === trainingId) : undefined;
 
@@ -331,6 +414,23 @@ export function CampaignScreen() {
     );
   }
 
+  const flightShape = activeVisualFlight ? flightArc(activeVisualFlight) : null;
+  const mapStyle = {
+    "--ship-x": `${shipPosition.x}%`,
+    "--ship-y": `${shipPosition.y}%`,
+    ...(flightShape && activeVisualFlight
+      ? {
+          "--ship-from-x": `${activeVisualFlight.from.x}%`,
+          "--ship-from-y": `${activeVisualFlight.from.y}%`,
+          "--ship-mid-x": `${flightShape.midX}%`,
+          "--ship-mid-y": `${flightShape.midY}%`,
+          "--ship-arc": `${flightShape.arc}%`,
+          "--ship-to-x": `${activeVisualFlight.to.x}%`,
+          "--ship-to-y": `${activeVisualFlight.to.y}%`,
+        }
+      : {}),
+  } as CSSProperties;
+
   return (
     <div className="screen campaign-screen">
       <header className="campaign-top">
@@ -348,7 +448,7 @@ export function CampaignScreen() {
         </button>
         <div className="campaign-title-block">
           <p className="eyebrow">{t("campaign.kingdom")}</p>
-          <h1>{t("menu.campaign")}</h1>
+          <h1 className="display-title">{t("menu.campaign")}</h1>
         </div>
         <div className="campaign-darkness" aria-label={t("campaign.darknessLabel")}>
           <span className="campaign-darkness-name">{t("campaign.darkness")}</span>
@@ -401,12 +501,12 @@ export function CampaignScreen() {
           </div>
 
           <div
-            className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}`}
+            className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}${activeVisualFlight ? " is-flying" : ""}`}
             role="region"
             aria-label={t("campaign.mapLabel")}
-            style={{ "--ship-x": `${shipPosition.x}%`, "--ship-y": `${shipPosition.y}%` } as CSSProperties}
+            style={mapStyle}
           >
-            {/* Декоративный рельеф: река, горы, леса, дорога между точками */}
+            {/* Декоративный рельеф: река, горы, леса и открытые участки дороги */}
             <svg className="map-terrain" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path
                 d="M-4 58 C 14 46 26 62 40 54 C 54 46 58 28 78 24 C 88 22 98 30 106 22"
@@ -430,30 +530,37 @@ export function CampaignScreen() {
               <path d="M13 74 19 86 7 86Z" fill="#223027" />
               <path d="M20 80 26 92 14 92Z" fill="#1e2a22" />
               <path d="M27 76 33 87 21 87Z" fill="#223027" />
-              <polyline
-                points={roadPath(missions)}
-                fill="none"
-                stroke="rgba(224, 179, 74, 0.16)"
-                strokeWidth="0.5"
-                strokeDasharray="1.6 1.8"
-                strokeLinecap="round"
-              />
+              {roadSegments.map((segment, index) => (
+                <polyline
+                  key={`${segment[0]?.id}-${segment[segment.length - 1]?.id}`}
+                  className="map-road-segment"
+                  points={roadPath(segment)}
+                  fill="none"
+                  pathLength="100"
+                  style={{ animationDelay: `${index * 90}ms` }}
+                />
+              ))}
             </svg>
+            {flightShape && activeVisualFlight ? (
+              <svg className="ship-flight-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                <path className="ship-flight-trail-glow" d={flightShape.path} pathLength="100" />
+                <path className="ship-flight-trail" d={flightShape.path} pathLength="100" />
+              </svg>
+            ) : null}
             <div className="map-fog" aria-hidden="true" />
             {/* Волна сканирования от корабля */}
             {scanKey > 0 ? <div key={scanKey} className="scan-wave" aria-hidden="true" /> : null}
             {scanMissed ? <p className="scan-toast" role="status">{t("scan.nothing")}</p> : null}
 
-            {missions.map((mission, index) => {
+            {missions.map((mission) => {
               const point = state.missions.find((candidate) => candidate.id === mission.id);
               const status = point?.status ?? "locked";
-              const rune = RUNES[index % RUNES.length] ?? "✦";
               const isNewlyOpen = justOpened.includes(mission.id);
               return (
                 <button
                   key={mission.id}
                   type="button"
-                  className={`map-marker is-${status}${selectedId === mission.id ? " is-selected" : ""}${isNewlyOpen ? " is-revealed" : ""}`}
+                  className={`map-marker is-${status} is-mission-${mission.type}${selectedId === mission.id ? " is-selected" : ""}${isNewlyOpen ? " is-revealed" : ""}`}
                   style={{ left: `${mission.x}%`, top: `${mission.y}%` }}
                   aria-label={t(`campaign.marker.${status}`, { mission: mission.id })}
                   disabled={status === "locked"}
@@ -462,7 +569,8 @@ export function CampaignScreen() {
                   }}
                 >
                   <span className="marker-medallion" aria-hidden="true">
-                    {status === "done" ? "✓" : status === "locked" ? "?" : rune}
+                    {status === "locked" ? <span className="marker-locked">?</span> : missionIcon(mission.type)}
+                    {status === "done" ? <span className="marker-complete">✓</span> : null}
                   </span>
                   <span className="marker-label" aria-hidden="true">
                     {mission.id.replace("clearing_", "C")}
@@ -472,10 +580,13 @@ export function CampaignScreen() {
             })}
 
             <div
-              className="ship-marker"
+              className={`ship-marker${activeVisualFlight ? " is-flying" : ""}`}
               aria-hidden="true"
               title={t("campaign.ship")}
-              style={{ left: `${shipPosition.x}%`, top: `${shipPosition.y}%` }}
+              style={{
+                left: `${activeVisualFlight?.from.x ?? shipPosition.x}%`,
+                top: `${activeVisualFlight?.from.y ?? shipPosition.y}%`,
+              }}
             >
               <span className="ship-glyph">
                 <ShipIcon />
@@ -689,7 +800,8 @@ export function CampaignScreen() {
       ) : null}
 
       {tab === "chamber" ? (
-        <div className="roster-panel" aria-label={t("campaign.tabChamber")}>
+        <div className="roster-panel chamber-panel" aria-label={t("campaign.tabChamber")}>
+
           <div className="panel-head">
             <h2>{t("campaign.tabChamber")}</h2>
             <p className="muted">
