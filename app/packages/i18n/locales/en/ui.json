@@ -75,8 +75,6 @@
     "objectiveQuick": "Destroy all enemies",
     "enemyTurn": "The Nav advances",
     "pause": "Pause",
-    "fastPace": "Speed up battle",
-    "fastPaceHint": "Double speed is on: pauses, movement and effects run faster. Press to return to normal speed.",
     "resume": "Resume",
     "toMenu": "Return to menu",
     "hp": "Health {current} / {max}",
@@ -249,8 +247,6 @@
     "sfxVolume": "Actions",
     "showHints": "Show hints",
     "showHintsHint": "First-time tutorials in the campaign. Turning them off does not block progress.",
-    "autoEndTurn": "End turn automatically",
-    "autoEndTurnHint": "When your fighters have no action points left, the turn passes to the opponent without pressing the button.",
     "debugMode": "Debug mode",
     "debugModeHint": "Inspection tools (movement-cost overlay, auto-win) in battle. For developers and QA.",
     "back": "Back to menu"

@@ -33,13 +33,10 @@ const rendererStub: FieldRenderer = {
   setOnHover: vi.fn((handler: (x: number, y: number) => void) => {
     hover = handler;
   }),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
 };
 
 vi.mock("@bylina/render", () => ({
   createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
 }));
 
 beforeEach(() => {

@@ -10,11 +10,6 @@ export interface SettingsState {
   /** Показывать подсказки и туториалы «первого раза» (0.20.0); по умолчанию включено. */
   showHints: boolean;
   /**
-   * Автоматическое завершение хода, когда у всех бойцов стороны игрока
-   * не осталось очков действия (0.20.20, этап 1.5); по умолчанию выключено.
-   */
-  autoEndTurn: boolean;
-  /**
    * Отладочный режим (0.20.1, doc/debug-mode.md): включает средства QA
    * (оверлей стоимости, автопобеда) в боевом интерфейсе. Помимо адреса с
    * параметром `?debug=1` теперь активируется и настройкой — удобно на
@@ -31,7 +26,6 @@ export const defaultSettings: SettingsState = {
   fontScale: 1,
   highContrast: false,
   showHints: true,
-  autoEndTurn: false,
   debugMode: false,
 };
 
@@ -63,7 +57,6 @@ export function sanitizeSettings(
     fontScale: clamp(Number(raw?.fontScale ?? defaultSettings.fontScale), 0.85, 1.4),
     highContrast: Boolean(raw?.highContrast),
     showHints: raw?.showHints !== false,
-    autoEndTurn: Boolean(raw?.autoEndTurn),
     debugMode: Boolean(raw?.debugMode),
   };
 }

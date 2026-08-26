@@ -1197,7 +1197,7 @@
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55);
   z-index: 69;
   pointer-events: none;
-  animation: hint-in var(--pop-duration, 240ms) var(--pop-ease, ease-out);
+  animation: hint-in 300ms ease-out;
 }
 
 .training-coach-face {
@@ -1398,7 +1398,7 @@
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
   z-index: 71;
   pointer-events: none;
-  animation: hint-in var(--pop-duration, 240ms) var(--pop-ease, ease-out);
+  animation: hint-in 260ms ease-out;
 }
 
 .training-note-mark {
@@ -1475,149 +1475,4 @@
 .training-step-dot.is-current {
   background: var(--amber, #e0b34a);
   transform: scale(1.3);
-}
-
-/* Этап 2.10: кнопка темпа боя; активное состояние — янтарный контур. */
-.pace-toggle.is-on {
-  border-color: var(--amber, #e0b34a);
-  color: var(--amber, #e0b34a);
-}
-
-/* ---- Этап 4 (0.21.x) ------------------------------------------------ */
-
-/* 4.8: карточка прицеливания смещается ближе к цели — абсолютная позиция
-   в долях экрана, с удержанием в пределах и без перекрытия самой цели. */
-.aim-card.is-floating {
-  position: absolute;
-  z-index: 45;
-  margin: 0;
-  transform: translateX(-50%);
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
-}
-
-/* 4.5: приглушённо-красный акцент опасности на погибших бойцах вместо
-   нейтральной прозрачности. */
-.roster-card.is-dead {
-  border-color: rgba(176, 90, 90, 0.55);
-}
-
-/* 4.7: узкие экраны — лента оружия и умений прокручивается горизонтально
-   (индикатор прокрутки скрыт, у правого края — затухающая подсказка),
-   карточки дружины превращаются в круглые аватары с ромбами ОД. */
-@media (max-width: 640px) {
-  .skill-row {
-    flex-wrap: nowrap;
-    justify-content: flex-start;
-    overflow-x: auto;
-    scrollbar-width: none;
-    -webkit-overflow-scrolling: touch;
-    scroll-snap-type: x proximity;
-    position: relative;
-  }
-
-  .skill-row::-webkit-scrollbar {
-    display: none;
-  }
-
-  .skill-row > * {
-    scroll-snap-align: start;
-    flex: 0 0 auto;
-  }
-
-  /* Подсказка прокрутки: мягкое затухание у правого края ленты. */
-  .skill-row::after {
-    content: "";
-    position: sticky;
-    right: 0;
-    flex: 0 0 20px;
-    align-self: stretch;
-    background: linear-gradient(270deg, rgba(16, 20, 16, 0.9), transparent);
-    pointer-events: none;
-  }
-
-  .roster-card,
-  .roster-card.is-on {
-    min-width: 44px;
-    min-height: 44px;
-    width: 44px;
-    padding: 2px;
-    border-radius: 50%;
-    justify-content: center;
-  }
-
-  .roster-card .roster-face {
-    width: 34px;
-    height: 34px;
-    border-radius: 50%;
-  }
-
-  /* Имя скрывается; ромбы очков действия остаются рядом с аватаром. */
-  .roster-card .roster-meta .name {
-    display: none;
-  }
-
-  .roster-card .roster-meta {
-    position: absolute;
-    bottom: -3px;
-    left: 50%;
-    transform: translateX(-50%);
-    flex-direction: row;
-    background: rgba(10, 14, 10, 0.85);
-    border-radius: 4px;
-    padding: 1px 3px;
-  }
-
-  .roster-card .diamonds {
-    gap: 2px;
-    margin-top: 0;
-  }
-
-  .roster-card .diamond {
-    width: 5px;
-    height: 5px;
-  }
-}
-
-/* ---- Этап 1 (0.20.20): быстрые улучшения читаемости ----------------- */
-
-/* Этап 1.5: «Завершить ход» — самая частая команда боя. Когда у всех
-   бойцов стороны игрока не осталось очков действия, кнопка получает
-   янтарную заливку (по образцу активных переключателей языка). */
-.end-turn.is-ready:not(:disabled) {
-  border-color: var(--amber, #e0b34a);
-  background: linear-gradient(180deg, rgba(224, 179, 74, 0.85), rgba(224, 179, 74, 0.65));
-  color: #14181c;
-}
-
-.end-turn.is-ready:not(:disabled):hover,
-.end-turn.is-ready:not(:disabled):focus-visible {
-  background: linear-gradient(180deg, rgba(232, 182, 76, 0.95), rgba(224, 179, 74, 0.78));
-}
-
-/* Заблокированное состояние остаётся приглушённым. */
-.hud-btn:disabled {
-  opacity: 0.55;
-}
-
-/* Этап 1.10: основные кнопки действий боя при наведении получают мягкое
-   янтарное свечение — как у «Продолжить» в меню. */
-.skill-slot:hover,
-.skill-slot:focus-visible,
-.end-turn:not(:disabled):hover,
-.end-turn:not(:disabled):focus-visible {
-  box-shadow: 0 0 14px rgba(224, 179, 74, 0.35);
-}
-
-/* Этап 1.7: системная настройка «уменьшить движение» — боевой интерфейс
-   без пульсаций и покачиваний; анимации поля гасит сам рендерер. */
-@media (prefers-reduced-motion: reduce) {
-  .phase-banner,
-  .training-note,
-  .training-step-dot,
-  .hint-pulse,
-  .apple-hud-icon,
-  .objective-hp i {
-    animation: none !important;
-    transition: none !important;
-  }
 }

@@ -8,14 +8,8 @@ import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@byli
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
-import { applyPaletteCssVariables } from "@bylina/render";
 import { loadAppContent } from "./content-files.js";
 import { useInstallPrompt } from "./install.js";
-
-// Этап 1.1 (0.20.20): CSS-переменные интерфейса порождаются единым
-// справочником цветов пакета отрисовки — поле и стили используют одни
-// и те же величины. Статические значения styles.css остаются запасными.
-applyPaletteCssVariables();
 
 const localeModules = import.meta.glob("../../../packages/i18n/locales/*/*.json", {
   eager: true,

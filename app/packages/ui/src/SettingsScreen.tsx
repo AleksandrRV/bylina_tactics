@@ -74,23 +74,6 @@ export function SettingsScreen() {
       </section>
 
       <section className="panel">
-        <label className="toggle-row" htmlFor="auto-end-turn">
-          <span className="toggle-meta">
-            <span>{t("settings.autoEndTurn")}</span>
-            <span className="muted">{t("settings.autoEndTurnHint")}</span>
-          </span>
-          <input
-            id="auto-end-turn"
-            type="checkbox"
-            role="switch"
-            aria-checked={state.autoEndTurn}
-            checked={state.autoEndTurn}
-            onChange={(event) => settings.set({ autoEndTurn: event.target.checked })}
-          />
-        </label>
-      </section>
-
-      <section className="panel">
         <label className="toggle-row" htmlFor="debug-mode">
           <span className="toggle-meta">
             <span>{t("settings.debugMode")}</span>

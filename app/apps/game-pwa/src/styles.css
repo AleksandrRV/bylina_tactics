@@ -5,18 +5,9 @@
   --ink-3: #262f38;
   --line: #3a4550;
   --mist: #d5cfc0;
-  /* Этап 1.8: приглушённый текст осветлён до контраста ≥ 6:1 с фоном.
-     Значение дублируется справочником цветов пакета render (palette.ts),
-     который накладывает переменные при старте приложения. */
-  --mist-dim: #a8a196;
+  --mist-dim: #9a9384;
   --amber: #e0b34a;
   --amber-dim: #8a6a24;
-  /* Этап 4.10: единые константы анимации появления окон, плашек и баннеров. */
-  --pop-duration: 240ms;
-  --pop-ease: cubic-bezier(0.2, 0.9, 0.3, 1);
-  /* Этап 4.5: приглушённо-красный вторичный акцент опасности (ранения,
-     потери) — не пересекается с семантикой янтарного/синего/зелёного/жёлтого. */
-  --danger-muted: #b05a5a;
   --shadow: 0 18px 50px rgba(0, 0, 0, 0.35);
   font-family: "Segoe UI", "PT Sans", "Noto Sans", system-ui, sans-serif;
   font-size: 17px;
@@ -95,29 +86,6 @@ input {
 
 .muted {
   color: var(--mist-dim);
-}
-
-/* Этап 4.11: характер письма крупных титулов. Встраивание файла дисплейного
-   шрифта недоступно, поэтому применяется типографская обработка системного
-   заголовочного шрифта — Android теряет Palatino, и именно тут решают
-   увеличенный трекинг, мягкая тень и выверенные размеры. */
-.display-title,
-.menu-brand h1,
-.settings-head h1,
-.pause-card h2,
-.training-over-card h2,
-.pass-side-title,
-.result-emblem + h1,
-.mission-title {
-  letter-spacing: 0.09em;
-  text-shadow:
-    0 2px 0 rgba(0, 0, 0, 0.55),
-    0 0 22px rgba(224, 179, 74, 0.16);
-}
-
-.display-title {
-  letter-spacing: 0.05em;
-  word-spacing: 0.12em;
 }
 
 .version-line,
