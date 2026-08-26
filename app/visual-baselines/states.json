@@ -1,0 +1,133 @@
+{
+  "format": 1,
+  "version": "0.21.2",
+  "description": "Deterministic visual-state contracts; browser-independent golden baselines.",
+  "states": [
+    {
+      "id": "battle-start",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "menu → quick match → normal",
+      "selector": ".battle-screen",
+      "landmarks": [
+        ".battle-top",
+        ".battle-stage",
+        ".battle-bottom",
+        ".battle-objective"
+      ],
+      "sources": [
+        "packages/ui/src/BattleScreenView.tsx",
+        "packages/ui/src/battle.css",
+        "packages/render/src/field-renderer.ts"
+      ],
+      "sourceDigest": "c41c961e9599e21cf29a04183bd0a7ab241c6a92f5c634b2fd7641650d9c5da6"
+    },
+    {
+      "id": "aiming",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "battle-start → selected weapon → target preview",
+      "selector": ".aim-card",
+      "landmarks": [
+        ".aim-card",
+        ".aim-chance",
+        ".battle-stage",
+        ".aim-dmg"
+      ],
+      "sources": [
+        "packages/ui/src/BattleScreenView.tsx",
+        "packages/ui/src/battle.css",
+        "packages/render/src/field-renderer.ts"
+      ],
+      "sourceDigest": "c41c961e9599e21cf29a04183bd0a7ab241c6a92f5c634b2fd7641650d9c5da6"
+    },
+    {
+      "id": "fog",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "battle-start → hidden cells",
+      "selector": ".battle-stage canvas",
+      "landmarks": [
+        ".battle-stage",
+        "--fog",
+        "fogBaseLayer",
+        "paintFog"
+      ],
+      "sources": [
+        "packages/ui/src/BattleScreenView.tsx",
+        "packages/ui/src/battle.css",
+        "packages/render/src/field-renderer.ts"
+      ],
+      "sourceDigest": "c41c961e9599e21cf29a04183bd0a7ab241c6a92f5c634b2fd7641650d9c5da6"
+    },
+    {
+      "id": "training",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "route": "menu → training → first mission",
+      "selector": ".training-coach",
+      "landmarks": [
+        ".training-coach",
+        ".training-step-dots",
+        ".training-edge-hint",
+        ".is-training-focus"
+      ],
+      "sources": [
+        "packages/ui/src/BattleScreenView.tsx",
+        "packages/ui/src/battle.css",
+        "packages/ui/src/training-scenario.ts"
+      ],
+      "sourceDigest": "0dc9fd646fb0e4018c2bb8ea989aa1e3974ed19b898ecc45181e2209b74034cd"
+    },
+    {
+      "id": "campaign-map",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "menu → new tale",
+      "selector": ".campaign-map",
+      "landmarks": [
+        ".campaign-map",
+        ".map-road-segment",
+        ".map-marker",
+        ".ship-marker"
+      ],
+      "sources": [
+        "packages/ui/src/CampaignScreen.tsx",
+        "packages/ui/src/campaign.css",
+        "packages/campaign/src/index.ts"
+      ],
+      "sourceDigest": "4c4caabe0482d5f353b6335fc5377492cc02623feb995d84afa75f02bb926067"
+    },
+    {
+      "id": "mission-result",
+      "viewport": {
+        "width": 1280,
+        "height": 720
+      },
+      "route": "campaign battle → victory/defeat result",
+      "selector": ".mission-result-screen",
+      "landmarks": [
+        ".mission-result-screen",
+        ".roster-outcomes",
+        ".rewards-strip",
+        ".darkness-summary"
+      ],
+      "sources": [
+        "packages/ui/src/MissionResultScreen.tsx",
+        "packages/ui/src/campaign.css",
+        "apps/game-pwa/src/styles.css"
+      ],
+      "sourceDigest": "06b1f59fc86ba43a386355a3f3f098358cc9c7b75809f0a34fe34f1c8f1dd5ae"
+    }
+  ]
+}

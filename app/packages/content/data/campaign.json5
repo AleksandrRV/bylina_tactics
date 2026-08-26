@@ -46,6 +46,7 @@
         edgeCoverChance: 0.4,
         halfCoverChance: 0.55,
         heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+        biome: "meadow",
       },
       enemies: [{ unitId: "upyr", count: 3 }],
     },
@@ -67,6 +68,7 @@
         edgeCoverChance: 0.45,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        biome: "thicket",
       },
       enemies: [
         { unitId: "upyr", count: 2 },
@@ -91,6 +93,7 @@
         edgeCoverChance: 0.45,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        biome: "swamp",
       },
       enemies: [
         { unitId: "upyr", count: 3 },
@@ -115,6 +118,7 @@
         edgeCoverChance: 0.45,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        biome: "scorched",
       },
       objectiveUnitId: "idol",
       enemies: [
@@ -140,6 +144,7 @@
         edgeCoverChance: 0.4,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+        biome: "meadow",
         extract: true,
       },
       escorteeUnitId: "captive",
@@ -167,6 +172,7 @@
         edgeCoverChance: 0.45,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.15, z1: 0.7, z2: 0.15 },
+        biome: "thicket",
         extract: true,
       },
       enemies: [
@@ -193,6 +199,7 @@
         edgeCoverChance: 0.5,
         halfCoverChance: 0.5,
         heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+        biome: "scorched",
       },
       enemies: [
         { unitId: "upyr", count: 2 },
@@ -220,6 +227,7 @@
         edgeCoverChance: 0.5,
         halfCoverChance: 0.45,
         heightMix: { z0: 0.2, z1: 0.6, z2: 0.2 },
+        biome: "thicket",
       },
       enemies: [
         { unitId: "upyr", count: 4 },

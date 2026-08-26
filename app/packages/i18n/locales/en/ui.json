@@ -75,6 +75,9 @@
     "objectiveQuick": "Destroy all enemies",
     "enemyTurn": "The Nav advances",
     "pause": "Pause",
+    "speedFast": "Fast mode",
+    "speedNormal": "Normal speed",
+    "speedHint": "Toggle double speed for battle and replay.",
     "resume": "Resume",
     "toMenu": "Return to menu",
     "hp": "Health {current} / {max}",
@@ -116,7 +119,8 @@
       "NO_LOS": "The target is hidden behind an obstacle.",
       "OUT_OF_RANGE": "Out of range."
     },
-    "controlsTitle": "Controls"
+    "controlsTitle": "Controls",
+    "skillScrollHint": "Scroll weapons and skills →"
   },
   "unit": {
     "bogatyr": {
@@ -247,6 +251,8 @@
     "sfxVolume": "Actions",
     "showHints": "Show hints",
     "showHintsHint": "First-time tutorials in the campaign. Turning them off does not block progress.",
+    "autoEndTurn": "Auto-end turn",
+    "autoEndTurnHint": "Pass to the Nav when all living fighters have spent their AP.",
     "debugMode": "Debug mode",
     "debugModeHint": "Inspection tools (movement-cost overlay, auto-win) in battle. For developers and QA.",
     "back": "Back to menu"
@@ -651,6 +657,7 @@
     "allDoneHint": "All three missions are done. The Chronicler is pleased — the Quick Match awaits you.",
     "toQuickMatch": "Go to Quick Match",
     "continue": "Continue",
+    "offscreenHint": "Target is beyond the screen edge",
     "reset": "Reset progress",
     "resetHint": "Completed mission marks will be cleared.",
     "battleLabel": "Training",
