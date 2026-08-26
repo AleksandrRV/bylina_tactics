@@ -1604,84 +1604,35 @@
   height: 16px;
 }
 
-/* 4.1: перелёт корабля по дуге с затухающим следом. */
-.ship-marker.is-flying {
-  visibility: hidden;
-}
-
-.ship-flight {
-  position: absolute;
-  transform: translate(-50%, -50%);
-  pointer-events: none;
+/* 4.1: полёт анимирует сам marker. У него уже есть размер благодаря
+   .ship-glyph, поэтому left/top и transform работают в одной системе
+   координат; отдельная нулевая обёртка больше не нужна. */
+.ship-marker.is-flying,
+.campaign-map.is-flying .ship-marker {
   z-index: 7;
-  /* Правка: движение по прямой одним элементом — left и top анимируются
-     вместе, поэтому корабль всегда над линией маршрута (прежде вертикальная
-     составляющая считалась от нулевой высоты обёртки и «улетала» с экрана). */
-  animation: fly-move 900ms cubic-bezier(0.45, 0.05, 0.55, 0.95) both;
+  animation: ship-flight 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) both;
 }
 
-@keyframes fly-move {
-  from {
-    left: var(--x0);
-    top: var(--y0);
+@keyframes ship-flight {
+  0% {
+    left: var(--ship-from-x);
+    top: var(--ship-from-y);
+    transform: translate(-50%, -50%) rotate(-5deg) scale(0.94);
   }
-  to {
-    left: var(--x1);
-    top: var(--y1);
+  42% {
+    left: var(--ship-mid-x);
+    top: var(--ship-mid-y);
+    transform: translate(-50%, -50%) rotate(3deg) scale(1.06);
   }
-}
-
-.ship-flight-body {
-  position: absolute;
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  color: var(--amber);
-  filter: drop-shadow(0 2px 6px rgba(224, 179, 74, 0.35));
-  /* Лёгкий крен и «вздох» в середине пути без смещения позиции. */
-  animation: fly-tilt 900ms ease-in-out both;
-}
-
-@keyframes fly-tilt {
-  0% { transform: rotate(-5deg) scale(0.94); }
-  50% { transform: rotate(3deg) scale(1.06); }
-  100% { transform: rotate(0deg) scale(1); }
-}
-
-.ship-flight-trail {
-  position: absolute;
-  right: 14px;
-  top: 50%;
-  width: 46px;
-  height: 3px;
-  transform-origin: right center;
-  rotate: var(--fly-angle, 0deg);
-  border-radius: 2px;
-  background: linear-gradient(270deg, rgba(224, 179, 74, 0.75), rgba(224, 179, 74, 0));
-  animation: trail-fade 900ms ease-out both;
-}
-
-@keyframes trail-fade {
-  0% { opacity: 0.9; }
-  70% { opacity: 0.45; }
-  100% { opacity: 0; }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ship-flight,
-  .map-road .road-seg-draw {
-    display: none;
-    animation: none;
-  }
-
-  .ship-marker.is-flying {
-    visibility: visible;
+  100% {
+    left: var(--ship-to-x);
+    top: var(--ship-to-y);
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
   }
 }
 
-/* Этап 4.1 (правка по ревью): дуговой след перелёта — свечение под линией,
-   обе дорисовываются синхронно с полётом корабля и растворяются. */
+/* Этап 4.1 (правка по ревью): прямой след перелёта — свечение под
+   линией, дорисовывается синхронно с движением корабля и растворяется. */
 .ship-flight-layer {
   position: absolute;
   inset: 0;
@@ -1723,6 +1674,14 @@
 @media (prefers-reduced-motion: reduce) {
   .ship-flight-layer {
     display: none;
+  }
+
+  .ship-marker.is-flying,
+  .campaign-map.is-flying .ship-marker {
+    animation: none;
+    left: var(--ship-to-x);
+    top: var(--ship-to-y);
+    transform: translate(-50%, -50%);
   }
 }
 

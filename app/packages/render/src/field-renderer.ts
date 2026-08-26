@@ -74,12 +74,17 @@ export interface FieldView {
   /** Цель прицеливания открыта с фланга (этап 2.7): красные уголки-скобки. */
   aimFlanked?: boolean;
   /**
-   * Областной прицел выбранного умения (0.21.x, этап 2.6, правка): центр и
-   * радиус из определения умения — показывается сразу при выборе кнопки,
-   * включая умения «на себя» (круговой взмах богатыря). Геометрию клеток
-   * считает отрисовщик по правилам ядра.
+   * Областной прицел выбранного умения (0.21.x, этап 2.6): центр и радиус
+   * нужны для оформления, а areaCells — точный результат preview ядра.
+   * Renderer не пересчитывает область самостоятельно.
    */
-  areaPreview?: { center: CellPos; radius: number } | null;
+  areaPreview?: {
+    center: CellPos;
+    radius: number;
+    areaCells: readonly CellPos[];
+    /** Показывать friendly-fire warning для атак, допускающих союзников. */
+    warnFriendly?: boolean;
+  } | null;
   /**
    * Локализованная строка «Промах» для всплывающего числа (этап 2.1):
    * средство отображения не знает языков — строка приходит из интерфейса.
@@ -1732,35 +1737,50 @@ export function createFieldRenderer(): FieldRenderer {
     // замирают на нейтральной фазе, а не продолжают мерцать.
     const motionNow = reducedMotion ? 12000 : now;
 
-    // Областной прицел (0.21.x, этап 2.6, правка): ровно геометрия ядра —
-    // горизонтальный радиус и не более одного яруса перепада; тёплый
-    // оранжевый, отличный от синего шага и жёлтого рывка. Показывается,
-    // пока выбрано умение, в том числе «на себя» (круговой взмах богатыря).
+    // Областной прицел (0.21.x, этап 2.6): areaCells уже посчитаны ядром
+    // через distH. Рисуем именно их, а не повторяем формулу расстояния в
+    // Pixi — так радиус 1 включает все восемь соседних клеток по правилам.
     if (view.areaPreview) {
-      const { center, radius } = view.areaPreview;
-      // Этап-правка: если в область попадает союзник — его клетка помечается
-      // предупреждением (алые диагонали поверх оранжевой подсветки).
+      const { areaCells, warnFriendly } = view.areaPreview;
       const caster = view.snapshot.entities.find((candidate) => candidate.id === view!.selectedId);
-      for (const tile of view.snapshot.grid.tiles) {
-        if (Math.hypot(center.x - tile.x, center.y - tile.y) > radius + 0.001) continue;
-        if (Math.abs(center.z - tile.z) > 1) continue;
-        if (!view.visibleCells!.has(`${tile.x},${tile.y}`)) continue;
+      const pulse = 0.5 + Math.sin(motionNow * 0.004) * 0.5;
+      for (const cell of areaCells) {
+        const tile = tileAt(view.snapshot.grid, cell.x, cell.y);
+        if (!tile) continue;
+        if (view.visibleCells && !view.visibleCells.has(`${cell.x},${cell.y}`)) continue;
         const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
-        g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: 0xe07a2a, alpha: 0.18 });
-        g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6).stroke({ width: 2, color: 0xe07a2a, alpha: 0.82 });
-        const occupant = view.snapshot.entities.find(
+        const areaColor = 0xe07a2a;
+
+        // Двойной контур и мягкая пульсация отделяют область умения от
+        // синей достижимости и жёлтого маршрута перемещения.
+        g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4)
+          .fill({ color: areaColor, alpha: 0.12 + pulse * 0.06 });
+        g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6)
+          .stroke({ width: 2.2, color: areaColor, alpha: 0.72 + pulse * 0.18 });
+        g.rect(fx + 7, fy + 7, CELL_SIZE - 14, CELL_SIZE - 14)
+          .stroke({ width: 0.9, color: 0xffd18a, alpha: 0.3 + pulse * 0.18 });
+
+        const ally = caster && view.snapshot.entities.find(
           (candidate) =>
             !candidate.dead &&
             candidate.coverType === 0 &&
-            candidate.x === tile.x &&
-            candidate.y === tile.y,
+            candidate.id !== caster.id &&
+            candidate.owner === caster.owner &&
+            candidate.x === cell.x &&
+            candidate.y === cell.y,
         );
-        if (caster && occupant && occupant.id !== caster.id && occupant.owner === caster.owner) {
-          // Союзник под ударом: алые диагонали клетки.
-          g.moveTo(fx + 6, fy + 6).lineTo(fx + CELL_SIZE - 6, fy + CELL_SIZE - 6)
-            .stroke({ width: 2.2, color: 0xd84a3a, alpha: 0.85 });
-          g.moveTo(fx + CELL_SIZE - 6, fy + 6).lineTo(fx + 6, fy + CELL_SIZE - 6)
-            .stroke({ width: 2.2, color: 0xd84a3a, alpha: 0.85 });
+        if (warnFriendly && ally) {
+          // Союзник действительно входит в область all: алый щит и крест
+          // заметно предупреждают игрока, не меняя список целей ядра.
+          g.rect(fx + 4, fy + 4, CELL_SIZE - 8, CELL_SIZE - 8)
+            .fill({ color: AIM_IMPOSSIBLE, alpha: 0.1 + pulse * 0.06 })
+            .stroke({ width: 2.8, color: AIM_IMPOSSIBLE, alpha: 0.86 + pulse * 0.12 });
+          g.moveTo(fx + 8, fy + 8).lineTo(fx + CELL_SIZE - 8, fy + CELL_SIZE - 8)
+            .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
+          g.moveTo(fx + CELL_SIZE - 8, fy + 8).lineTo(fx + 8, fy + CELL_SIZE - 8)
+            .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
+          g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 8)
+            .stroke({ width: 1.2, color: 0xffb3a8, alpha: 0.65 + pulse * 0.2 });
         }
       }
     }

@@ -1195,8 +1195,10 @@ export function BattleScreenView() {
   }, [battleKind, session]);
 
   // Этап 2.6 (правка по ревью): областной прицел виден сразу при выборе
-  // умения с областью, включая «круговой взмах» богатыря (self + радиус):
-  // центр — сам боец, для позиционных — выбранная клетка.
+  // умения с областью, включая «круговой взмах» богатыря (self + радиус).
+  // Геометрия приходит из того же preview-вызова ядра, который используется
+  // боевым экраном, поэтому renderer не может расхождениями Math.hypot
+  // потерять диагональные клетки.
   const areaPreview = useMemo(() => {
     if (action?.type !== "skill" || selectedId === null || paused || busy) return null;
     const skill = skills[action.id];
@@ -1204,9 +1206,31 @@ export function BattleScreenView() {
     const hasArea = (skill.radius ?? 0) > 0
       || skill.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
     if (!hasArea) return null;
-    const center = skill.category === "self" ? selected : skillTargetPos ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z } : undefined;
-    return center ? { center, radius: skill.radius ?? 0 } : null;
-  }, [action, selectedId, selected, skillTargetPos, skills, paused, busy]);
+
+    const center = skill.category === "self"
+      ? selected
+      : skillTargetPos
+        ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z }
+        : undefined;
+    if (!center) return null;
+
+    // У self-навыка без цели hit намеренно null: это не одиночный target
+    // preview. Запрашиваем тот же SkillPreview отдельно, чтобы получить
+    // areaCells и не дублировать геометрию в UI или renderer.
+    const skillPreview = skill.category === "self" && !usesNetSnapshot
+      ? session.getBattleSkillPreview(selectedId, action.id)
+      : hit;
+    if (!skillPreview?.areaCells?.length) return null;
+
+    return {
+      center: { x: center.x, y: center.y, z: center.z },
+      radius: skill.radius ?? 0,
+      areaCells: skillPreview.areaCells,
+      // Красное предупреждение нужно только там, где атака действительно
+      // допускает friendly fire; лечение/призыв с filter="all" не опасны.
+      warnFriendly: skill.resolution === "attack" && (skill.filter === "all" || skill.filter === "allies"),
+    };
+  }, [action, selectedId, selected, skillTargetPos, skills, paused, busy, usesNetSnapshot, session, hit, kernel, snapshot.turnNumber]);
 
   // Этап 4.8: карточка прицеливания подтягивается к цели (доли экрана).
   const [aimCardPos, setAimCardPos] = useState<{ x: number; y: number } | null>(null);
