@@ -7,13 +7,14 @@
 ### Порядок ознакомления
 
 1. Замысел — `game-design.md`
-2. Правила — `game-rules.md`
-3. Данные и состояние — `content-schema.md`, `runtime-model.md`
-4. Программа — `network-protocol.md`, `architecture.md`, `technology.md`
-5. Представление — `ui-design.md`
-6. План — `roadmap.md`
-7. Языки — `localization.md`
-8. Запуск и публикация — `operations.md`
+2. Начало кампании — `campaign.md` (пролог)
+3. Правила — `game-rules.md`
+4. Данные и состояние — `content-schema.md`, `runtime-model.md`
+5. Программа — `network-protocol.md`, `architecture.md`, `technology.md`
+6. Представление — `ui-design.md`
+7. План — `roadmap.md`
+8. Языки — `localization.md`
+9. Запуск и публикация — `operations.md`
 
 ### Инварианты
 
