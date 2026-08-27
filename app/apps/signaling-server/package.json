@@ -1,6 +1,6 @@
 {
   "name": "@bylina/signaling-server",
-  "version": "0.21.5",
+  "version": "0.20.30",
   "private": true,
   "type": "module",
   "description": "Ретранслятор установления соединения (сеть общего пользования). Не исполняет игровые правила.",

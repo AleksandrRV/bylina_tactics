@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.21.5";
+export const CORE_VERSION = "0.20.30";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -842,7 +842,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     .sort((a, b) => a.id - b.id);
 
   const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
-    // Клетки области действия для предпросмотра (0.21.5, этап 2.6):
+    // Клетки области действия для предпросмотра (0.20.30, этап 2.6):
     // та же геометрия, что у areaTargets — дистанция по горизонтали и
     // перепад ярусов не более единицы; непроходимые клетки исключаются.
     const previewAreaCells = (center: CellPos): CellPos[] => {
@@ -1336,7 +1336,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           // вычет, разрушающее оружие ближнего боя пробивает грань, как при одиночном ударе.
           for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
             // Круговой взмах бьёт вокруг бойца; сам кастер не задевается,
-            // даже когда фильтр «all» допускает союзников (0.21.5).
+            // даже когда фильтр «all» допускает союзников (0.20.30).
             if (areaTarget.id === actor.id) continue;
             const breach = edgeBreach(actor, areaTarget, weapon);
             if (weapon.category === "melee" && edgeCoverOnLine(actor, areaTarget)?.coverType === 2 && !breach) continue;

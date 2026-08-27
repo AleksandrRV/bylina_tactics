@@ -29,7 +29,7 @@ export const NAV_LOOK: FactionLook = { ring: 0x8bc34a, ringDark: 0x1e3311, disc:
 /** Резервная заливка фишки без собственной иллюстрации класса. */
 export const FALLBACK_TOKEN_ART = { druzhina: 0xc9a24b, nav: 0x6d9a3a } as const;
 
-/* ---------- биомы (0.21.0, этап 3.1) ---------- */
+/* ---------- биомы (0.20.25, этап 3.1) ---------- */
 
 export type BiomeId = "meadow" | "swamp" | "thicket" | "scorched";
 

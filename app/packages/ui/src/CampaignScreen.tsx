@@ -11,7 +11,7 @@ const CLASS_IDS: readonly string[] = ["bogatyr", "strelets", "znaharka", "volkhv
 
 type CampTab = "map" | "roster" | "chamber" | "forge";
 
-/** Иконка типа миссии (0.21.x, этап 4.3): смысл точки читается без панели. */
+/** Иконка типа миссии (0.20.x, этап 4.3): смысл точки читается без панели. */
 function MissionTypeIcon({ type }: { type: MissionConfig["type"] }) {
   if (type === "destroy") return <IdolIcon />;
   if (type === "rescue") return <RescueIcon />;
