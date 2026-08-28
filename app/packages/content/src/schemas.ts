@@ -392,6 +392,117 @@ export const trainingConfigSchema = z.object({
   missions: z.array(trainingMissionSchema).length(3),
 }).strict();
 
+/* ============================================================
+   Пролог кампании (Этап 1, 0.20.31; норматив — doc/campaign.md)
+   ============================================================ */
+
+/** Авторская раскладка: семантика символов — компилятор Этапа 2. */
+export const prologueLayoutSchema = z.object({
+  rows: z.array(z.string()).min(1),
+  legend: z.record(z.string(), z.unknown()).optional(),
+}).strict();
+
+/**
+ * Карта миссии пролога: заготовка генератора + необязательный layout.
+ * Высота от 6: авторская карта М1 — 20×6 (канон §7.1).
+ */
+export const prologueMapSchema = mapGenConfigSchema.extend({
+  height: z.number().int().min(6).max(64),
+  layout: prologueLayoutSchema.optional(),
+}).strict();
+
+export const prologueHintSchema = z.object({
+  key: z.string().min(1),
+  panelKey: z.string().optional(),
+  textKey: z.string().min(1),
+  once: z.boolean(),
+}).strict();
+
+export const prologueHintsSchema = z.object({
+  hints: z.array(prologueHintSchema).min(1),
+}).strict();
+
+export const prologueScriptActionSchema = z.object({
+  unitId: id.optional(),
+  side: z.enum(["player", "enemy"]).optional(),
+  kind: z.enum(["attack", "skill", "approach", "defend", "overwatch", "resurrect", "endTurn", "spawn", "appear"]),
+  targetUnitId: id.optional(),
+  weaponId: id.optional(),
+  skillId: id.optional(),
+  corpseUnitId: id.optional(),
+  forceOutcome: z.enum(["hit", "miss"]).optional(),
+  at: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
+  onlyIf: z.enum(["targetAlive", "targetNotPoisoned", "targetWounded", "corpseExists"]).optional(),
+}).strict();
+
+export const prologueScriptSchema = z.object({
+  priority: z.array(prologueScriptActionSchema).optional(),
+  actions: z.array(prologueScriptActionSchema).optional(),
+}).strict();
+
+export const prologueObjectiveSchema = z.object({
+  initialTextKey: z.string().min(1),
+  retarget: z.array(z.object({
+    onKey: z.string().min(1),
+    textKey: z.string().min(1),
+  }).strict()).optional(),
+}).strict();
+
+export const prologueCheckpointSchema = z.object({
+  id: z.string().min(1),
+  onKey: z.string().min(1).optional(),
+  description: z.string().optional(),
+}).strict();
+
+export const prologueMissionConfigSchema = z.object({
+  id,
+  titleKey: z.string().min(1),
+  introKey: z.string().min(1),
+  outroKey: z.string().min(1),
+  nextMissionId: id.nullable().optional(),
+  playerSlots: z.array(id).min(1),
+  fog: z.boolean(),
+  map: prologueMapSchema,
+  enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()),
+  objective: prologueObjectiveSchema.optional(),
+  script: prologueScriptSchema.optional(),
+  hints: z.array(z.string()),
+  checkpoints: z.array(prologueCheckpointSchema).optional(),
+  reinforcements: z.string().optional(),
+  onboarding: z.array(z.string()),
+}).strict();
+
+export const prologueConfigSchema = z.object({
+  enabled: z.boolean(),
+  roster: z.array(id).min(1),
+  prologueFinalMissionId: id,
+  missions: z.array(prologueMissionConfigSchema).min(1),
+}).strict();
+
+export const prologueBestiarySchema = z.object({
+  units: z.array(unitConfigSchema),
+  weapons: z.array(weaponConfigSchema),
+}).strict();
+
+export const reinforcementsConfigSchema = z.object({
+  enabled: z.boolean().default(true),
+  mode: z.enum(["threshold", "onKill"]).default("threshold"),
+  thresholdEnemyCount: z.number().int().min(0).optional(),
+  delayTurns: z.number().int().min(0).default(1),
+  pool: z.array(id).min(1),
+  countPerWave: z.number().int().min(1).optional(),
+  maxConcurrentEnemies: z.number().int().min(1),
+  spawnEdge: z.enum(["north", "south", "east", "west"]).optional(),
+  spawnCells: z.array(z.object({ x: z.number().int(), y: z.number().int() }).strict()).optional(),
+  perKill: z.number().int().min(0).optional(),
+  perTurnNoKill: z.number().int().min(0).optional(),
+}).strict();
+
+export const reinforcementsFileSchema = z.object({
+  default: reinforcementsConfigSchema,
+  profiles: z.record(z.string(), reinforcementsConfigSchema).optional(),
+}).strict();
+
 export type TrainingHintConfig = z.infer<typeof trainingHintSchema>;
 export type TrainingMissionConfig = z.infer<typeof trainingMissionSchema>;
 export type TrainingConfig = z.infer<typeof trainingConfigSchema>;
@@ -408,3 +519,10 @@ export type WoundPenaltyConfig = z.infer<typeof woundPenaltySchema>;
 export type ItemConfig = z.infer<typeof itemConfigSchema>;
 export type ResourcesConfig = z.infer<typeof resourcesSchema>;
 export type ScanConfig = z.infer<typeof scanConfigSchema>;
+export type PrologueHintConfig = z.infer<typeof prologueHintSchema>;
+export type PrologueHintsConfig = z.infer<typeof prologueHintsSchema>;
+export type PrologueMissionConfig = z.infer<typeof prologueMissionConfigSchema>;
+export type PrologueConfig = z.infer<typeof prologueConfigSchema>;
+export type PrologueBestiaryConfig = z.infer<typeof prologueBestiarySchema>;
+export type ReinforcementsConfig = z.infer<typeof reinforcementsConfigSchema>;
+export type ReinforcementsFileConfig = z.infer<typeof reinforcementsFileSchema>;

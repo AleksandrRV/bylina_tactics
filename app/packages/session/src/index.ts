@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.30";
+export const APP_VERSION = "0.20.31";
 
 export type AppScreen =
   | "boot"
@@ -109,6 +109,8 @@ export interface SessionState {
   trainingDone?: string[];
   /** Показанные туториалы «первого раза» кампании (0.20.0): каждый показывается один раз. */
   campaignHintsDone?: string[];
+  /** Каркас маршрута пролога (0.20.31). UI не подключён до Этапа 3. */
+  prologueMissionId?: string | null;
   /** Победитель завершённой партии (для сохранения повтора). */
   replayWinner?: 1 | 2 | null;
   /** Черновик журнала текущего боя (команды, seed, составы). */
@@ -261,6 +263,11 @@ export interface SessionApi {
   isCampaignHintShown(hintId: string): boolean;
   /** Отметить туториал кампании показанным — повторно не появляется (0.20.0). */
   markCampaignHintShown(hintId: string): void;
+  /**
+   * Каркас старта миссии пролога (0.20.31). При `enabled: false` — no-op
+   * (поведение идентично 0.20.30). Экраны пролога — Этап 2–3.
+   */
+  startPrologue(missionId: string, enabled: boolean): boolean;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -290,6 +297,7 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" |
   replayJournal: null,
   replayDraft: null,
   trainingMissionId: null,
+  prologueMissionId: null,
 };
 
 /**
@@ -982,6 +990,11 @@ export function createSession(
       const done = state.campaignHintsDone ?? [];
       if (done.includes(hintId)) return;
       emit({ ...state, campaignHintsDone: [...done, hintId] });
+    },
+    startPrologue: (missionId, enabled) => {
+      if (!enabled) return false;
+      emit({ ...state, prologueMissionId: missionId });
+      return true;
     },
     bindTacticsHost: (host) => {
       tacticsHost = host;

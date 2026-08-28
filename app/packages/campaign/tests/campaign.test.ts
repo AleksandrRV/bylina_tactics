@@ -501,3 +501,50 @@ describe("generals in campaign (0.18.0)", () => {
     expect(automaton.getState().deadGenerals).toEqual([]);
   });
 });
+
+describe("createCampaign: chapter prologue (0.20.31)", () => {
+  it("defaults chapter to open", () => {
+    expect(campaign().getState().chapter).toBe("open");
+  });
+
+  it("disables darkness, rewards, wounds, permanent death and recruit in prologue", () => {
+    const automaton = campaign(CONFIG, { chapter: "prologue" });
+    expect(automaton.getState().chapter).toBe("prologue");
+    const fighters = automaton.getState().fighters;
+    automaton.startMission("clearing_1");
+    const result = automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 1 })),
+    );
+    expect(result).not.toBeNull();
+    expect(automaton.getState().darkness).toBe(0);
+    expect(automaton.getState().resources).toEqual(CONFIG.startingResources);
+    for (const fighter of automaton.getState().fighters) {
+      expect(fighter.wounded).toBe(false);
+      expect(fighter.level).toBe(CONFIG.classUnlockLevel);
+    }
+    expect(automaton.getState().fighters.length).toBe(fighters.length);
+  });
+
+  it("keeps a fallen fighter alive in prologue", () => {
+    const automaton = campaign(CONFIG, { chapter: "prologue" });
+    const fighters = automaton.getState().fighters;
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "defeat", [
+      { fighterId: fighters[0]!.id, survived: false, hp: 0 },
+      { fighterId: fighters[1]!.id, survived: true, hp: 6 },
+      { fighterId: fighters[2]!.id, survived: true, hp: 7 },
+    ]);
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === fighters[0]!.id)?.alive).toBe(true);
+    expect(automaton.getState().phase).toBe("active");
+  });
+
+  it("migrates a saved state without chapter to open", () => {
+    const base = campaign().getState();
+    const legacy = { ...base } as Record<string, unknown>;
+    delete legacy.chapter;
+    const restored = campaign(CONFIG, { initialState: legacy as never });
+    expect(restored.getState().chapter).toBe("open");
+  });
+});

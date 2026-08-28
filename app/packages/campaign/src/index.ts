@@ -15,6 +15,7 @@ import type { CampaignConfig, ItemConfig, MissionConfig } from "@bylina/content"
 
 export type MissionOutcome = "victory" | "defeat";
 export type CampaignPhase = "active" | "lost";
+export type CampaignChapter = "prologue" | "open";
 
 export type MissionPointStatus = "open" | "done" | "locked";
 
@@ -78,6 +79,8 @@ export interface ScanResult {
 }
 
 export interface CampaignState {
+  /** Глава: пролог (линейная цепочка) либо открытая карта (0.20.31). */
+  chapter: CampaignChapter;
   darkness: number;
   darknessMax: number;
   phase: CampaignPhase;
@@ -109,6 +112,7 @@ export interface CampaignState {
 
 export interface CampaignApi {
   getState(): CampaignState;
+  setChapter(chapter: CampaignChapter): void;
   /** Записи точек в порядке конфигурации. */
   getMissions(): MissionConfig[];
   getMission(id: string): MissionConfig | undefined;
@@ -167,7 +171,9 @@ export interface CampaignOptions {
   /** Записи предметов Кузни (из модуля содержания). */
   items?: ItemConfig[];
   /** Восстановленное состояние кампании (сохранение, версия 0.13.0). */
-  initialState?: CampaignState;
+  initialState?: Omit<CampaignState, "chapter"> & { chapter?: CampaignChapter };
+  /** Начальная глава (0.20.31). По умолчанию «open». */
+  chapter?: CampaignChapter;
   /**
    * Допустимые записи классов для назначения рекруту (0.19.2): при заданном
    * списке `assignClass` отклоняет записи вне его — защита от назначения
@@ -228,6 +234,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
   const firstMission = missions[0];
   const freshState: CampaignState = {
+    chapter: options.chapter ?? "open",
     darkness: 0,
     darknessMax: config.darknessMax,
     phase: "active",
@@ -246,6 +253,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   const state: CampaignState = options.initialState
     ? {
         ...options.initialState,
+        chapter: options.initialState.chapter ?? "open",
         darknessMax: config.darknessMax,
         resources: { ...options.initialState.resources },
         inventory: [...options.initialState.inventory],
@@ -308,6 +316,10 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       fighters: state.fighters.map((fighter) => ({ ...fighter })),
       lastResult: cloneLastResult(state.lastResult),
     }),
+    setChapter: (chapter) => {
+      state.chapter = chapter;
+      emit();
+    },
     getMissions: () => missions.map((mission) => ({ ...mission })),
     getMission: (id) => missions.find((mission) => mission.id === id),
     getItems: () => items.map((item) => ({ ...item, cost: { ...item.cost } })),
@@ -326,11 +338,16 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       const mission = missions.find((entry) => entry.id === id);
       if (!point || !mission) return null;
 
-      const darknessGained = outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat;
-      state.darkness = Math.min(state.darknessMax, state.darkness + darknessGained);
+      const sandbox = state.chapter !== "prologue";
+      const darknessGained = sandbox
+        ? (outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat)
+        : 0;
+      if (sandbox) {
+        state.darkness = Math.min(state.darknessMax, state.darkness + darknessGained);
+      }
 
-      const rewards: Resources = outcome === "victory" ? { ...mission.rewards } : { ...ZERO_RESOURCES };
-      if (outcome === "victory") gain(rewards);
+      const rewards: Resources = sandbox && outcome === "victory" ? { ...mission.rewards } : { ...ZERO_RESOURCES };
+      if (sandbox && outcome === "victory") gain(rewards);
 
       const fallen: string[] = [];
       const wounded: string[] = [];
@@ -340,47 +357,50 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         const fighter = state.fighters.find((candidate) => candidate.id === participant.fighterId);
         if (!fighter || !fighter.alive) continue;
         if (!participant.survived) {
-          fighter.alive = false;
-          fighter.hp = 0;
-          // Снаряжение погибшего возвращается в запасы корабля.
-          fighter.equippedItemId = null;
-          fallen.push(fighter.name);
+          if (sandbox) {
+            fighter.alive = false;
+            fighter.hp = 0;
+            fighter.equippedItemId = null;
+            fallen.push(fighter.name);
+          } else {
+            fighter.hp = Math.max(1, participant.hp);
+          }
           continue;
         }
         fighter.hp = Math.max(1, Math.min(fighter.maxHp, participant.hp));
-        // §4 content-schema: ранение при запасе здоровья не выше woundHpRatio × maxHealth.
-        // Порог не округляется: 4/12 > 0.3 не является ранением.
-        const woundedNow = fighter.hp <= fighter.maxHp * config.woundHpRatio;
-        if (woundedNow && !fighter.wounded) wounded.push(fighter.name);
-        fighter.wounded = fighter.wounded || woundedNow;
-        if (outcome === "victory") {
-          fighter.level += 1;
-          leveledUp.push(fighter.name);
+        if (sandbox) {
+          const woundedNow = fighter.hp <= fighter.maxHp * config.woundHpRatio;
+          if (woundedNow && !fighter.wounded) wounded.push(fighter.name);
+          fighter.wounded = fighter.wounded || woundedNow;
+          if (outcome === "victory") {
+            fighter.level += 1;
+            leveledUp.push(fighter.name);
+          }
         }
       }
 
       point.status = "done";
       state.activeMissionId = null;
-      // Окончательная гибель генералов (0.18.0): погибший не возвращается.
       for (const generalId of generalDeaths ?? []) {
-        if (!state.deadGenerals.includes(generalId)) state.deadGenerals.push(generalId);
+        if (sandbox && !state.deadGenerals.includes(generalId)) state.deadGenerals.push(generalId);
       }
-      // Корабль перелетает к завершённой точке; дальнейшие точки открываются сканированием.
       state.shipPosition = { x: mission.x, y: mission.y };
 
       let newRecruit: string | null = null;
-      if (outcome === "victory" && livingCount() > 0 && state.fighters.length < config.rosterCap) {
+      if (sandbox && outcome === "victory" && livingCount() > 0 && state.fighters.length < config.rosterCap) {
         const recruit = makeFighter(config.recruitUnitId, 1);
         state.fighters.push(recruit);
         newRecruit = recruit.name;
       }
 
-      const campaignLost = state.darkness >= state.darknessMax || livingCount() === 0;
-      const lostReason = state.darkness >= state.darknessMax
-        ? "darkness"
-        : livingCount() === 0
-          ? "roster"
-          : undefined;
+      const campaignLost = sandbox && (state.darkness >= state.darknessMax || livingCount() === 0);
+      const lostReason = sandbox
+        ? (state.darkness >= state.darknessMax
+          ? "darkness"
+          : livingCount() === 0
+            ? "roster"
+            : undefined)
+        : undefined;
       state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit };
       if (campaignLost) {
         state.phase = "lost";

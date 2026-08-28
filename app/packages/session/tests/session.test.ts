@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.30", () => {
-    expect(APP_VERSION).toBe("0.20.30");
+  it("reports version 0.20.31", () => {
+    expect(APP_VERSION).toBe("0.20.31");
   });
 
   it("moves between menu and settings", () => {
@@ -392,6 +392,21 @@ describe("createSession training hints (0.19.0)", () => {
     session.completeTrainingMission("combat");
     session.goTo("training");
     expect(session.get().trainingDone).toEqual(["movement", "combat"]);
+  });
+});
+
+describe("createSession prologue route (0.20.31)", () => {
+  it("does not start the prologue when the feature flag is off", () => {
+    const session = createSession("menu");
+    expect(session.startPrologue("prologue_brushwood", false)).toBe(false);
+    expect(session.get().prologueMissionId ?? null).toBeNull();
+    expect(session.get().screen).toBe("menu");
+  });
+
+  it("records the prologue mission id when enabled", () => {
+    const session = createSession("menu");
+    expect(session.startPrologue("prologue_brushwood", true)).toBe(true);
+    expect(session.get().prologueMissionId).toBe("prologue_brushwood");
   });
 });
 

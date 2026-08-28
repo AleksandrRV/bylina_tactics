@@ -1,6 +1,6 @@
 {
   "name": "@bylina/signaling",
-  "version": "0.20.30",
+  "version": "0.20.31",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

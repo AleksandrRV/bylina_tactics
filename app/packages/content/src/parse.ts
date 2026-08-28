@@ -3,16 +3,24 @@ import { z } from "zod";
 import {
   campaignConfigSchema,
   itemConfigSchema,
+  prologueBestiarySchema,
+  prologueConfigSchema,
+  prologueHintsSchema,
   pvpConfigSchema,
   quickMatchConfigSchema,
+  reinforcementsFileSchema,
   skillConfigSchema,
   trainingConfigSchema,
   unitConfigSchema,
   weaponConfigSchema,
   type CampaignConfig,
   type ItemConfig,
+  type PrologueBestiaryConfig,
+  type PrologueConfig,
+  type PrologueHintsConfig,
   type PvpConfig,
   type QuickMatchConfig,
+  type ReinforcementsFileConfig,
   type SkillConfig,
   type TrainingConfig,
   type UnitConfig,
@@ -29,6 +37,11 @@ export interface ContentBundle {
   weapons: WeaponConfig[];
   skills: SkillConfig[];
   items: ItemConfig[];
+  /** Пролог (0.20.31): бестиарий изолирован от канонических units/weapons. */
+  prologue: PrologueConfig;
+  prologueBestiary: PrologueBestiaryConfig;
+  prologueHints: PrologueHintsConfig;
+  reinforcements: ReinforcementsFileConfig;
 }
 
 export interface ContentIssue {
@@ -40,7 +53,7 @@ export type ContentLoadResult =
   | { ok: true; data: ContentBundle }
   | { ok: false; issues: ContentIssue[] };
 
-function parseFile<T>(file: string, raw: string, schema: z.ZodType<T>): { value?: T; issue?: ContentIssue } {
+function parseFile<S extends z.ZodTypeAny>(file: string, raw: string, schema: S): { value?: z.output<S>; issue?: ContentIssue } {
   try {
     const json: unknown = JSON5.parse(raw);
     const parsed = schema.safeParse(json);
@@ -78,21 +91,37 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
   const quickRaw = byName("quick-match.json5");
   const pvpRaw = byName("pvp.json5");
   const trainingRaw = byName("training.json5");
+  const prologueRaw = byName("prologue_missions.json5");
+  const bestiaryRaw = byName("prologue_bestiary.json5");
+  const prologueHintsRaw = byName("prologue_hints.json5");
+  const reinforcementsRaw = byName("reinforcements.json5");
 
   if (!campaignRaw) issues.push({ file: "campaign.json5", message: "file is missing" });
   if (!quickRaw) issues.push({ file: "quick-match.json5", message: "file is missing" });
   if (!pvpRaw) issues.push({ file: "pvp.json5", message: "file is missing" });
   if (!trainingRaw) issues.push({ file: "training.json5", message: "file is missing" });
+  if (!prologueRaw) issues.push({ file: "prologue_missions.json5", message: "file is missing" });
+  if (!bestiaryRaw) issues.push({ file: "prologue_bestiary.json5", message: "file is missing" });
+  if (!prologueHintsRaw) issues.push({ file: "prologue_hints.json5", message: "file is missing" });
+  if (!reinforcementsRaw) issues.push({ file: "reinforcements.json5", message: "file is missing" });
 
   const campaign = campaignRaw ? parseFile("campaign.json5", campaignRaw, campaignConfigSchema) : {};
   const quickMatch = quickRaw ? parseFile("quick-match.json5", quickRaw, quickMatchConfigSchema) : {};
   const pvp = pvpRaw ? parseFile("pvp.json5", pvpRaw, pvpConfigSchema) : {};
   const training = trainingRaw ? parseFile("training.json5", trainingRaw, trainingConfigSchema) : {};
+  const prologue = prologueRaw ? parseFile("prologue_missions.json5", prologueRaw, prologueConfigSchema) : {};
+  const prologueBestiary = bestiaryRaw ? parseFile("prologue_bestiary.json5", bestiaryRaw, prologueBestiarySchema) : {};
+  const prologueHints = prologueHintsRaw ? parseFile("prologue_hints.json5", prologueHintsRaw, prologueHintsSchema) : {};
+  const reinforcements = reinforcementsRaw ? parseFile("reinforcements.json5", reinforcementsRaw, reinforcementsFileSchema) : {};
 
   if (campaign.issue) issues.push(campaign.issue);
   if (quickMatch.issue) issues.push(quickMatch.issue);
   if (pvp.issue) issues.push(pvp.issue);
   if (training.issue) issues.push(training.issue);
+  if (prologue.issue) issues.push(prologue.issue);
+  if (prologueBestiary.issue) issues.push(prologueBestiary.issue);
+  if (prologueHints.issue) issues.push(prologueHints.issue);
+  if (reinforcements.issue) issues.push(reinforcements.issue);
 
   const units: UnitConfig[] = [];
   for (const [file, raw] of collect(files, "units")) {
@@ -134,6 +163,27 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
   const weaponIds = checkUnique("weapons", weapons);
   const skillIds = checkUnique("skills", skills);
   const itemIds = checkUnique("items", items);
+
+  const prologueUnits = prologueBestiary.value?.units ?? [];
+  const prologueWeapons = prologueBestiary.value?.weapons ?? [];
+  const prologueUnitIds = checkUnique("prologue_bestiary units", prologueUnits);
+  const prologueWeaponIds = checkUnique("prologue_bestiary weapons", prologueWeapons);
+  for (const uid of prologueUnitIds) {
+    if (unitIds.has(uid)) issues.push({ file: "prologue_bestiary.json5", message: `unit id overlaps canonical units: ${uid}` });
+  }
+  for (const wid of prologueWeaponIds) {
+    if (weaponIds.has(wid)) issues.push({ file: "prologue_bestiary.json5", message: `weapon id overlaps canonical weapons: ${wid}` });
+  }
+  const allUnitIds = new Set<string>([...unitIds, ...prologueUnitIds]);
+  const allWeaponIds = new Set<string>([...weaponIds, ...prologueWeaponIds]);
+  for (const unit of prologueUnits) {
+    for (const weaponId of unit.weapons) {
+      if (!allWeaponIds.has(weaponId)) issues.push({ file: `prologue_bestiary/${unit.id}`, message: `unknown weapon: ${weaponId}` });
+    }
+    for (const skillId of unit.skills) {
+      if (!skillIds.has(skillId)) issues.push({ file: `prologue_bestiary/${unit.id}`, message: `unknown skill: ${skillId}` });
+    }
+  }
 
   for (const unit of units) {
     for (const weaponId of unit.weapons) {
@@ -259,7 +309,82 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     }
   }
 
-  if (issues.length > 0 || !campaign.value || !quickMatch.value || !pvp.value || !training.value) {
+  if (prologue.value) {
+    const hintKeys = new Set((prologueHints.value?.hints ?? []).map((hint) => hint.key));
+    const reinforcementProfiles = new Set<string>([
+      "default",
+      ...Object.keys(reinforcements.value?.profiles ?? {}),
+    ]);
+    const missionIds = new Set(prologue.value.missions.map((mission) => mission.id));
+    for (const rosterUnit of prologue.value.roster) {
+      if (!allUnitIds.has(rosterUnit)) {
+        issues.push({ file: "prologue_missions.json5", message: `unknown roster unit: ${rosterUnit}` });
+      }
+    }
+    if (!missionIds.has(prologue.value.prologueFinalMissionId)) {
+      issues.push({
+        file: "prologue_missions.json5",
+        message: `prologueFinalMissionId refers to missing mission: ${prologue.value.prologueFinalMissionId}`,
+      });
+    }
+    const reinforcementPools = [
+      ...(reinforcements.value ? [reinforcements.value.default] : []),
+      ...Object.values(reinforcements.value?.profiles ?? {}),
+    ];
+    for (const profile of reinforcementPools) {
+      for (const poolUnitId of profile.pool) {
+        if (!allUnitIds.has(poolUnitId)) {
+          issues.push({ file: "reinforcements.json5", message: `unknown pool unit: ${poolUnitId}` });
+        }
+      }
+    }
+    for (const mission of prologue.value.missions) {
+      if (mission.nextMissionId && !missionIds.has(mission.nextMissionId)) {
+        issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown nextMissionId: ${mission.nextMissionId}` });
+      }
+      for (const slot of mission.playerSlots) {
+        if (!allUnitIds.has(slot)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown player unit: ${slot}` });
+        }
+      }
+      for (const entry of mission.enemies ?? []) {
+        if (!allUnitIds.has(entry.unitId)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown enemy unit: ${entry.unitId}` });
+        }
+      }
+      for (const hintKey of mission.hints ?? []) {
+        if (!hintKeys.has(hintKey)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown hint key: ${hintKey}` });
+        }
+      }
+      if (mission.reinforcements && !reinforcementProfiles.has(mission.reinforcements)) {
+        issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown reinforcements profile: ${mission.reinforcements}` });
+      }
+      for (const action of [...(mission.script?.priority ?? []), ...(mission.script?.actions ?? [])]) {
+        if (action.unitId && !allUnitIds.has(action.unitId)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown script unit: ${action.unitId}` });
+        }
+        if (action.weaponId && !allWeaponIds.has(action.weaponId)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: unknown script weapon: ${action.weaponId}` });
+        }
+      }
+      if (mission.map.layout) {
+        const { rows } = mission.map.layout;
+        if (rows.some((row) => row.length !== mission.map.width)) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: layout row length != width` });
+        }
+        if (rows.length !== mission.map.height) {
+          issues.push({ file: "prologue_missions.json5", message: `mission ${mission.id}: layout rows count != height` });
+        }
+      }
+    }
+  }
+
+  if (
+    issues.length > 0
+    || !campaign.value || !quickMatch.value || !pvp.value || !training.value
+    || !prologue.value || !prologueBestiary.value || !prologueHints.value || !reinforcements.value
+  ) {
     return { ok: false, issues };
   }
 
@@ -274,6 +399,10 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
       weapons,
       skills,
       items,
+      prologue: prologue.value,
+      prologueBestiary: prologueBestiary.value,
+      prologueHints: prologueHints.value,
+      reinforcements: reinforcements.value,
     },
   };
 }
