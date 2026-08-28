@@ -1,4 +1,4 @@
-import type { AppScreen } from "@bylina/session";
+import { isBattleScreen, type AppScreen } from "@bylina/session";
 import { Suspense, type ComponentType } from "react";
 import { BattleScreen } from "./BattleScreen.js";
 import { BootScreen } from "./BootScreen.js";
@@ -51,7 +51,17 @@ export function screenComponent(screen: AppScreen): ComponentType {
 }
 
 export function Shell() {
-  const { screen } = useSessionState();
+  const { screen, battleEpoch } = useSessionState();
   const Component = screenComponent(screen);
-  return <Suspense fallback={<div className="boot-screen" />}><Component /></Suspense>;
+  // Сражение монтируется заново на каждую «эпоху» боя (0.20.38): ядро
+  // партии, счётчик хода, подсказка обучения и карточка миссии живут в
+  // состоянии экрана. Переход «итог миссии пролога → следующая миссия»
+  // не покидает экран боя, поэтому без ключа экран продолжал бы прежнюю
+  // партию: миссии пролога показывали итог, не начавшись.
+  const key = isBattleScreen(screen) ? `battle-${battleEpoch ?? 0}` : screen;
+  return (
+    <Suspense fallback={<div className="boot-screen" />}>
+      <Component key={key} />
+    </Suspense>
+  );
 }
