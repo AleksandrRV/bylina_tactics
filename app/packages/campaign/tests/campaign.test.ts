@@ -548,3 +548,114 @@ describe("createCampaign: chapter prologue (0.20.31)", () => {
     expect(restored.getState().chapter).toBe("open");
   });
 });
+
+describe("createCampaign: sandbox after prologue (0.20.35)", () => {
+  const UNIT_STATS_PROLOGUE = {
+    ...UNIT_STATS,
+    mikula_peasant: { maxHealth: 8 },
+    fedot_stranded: { maxHealth: 5 },
+    vasilisa: { maxHealth: 7 },
+  };
+
+  function prologueCampaign(finalId = "clearing_1") {
+    return createCampaign(CONFIG, {
+      unitStats: UNIT_STATS_PROLOGUE,
+      items: ITEMS,
+      chapter: "prologue",
+      prologueFinalMissionId: finalId,
+      initialState: {
+        chapter: "prologue",
+        darkness: 0,
+        darknessMax: 20,
+        phase: "active",
+        resources: { gold: 0, herbs: 0, artifacts: 0 },
+        inventory: [],
+        shipPosition: { x: 20, y: 50 },
+        missions: [
+          { id: "clearing_1", status: "open" },
+          { id: "clearing_2", status: "open" },
+          { id: "clearing_3", status: "locked" },
+        ],
+        fighters: [
+          { id: 1, name: "Микула", unitId: "mikula_peasant", level: 2, hp: 8, maxHp: 8, wounded: false, alive: true, equippedItemId: null },
+          { id: 2, name: "Федот", unitId: "fedot_stranded", level: 1, hp: 5, maxHp: 5, wounded: false, alive: true, equippedItemId: null },
+          { id: 3, name: "Василиса", unitId: "vasilisa", level: 1, hp: 7, maxHp: 7, wounded: false, alive: true, equippedItemId: null },
+        ],
+        deadGenerals: [],
+        activeMissionId: null,
+        lastResult: null,
+      },
+    });
+  }
+
+  it("opens sandbox after the configured final prologue mission", () => {
+    const automaton = prologueCampaign("clearing_1");
+    automaton.startMission("clearing_1");
+    const result = automaton.finishMission("clearing_1", "victory", [
+      { fighterId: 1, survived: true, hp: 8 },
+      { fighterId: 2, survived: true, hp: 5 },
+      { fighterId: 3, survived: true, hp: 7 },
+    ]);
+    expect(result?.darknessGained).toBe(0);
+    const after = automaton.getState();
+    expect(after.chapter).toBe("open");
+    expect(after.fighters.map((fighter) => fighter.unitId)).toEqual(["bogatyr", "strelets", "znaharka"]);
+    expect(after.fighters[0]?.name).toBe("Микула");
+    expect(after.fighters[0]?.level).toBe(2);
+    expect(after.resources).toEqual(CONFIG.startingResources);
+    expect(after.darkness).toBe(0);
+    expect(after.missions[0]?.status).toBe("done");
+  });
+
+  it("does not open sandbox before the configured final mission", () => {
+    const automaton = prologueCampaign("clearing_2");
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", [
+      { fighterId: 1, survived: true, hp: 8 },
+      { fighterId: 2, survived: true, hp: 5 },
+      { fighterId: 3, survived: true, hp: 7 },
+    ]);
+    expect(automaton.getState().chapter).toBe("prologue");
+    automaton.startMission("clearing_2");
+    automaton.finishMission("clearing_2", "victory", [
+      { fighterId: 1, survived: true, hp: 8 },
+      { fighterId: 2, survived: true, hp: 5 },
+      { fighterId: 3, survived: true, hp: 7 },
+    ]);
+    expect(automaton.getState().chapter).toBe("open");
+  });
+
+  it("applies sandbox economy only after the transition", () => {
+    const automaton = prologueCampaign("clearing_1");
+    automaton.startMission("clearing_1");
+    automaton.finishMission("clearing_1", "victory", [
+      { fighterId: 1, survived: true, hp: 8 },
+      { fighterId: 2, survived: true, hp: 5 },
+      { fighterId: 3, survived: true, hp: 7 },
+    ]);
+    expect(automaton.getState().darkness).toBe(0);
+    automaton.scan();
+    automaton.startMission("clearing_2");
+    const result = automaton.finishMission("clearing_2", "victory", [
+      { fighterId: 1, survived: true, hp: 12 },
+      { fighterId: 2, survived: true, hp: 8 },
+      { fighterId: 3, survived: true, hp: 7 },
+    ]);
+    expect(result?.darknessGained).toBe(2);
+    expect(automaton.getState().darkness).toBe(2);
+    expect(automaton.getState().resources.gold).toBeGreaterThan(CONFIG.startingResources.gold);
+  });
+
+  it("openSandboxFromPrologue is idempotent once the chapter is open", () => {
+    const automaton = prologueCampaign();
+    expect(automaton.openSandboxFromPrologue()).toBe(true);
+    expect(automaton.openSandboxFromPrologue()).toBe(false);
+    expect(automaton.getState().chapter).toBe("open");
+  });
+
+  it("blocks scan and craft while chapter is prologue", () => {
+    const automaton = prologueCampaign();
+    expect(automaton.scan()).toBeNull();
+    expect(automaton.craftItem("aim_charm")).toBe(false);
+  });
+});

@@ -1,4 +1,5 @@
 import type { CampaignConfig, ItemConfig, MissionConfig } from "@bylina/content";
+import { migratePrologueFighters } from "./prologue-migration.js";
 
 /**
  * Автомат Летучего Корабля (module-core-campaign).
@@ -146,6 +147,11 @@ export interface CampaignApi {
   healFighter(fighterId: number): boolean;
   /** Назначить класс рекруту, достигшему `classUnlockLevel`. */
   assignClass(fighterId: number, unitId: string): boolean;
+  /**
+   * Переход пролог → открытая кампания (0.20.35). Идемпотентно, если глава уже `open`.
+   * Точка перехода задаётся `prologueFinalMissionId` (конфиг этапа 1).
+   */
+  openSandboxFromPrologue(): boolean;
   subscribe(listener: () => void): () => void;
 }
 
@@ -306,6 +312,36 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     state.resources.artifacts += reward.artifacts;
   };
 
+  const SANDBOX_ROSTER = ["bogatyr", "strelets", "znaharka"] as const;
+
+  const openSandboxFromPrologue = (): boolean => {
+    if (state.chapter !== "prologue") return false;
+    state.chapter = "open";
+    state.fighters = migratePrologueFighters(state.fighters);
+    for (const fighter of state.fighters) {
+      if (fighter.unitId === "bogatyr" && fighter.level < 2) fighter.level = 2;
+      const maxHp = hpOf(fighter.unitId);
+      if (maxHp !== fighter.maxHp) {
+        const ratio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 1;
+        fighter.maxHp = maxHp;
+        fighter.hp = Math.max(1, Math.min(maxHp, Math.round(ratio * maxHp)));
+      }
+    }
+    for (const unitId of SANDBOX_ROSTER) {
+      if (state.fighters.some((fighter) => fighter.unitId === unitId && fighter.alive)) continue;
+      if (state.fighters.length >= config.rosterCap) break;
+      const level = unitId === "bogatyr" ? Math.max(2, config.classUnlockLevel) : 1;
+      state.fighters.push(makeFighter(unitId, level));
+    }
+    const empty =
+      state.resources.gold === 0 && state.resources.herbs === 0 && state.resources.artifacts === 0;
+    if (empty) gain(config.startingResources);
+    const first = state.missions[0];
+    if (first && first.status === "locked") first.status = "open";
+    emit();
+    return true;
+  };
+
   return {
     getState: () => ({
       ...state,
@@ -338,7 +374,8 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       const mission = missions.find((entry) => entry.id === id);
       if (!point || !mission) return null;
 
-      const sandbox = state.chapter !== "prologue";
+      const isPrologue = state.chapter === "prologue";
+      const sandbox = !isPrologue;
       const darknessGained = sandbox
         ? (outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat)
         : 0;
@@ -405,6 +442,10 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       if (campaignLost) {
         state.phase = "lost";
       }
+      const finalId = options.prologueFinalMissionId;
+      if (isPrologue && outcome === "victory" && finalId && id === finalId) {
+        openSandboxFromPrologue();
+      }
       emit();
       return { darknessGained, rewards, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit };
     },
@@ -414,6 +455,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       emit();
     },
     scan: () => {
+      if (state.chapter === "prologue") return null;
       if (state.phase !== "active" || state.activeMissionId !== null) return null;
       const cost = { ...config.scan.cost };
       if (!canPay(cost)) return null;
@@ -472,6 +514,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       emit();
       return true;
     },
+    openSandboxFromPrologue,
     assignClass: (fighterId, unitId) => {
       const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
       if (!fighter || !fighter.alive) return false;

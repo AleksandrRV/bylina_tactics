@@ -106,6 +106,8 @@ export function App() {
       items: content.data.items,
       initialState: campaignRestore !== "pending" && campaignRestore ? campaignRestore : undefined,
       classUnitIds,
+      prologueFinalMissionId: content.data.prologue.prologueFinalMissionId,
+      chapter: session.get().battleKind === "prologue" ? "prologue" : undefined,
     });
     // Привязка СИНХРОННО, до первого рендера экранов (исправление 0.20.2):
     // экраны кампании читают автомат в первом же рендере; мемо исполняется

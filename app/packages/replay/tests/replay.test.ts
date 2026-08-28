@@ -15,7 +15,7 @@ const OPTIONS: PvpMatchOptions = {
 
 describe("replay journal (0.20.19)", () => {
   it("uses the current replay format version", () => {
-    expect(REPLAY_VERSION).toBe("0.20.34");
+    expect(REPLAY_VERSION).toBe("0.20.35");
   });
 
   it("records commands and serializes to a plain object", () => {

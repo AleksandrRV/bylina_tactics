@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.34", () => {
-    expect(APP_VERSION).toBe("0.20.34");
+  it("reports version 0.20.35", () => {
+    expect(APP_VERSION).toBe("0.20.35");
   });
 
   it("moves between menu and settings", () => {
@@ -427,6 +427,18 @@ describe("createSession prologue route (0.20.31)", () => {
     expect(session.get().prologueMissionId).toBe("prologue_brushwood");
     expect(session.get().screen).toBe("battle");
     expect(session.get().battleKind).toBe("prologue");
+  });
+
+  it("opens the campaign sandbox when the prologue chain ends (0.20.35)", () => {
+    const session = createSession("menu");
+    const automaton = createCampaign(CAMPAIGN_CONFIG, { chapter: "prologue", unitStats: UNIT_STATS });
+    session.bindCampaign(automaton);
+    session.startPrologue("prologue_village", true);
+    expect(session.getCampaign().getState().chapter).toBe("prologue");
+    expect(session.advancePrologue(null)).toBe(true);
+    expect(session.get().screen).toBe("campaign");
+    expect(session.get().prologueMissionId ?? null).toBeNull();
+    expect(session.getCampaign().getState().chapter).toBe("open");
   });
 });
 

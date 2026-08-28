@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.34";
+export const APP_VERSION = "0.20.35";
 
 export type AppScreen =
   | "boot"
@@ -524,6 +524,9 @@ export function createSession(
     },
     bindCampaign: (automaton) => {
       campaign = automaton;
+      if (state.battleKind === "prologue" && campaign.getState().chapter !== "prologue") {
+        campaign.setChapter("prologue");
+      }
     },
     openCampaign: () => {
       emit({ ...idle, screen: "campaign" });
@@ -1030,6 +1033,7 @@ export function createSession(
     },
     startPrologue: (missionId, enabled) => {
       if (!enabled) return false;
+      if (campaign && campaign.getState().chapter !== "prologue") campaign.setChapter("prologue");
       const SEED: Record<string, number> = {
         prologue_brushwood: 701,
         prologue_cry: 702,
@@ -1048,6 +1052,7 @@ export function createSession(
     },
     advancePrologue: (nextMissionId) => {
       if (!nextMissionId) {
+        campaign?.openSandboxFromPrologue();
         emit({ ...idle, screen: "campaign", prologueMissionId: null });
         return true;
       }
