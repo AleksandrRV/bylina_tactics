@@ -247,19 +247,26 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(document.querySelector(".modal")).toBeNull();
       expect(document.querySelector(".menu-screen")).not.toBeNull();
       expect(hasButton("Продолжить")).toBe(true);
-      // Подтверждение — свежая былина: Тьма обнулена, «Продолжить» исчез.
+      // Подтверждение — свежая былина начинается прологом (0.20.31): бой М1
+      // «Хворост» вместо карты корабля; счётчик Тьмы в прологе скрыт
+      // (doc/campaign.md), сохранение перезаписано свежим автоматом.
       await act(async () => {
         buttonByText("Новая былина").click();
       });
       await act(async () => {
         buttonByText("Начать новую").click();
       });
-      await act(async () => {
-        await new Promise((resolve) => setTimeout(resolve, 80));
-      });
-      expect(document.querySelector(".campaign-screen")).not.toBeNull();
-      const darkness = document.querySelector(".campaign-darkness-value");
-      expect(darkness?.textContent).toContain("0");
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
+      expect(document.body.textContent).toContain("Хворост");
+      expect(
+        await waitFor(() => {
+          const raw = window.localStorage.getItem("bylina.save.v1");
+          if (!raw) return false;
+          const save = JSON.parse(raw) as { campaign: { darkness: number; chapter?: string } };
+          return save.campaign.darkness === 0 && save.campaign.chapter === "prologue";
+        }),
+      ).toBe(true);
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
@@ -280,7 +287,11 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 80));
       });
-      expect(document.querySelector(".campaign-screen")).not.toBeNull();
+      // Пролог включён (0.20.31): без сохранения «Новая былина» открывает
+      // кампанию сразу с боя М1, без карты корабля и без предупреждения.
+      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(document.querySelector(".campaign-screen")).toBeNull();
+      expect(document.body.textContent).toContain("Хворост");
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
