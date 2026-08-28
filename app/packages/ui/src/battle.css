@@ -1610,12 +1610,39 @@
 
 /* Этап 1.7: системная настройка «уменьшить движение» — боевой интерфейс
    без пульсаций и покачиваний; анимации поля гасит сам рендерер. */
+/* Пропуск кинематографической сцены (0.20.37, campaign.md §1.8).
+   Висит над полем, но ниже модальных карточек паузы и итога миссии. */
+.cutscene-skip {
+  position: absolute;
+  right: max(14px, env(safe-area-inset-right));
+  bottom: max(14px, env(safe-area-inset-bottom));
+  z-index: 40;
+  padding: 8px 16px;
+  border: 1px solid var(--line, #3a4550);
+  border-radius: 999px;
+  background: rgba(20, 24, 28, 0.82);
+  color: var(--mist-dim, #a8a196);
+  font: inherit;
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  backdrop-filter: blur(3px);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.cutscene-skip:hover,
+.cutscene-skip:focus-visible {
+  color: var(--mist, #d5cfc0);
+  border-color: var(--amber, #e0b34a);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .phase-banner,
   .training-note,
   .training-step-dot,
   .hint-pulse,
   .apple-hud-icon,
+  .cutscene-skip,
   .objective-hp i {
     animation: none !important;
     transition: none !important;

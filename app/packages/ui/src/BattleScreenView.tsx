@@ -1,16 +1,19 @@
 import {
   ENEMY_OWNER,
   PLAYER_OWNER,
+  compilePrologueLayout,
   createMissionMatch,
   createPvpMatch,
   createQuickMatch,
   createTacticsKernel,
   defaultTrainingWeapons,
   pickEnemyCommand,
+  pickCutscene,
   pickScriptedEnemyCommand,
   weaponStatsFromRecord,
   type CellPos,
   type Command,
+  type CutsceneEvent,
   type EntityState,
   type GameEvent,
   type HitPreview,
@@ -43,6 +46,11 @@ import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { unitPortrait } from "./portraits.js";
+import {
+  buildCinematicPlan,
+  splitSpawnEvents,
+  type LayoutMarkers,
+} from "./prologue-cutscene.js";
 import { useBattleNetwork } from "./useBattleNetwork.js";
 import { useBattleInput } from "./useBattleInput.js";
 import { useReplayControls } from "./useReplayControls.js";
@@ -54,6 +62,7 @@ import {
   initPrologueMatch,
   prologueUnits,
   shouldRestoreCheckpoint,
+  takePrologueSpawnEvents,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   createTelemetryLog,
@@ -167,6 +176,12 @@ export function BattleScreenView() {
   const prologueMission = isPrologue
     ? content.prologue.missions.find((mission) => mission.id === session.get().prologueMissionId)
     : undefined;
+  // Маркеры авторской раскладки миссии: сцена ссылается на палку или точку
+  // выхода крысы символом, средство отображения получает уже клетку.
+  const prologueMarkers = useMemo<LayoutMarkers | null>(() => {
+    if (!prologueMission?.map.layout) return null;
+    return compilePrologueLayout(prologueMission.map.layout).markers;
+  }, [prologueMission]);
   const [kernel] = useState<TacticsKernel | null>(() => {
     if (isPrologue && prologueMission) {
       const host = createTacticsKernel({
@@ -313,6 +328,9 @@ export function BattleScreenView() {
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [enemyPhase, setEnemyPhase] = useState(false);
+  // Кинематографическая сцена (0.20.37): пока идёт, ввод игрока закрыт и на
+  // экране доступна кнопка пропуска (campaign.md §1.8).
+  const [cutscenePlaying, setCutscenePlaying] = useState(false);
 
   useEffect(
     () =>
@@ -764,6 +782,87 @@ export function BattleScreenView() {
     });
   };
 
+  /* ---------- режиссура камеры (0.20.37, campaign.md §13.4) ---------- */
+
+  /** Проиграть сцену миссии, если для этого события она описана в данных. */
+  const runPrologueCutscene = async (event: CutsceneEvent): Promise<void> => {
+    if (!prologueMission?.cutscenes || !kernel) return;
+    const config = pickCutscene(prologueMission.cutscenes, event);
+    if (!config) return;
+    const plan = buildCinematicPlan(config, prologueMarkers);
+    setCutscenePlaying(true);
+    setBusy(true);
+    try {
+      const skipped = (await rendererRef.current?.playCinematic?.(plan)) ?? false;
+      if (skipped) {
+        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+          type: "skip_cutscene",
+          missionId: prologueMission.id,
+        });
+      }
+    } finally {
+      setCutscenePlaying(false);
+      setBusy(false);
+    }
+  };
+
+  /**
+   * Появления противника, накопленные внутри `afterPrologueApply`: событие
+   * рождается ядром не в `apply`, поэтому без этого канала крыса возникала
+   * бы на поле без всякой анимации. Появление, за которое отвечает сцена,
+   * проигрывается ею; остальные идут обычным порядком событий.
+   */
+  const runPrologueSpawnBeats = async (events: readonly GameEvent[]): Promise<void> => {
+    if (!prologueMission || events.length === 0) return;
+    const { staged, generic } = splitSpawnEvents(events, prologueMission.cutscenes);
+    if (generic.length > 0) await (rendererRef.current?.play(generic) ?? Promise.resolve());
+    for (const entry of staged) {
+      await runPrologueCutscene(entry.event);
+    }
+  };
+
+  /**
+   * Откат сцены к контрольной точке (§1.5): плавное затемнение, восстановление
+   * снимка, кадр на герое, проявление. Затемнение и проезд идут через
+   * проигрыватель поля, поэтому уважают настройку «уменьшить движение» и
+   * множитель скорости боя.
+   */
+  const restorePrologueScene = async (): Promise<void> => {
+    const renderer = rendererRef.current;
+    setBusy(true);
+    setLog(t("prologue.scene.revive"));
+    try {
+      await (renderer?.fadeScreen?.("out", 600) ?? Promise.resolve());
+      session.restoreBattleCheckpoint();
+      setSelectedId(null);
+      setAction(null);
+      setAimId(null);
+      setSkillTargetPos(null);
+      setPreview(null);
+      // Клетку героя берём из свежего снимка: состояние `view` обновится
+      // только после перерисовки, и опора на него дала бы гонку.
+      const heroId = prologueMission?.playerSlots[0];
+      const hero = heroId
+        ? session.getBattleFullSnapshot()?.entities.find((entity) => entity.configId === heroId && !entity.dead)
+        : undefined;
+      if (hero) {
+        await (renderer?.playCinematic?.({
+          id: "checkpoint_focus",
+          lockInput: false,
+          steps: [{ kind: "focus", target: { cell: { x: hero.x, y: hero.y } } }],
+        }) ?? Promise.resolve());
+      }
+      await (renderer?.fadeScreen?.("in", 500) ?? Promise.resolve());
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Пропуск текущей сцены кнопкой или клавишей (§1.8). */
+  const skipCutscene = (): void => {
+    rendererRef.current?.skipCinematic?.();
+  };
+
   /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы.
    *  Доступна только в отладочном режиме (?debug=1) и не действует в повторе (0.20.1).
    *  В обучении победа определяется шагами подсказки — автопобеда довершает
@@ -812,17 +911,30 @@ export function BattleScreenView() {
       return;
     }
     announce(result.events);
+    let prologueAfter: (() => void) | null = null;
     if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
       const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
       const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
-      if ((next.fedotFreed || next.firstWave || next.vasilisaJoined) && !session.hasBattleCheckpoint()) {
+      // Контрольная точка миссии: вход в миссию уже ею обеспечен, дальше —
+      // ключевые сюжетные вехи, включая выход крысы в М1.
+      const armed = next.fedotFreed || next.firstWave || next.vasilisaJoined || next.ratSpawned;
+      if (armed && !session.hasBattleCheckpoint()) {
         session.saveBattleCheckpoint();
       }
       if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
         prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
-        session.restoreBattleCheckpoint();
+        if (session.hasBattleCheckpoint()) {
+          prologueRunRef.current = next;
+          prologueAfter = () => void restorePrologueScene();
+        } else {
+          // Контрольной точки нет — честное поражение, а не «живой» труп на поле.
+          prologueRunRef.current = { ...next, outcome: "defeat" };
+          setPrologueCard("outro");
+        }
       } else {
-        prologueRunRef.current = next;
+        const taken = takePrologueSpawnEvents(next);
+        prologueRunRef.current = taken.state;
+        if (taken.events.length > 0) prologueAfter = () => void runPrologueSpawnBeats(taken.events);
       }
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
       if (hint && hint !== prologueHintKey) {
@@ -840,7 +952,7 @@ export function BattleScreenView() {
     setAimId(null);
     setSkillTargetPos(null);
     setPreview(null);
-    playThen(result.events);
+    playThen(result.events, prologueAfter ?? undefined);
   };
 
   const tryMove = (to: CellPos): void => {
@@ -951,6 +1063,9 @@ export function BattleScreenView() {
 
   const runEnemyPhase = async (): Promise<void> => {
     setEnemyPhase(true);
+    // Отложенные постановочные действия: откат к контрольной точке или выход
+    // противника — исполняются после проигрывания событий хода.
+    let enemyAfter: (() => void) | null = null;
     try {
       // В обучении без противника («Первые шаги») ход Нави отсутствует:
       // завершаем его сразу, возвращая управление игроку. В миссиях с
@@ -998,9 +1113,18 @@ export function BattleScreenView() {
           const next = afterPrologueApply(kernel, command, applied.events, prologueRunRef.current, ctx);
           if (shouldRestoreCheckpoint(next, applied.events, kernel.getSnapshot())) {
             prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
-            session.restoreBattleCheckpoint();
+            if (session.hasBattleCheckpoint()) {
+              prologueRunRef.current = next;
+              // Затемнение и откат — после того, как ход Нави доигран.
+              enemyAfter = () => void restorePrologueScene();
+            } else {
+              prologueRunRef.current = { ...next, outcome: "defeat" };
+              setPrologueCard("outro");
+            }
           } else {
-            prologueRunRef.current = next;
+            const taken = takePrologueSpawnEvents(next);
+            prologueRunRef.current = taken.state;
+            if (taken.events.length > 0) enemyAfter = () => void runPrologueSpawnBeats(taken.events);
           }
           setPrologueObjectiveKey(next.objectiveKey);
           if (next.outcome !== "ongoing") setPrologueCard("outro");
@@ -1013,6 +1137,7 @@ export function BattleScreenView() {
       if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
         await runProloguePlayerScript();
       }
+      if (enemyAfter) await enemyAfter();
     } finally {
       setEnemyPhase(false);
     }
@@ -1036,6 +1161,9 @@ export function BattleScreenView() {
       setPrologueObjectiveKey(next.objectiveKey);
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
       setPrologueHintKey(hint);
+      const taken = takePrologueSpawnEvents(next);
+      prologueRunRef.current = taken.state;
+      if (taken.events.length > 0) await runPrologueSpawnBeats(taken.events);
       if (next.outcome !== "ongoing") setPrologueCard("outro");
     }
   };
@@ -1440,6 +1568,13 @@ export function BattleScreenView() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
+      // Пропуск сцены — раньше прочих обработчиков (campaign.md §1.8):
+      // во время сцены ввод игрока закрыт, но кадр всегда можно отпустить.
+      if (cutscenePlaying && (event.key === "Escape" || event.key === " " || event.key === "Enter")) {
+        event.preventDefault();
+        skipCutscene();
+        return;
+      }
       if (event.key === "Escape") {
         session.setPaused(!paused);
         return;
@@ -1541,7 +1676,7 @@ export function BattleScreenView() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, [paused, busy, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
+  }, [paused, busy, cutscenePlaying, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
   const roster = snapshot.entities.filter((entity) =>
     (isSpectator ? (entity.owner === 1 || entity.owner === 2) : entity.owner === viewOwner) && entity.coverType === 0,
@@ -2234,11 +2369,9 @@ export function BattleScreenView() {
                     missionId: prologueMission.id,
                   });
                   setPrologueCard(null);
-                  const stick = snapshot.entities.find((entity) => entity.configId === "stick");
-                  if (stick) {
-                    const pos = rendererRef.current?.getEntityScreenPosition?.(stick.id);
-                    if (pos) rendererRef.current?.pan((0.5 - pos.x) * 420, (0.42 - pos.y) * 320);
-                  }
+                  // Дальше кадром управляет сцена миссии: герой → цель → герой,
+                  // и только после этого игрок получает управление (§13.4).
+                  void runPrologueCutscene({ type: "missionStart" });
                   return;
                 }
                 const nextId = prologueMission.nextMissionId ?? null;
@@ -2263,6 +2396,12 @@ export function BattleScreenView() {
         <div className="training-note" role="status">
           {t(content.prologueHints.hints.find((hint) => hint.key === prologueHintKey)?.textKey ?? prologueHintKey)}
         </div>
+      ) : null}
+
+      {cutscenePlaying ? (
+        <button type="button" className="cutscene-skip" onClick={skipCutscene}>
+          {t("battle.cutscene.skip")}
+        </button>
       ) : null}
 
       {isTraining && trainingOver ? (

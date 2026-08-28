@@ -5,6 +5,7 @@ import {
   createPrologueRunState,
   gatePrologueCommand,
   shouldRestoreCheckpoint,
+  takePrologueSpawnEvents,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   createTelemetryLog,
@@ -65,6 +66,7 @@ export {
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   shouldRestoreCheckpoint,
+  takePrologueSpawnEvents,
   createTelemetryLog,
   recordTelemetry,
 };

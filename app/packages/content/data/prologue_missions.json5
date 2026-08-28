@@ -23,17 +23,34 @@
         halfCoverChance: 0.0,
         heightMix: { z0: 0.0, z1: 1.0, z2: 0.0 },
         layout: {
+          // Околица Выселок: на севере — пологие всхолмления с валунами,
+          // по центру — ровная тропа от околицы к поляне, на юге — сухой
+          // ручей в низине. Ярусы заданы параллельно рядам: символы внутри
+          // `rows` стали бы ложными маркерами (см. prologue-layout.ts).
           rows: [
-            "....................",
-            "....t.....t......t..",
+            ".t..W....t....W...t.",
+            "..t.....t...t....t..",
             "..................F.",
-            ".M..t..........t...S",
-            "....................",
-            "....t.....t......t..",
+            ".M..t.......t..t...S",
+            "..t.....t.......t...",
+            ".t..W....t....W..t..",
+          ],
+          // Рельеф по клеткам: 0 — низина, 1 — луг, 2 — всхолмление.
+          // Тропа (ряд 3), старт Микулы (1,3), палка (19,3) и точка выхода
+          // крысы (18,2) держатся на одном ярусе: перепад дал бы стороне
+          // лишнюю поправку к меткости в учебном бою.
+          heights: [
+            "11122221111111122111",
+            "11122211111111112211",
+            "11111211111111111111",
+            "11111111111111111111",
+            "11000011111000111111",
+            "10000011100000011111",
           ],
           legend: {
             ".": { kind: "ground" },
             "t": { kind: "decor", decor: "bush" },
+            "W": { kind: "wall" },
             "M": { kind: "spawn", side: "player", unitId: "mikula_peasant" },
             "S": { kind: "pickup", itemId: "stick", weaponId: "club" },
             "F": { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
@@ -54,10 +71,43 @@
           { kind: "endTurn" },
         ],
       },
+      // Режиссура камеры (campaign.md §13.4). Описана данными, а не кодом
+      // экрана: тот же проигрыватель обслуживает выход Федота (М2), новую
+      // волну (М3) и посадку корабля (М6).
+      cutscenes: [
+        {
+          id: "m1_intro",
+          trigger: { kind: "missionStart" },
+          lockInput: true,
+          skippable: true,
+          steps: [
+            // Акцент на герое: кто перед нами и где он стоит.
+            { kind: "focus", target: { configId: "mikula_peasant" }, holdMs: 600 },
+            // Камера уходит к палке — цель названа изображением, без текста.
+            { kind: "pan", target: { marker: "S" }, durationMs: 1000, holdMs: 800 },
+            // Возврат к герою, после которого управление отдаётся игроку.
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 800 },
+          ],
+        },
+        {
+          id: "m1_rat_appear",
+          trigger: { kind: "onSpawn", configId: "forest_rat" },
+          lockInput: true,
+          skippable: true,
+          steps: [
+            // Камера успевает к опушке, пока крысы ещё нет в кадре.
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 320 },
+            // Крыса выбегает из-за предела карты.
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 420, holdMs: 700 },
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 700 },
+          ],
+        },
+      ],
       hints: ["m1.endTurn"],
       onboarding: [],
       checkpoints: [
         { id: "start", description: "Вход в миссию" },
+        { id: "rat_spawn", onKey: "stick", description: "Появление крысы" },
       ],
     },
     {

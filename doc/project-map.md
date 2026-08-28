@@ -57,6 +57,8 @@
 | `app/packages/core/src/los.ts` | Линия наблюдения |
 | `app/packages/core/src/types.ts` | `EntityState` и типы матча |
 | `app/packages/render/src/` | Отрисовка поля и камера |
+| `app/packages/render/src/token-art.ts` | Иллюстрации фишек пролога (0.20.37): Микула, крыса, палка |
+| `app/packages/core/src/cutscene.ts` | Типы кинематографических сцен и сопоставление триггера с событием (0.20.37) |
 | `app/packages/session/src/index.ts` | Оркестрация сессии, `suspendedCampaign` |
 | `app/packages/content/data/` | Баланс: юниты, оружие, умения, миссии |
 | `app/packages/content/src/schemas.ts` | Zod-схемы |
