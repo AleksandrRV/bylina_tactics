@@ -46,6 +46,17 @@ import { unitPortrait } from "./portraits.js";
 import { useBattleNetwork } from "./useBattleNetwork.js";
 import { useBattleInput } from "./useBattleInput.js";
 import { useReplayControls } from "./useReplayControls.js";
+import {
+  afterPrologueApply,
+  buildPrologueContext,
+  createPrologueRunState,
+  gatePrologueCommand,
+  initPrologueMatch,
+  prologueUnits,
+  shouldRestoreCheckpoint,
+  tickPrologueEnemyTurn,
+  type PrologueRunState,
+} from "./prologue-battle.js";
 import "./battle.css";
 
 function cellKey(x: number, y: number): string {
@@ -142,10 +153,27 @@ export function BattleScreenView() {
   const isReplay = battleKind === "replay";
   const replayJournal = session.get().replayJournal;
   const isTraining = battleKind === "training";
+  const isPrologue = battleKind === "prologue";
   const trainingMission = isTraining
     ? content.training.missions.find((mission) => mission.id === session.get().trainingMissionId)
     : undefined;
+  const prologueMission = isPrologue
+    ? content.prologue.missions.find((mission) => mission.id === session.get().prologueMissionId)
+    : undefined;
   const [kernel] = useState<TacticsKernel | null>(() => {
+    if (isPrologue && prologueMission) {
+      const host = createTacticsKernel({
+        initial: session.get().restoredMatch ?? initPrologueMatch(prologueMission, content, matchSeed || 701),
+        weapons,
+        skills,
+        units: prologueUnits(content),
+        seed: matchSeed || 701,
+        fog: session.get().restoredFog,
+        fogDisabled: prologueMission.fog === false,
+      });
+      session.bindTacticsHost(host);
+      return host;
+    }
     if (isTraining && trainingMission) {
       const host = createTacticsKernel({
         initial: createMissionMatch({
@@ -294,6 +322,11 @@ export function BattleScreenView() {
   // Позиция в очереди сценария Нави (0.20.13): живёт на время боя, очередь
   // с маркерами конца хода читается последовательно.
   const enemyScriptRef = useRef<TrainingEnemyScriptState>({ index: 0 });
+  const prologueRunRef = useRef<PrologueRunState | null>(
+    isPrologue && prologueMission ? createPrologueRunState(prologueMission.id) : null,
+  );
+  const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
+  const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
   const trainingHints = isTraining && trainingMission
     ? trainingHintsSorted(trainingMission.hints)
     : [];
@@ -454,7 +487,10 @@ export function BattleScreenView() {
   // и только указанным исполнителем, оружием, умением и целью. Пауза и выход
   // из обучения остаются доступны всегда. Отклонённое действие поясняется
   // строкой лога (ключи training.locked.*, ui-design §4.5).
-  const trainingAllows = (action: TrainingActionKind): boolean => directiveAllowsAction(directiveView, action);
+  const trainingAllows = (action: TrainingActionKind): boolean => {
+    if (isPrologue && prologueRunRef.current?.forceDefend) return action === "defend";
+    return directiveAllowsAction(directiveView, action);
+  };
   const trainingDeny = (action: TrainingActionKind): void => {
     if (directiveView) setLog(t(trainingDenialKey(directiveView, action)));
   };
@@ -464,11 +500,15 @@ export function BattleScreenView() {
       ? trainingDirective.actorId
       : null;
   /** Разрешено ли текущее указание этому исполнителю с этим оружием. */
-  const trainingWeaponAllowed = (weaponId: string): boolean =>
-    !isTraining || (trainingDirective?.kind === "attack" && trainingDirective.weaponId === weaponId);
+  const trainingWeaponAllowed = (weaponId: string): boolean => {
+    if (isPrologue && prologueRunRef.current?.forceDefend) return false;
+    return !isTraining || (trainingDirective?.kind === "attack" && trainingDirective.weaponId === weaponId);
+  };
   /** Разрешено ли текущее указание этому умению. */
-  const trainingSkillAllowed = (skillId: string): boolean =>
-    !isTraining || (trainingDirective?.kind === "skill" && trainingDirective.skillId === skillId);
+  const trainingSkillAllowed = (skillId: string): boolean => {
+    if (isPrologue && prologueRunRef.current?.forceDefend) return false;
+    return !isTraining || (trainingDirective?.kind === "skill" && trainingDirective.skillId === skillId);
+  };
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
@@ -661,7 +701,7 @@ export function BattleScreenView() {
     const ended = events.find((event) => event.type === "MATCH_ENDED");
     if (!ended || ended.type !== "MATCH_ENDED") return;
     // Повтор: партия не «завершается»; обучение завершает экран отдельным эффектом.
-    if (isReplay || isTraining) return;
+    if (isReplay || isTraining || isPrologue) return;
     if (battleKind === "pvp" || battleKind === "pvpNet") {
       const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
       if (winner) session.finishPvpMatch(winner);
@@ -757,6 +797,19 @@ export function BattleScreenView() {
       return;
     }
     announce(result.events);
+    if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
+      const ctx = buildPrologueContext(prologueMission, content, true);
+      const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
+      if (next.fedotFreed && !session.hasBattleCheckpoint()) session.saveBattleCheckpoint();
+      if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
+        session.restoreBattleCheckpoint();
+      } else {
+        prologueRunRef.current = next;
+      }
+      const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
+      setPrologueHintKey(hint);
+      if (next.outcome !== "ongoing") setPrologueCard("outro");
+    }
     // Подсказка обучения продвигается событиями действия самого игрока (0.19.1);
     // реактивные плашки (яд, воскрешение, призыв) показываются любыми событиями (0.20.1).
     advanceTraining(result.events);
@@ -900,6 +953,11 @@ export function BattleScreenView() {
           const decision = pickScriptedEnemyCommand(kernel, trainingMission?.enemyScript, enemyScriptRef.current);
           enemyScriptRef.current = decision.state;
           command = decision.command;
+        } else if (isPrologue && prologueMission && prologueRunRef.current) {
+          const ctx = buildPrologueContext(prologueMission, content, true);
+          const decision = tickPrologueEnemyTurn(kernel, prologueRunRef.current, ctx);
+          prologueRunRef.current = decision.state;
+          command = decision.command;
         } else {
           command = pickEnemyCommand(kernel);
         }
@@ -913,6 +971,16 @@ export function BattleScreenView() {
         await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
         announce(applied.events);
         showTrainingNote(applied.events);
+        if (isPrologue && prologueMission && prologueRunRef.current && command) {
+          const ctx = buildPrologueContext(prologueMission, content, true);
+          const next = afterPrologueApply(kernel, command, applied.events, prologueRunRef.current, ctx);
+          if (shouldRestoreCheckpoint(next, applied.events, kernel.getSnapshot())) {
+            session.restoreBattleCheckpoint();
+          } else {
+            prologueRunRef.current = next;
+          }
+          if (next.outcome !== "ongoing") setPrologueCard("outro");
+        }
         finishFromEvents(applied.events);
         if (!command) break;
         if (session.getBattleOutcome() !== "ongoing") break;
@@ -1176,6 +1244,7 @@ export function BattleScreenView() {
   // Этап 3.1: биом карты — из конфигурации режима, который создал матч.
   const battleBiome = useMemo(() => {
     if (isTraining && trainingMission) return trainingMission.map.biome;
+    if (isPrologue && prologueMission) return prologueMission.map.biome;
     if (battleKind === "campaign" && activeMissionId) {
       return session.getCampaign().getMission(activeMissionId)?.map.biome;
     }
@@ -2083,6 +2152,43 @@ export function BattleScreenView() {
         </div>
       ) : null}
 
+      {isPrologue && prologueCard && prologueMission ? (
+        <div className="pause-root" role="presentation">
+          <div className="pause-card training-over-card" role="dialog" aria-modal="true">
+            <p className="eyebrow">{t(prologueMission.titleKey)}</p>
+            <h2>{prologueCard === "intro" ? t(prologueMission.introKey) : t(prologueMission.outroKey)}</h2>
+            <button
+              type="button"
+              className="hud-btn hud-btn-primary"
+              onClick={() => {
+                if (prologueCard === "intro") {
+                  setPrologueCard(null);
+                  return;
+                }
+                const nextId = prologueMission.nextMissionId ?? null;
+                if (prologueRunRef.current?.outcome === "defeat") {
+                  session.startPrologue(prologueMission.id, true);
+                  return;
+                }
+                if (nextId === "prologue_glade" || nextId === "prologue_village") {
+                  session.advancePrologue(null);
+                  return;
+                }
+                session.advancePrologue(nextId);
+              }}
+            >
+              {t(prologueCard === "intro" ? "common.ok" : prologueMission.nextMissionId && prologueMission.id === "prologue_brushwood" ? "prologue.next.toCry" : "prologue.next.toMap")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {isPrologue && !prologueCard && prologueHintKey ? (
+        <div className="training-note" role="status">
+          {t(content.prologueHints.hints.find((hint) => hint.key === prologueHintKey)?.textKey ?? prologueHintKey)}
+        </div>
+      ) : null}
+
       {isTraining && trainingOver ? (
         <div className="pause-root" role="presentation">
           <div className="pause-card training-over-card" role="dialog" aria-modal="true" aria-labelledby="training-over-title">
@@ -2136,7 +2242,7 @@ export function BattleScreenView() {
                 // меню возвращает в бой. Покинуть миссию можно осознанно —
                 // кнопкой «К карте корабля». Иные бои выходят в меню как
                 // прежде (их партия эфемерна).
-                if (battleKind === "campaign") session.suspendCampaignBattle();
+                if (battleKind === "campaign" || battleKind === "prologue") session.suspendCampaignBattle();
                 else session.goTo("menu");
               }}
             >

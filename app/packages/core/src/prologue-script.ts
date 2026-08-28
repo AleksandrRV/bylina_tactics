@@ -44,7 +44,8 @@ export interface ScriptedDecision {
 }
 
 function livingByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, configId: string): EntityState | undefined {
-  return snap.entities.find((entity) => entity.configId === configId && !entity.dead);
+  return snap.entities.find((entity) => entity.configId === configId && !entity.dead && entity.ap > 0)
+    ?? snap.entities.find((entity) => entity.configId === configId && !entity.dead);
 }
 
 function deadByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, configId: string, owner: number): EntityState | undefined {

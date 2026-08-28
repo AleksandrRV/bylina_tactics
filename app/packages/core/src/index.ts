@@ -51,6 +51,17 @@ export {
 } from "./mission-script.js";
 export { compilePrologueLayout, createLayoutMatch } from "./prologue-layout.js";
 export type { PrologueLayout, CompiledLayout } from "./prologue-layout.js";
+export { createPrologueMatch } from "./prologue-match.js";
+export {
+  createPrologueRunState,
+  afterPrologueApply,
+  gatePrologueCommand,
+  tickPrologueEnemyTurn,
+  prologueHintView,
+  dismissPrologueHint,
+  shouldRestoreCheckpoint,
+} from "./prologue-run.js";
+export type { PrologueRunState, PrologueRunContext } from "./prologue-run.js";
 export {
   createReinforcementsState,
   tickReinforcements,

@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.32";
+export const CORE_VERSION = "0.20.33";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -200,7 +200,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const eliminationOwners = new Set(state.entities
     .filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false)
     .map((entity) => entity.owner));
-  const eliminationEnabled = eliminationOwners.size >= 2;
+  let eliminationEnabled = eliminationOwners.size >= 2;
 
   const actorOf = (id: number): EntityState | undefined => state.entities.find((entity) => entity.id === id);
   const weaponIdsOf = (entity: EntityState): string[] => entity.weaponIds ?? (entity.weaponId ? [entity.weaponId] : []);
@@ -1196,6 +1196,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (spawned) {
         spawned.countsForElimination = owner === ENEMY_OWNER;
         spawned.ap = spawned.maxAp;
+        if (spawned.countsForElimination !== false && spawned.owner > 0) {
+          eliminationOwners.add(spawned.owner);
+          eliminationEnabled = eliminationOwners.size >= 2;
+        }
         emit();
       }
       return spawned;

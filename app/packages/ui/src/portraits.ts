@@ -11,6 +11,10 @@ const PORTRAIT_FILES: Record<string, string> = {
   kikimora: "kikimora.jpg",
   idol: "idol.jpg",
   captive: "captive.jpg",
+  mikula_peasant: "recruit.jpg",
+  fedot_stranded: "captive.jpg",
+  forest_rat: "upyr.jpg",
+  slug: "kikimora.jpg",
   // Состязательные записи рядовых (0.16.0) используют образы исходных типов.
   upyr_pvp: "upyr.jpg",
   leshy_pvp: "leshy.jpg",

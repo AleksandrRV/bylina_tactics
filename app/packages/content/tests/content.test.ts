@@ -407,7 +407,7 @@ describe("prologue content (0.20.31)", () => {
     const result = parseContent(readDataTree());
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.data.prologue.enabled).toBe(false);
+    expect(result.data.prologue.enabled).toBe(true);
     expect(result.data.prologue.missions.map((mission: { id: string }) => mission.id)).toEqual([
       "prologue_brushwood",
       "prologue_cry",

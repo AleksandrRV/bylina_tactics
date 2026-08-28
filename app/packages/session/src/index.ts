@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.32";
+export const APP_VERSION = "0.20.33";
 
 export type AppScreen =
   | "boot"
@@ -36,7 +36,7 @@ export type AppScreen =
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training";
+export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue";
 
 /** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
 export type PvpSide = 1 | 2;
@@ -268,6 +268,8 @@ export interface SessionApi {
    * (поведение идентично 0.20.30). Экраны пролога — Этап 2–3.
    */
   startPrologue(missionId: string, enabled: boolean): boolean;
+  /** Следующая миссия пролога либо карта кампании. */
+  advancePrologue(nextMissionId: string | null): boolean;
   /** Снимок чекпоинта боя (не пишется в журнал повтора). */
   saveBattleCheckpoint(): boolean;
   restoreBattleCheckpoint(): boolean;
@@ -593,6 +595,23 @@ export function createSession(
       emit({ ...state, suspendedCampaign: null });
     },
     suspendCampaignBattle: () => {
+      if (state.battleKind === "prologue" && state.prologueMissionId) {
+        const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
+        const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
+        emit({
+          screen: "menu",
+          ...idle,
+          prologueMissionId: state.prologueMissionId,
+          suspendedCampaign: {
+            activeMissionId: state.prologueMissionId,
+            deployment: [],
+            matchSeed: state.matchSeed,
+            restoredMatch: snapshot ?? state.restoredMatch,
+            restoredFog: fog ?? state.restoredFog,
+          },
+        });
+        return;
+      }
       if (state.battleKind !== "campaign" || state.activeMissionId === null) {
         // Не бой кампании — обычный выход в меню; слот приостановленной
         // миссии (если был) сохраняется — emit не стирает его.
@@ -618,6 +637,19 @@ export function createSession(
     },
     resumeCampaign: () => {
       const slot = state.suspendedCampaign ?? null;
+      if (slot && slot.activeMissionId.startsWith("prologue_")) {
+        emit({
+          ...idle,
+          screen: "battle",
+          battleKind: "prologue",
+          prologueMissionId: slot.activeMissionId,
+          matchSeed: slot.matchSeed,
+          restoredMatch: slot.restoredMatch,
+          restoredFog: slot.restoredFog,
+          suspendedCampaign: null,
+        });
+        return;
+      }
       const active = requireCampaign().getState().activeMissionId;
       // Слот действителен, только пока миссия начата в автомате кампании:
       // завершённая либо покинутая миссия боем/высадкой не считается.
@@ -998,7 +1030,41 @@ export function createSession(
     },
     startPrologue: (missionId, enabled) => {
       if (!enabled) return false;
-      emit({ ...state, prologueMissionId: missionId });
+      const SEED: Record<string, number> = {
+        prologue_brushwood: 701,
+        prologue_cry: 702,
+        prologue_glade: 703,
+        prologue_village: 704,
+      };
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "prologue",
+        prologueMissionId: missionId,
+        matchSeed: SEED[missionId] ?? 701,
+        suspendedCampaign: null,
+      });
+      return true;
+    },
+    advancePrologue: (nextMissionId) => {
+      if (!nextMissionId) {
+        emit({ ...idle, screen: "campaign", prologueMissionId: null });
+        return true;
+      }
+      const SEED: Record<string, number> = {
+        prologue_brushwood: 701,
+        prologue_cry: 702,
+        prologue_glade: 703,
+        prologue_village: 704,
+      };
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "prologue",
+        prologueMissionId: nextMissionId,
+        matchSeed: SEED[nextMissionId] ?? 701,
+        suspendedCampaign: null,
+      });
       return true;
     },
     saveBattleCheckpoint: () => {

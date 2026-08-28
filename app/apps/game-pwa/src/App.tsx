@@ -153,6 +153,11 @@ export function App() {
   const startNewCampaign = (): void => {
     setCampaignRestore(null);
     session.clearSuspendedCampaign();
+    if (contentData?.prologue.enabled) {
+      const first = contentData.prologue.missions[0]?.id ?? "prologue_brushwood";
+      session.startPrologue(first, true);
+      return;
+    }
     session.openMode("campaign");
   };
 

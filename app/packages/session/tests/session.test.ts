@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.32", () => {
-    expect(APP_VERSION).toBe("0.20.32");
+  it("reports version 0.20.33", () => {
+    expect(APP_VERSION).toBe("0.20.33");
   });
 
   it("moves between menu and settings", () => {
@@ -425,6 +425,8 @@ describe("createSession prologue route (0.20.31)", () => {
     const session = createSession("menu");
     expect(session.startPrologue("prologue_brushwood", true)).toBe(true);
     expect(session.get().prologueMissionId).toBe("prologue_brushwood");
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().battleKind).toBe("prologue");
   });
 });
 

@@ -1,6 +1,6 @@
 // Цепочка М1–М4. Этап 1: данные закрыты флагом enabled.
 {
-  enabled: false,
+  enabled: true,
   roster: ["mikula_peasant", "fedot_stranded", "bogatyr", "strelets", "znaharka"],
   prologueFinalMissionId: "prologue_village",
   missions: [
