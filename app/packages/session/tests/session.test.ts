@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.37", () => {
-    expect(APP_VERSION).toBe("0.20.37");
+  it("reports version 0.20.38", () => {
+    expect(APP_VERSION).toBe("0.20.38");
   });
 
   it("moves between menu and settings", () => {
@@ -427,6 +427,42 @@ describe("createSession prologue route (0.20.31)", () => {
     expect(session.get().prologueMissionId).toBe("prologue_brushwood");
     expect(session.get().screen).toBe("battle");
     expect(session.get().battleKind).toBe("prologue");
+  });
+
+  it("opens the next prologue mission as a new battle (0.20.38)", () => {
+    const session = createSession("menu");
+    session.startPrologue("prologue_brushwood", true);
+    const first = session.get().battleEpoch ?? 0;
+    expect(first).toBeGreaterThan(0);
+    // Переход «итог миссии → следующая миссия» не покидает экран боя:
+    // эпоха обязана прирасти, иначе экран продолжит прежнюю партию.
+    session.advancePrologue("prologue_cry");
+    expect(session.get().screen).toBe("battle");
+    expect(session.get().prologueMissionId).toBe("prologue_cry");
+    expect(session.get().battleEpoch ?? 0).toBe(first + 1);
+  });
+
+  it("opens a repeated prologue mission as a new battle (0.20.38)", () => {
+    const session = createSession("menu");
+    session.startPrologue("prologue_brushwood", true);
+    const first = session.get().battleEpoch ?? 0;
+    // Повтор той же миссии («ещё раз» после поражения): та же миссия и тот
+    // же посев, но партия новая — эпоха прирастает и здесь.
+    session.startPrologue("prologue_brushwood", true);
+    expect(session.get().battleEpoch ?? 0).toBe(first + 1);
+  });
+
+  it("keeps the battle epoch while the same battle runs (0.20.38)", () => {
+    const session = createSession("menu");
+    session.openQuickMatch();
+    session.selectDifficulty("easy");
+    const epoch = session.get().battleEpoch ?? 0;
+    expect(epoch).toBeGreaterThan(0);
+    // Пауза и ходы — не новый бой: экран не должен перемонтироваться.
+    session.setPaused(true);
+    expect(session.get().battleEpoch ?? 0).toBe(epoch);
+    session.setPaused(false);
+    expect(session.get().battleEpoch ?? 0).toBe(epoch);
   });
 
   it("opens the campaign sandbox when the prologue chain ends (0.20.35)", () => {
