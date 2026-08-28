@@ -31,6 +31,9 @@ export interface PrologueRunContext {
   reinforcements?: ReinforcementsConfig;
   ratMarker?: { x: number; y: number };
   fedotWaveSpawns?: { x: number; y: number }[];
+  waveCells?: { x: number; y: number }[];
+  allyCell?: { x: number; y: number };
+  healerCell?: { x: number; y: number };
 }
 
 export interface PrologueRunState {
@@ -45,6 +48,10 @@ export interface PrologueRunState {
   objectiveKey: string;
   outcome: "ongoing" | "victory" | "defeat";
   waveArmed: boolean;
+  firstWave: boolean;
+  fedotJoined: boolean;
+  vasilisaJoined: boolean;
+  pendingCommand: Command | null;
 }
 
 export function createPrologueRunState(missionId: string): PrologueRunState {
@@ -57,9 +64,20 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
     pickupDone: false,
     fedotFreed: false,
     extracted: [],
-    objectiveKey: missionId === "prologue_cry" ? "prologue.objective.rescueFedot" : "prologue.objective.gather",
+    objectiveKey:
+      missionId === "prologue_cry"
+        ? "prologue.objective.rescueFedot"
+        : missionId === "prologue_glade"
+          ? "prologue.objective.clearGlade"
+          : missionId === "prologue_village"
+            ? "prologue.objective.clearStreet"
+            : "prologue.objective.gather",
     outcome: "ongoing",
     waveArmed: false,
+    firstWave: false,
+    fedotJoined: false,
+    vasilisaJoined: false,
+    pendingCommand: null,
   };
 }
 
@@ -69,6 +87,16 @@ const M1_TRIGGERS: MissionTrigger[] = [
 
 const M2_TRIGGERS: MissionTrigger[] = [
   { id: "free_fedot", kind: "OnUnitAdjacent", unitId: "mikula_peasant", otherUnitId: "fedot_stranded", once: true, flag: "fedotFreed" },
+];
+
+const M3_TRIGGERS: MissionTrigger[] = [
+  { id: "first_upyr_dead", kind: "OnUnitDied", unitId: "upyr", once: true, flag: "firstWave" },
+  { id: "shield", kind: "OnSkillUsed", skillId: "shield_bash", once: true, flag: "blow" },
+];
+
+const M4_TRIGGERS: MissionTrigger[] = [
+  { id: "poison_join", kind: "OnPoisonApplied", side: "player", once: true, flag: "vasilisa_joined" },
+  { id: "line_join", kind: "OnCrossLine", side: "player", lineAxis: "x", lineValue: 8, once: true, flag: "vasilisa_joined" },
 ];
 
 function living(match: MatchState, configId: string) {
@@ -140,17 +168,44 @@ function freeFedot(kernel: TacticsKernel): void {
   });
 }
 
-function spawnRats(kernel: TacticsKernel, cells: { x: number; y: number }[], countForElim: boolean): void {
+function spawnUnits(
+  kernel: TacticsKernel,
+  unitId: string,
+  owner: number,
+  cells: { x: number; y: number }[],
+  countForElim: boolean,
+): void {
   for (const cell of cells) {
     const tile = tileAt(kernel.getSnapshot().grid, cell.x, cell.y);
-    const spawned = kernel.spawnScripted("forest_rat", ENEMY_OWNER, { x: cell.x, y: cell.y, z: tile?.z ?? 1 });
+    const spawned = kernel.spawnScripted(unitId, owner, { x: cell.x, y: cell.y, z: tile?.z ?? 1 });
     if (spawned && !countForElim) {
       restorePatch(kernel, (match) => {
-        const rat = match.entities.find((entity) => entity.id === spawned.id);
-        if (rat) rat.countsForElimination = false;
+        const entity = match.entities.find((candidate) => candidate.id === spawned.id);
+        if (entity) entity.countsForElimination = false;
       });
     }
   }
+}
+
+function spawnRats(kernel: TacticsKernel, cells: { x: number; y: number }[], countForElim: boolean): void {
+  spawnUnits(kernel, "forest_rat", ENEMY_OWNER, cells, countForElim);
+}
+
+function livingEnemies(match: MatchState) {
+  return match.entities.filter(
+    (entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false,
+  );
+}
+
+function livingPlayers(match: MatchState) {
+  return match.entities.filter(
+    (entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0,
+  );
+}
+
+function joinVasilisa(kernel: TacticsKernel, ctx: PrologueRunContext): void {
+  if (living(kernel.getSnapshot(), "znaharka")) return;
+  spawnUnits(kernel, "znaharka", PLAYER_OWNER, [ctx.healerCell ?? { x: 12, y: 2 }], true);
 }
 
 export function afterPrologueApply(
@@ -168,7 +223,14 @@ export function afterPrologueApply(
   if (next.outcome !== "ongoing") return next;
 
   const match = kernel.getSnapshot();
-  const triggers = ctx.missionId === "prologue_cry" ? M2_TRIGGERS : M1_TRIGGERS;
+  const triggers =
+    ctx.missionId === "prologue_cry"
+      ? M2_TRIGGERS
+      : ctx.missionId === "prologue_glade"
+        ? M3_TRIGGERS
+        : ctx.missionId === "prologue_village"
+          ? M4_TRIGGERS
+          : M1_TRIGGERS;
   const evaluated = evaluateMissionTriggers(match, events, triggers, next.mission);
   next.mission = evaluated.state;
 
@@ -265,6 +327,36 @@ export function afterPrologueApply(
     }
   }
 
+  if (ctx.missionId === "prologue_glade") {
+    if (evaluated.fired.some((item) => item.flag === "firstWave") && !next.firstWave) {
+      next.firstWave = true;
+      spawnUnits(kernel, "upyr", ENEMY_OWNER, ctx.waveCells ?? [], true);
+      if (ctx.allyCell && !living(kernel.getSnapshot(), "strelets")) {
+        spawnUnits(kernel, "strelets", PLAYER_OWNER, [ctx.allyCell], true);
+      }
+      enqueue(next, ctx, "m3.more");
+      enqueue(next, ctx, "m3.shot");
+    }
+    if (evaluated.fired.some((item) => item.flag === "blow")) {
+      enqueue(next, ctx, "m3.blow");
+    }
+    const after = kernel.getSnapshot();
+    if (!livingPlayers(after).length) next.outcome = "defeat";
+    else if (next.firstWave && !livingEnemies(after).length) next.outcome = "victory";
+  }
+
+  if (ctx.missionId === "prologue_village") {
+    const poisonOrLine = evaluated.fired.some((item) => item.flag === "vasilisa_joined");
+    if (poisonOrLine && !next.vasilisaJoined) {
+      next.vasilisaJoined = true;
+      joinVasilisa(kernel, ctx);
+      enqueue(next, ctx, "m4.join");
+    }
+    const after = kernel.getSnapshot();
+    if (!livingPlayers(after).length) next.outcome = "defeat";
+    else if (!livingEnemies(after).length) next.outcome = "victory";
+  }
+
   return next;
 }
 
@@ -283,7 +375,7 @@ export function tickPrologueEnemyTurn(
   next.script = decision.state;
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
   if (decision.spawn) {
-    spawnRats(kernel, [decision.spawn.at], ctx.missionId !== "prologue_cry");
+    spawnUnits(kernel, decision.spawn.unitId, decision.spawn.owner, [decision.spawn.at], decision.spawn.owner === ENEMY_OWNER);
   }
   return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
 }

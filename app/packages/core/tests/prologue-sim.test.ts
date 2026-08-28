@@ -186,3 +186,149 @@ describe("prologue M2 gate", () => {
     expect(gatePrologueCommand(state, { type: "DEFEND", actorId: mikula.id })).toBe(true);
   });
 });
+
+const BOGATYR: SpawnUnitConfig = {
+  id: "bogatyr",
+  maxHealth: 12,
+  maxAP: 2,
+  mobility: 4,
+  aim: 70,
+  defense: 10,
+  vision: 10,
+  weapons: ["sword"],
+};
+const UPYR: SpawnUnitConfig = {
+  id: "upyr",
+  maxHealth: 6,
+  maxAP: 2,
+  mobility: 4,
+  aim: 50,
+  defense: 0,
+  vision: 8,
+  weapons: ["claws"],
+};
+const STRELETS: SpawnUnitConfig = {
+  id: "strelets",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 5,
+  aim: 70,
+  defense: 0,
+  vision: 12,
+  weapons: ["bow"],
+};
+const ZNAHARKA: SpawnUnitConfig = {
+  id: "znaharka",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 4,
+  aim: 50,
+  defense: 0,
+  vision: 10,
+  weapons: [],
+};
+
+describe("prologue M3 wave", () => {
+  it("spawns the second wave and strelets after the first upyr dies", () => {
+    const layout = {
+      rows: [
+        "............",
+        "............",
+        "............",
+        ".M...U......",
+        "............",
+        "..........A.",
+        ".......SS...",
+        "............",
+        "............",
+      ],
+      legend: {
+        M: { kind: "spawn", side: "player", unitId: "bogatyr" },
+        U: { kind: "spawn", side: "enemy", unitId: "upyr" },
+        S: { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
+        A: { kind: "spawn", side: "player", unitId: "strelets", scripted: true },
+      },
+    };
+    const match = createPrologueMatch({ layout, units: [BOGATYR, UPYR, STRELETS], seed: 703 });
+    expect(match.entities.filter((entity) => entity.configId === "upyr")).toHaveLength(1);
+    expect(match.entities.some((entity) => entity.configId === "strelets")).toBe(false);
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [BOGATYR, UPYR, STRELETS],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 703,
+      fogDisabled: false,
+    });
+    expect(kernel.getVisibleCells(1).size).toBeGreaterThan(0);
+    const compiled = compilePrologueLayout(layout);
+    let state = createPrologueRunState("prologue_glade");
+    const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
+    state = afterPrologueApply(
+      kernel,
+      { type: "ATTACK", actorId: 1, targetId: upyr.id, weaponId: "sword" },
+      [{ type: "ENTITY_DIED", entityId: upyr.id, causeOfDeath: "DAMAGE" }],
+      state,
+      {
+        missionId: "prologue_glade",
+        hints: [],
+        showHints: true,
+        waveCells: compiled.markers.S,
+        allyCell: compiled.markers.A?.[0],
+      },
+    );
+    expect(state.firstWave).toBe(true);
+    const after = kernel.getSnapshot();
+    expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead).length).toBeGreaterThanOrEqual(2);
+    expect(after.entities.some((entity) => entity.configId === "strelets" && !entity.dead)).toBe(true);
+  });
+});
+
+describe("prologue M4 vasilisa", () => {
+  it("joins on poison or crossing x>=8, not twice", () => {
+    const layout = {
+      rows: [
+        "..............",
+        "..............",
+        "............z.",
+        "M.............",
+        "A.............",
+        "..............",
+        "..............",
+        "..............",
+        "..............",
+      ],
+      legend: {
+        M: { kind: "spawn", side: "player", unitId: "bogatyr" },
+        A: { kind: "spawn", side: "player", unitId: "strelets" },
+        z: { kind: "spawn", side: "player", unitId: "znaharka", scripted: true },
+      },
+    };
+    const match = createPrologueMatch({ layout, units: [BOGATYR, STRELETS, ZNAHARKA], seed: 704 });
+    expect(match.entities.some((entity) => entity.configId === "znaharka")).toBe(false);
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [BOGATYR, STRELETS, ZNAHARKA],
+      seed: 704,
+    });
+    const compiled = compilePrologueLayout(layout);
+    let state = createPrologueRunState("prologue_village");
+    const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    state = afterPrologueApply(
+      kernel,
+      { type: "MOVE", actorId: bogatyr.id, to: { x: 8, y: 3, z: 1 } },
+      [{ type: "ENTITY_MOVED", entityId: bogatyr.id, path: [{ x: 0, y: 3, z: 1 }, { x: 8, y: 3, z: 1 }], isDash: false, apSpent: 1 }],
+      state,
+      { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
+    );
+    expect(state.vasilisaJoined).toBe(true);
+    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
+    state = afterPrologueApply(
+      kernel,
+      { type: "USE_SKILL", actorId: 2, skillId: "poison_needles", targetId: bogatyr.id },
+      [{ type: "STATUS_CHANGED", entityId: bogatyr.id, status: "POISON", applied: true, duration: 2, magnitude: 1, sourceId: 99 }],
+      state,
+      { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
+    );
+    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
+  });
+});

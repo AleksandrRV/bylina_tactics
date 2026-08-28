@@ -133,6 +133,30 @@ describe("mission triggers", () => {
 
     const interacted = evaluateMissionTriggers(match, [{ type: "SKILL_RESOLVED", sourceId: 1, skillId: "open", success: true }], [{ id: "i", kind: "OnObjectInteracted", once: true }], createMissionScriptState());
     expect(interacted.fired).toHaveLength(1);
+
+    const died = evaluateMissionTriggers(
+      { ...match, entities: [unit, fighter(2, 2, 5, 2, { configId: "upyr", dead: true })] },
+      [{ type: "ENTITY_DIED", entityId: 2, causeOfDeath: "DAMAGE" }],
+      [{ id: "died", kind: "OnUnitDied", unitId: "upyr", once: true, flag: "firstWave" }],
+      createMissionScriptState(),
+    );
+    expect(died.fired[0]?.flag).toBe("firstWave");
+
+    const line = evaluateMissionTriggers(
+      match,
+      [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 2, y: 2, z: 1 }, { x: 8, y: 2, z: 1 }], isDash: false, apSpent: 1 }],
+      [{ id: "line", kind: "OnCrossLine", side: "player", lineAxis: "x", lineValue: 8, once: true, flag: "vasilisa_joined" }],
+      createMissionScriptState(),
+    );
+    expect(line.fired[0]?.flag).toBe("vasilisa_joined");
+
+    const poison = evaluateMissionTriggers(
+      match,
+      [{ type: "STATUS_CHANGED", entityId: 1, status: "POISON", applied: true, duration: 2, magnitude: 1, sourceId: 2 }],
+      [{ id: "poi", kind: "OnPoisonApplied", side: "player", once: true, flag: "vasilisa_joined" }],
+      createMissionScriptState(),
+    );
+    expect(poison.fired[0]?.flag).toBe("vasilisa_joined");
   });
 });
 

@@ -37,6 +37,10 @@ export function buildPrologueContext(
     showHints,
     reinforcements: profile,
     ratMarker: rat,
+    fedotWaveSpawns: layout?.markers.F?.slice(1),
+    waveCells: layout?.markers.S,
+    allyCell: layout?.markers.A?.[0],
+    healerCell: layout?.markers.z?.[0],
   };
 }
 

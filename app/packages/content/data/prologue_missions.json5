@@ -247,6 +247,7 @@
       onboarding: [],
       checkpoints: [
         { id: "start", description: "Вход в миссию" },
+        { id: "vasilisa", onKey: "vasilisa_joined", description: "После прихода Василисы" },
       ],
     },
   ],

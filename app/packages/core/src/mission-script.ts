@@ -11,7 +11,10 @@ export type MissionTriggerKind =
   | "OnEnemyAliveBelow"
   | "OnUnitHpBelow"
   | "OnPickup"
-  | "OnSkillUsed";
+  | "OnSkillUsed"
+  | "OnUnitDied"
+  | "OnCrossLine"
+  | "OnPoisonApplied";
 
 export interface MissionTrigger {
   id: string;
@@ -29,6 +32,8 @@ export interface MissionTrigger {
   turnNumber?: number;
   n?: number;
   percent?: number;
+  lineAxis?: "x" | "y";
+  lineValue?: number;
 }
 
 export interface MissionScriptState {
@@ -167,6 +172,43 @@ export function evaluateMissionTriggers(
         }
         mark(next, trigger, fired);
       }
+    } else if (trigger.kind === "OnUnitDied") {
+      const died = events.some((event) => {
+        if (event.type !== "ENTITY_DIED") return false;
+        const entity = match.entities.find((candidate) => candidate.id === event.entityId);
+        if (trigger.unitId && entity?.configId !== trigger.unitId) return false;
+        return true;
+      });
+      if (died) mark(next, trigger, fired);
+    } else if (trigger.kind === "OnCrossLine") {
+      const axis = trigger.lineAxis ?? "x";
+      const threshold = trigger.lineValue ?? 0;
+      const moved = events.filter((event) => event.type === "ENTITY_MOVED");
+      for (const event of moved) {
+        if (event.type !== "ENTITY_MOVED") continue;
+        const last = event.path[event.path.length - 1];
+        if (!last) continue;
+        const entity = match.entities.find((candidate) => candidate.id === event.entityId);
+        if (!entity || entity.dead) continue;
+        if (trigger.side === "player" && entity.owner !== 1) continue;
+        if (trigger.side === "enemy" && entity.owner !== 2) continue;
+        if (trigger.unitId && entity.configId !== trigger.unitId) continue;
+        const coord = axis === "x" ? last.x : last.y;
+        if (coord >= threshold) {
+          mark(next, trigger, fired);
+          break;
+        }
+      }
+    } else if (trigger.kind === "OnPoisonApplied") {
+      const poisoned = events.some((event) => {
+        if (event.type !== "STATUS_CHANGED" || event.status !== "POISON" || !event.applied) return false;
+        const entity = match.entities.find((candidate) => candidate.id === event.entityId);
+        if (!entity) return false;
+        if (trigger.side === "player" && entity.owner !== 1) return false;
+        if (trigger.side === "enemy" && entity.owner !== 2) return false;
+        return true;
+      });
+      if (poisoned) mark(next, trigger, fired);
     }
   }
 

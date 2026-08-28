@@ -787,6 +787,10 @@ export function BattleScreenView() {
       trainingDeny(trainingActionKindOfCommand(command));
       return;
     }
+    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, command)) {
+      setLog(t("prologue.hint.m2.noise"));
+      return;
+    }
     const result = session.applyBattleCommand(command);
     if (!result.ok) {
       // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
@@ -800,7 +804,9 @@ export function BattleScreenView() {
     if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
       const ctx = buildPrologueContext(prologueMission, content, true);
       const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
-      if (next.fedotFreed && !session.hasBattleCheckpoint()) session.saveBattleCheckpoint();
+      if ((next.fedotFreed || next.firstWave || next.vasilisaJoined) && !session.hasBattleCheckpoint()) {
+        session.saveBattleCheckpoint();
+      }
       if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
         session.restoreBattleCheckpoint();
       } else {
@@ -2168,10 +2174,6 @@ export function BattleScreenView() {
                 const nextId = prologueMission.nextMissionId ?? null;
                 if (prologueRunRef.current?.outcome === "defeat") {
                   session.startPrologue(prologueMission.id, true);
-                  return;
-                }
-                if (nextId === "prologue_glade" || nextId === "prologue_village") {
-                  session.advancePrologue(null);
                   return;
                 }
                 session.advancePrologue(nextId);

@@ -62,12 +62,12 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
   const legend = (options.layout.legend ?? {}) as Record<string, { kind?: string; unitId?: string; side?: string; scripted?: boolean; state?: string; itemId?: string }>;
 
   const spawnAt = (marker: string, unitId: string, owner: number, extra?: (entity: EntityState) => void): void => {
-    const pos = compiled.markers[marker]?.[0];
-    if (!pos) return;
-    const tile = tileAt(compiled.grid, pos.x, pos.y);
-    const spawned = spawnUnitState(id++, pickUnit(options.units, unitId), owner, pos.x, pos.y, tile?.z ?? 1, owner === PLAYER_OWNER ? 1 : 3);
-    extra?.(spawned);
-    entities.push(spawned);
+    for (const pos of compiled.markers[marker] ?? []) {
+      const tile = tileAt(compiled.grid, pos.x, pos.y);
+      const spawned = spawnUnitState(id++, pickUnit(options.units, unitId), owner, pos.x, pos.y, tile?.z ?? 1, owner === PLAYER_OWNER ? 1 : 3);
+      extra?.(spawned);
+      entities.push(spawned);
+    }
   };
 
   for (const [ch, entry] of Object.entries(legend)) {
