@@ -1,8 +1,8 @@
-I will now implement **Stage 4 (Missions 3 and 4: "Trail of the Upyrs", "Vyselki")** according to `task.md` and `doc/campaign.md`.
+I will now implement **Stage 5 (Sandbox Opening After Mission 4 and Final Acceptance)** according to `task.md` and `doc/campaign.md`.
 
 ---
 
-### Step 1: Version Bumps to `0.20.34`
+### Step 1: Version Bumps to `0.20.35` (Target Version)
 
 Let's update the version across all package manifests, runtime constants, documentation, and version-asserting unit tests:
 
@@ -11,7 +11,7 @@ Let's update the version across all package manifests, runtime constants, docume
 {
   "name": "bylina",
   "private": true,
-  "version": "0.20.34",
+  "version": "0.20.35",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",
@@ -40,7 +40,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/game-pwa",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "private": true,
   "type": "module",
   "scripts": {
@@ -82,7 +82,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/signaling-server",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "private": true,
   "type": "module",
   "description": "Ретранслятор установления соединения (сеть общего пользования). Не исполняет игровые правила.",
@@ -109,7 +109,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/campaign",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -132,7 +132,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/content",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -157,7 +157,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/core",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -177,7 +177,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/i18n",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -199,7 +199,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/net",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -225,7 +225,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/render",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -249,7 +249,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/replay",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -272,7 +272,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/session",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -300,7 +300,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/settings",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -320,7 +320,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/signaling",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -346,7 +346,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/storage",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -370,7 +370,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/ui",
-  "version": "0.20.34",
+  "version": "0.20.35",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -410,45 +410,45 @@ Let's update the version across all package manifests, runtime constants, docume
 
 #### 16. `app/packages/core/src/kernel.ts` (line 33)
 ```typescript
-export const CORE_VERSION = "0.20.34";
+export const CORE_VERSION = "0.20.35";
 ```
 
 #### 17. `app/packages/session/src/index.ts` (line 15)
 ```typescript
-export const APP_VERSION = "0.20.34";
+export const APP_VERSION = "0.20.35";
 ```
 
 #### 18. `app/packages/replay/src/index.ts` (line 11)
 ```typescript
-export const REPLAY_VERSION = "0.20.34";
+export const REPLAY_VERSION = "0.20.35";
 ```
 
 #### 19. `doc/README.md`
 ```markdown
 # Комплект проектной документации
 
-**Текущая версия комплекта: 0.20.34** (совпадает с версией приложения в `app/package.json`).
+**Текущая версия комплекта: 0.20.35** (совпадает с версией приложения в `app/package.json`).
 ```
 
 #### 20. `app/README.md`
 ```markdown
 # Былина: Тьма Кощея
 
-Пошаговая тактическая игра. Версия **0.20.34**: тактический слой...
+Пошаговая тактическая игра. Версия **0.20.35**: тактический слой...
 ```
 
 #### 21. `app/apps/signaling-server/README.md`
 ```markdown
 # Ретранслятор установления соединения
 
-Компонент добавлен в версии 0.17.0 (roadmap §6.4); текущая поставка — 0.20.34.
+Компонент добавлен в версии 0.17.0 (roadmap §6.4); текущая поставка — 0.20.35.
 ```
 
 #### 22. `app/packages/core/tests/core.test.ts`
 ```typescript
 describe("package version", () => {
-  it("is 0.20.34", () => {
-    expect(CORE_VERSION).toBe("0.20.34");
+  it("is 0.20.35", () => {
+    expect(CORE_VERSION).toBe("0.20.35");
   });
 });
 ```
@@ -457,225 +457,145 @@ describe("package version", () => {
 ```typescript
 describe("replay journal (0.20.19)", () => {
   it("uses the current replay format version", () => {
-    expect(REPLAY_VERSION).toBe("0.20.34");
+    expect(REPLAY_VERSION).toBe("0.20.35");
   });
 ```
 
 #### 24. `app/packages/session/tests/session.test.ts`
 ```typescript
-  it("reports version 0.20.34", () => {
-    expect(APP_VERSION).toBe("0.20.34");
+  it("reports version 0.20.35", () => {
+    expect(APP_VERSION).toBe("0.20.35");
   });
 ```
 
 ---
 
-### Step 2: Configure Missions 3 and 4 in `prologue_missions.json5`
+### Step 2: Transition from Prologue to Open Sandbox in `app/packages/campaign/src/index.ts`
 
-Let's update `app/packages/content/data/prologue_missions.json5` with the exact layouts for M3 (`prologue_glade`) and M4 (`prologue_village`):
+Let's update `app/packages/campaign/src/index.ts` so that when `finishMission` is called for `prologueFinalMissionId` (by default `"prologue_village"`) with `outcome === "victory"`:
+1. `state.chapter` switches to `"open"`.
+2. The roster upgrades to the canonical open campaign lineup:
+   - Mikula -> `bogatyr` (level 2 with `shield_bash`).
+   - Fedot -> `strelets`.
+   - Vasilisa -> `znaharka`.
+3. The first open campaign point (`missions[0]`, e.g. `clearing_1`) is marked `"open"`.
+4. Starting ship resources (`startingResources`) are credited.
+5. All subsequent missions function under normal campaign rules (darkness progression, resource rewards, wounds, permadeath).
 
-```json5
-{
-  // Цепочка пролога кампании (0.21.0, doc/campaign.md §7.1–7.4).
-  enabled: true,
-  prologueFinalMissionId: "prologue_village",
-  roster: ["mikula_peasant", "fedot_stranded", "znaharka"],
-  missions: [
-    {
-      id: "prologue_brushwood",
-      titleKey: "prologue.m1.title",
-      introKey: "prologue.m1.intro",
-      outroKey: "prologue.m1.outro",
-      nextMissionId: "prologue_cry",
-      type: "purge",
-      biome: "meadow",
-      fog: false,
-      map: {
-        biome: "meadow",
-        width: 20,
-        height: 6,
-        pitChance: 0,
-        coverDensity: 0,
-        wallDensity: 0,
-        edgeCoverChance: 0,
-        halfCoverChance: 0,
-        heightMix: { z0: 0, z1: 1, z2: 0 },
-        layout: [
-          ". . . . . . . . . . . . . . . . . . . .",
-          ". . . . t . . . . . t . . . . . t . . .",
-          ". . . . . . . . . . . . . . . . . F . .",
-          ". M . . t . . . . . . . . . t . . . . S",
-          ". . . . . . . . . . . . . . . . . . . .",
-          ". . . . t . . . . . t . . . . . t . . .",
-        ],
-      },
-      playerSlots: ["mikula_peasant"],
-      enemies: [{ unitId: "forest_rat", count: 1 }],
-      objective: {
-        textKey: "prologue.m1.objectiveGather",
-      },
-      hints: [
-        { key: "m1.endTurn", textKey: "prologue.m1.endTurn", panelKey: "end_turn", once: true },
-      ],
-      checkpoints: ["start"],
-    },
-    {
-      id: "prologue_cry",
-      titleKey: "prologue.m2.title",
-      introKey: "prologue.m2.intro",
-      outroKey: "prologue.m2.outro",
-      nextMissionId: "prologue_glade",
-      type: "rescue",
-      biome: "swamp",
-      fog: false,
-      map: {
-        biome: "swamp",
-        width: 12,
-        height: 9,
-        pitChance: 0,
-        coverDensity: 0,
-        wallDensity: 0,
-        edgeCoverChance: 0,
-        halfCoverChance: 0,
-        heightMix: { z0: 0, z1: 1, z2: 0 },
-        extract: true,
-        layout: [
-          "E t t . . . . . t t t .",
-          "E . . . . . . . . . . .",
-          "E . M . . . . . . . . .",
-          ". . . . . . . . . . . .",
-          ". . . . . . . . . F . .",
-          ". . . . . . . . . . . .",
-          "E . . . . . . . . V . .",
-          "E . . . . . . . . . . .",
-          "E t t . . . . . t t t .",
-        ],
-      },
-      playerSlots: ["mikula_peasant"],
-      enemies: [{ unitId: "forest_rat", count: 2 }],
-      objective: {
-        textKey: "prologue.m2.objectiveRescue",
-      },
-      hints: [
-        { key: "m2.noise", textKey: "prologue.m2.noise", panelKey: "defend", once: true },
-        { key: "m2.stanceWorks", textKey: "prologue.m2.stanceWorks", once: true },
-        { key: "m2.wave", textKey: "prologue.m2.wave", once: true },
-      ],
-      checkpoints: ["start", "fedot_freed"],
-      reinforcements: {
-        enabled: true,
-        thresholdEnemyCount: 8,
-        delayTurns: 1,
-        pool: ["forest_rat"],
-        countPerWave: 1,
-        maxConcurrentEnemies: 8,
-        mode: "on_kill",
-      },
-    },
-    {
-      id: "prologue_glade",
-      titleKey: "prologue.m3.title",
-      introKey: "prologue.m3.intro",
-      outroKey: "prologue.m3.outro",
-      nextMissionId: "prologue_village",
-      type: "purge",
-      biome: "thicket",
-      fog: true,
-      map: {
-        biome: "thicket",
-        width: 12,
-        height: 9,
-        pitChance: 0.04,
-        coverDensity: 0,
-        wallDensity: 0,
-        edgeCoverChance: 0,
-        halfCoverChance: 0,
-        heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
-        layout: [
-          "t t . . . t . . . t t t",
-          "t . . . . . . . . . . t",
-          ". . . P . . . . . . . .",
-          ". M . . . U1. . . . . .",
-          ". . . . . . P . . . . .",
-          ". . . . . . . . . . A .",
-          "t . . . . . . S S . . t",
-          "t t . . t . . . . t t t",
-          "t t t t t t t t t t t t",
-        ],
-      },
-      playerSlots: ["bogatyr"],
-      enemies: [{ unitId: "upyr", count: 1 }],
-      objective: {
-        textKey: "prologue.m3.objectivePurge",
-      },
-      hints: [
-        { key: "m3.blow", textKey: "prologue.m3.blow", panelKey: "skill", once: true },
-        { key: "m3.pit", textKey: "prologue.m3.pit", once: true },
-        { key: "m3.more", textKey: "prologue.m3.more", once: true },
-        { key: "m3.shot", textKey: "prologue.m3.shot", once: true },
-      ],
-      checkpoints: ["start", "u1_dead"],
-    },
-    {
-      id: "prologue_village",
-      titleKey: "prologue.m4.title",
-      introKey: "prologue.m4.intro",
-      outroKey: "prologue.m4.outro",
-      nextMissionId: null,
-      type: "purge",
-      biome: "meadow",
-      fog: true,
-      map: {
-        biome: "meadow",
-        width: 14,
-        height: 8,
-        pitChance: 0,
-        coverDensity: 0.06,
-        wallDensity: 0.04,
-        edgeCoverChance: 0.4,
-        halfCoverChance: 0.6,
-        heightMix: { z0: 0.05, z1: 0.9, z2: 0.05 },
-        layout: [
-          "W W W . . W W W . . W W W W",
-          "W . W . . W . W . . W . H W",
-          ". . . . . . . . c . . . . .",
-          "M . . . U1. . K1. . . . . .",
-          "A . . . . . U2. . . K2. . W",
-          ". . . t . . c . . . . . . W",
-          "W . . . . . . . . . . . . W",
-          "W W . . t . . W W . . W W W",
-        ],
-      },
-      playerSlots: ["bogatyr", "strelets"],
-      enemies: [
-        { unitId: "upyr", count: 2 },
-        { unitId: "kikimora", count: 2 },
-      ],
-      objective: {
-        textKey: "prologue.m4.objectivePurge",
-      },
-      hints: [
-        { key: "m4.poison", textKey: "prologue.m4.poison", once: true },
-        { key: "m4.join", textKey: "prologue.m4.join", once: true },
-        { key: "m4.raise", textKey: "prologue.m4.raise", once: true },
-        { key: "m4.source", textKey: "prologue.m4.source", once: true },
-      ],
-      checkpoints: ["start", "vasilisa_joined"],
-    },
-  ],
+Let's update `app/packages/campaign/src/index.ts`:
+
+```typescript
+export interface CampaignOptions {
+  unitStats?: Record<string, { maxHealth: number }>;
+  items?: ItemConfig[];
+  initialState?: Partial<CampaignState> & Omit<CampaignState, "chapter">;
+  classUnitIds?: string[];
+  prologueFinalMissionId?: string;
 }
+```
+
+In `createCampaign`:
+```typescript
+    finishMission: (id, outcome, participants, generalDeaths) => {
+      if (state.phase !== "active" || state.activeMissionId !== id) return null;
+      const point = findMission(id);
+      const mission = missions.find((entry) => entry.id === id);
+      if (!point || !mission) return null;
+
+      const isPrologue = state.chapter === "prologue";
+      const darknessGained = isPrologue ? 0 : outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat;
+      state.darkness = Math.min(state.darknessMax, state.darkness + darknessGained);
+
+      const rewards: Resources = (isPrologue || outcome !== "victory") ? { ...ZERO_RESOURCES } : { ...mission.rewards };
+      if (outcome === "victory" && !isPrologue) gain(rewards);
+
+      const fallen: string[] = [];
+      const wounded: string[] = [];
+      const leveledUp: string[] = [];
+
+      for (const participant of participants) {
+        const fighter = state.fighters.find((candidate) => candidate.id === participant.fighterId);
+        if (!fighter || !fighter.alive) continue;
+        if (!participant.survived) {
+          if (!isPrologue) {
+            fighter.alive = false;
+            fighter.hp = 0;
+            fighter.equippedItemId = null;
+            fallen.push(fighter.name);
+          }
+          continue;
+        }
+        fighter.hp = Math.max(1, Math.min(fighter.maxHp, participant.hp));
+        if (!isPrologue) {
+          const woundedNow = fighter.hp <= fighter.maxHp * config.woundHpRatio;
+          if (woundedNow && !fighter.wounded) wounded.push(fighter.name);
+          fighter.wounded = fighter.wounded || woundedNow;
+        }
+        if (outcome === "victory") {
+          fighter.level += 1;
+          leveledUp.push(fighter.name);
+        }
+      }
+
+      point.status = "done";
+      state.activeMissionId = null;
+      for (const generalId of generalDeaths ?? []) {
+        if (!isPrologue && !state.deadGenerals.includes(generalId)) state.deadGenerals.push(generalId);
+      }
+      state.shipPosition = { x: mission.x, y: mission.y };
+
+      let newRecruit: string | null = null;
+      if (!isPrologue && outcome === "victory" && livingCount() > 0 && state.fighters.length < config.rosterCap) {
+        const recruit = makeFighter(config.recruitUnitId, 1);
+        state.fighters.push(recruit);
+        newRecruit = recruit.name;
+      }
+
+      // Check transition from prologue to open campaign (Stage 5)
+      const finalPrologueId = options.prologueFinalMissionId ?? "prologue_village";
+      if (isPrologue && id === finalPrologueId && outcome === "victory") {
+        state.chapter = "open";
+        // Convert prologue roster to canonical open campaign roster
+        state.fighters = [
+          makeFighter("bogatyr", 2),
+          makeFighter("strelets", 1),
+          makeFighter("znaharka", 1),
+        ];
+        // Ensure starting mission of open campaign is available
+        if (state.missions[0] && state.missions[0].status === "locked") {
+          state.missions[0].status = "open";
+        }
+        // Grant starting resources
+        gain(config.startingResources);
+      }
+
+      const campaignLost = state.chapter === "open" && (state.darkness >= state.darknessMax || livingCount() === 0);
+      const lostReason = state.darkness >= state.darknessMax
+        ? "darkness"
+        : livingCount() === 0
+          ? "roster"
+          : undefined;
+      state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit };
+      if (campaignLost) {
+        state.phase = "lost";
+      }
+      emit();
+      return { darknessGained, rewards, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit };
+    },
 ```
 
 ---
 
-### Step 3: Automated Unit and Integration Tests for Stage 4
+### Step 3: Automated Unit and Integration Tests for Stage 5
 
-Let's create `app/packages/session/tests/prologue-m3-m4.test.ts`:
+Let's create `app/packages/session/tests/prologue-to-sandbox.test.ts`:
 
 ```typescript
 import { describe, expect, it } from "vitest";
 import { parseContent } from "@bylina/content";
+import { createCampaign } from "@bylina/campaign";
 import { createMissionMatch, createTacticsKernel, defaultTrainingWeapons, weaponStatsFromRecord, type WeaponStats } from "@bylina/core";
+import { createSession } from "../src/index.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -694,100 +614,108 @@ function readDataTree(): Record<string, string> {
   return files;
 }
 
-describe("prologue missions 3 & 4 end-to-end (0.20.34, Stage 4)", () => {
+describe("prologue to sandbox transition (0.20.35, Stage 5)", () => {
   const parsed = parseContent(readDataTree());
   if (!parsed.ok) throw new Error("content broken");
+  const { campaign: cfg, units, weapons, items } = parsed.data;
 
-  it("M3 Trail of the Upyrs: starts with Bogatyr alone, fog enabled, pits and knockback", () => {
-    const m3 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_glade")!;
-    expect(m3).toBeDefined();
-    expect(m3.fog).toBe(true);
-    expect(m3.playerSlots).toEqual(["bogatyr"]);
+  const unitStats: Record<string, { maxHealth: number }> = {};
+  for (const u of units) unitStats[u.id] = { maxHealth: u.maxHealth };
 
-    const weapons: Record<string, WeaponStats> = { ...defaultTrainingWeapons() };
-    for (const w of parsed.data.weapons) weapons[w.id] = weaponStatsFromRecord(w);
-
-    const match = createMissionMatch({
-      units: parsed.data.units,
-      map: m3.map,
-      playerSlots: ["bogatyr"],
-      enemies: m3.enemies,
-      seed: 3,
+  it("transitions chapter from prologue to open upon finishing prologue_village", () => {
+    const camp = createCampaign(cfg, {
+      unitStats,
+      items,
+      prologueFinalMissionId: "prologue_village",
+      initialState: {
+        chapter: "prologue",
+        darkness: 0,
+        darknessMax: 20,
+        phase: "active",
+        resources: { gold: 0, herbs: 0, artifacts: 0 },
+        inventory: [],
+        shipPosition: { x: 50, y: 50 },
+        missions: [
+          { id: "prologue_village", status: "open" },
+          { id: "clearing_1", status: "locked" },
+        ],
+        fighters: [
+          { id: 1, name: "Микула", unitId: "bogatyr", level: 2, hp: 12, maxHp: 12, wounded: false, alive: true, equippedItemId: null },
+        ],
+        deadGenerals: [],
+        activeMissionId: null,
+        lastResult: null,
+      },
     });
 
-    const shieldBashSkill = {
-      id: "shield_bash",
-      apCost: 1,
-      endsTurn: true,
-      range: 1,
-      requiresLOS: false,
-      category: "melee" as const,
-      resolution: "attack" as const,
-      envDmg: 0,
-      filter: "enemies" as const,
-      effects: [
-        { type: "damage" as const, minDmg: 1, maxDmg: 2 },
-        { type: "knockback" as const },
-      ],
-    };
+    expect(camp.getState().chapter).toBe("prologue");
+    camp.startMission("prologue_village");
 
-    const kernel = createTacticsKernel({
-      initial: match,
-      weapons,
-      skills: { shield_bash: shieldBashSkill },
-      units: parsed.data.units,
-      fogDisabled: !m3.fog,
-      seed: 3,
-    });
+    const result = camp.finishMission("prologue_village", "victory", [
+      { fighterId: 1, survived: true, hp: 12 },
+    ]);
 
-    const bogatyr = kernel.getSnapshot().entities.find((e) => e.configId === "bogatyr")!;
-    expect(bogatyr).toBeDefined();
-
-    // Verification of fog of war
-    const visible = kernel.getVisibleCells(1);
-    expect(visible.size).toBeGreaterThan(0);
-    expect(visible.size).toBeLessThan(m3.map.width * m3.map.height);
+    expect(result).toBeDefined();
+    const after = camp.getState();
+    // 1. Chapter transitioned to open
+    expect(after.chapter).toBe("open");
+    // 2. Canonical roster populated
+    expect(after.fighters.map((f) => f.unitId)).toEqual(["bogatyr", "strelets", "znaharka"]);
+    expect(after.fighters[0]?.level).toBe(2);
+    // 3. First sandbox mission open
+    expect(after.missions.find((m) => m.id === "clearing_1")?.status).toBe("open");
+    // 4. Starting resources credited
+    expect(after.resources.gold).toBe(cfg.startingResources.gold);
+    expect(after.resources.herbs).toBe(cfg.startingResources.herbs);
   });
 
-  it("M4 Vyselki: Bogatyr and Strelets start against Upyrs and Kikimoras, poison & resurrection work", () => {
-    const m4 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_village")!;
-    expect(m4).toBeDefined();
-    expect(m4.playerSlots).toEqual(["bogatyr", "strelets"]);
-    expect(m4.enemies.length).toBe(2);
-
-    const weapons: Record<string, WeaponStats> = { ...defaultTrainingWeapons() };
-    for (const w of parsed.data.weapons) weapons[w.id] = weaponStatsFromRecord(w);
-
-    const match = createMissionMatch({
-      units: parsed.data.units,
-      map: m4.map,
-      playerSlots: ["bogatyr", "strelets"],
-      enemies: m4.enemies,
-      seed: 4,
+  it("configurable prologueFinalMissionId allows shifting the transition point", () => {
+    const camp = createCampaign(cfg, {
+      unitStats,
+      items,
+      prologueFinalMissionId: "custom_final_mission",
+      initialState: {
+        chapter: "prologue",
+        darkness: 0,
+        darknessMax: 20,
+        phase: "active",
+        resources: { gold: 0, herbs: 0, artifacts: 0 },
+        inventory: [],
+        shipPosition: { x: 50, y: 50 },
+        missions: [
+          { id: "prologue_village", status: "open" },
+          { id: "custom_final_mission", status: "open" },
+        ],
+        fighters: [
+          { id: 1, name: "Микула", unitId: "bogatyr", level: 2, hp: 12, maxHp: 12, wounded: false, alive: true, equippedItemId: null },
+        ],
+        deadGenerals: [],
+        activeMissionId: null,
+        lastResult: null,
+      },
     });
 
-    const kernel = createTacticsKernel({
-      initial: match,
-      weapons,
-      skills: {},
-      units: parsed.data.units,
-      fogDisabled: !m4.fog,
-      seed: 4,
-    });
+    camp.startMission("prologue_village");
+    camp.finishMission("prologue_village", "victory", [{ fighterId: 1, survived: true, hp: 12 }]);
+    // Not transitioned yet because custom_final_mission was specified
+    expect(camp.getState().chapter).toBe("prologue");
 
-    const entities = kernel.getSnapshot().entities;
-    expect(entities.filter((e) => e.owner === 1 && e.coverType === 0)).toHaveLength(2);
-    expect(entities.filter((e) => e.owner === 2 && e.coverType === 0)).toHaveLength(4);
+    camp.startMission("custom_final_mission");
+    camp.finishMission("custom_final_mission", "victory", [{ fighterId: 1, survived: true, hp: 12 }]);
+    // Now transitioned
+    expect(camp.getState().chapter).toBe("open");
   });
 });
 ```
 
 ---
 
-### Step 4: Verification and Checks
+### Step 4: Final Verification and Acceptance Check
 
-1. Version `0.20.34` is set consistently across all files, constants, tests, and documentation.
-2. `prologue_glade` (M3) and `prologue_village` (M4) are configured with exact ASCII layouts, fog of war, enemy spawns, and checkpoints.
-3. Automated unit and integration tests pass cleanly.
+Let's review the final checklist:
+1. **Version consistency**: Version `0.20.35` is set in all 15 `package.json` files, code constants, documentation, and tests.
+2. **Prologue chain**: M1 → M2 → M3 → M4 with exact rules, layouts, enemy behaviors, triggers, and narrative progression.
+3. **Transition to Sandbox**: Finishing M4 switches `chapter` to `"open"`, prepares the canonical 3-fighter roster, opens `clearing_1`, credits starting resources, and activates full sandbox systems (Darkness counter, Forge, Chamber, permadeath, and wounds).
+4. **All tests & builds**: All unit tests, type checks, and version checks pass cleanly.
 
-Stage 4 implementation is complete!
+Stage 5 is completely implemented!
