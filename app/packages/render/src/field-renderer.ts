@@ -11,6 +11,7 @@ import {
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, TilingSprite, Texture, type FederatedPointerEvent } from "pixi.js";
 import { needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, worldToScreen, type Point } from "./camera.js";
+import { M1_ART, type TokenCtx } from "./token-art.js";
 import {
   AIM_IMPOSSIBLE,
   AIM_PRESELECT,
@@ -18,6 +19,7 @@ import {
   DRUZHINA_LOOK,
   EXTRACT_GLOW,
   EXTRACT_SPARK,
+  FADE_COLOR,
   FALLBACK_TOKEN_ART,
   HOME_AMBER,
   HOME_BLUE,
@@ -116,6 +118,20 @@ export interface FieldRenderer {
    * подтягивает карточку прицеливания к цели. null, если цель недоступна.
    */
   getEntityScreenPosition?(entityId: number): { x: number; y: number } | null;
+  /**
+   * Проиграть кинематографическую сцену (0.20.37, campaign.md §13.4).
+   * Возвращает `true`, если сцену пропустили, — вызывающий учитывает это
+   * в телеметрии (`skip_cutscene`).
+   */
+  playCinematic?(plan: CinematicPlan): Promise<boolean>;
+  /** Пропустить текущую сцену: камера сразу встаёт на финальную точку. */
+  skipCinematic?(): void;
+  /** Идёт ли сцена прямо сейчас. */
+  isCinematicPlaying?(): boolean;
+  /** Затемнение (`out`) или проявление (`in`) экрана. */
+  fadeScreen?(mode: "out" | "in", durationMs?: number): Promise<void>;
+  /** Заблокировать жесты холста на время сцены. */
+  setInputLocked?(locked: boolean): void;
 }
 
 /* ---------- палитра и примитивы ---------- */
@@ -190,11 +206,7 @@ function neighborLevel(tiles: readonly Tile[], x: number, y: number): number | n
 const DRUZHINA: FactionLook = DRUZHINA_LOOK;
 const NAV: FactionLook = NAV_LOOK;
 
-interface TokenCtx {
-  g: Graphics;
-  cx: number;
-  cy: number;
-}
+
 
 /** Богатырь: стальной шлем с наносником, алые плечи, щит с коловратом.
  *  Этап 5.3: плечи шире — силуэт различим без увеличения. */
@@ -460,6 +472,7 @@ function drawSolovey({ g, cx, cy }: TokenCtx): void {
 }
 
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
+  ...M1_ART,
   bogatyr: drawBogatyr,
   strelets: drawStrelets,
   znaharka: drawZnaharka,
@@ -793,6 +806,34 @@ interface DisplayState {
 
 const BOLT_MS_PER_CELL = 30;
 
+/* ---------- кинематографические сцены (0.20.37) ---------- */
+
+/** Цель шага сцены: клетка поля либо сущность по записи бестиария. */
+export interface CinematicTarget {
+  cell?: { x: number; y: number };
+  configId?: string;
+}
+
+export interface CinematicStep {
+  /** `focus` — кадр на цели, `pan` — проезд, `hold` — пауза, `fade` — затемнение. */
+  kind: "focus" | "pan" | "hold" | "fade";
+  target?: CinematicTarget;
+  durationMs?: number;
+  holdMs?: number;
+  fade?: "out" | "in";
+  /** Вбегание сущности в клетку из-за предела карты (мс). */
+  runInMs?: number;
+}
+
+export interface CinematicPlan {
+  id: string;
+  steps: CinematicStep[];
+  /** Блокировать ввод игрока на время сцены (по умолчанию — да). */
+  lockInput?: boolean;
+  /** Сцену можно пропустить (по умолчанию — да). */
+  skippable?: boolean;
+}
+
 export function createFieldRenderer(): FieldRenderer {
   const app = new Application();
   const world = new Container();
@@ -816,6 +857,10 @@ export function createFieldRenderer(): FieldRenderer {
   // Атмосфера экрана (0.20.25, этапы 3.6/3.7): живёт в экранных координатах
   // поверх мира — холодный слой Тьмы, виньетка и статичное зерно.
   const atmosphere = new Container();
+  // Затемнение экрана (0.20.37): поверх мира и атмосферы, в экранных
+  // координатах — гибель героя и переходы между сценами гасят всё поле.
+  const fadeLayer = new Graphics();
+  fadeLayer.zIndex = 10000;
   const darknessG = new Graphics();
   const vignetteG = new Container();
   // Этап 5.4: стрелка к цели обучающего шага за пределами экрана
@@ -840,6 +885,8 @@ export function createFieldRenderer(): FieldRenderer {
   let onHover: ((x: number, y: number) => void) | null = null;
   let userMoved = false;
   let animFrame = 0;
+  /** Ввод игрока заблокирован на время кинематографической сцены (0.20.37). */
+  let inputLocked = false;
 
   const display = new Map<number, DisplayState>();
   const lunges = new Map<number, { dx: number; dy: number }>();
@@ -1272,7 +1319,7 @@ export function createFieldRenderer(): FieldRenderer {
 
   /* ---------- динамический слой: фишки и эффекты ---------- */
 
-  const drawToken = (g: Graphics, entity: EntityState): void => {
+  const drawToken = (g: Graphics, entity: EntityState, motionNow: number): void => {
     const shown = display.get(entity.id);
     const deadNow = shown?.dead ?? entity.dead;
     if (deadNow) return;
@@ -1334,7 +1381,10 @@ export function createFieldRenderer(): FieldRenderer {
       color: 0x000000,
       alpha: Math.min(0.55, Math.max(0.08, (0.32 - zShown * 0.05 + (isSelected ? 0.12 : 0)) * fade)),
     });
-    if (entity.owner === 2) {
+    if (entity.owner === 0) {
+      // Предметы (палка-хворост) лежат на земле: подставка стороны им не
+      // полагается — иначе вещь читается как боец дружины (0.20.37).
+    } else if (entity.owner === 2) {
       // Нави и прочие враждебные сущности: шестиугольная подставка
       // (этап 1.3) — «цвет дублируется формой» на самом малом масштабе.
       g.poly(hexPoints(cx, cy, 17.5)).fill(faction.ring);
@@ -1347,7 +1397,7 @@ export function createFieldRenderer(): FieldRenderer {
     }
 
     const art = CLASS_ART[entity.configId];
-    if (art) art({ g, cx, cy });
+    if (art) art({ g, cx, cy, entity, motionNow });
     else g.circle(cx, cy, 10).fill(FALLBACK_ART[entity.owner === 2 ? "nav" : "druzhina"]);
 
     const statusTime = (reducedMotion ? 12000 : performance.now()) * 0.004;
@@ -1975,7 +2025,7 @@ export function createFieldRenderer(): FieldRenderer {
         }
         continue;
       }
-      drawToken(g, entity);
+      drawToken(g, entity, motionNow);
     }
 
     // Подсветка защищённых граней выбранного персонажа.
@@ -2560,6 +2610,204 @@ export function createFieldRenderer(): FieldRenderer {
 
   const entityById = (id: number): EntityState | undefined => view?.snapshot.entities.find((e) => e.id === id);
 
+  /* ---------- режиссура камеры (0.20.37, campaign.md §13.4) ----------
+   *
+   * Проигрыватель кинематографических сцен. Сцена приходит данными из
+   * конфигурации миссии (пакет content), здесь исполняется: проезд камеры,
+   * удержание кадра, вбегание сущности из-за предела карты и затемнение
+   * экрана. Все длительности идут через собственные tween/wait, которые
+   * так же, как боевые, схлопываются при «уменьшить движение» (этап 1.7)
+   * и делятся на множитель скорости боя (этап 2.10).
+   */
+
+  /** Признак «сцену пропустили»: текущий шаг доводится до конца мгновенно. */
+  let cinematicSkip = false;
+  /** Идёт ли сцена прямо сейчас (для блокировки жестов и панели). */
+  let cinematicPlaying = false;
+
+  const waitCinematic = (ms: number): Promise<void> => {
+    if (cinematicSkip || reducedMotion || ms <= 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms / speedScale);
+    });
+  };
+
+  /** Тот же tween, что у боевых событий, но с досрочным выходом по пропуску. */
+  const tweenCinematic = (ms: number, step: (t: number) => void): Promise<void> =>
+    new Promise((resolve) => {
+      if (cinematicSkip || reducedMotion || ms <= 0) {
+        step(1);
+        resolve();
+        return;
+      }
+      const started = performance.now();
+      const duration = ms / speedScale;
+      const frame = (): void => {
+        if (destroyed || cinematicSkip) {
+          step(1);
+          resolve();
+          return;
+        }
+        const t = Math.min(1, (performance.now() - started) / duration);
+        step(t);
+        if (t >= 1) resolve();
+        else requestAnimationFrame(frame);
+      };
+      requestAnimationFrame(frame);
+    });
+
+  /**
+   * Проезд камеры к мировой точке. Положение ограничено границами поля той же
+   * математикой, что и подводка обучения: камера не показывает пустоту за
+   * краем карты. Ручное панорамирование игрока после сцены не перебивается
+   * автоматической подгонкой поля (`userMoved`).
+   */
+  const glideTo = async (point: Point, durationMs: number): Promise<void> => {
+    if (!mounted || destroyed) return;
+    const screen = { width: app.renderer.width, height: app.renderer.height };
+    if (screen.width <= 0 || screen.height <= 0) return;
+    const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
+    const target = trainingGlideOffset(point, plane, screen, mapPlane());
+    const fromX = world.x;
+    const fromY = world.y;
+    userMoved = true;
+    await tweenCinematic(durationMs, (t) => {
+      const e = easeInOut(t);
+      world.x = fromX + (target.x - fromX) * e;
+      world.y = fromY + (target.y - fromY) * e;
+    });
+  };
+
+  /**
+   * Вбегание сущности в свою клетку из-за предела карты. Смещение задаётся
+   * существующим механизмом выпада (`lunges`) — пиксельным сдвигом фишки,
+   * который уже учитывается в `entityPixel` и стирается по окончании
+   * проигрывания событий. Направление — от ближайшего края карты.
+   */
+  const runInEntity = async (entityId: number, durationMs: number): Promise<void> => {
+    const entity = entityById(entityId);
+    if (!entity) return;
+    const gridWidth = view?.snapshot.grid.width ?? 0;
+    const gridHeight = view?.snapshot.grid.height ?? 0;
+    const toWest = entity.x;
+    const toEast = Math.max(0, gridWidth - 1 - entity.x);
+    const toNorth = entity.y;
+    const toSouth = Math.max(0, gridHeight - 1 - entity.y);
+    const nearest = Math.min(toWest, toEast, toNorth, toSouth);
+    // Вылет за кромку: 3 клетки за ближайшим краем читаются как «из леса».
+    const over = 3 * CELL_SIZE;
+    let dx = 0;
+    let dy = 0;
+    if (nearest === toEast) dx = over;
+    else if (nearest === toWest) dx = -over;
+    else if (nearest === toSouth) dy = over;
+    else dy = -over;
+
+    await tweenCinematic(durationMs, (t) => {
+      const e = easeOut(t);
+      lunges.set(entityId, { dx: dx * (1 - e), dy: dy * (1 - e) });
+    });
+    lunges.delete(entityId);
+  };
+
+  /** Затемнение (`out`) или проявление (`in`) экрана поверх мира и атмосферы. */
+  const fadeScreen = async (mode: "out" | "in", durationMs = 500): Promise<void> => {
+    if (!mounted || destroyed) return;
+    const start = mode === "out" ? 0 : 1;
+    const target = mode === "out" ? 1 : 0;
+    const paint = (alpha: number): void => {
+      fadeLayer.clear();
+      if (alpha <= 0.001) return;
+      const width = app.renderer.width;
+      const height = app.renderer.height;
+      if (width <= 0 || height <= 0) return;
+      fadeLayer.rect(0, 0, width, height).fill({ color: FADE_COLOR, alpha });
+    };
+    if (reducedMotion || durationMs <= 0) {
+      paint(target);
+      return;
+    }
+    paint(start);
+    await tweenCinematic(durationMs, (t) => paint(start + (target - start) * t));
+    paint(target);
+  };
+
+  /** Мировая точка цели шага: клетка из данных либо текущее положение сущности. */
+  const cinematicPoint = (target: CinematicTarget | undefined): { point: Point | null; entityId?: number } => {
+    if (!target) return { point: null };
+    if (target.configId) {
+      const entity = view?.snapshot.entities.find(
+        (candidate) => candidate.configId === target.configId && !candidate.dead,
+      );
+      if (!entity) return { point: null };
+      const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === entity.x && candidate.y === entity.y);
+      const at = centerOf(entity.x, entity.y, tile ? visualLevel(tile) : entity.z);
+      return { point: { x: at.cx, y: at.cy }, entityId: entity.id };
+    }
+    if (target.cell) {
+      const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === target.cell!.x && candidate.y === target.cell!.y);
+      const at = centerOf(target.cell.x, target.cell.y, tile ? visualLevel(tile) : 1);
+      return { point: { x: at.cx, y: at.cy } };
+    }
+    return { point: null };
+  };
+
+  /** Точка последнего шага с целью: на неё камера встаёт при пропуске сцены. */
+  const finalPointOf = (plan: CinematicPlan): Point | null => {
+    for (let i = plan.steps.length - 1; i >= 0; i -= 1) {
+      const step = plan.steps[i];
+      if (!step || step.kind === "hold" || step.kind === "fade") continue;
+      const { point } = cinematicPoint(step.target);
+      if (point) return point;
+    }
+    return null;
+  };
+
+  const playCinematic = async (plan: CinematicPlan): Promise<boolean> => {
+    if (destroyed || !mounted || plan.steps.length === 0) return false;
+    cinematicSkip = false;
+    cinematicPlaying = true;
+    if (plan.lockInput !== false) inputLocked = true;
+    try {
+      for (const step of plan.steps) {
+        if (destroyed) break;
+        if (cinematicSkip) break;
+        const { point, entityId } = cinematicPoint(step.target);
+        if (step.kind === "fade") {
+          await fadeScreen(step.fade ?? "out", step.durationMs ?? 500);
+          continue;
+        }
+        if (step.kind === "hold") {
+          await waitCinematic(step.durationMs ?? step.holdMs ?? 400);
+          continue;
+        }
+        if (!point) continue;
+        if (step.kind === "focus") {
+          await glideTo(point, step.durationMs ?? 0);
+        } else {
+          await glideTo(point, step.durationMs ?? 600);
+        }
+        // Вбегание совмещено с проездом: сущность входит в кадр, пока камера
+        // занимает позицию, — так появление не выглядит телепортацией.
+        if (step.runInMs && entityId !== undefined) await runInEntity(entityId, step.runInMs);
+        if (step.holdMs) await waitCinematic(step.holdMs);
+      }
+      if (cinematicSkip) {
+        // Пропуск: камера сразу встаёт на финальную точку сцены.
+        const finish = finalPointOf(plan);
+        if (finish) await glideTo(finish, 0);
+      }
+      return cinematicSkip;
+    } finally {
+      cinematicPlaying = false;
+      if (plan.lockInput !== false) inputLocked = false;
+    }
+  };
+
+  const skipCinematic = (): void => {
+    if (cinematicPlaying) cinematicSkip = true;
+  };
+
   const playCombat = async (event: Extract<GameEvent, { type: "COMBAT_RESOLVED" }>): Promise<void> => {
     const source = entityById(event.sourceId);
     const target = entityById(event.targetId);
@@ -2833,6 +3081,8 @@ export function createFieldRenderer(): FieldRenderer {
   /* ---------- ввод ---------- */
 
   const onDown = (event: FederatedPointerEvent): void => {
+    // Сцена владеет кадром: жесты игрока не перебивают режиссуру (0.20.37).
+    if (inputLocked) return;
     pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
     if (pointers.size === 2) {
       const pts = [...pointers.values()];
@@ -2849,6 +3099,7 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   const onMove = (event: FederatedPointerEvent): void => {
+    if (inputLocked) return;
     if (pointers.has(event.pointerId)) {
       pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
     }
@@ -2882,6 +3133,7 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   const onUp = (event: FederatedPointerEvent): void => {
+    if (inputLocked) return;
     pointers.delete(event.pointerId);
     if (pointers.size < 2) pinch = 0;
     if (!drag) return;
@@ -2911,6 +3163,7 @@ export function createFieldRenderer(): FieldRenderer {
    * активируется — жест не завершился. Без обработки карта указателей
    * «залипает», и пинч остаётся сломанным до следующего pointerup. */
   const onCancel = (event: FederatedPointerEvent): void => {
+    if (inputLocked) return;
     pointers.delete(event.pointerId);
     if (pointers.size < 2) pinch = 0;
     drag = false;
@@ -2956,6 +3209,7 @@ export function createFieldRenderer(): FieldRenderer {
 
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
+    if (inputLocked) return;
     // Горизонтальный сдвиг трекпада сохраняет панорамирование.
     if (event.deltaX !== 0 && event.deltaY === 0) {
       world.x -= event.deltaX;
@@ -2968,6 +3222,7 @@ export function createFieldRenderer(): FieldRenderer {
 
   /** Двойной щелчок по фишке: центр камеры на этом бойце. */
   const onDblClick = (event: MouseEvent): void => {
+    if (inputLocked) return;
     const rect = app.canvas.getBoundingClientRect();
     const local = world.toLocal({ x: event.clientX - rect.left, y: event.clientY - rect.top });
     const cell = cellFromLocal(local.x, local.y);
@@ -3035,6 +3290,8 @@ export function createFieldRenderer(): FieldRenderer {
       app.stage.addChild(world);
       // Атмосфера поверх мира в экранных координатах (этапы 3.6/3.7).
       app.stage.addChild(atmosphere);
+      // Затемнение — самым верхним слоем.
+      app.stage.addChild(fadeLayer);
       // Поворот экрана или изменение окна: цель урока может оказаться за
       // пределами новой «зоны комфорта» — перепланировать подводку.
       app.renderer.on("resize", onCanvasResize);
@@ -3116,11 +3373,19 @@ export function createFieldRenderer(): FieldRenderer {
         }
       }
       try {
+        fadeLayer.clear();
         app.destroy(true);
       } catch {
         /* already torn down */
       }
       mounted = false;
+    },
+    playCinematic,
+    skipCinematic,
+    isCinematicPlaying: () => cinematicPlaying,
+    fadeScreen,
+    setInputLocked(locked) {
+      inputLocked = locked;
     },
     setOnActivate(handler) {
       onActivate = handler;

@@ -255,6 +255,14 @@ interface EventEntitySpawned {
   cause: "SUMMON" | "ILLUSION" | "RESURRECTION";
 }
 
+/**
+ * 0.20.37: скриптовое появление (подкрепление, противник пролога) происходит
+ * внутри `spawnScripted`, а не внутри `apply`, поэтому событие не попадает в
+ * обычный поток `apply → события → повтор`. Ядро копит такие события и отдаёт
+ * их вызовом `drainSpawnEvents()`; вызывающая сторона проигрывает их тем же
+ * проигрывателем поля. Сетевой формат события не меняется.
+ */
+
 interface EventCoverDestroyed {
   type: "COVER_DESTROYED";
   gridPos: { x: number; y: number; z: number };

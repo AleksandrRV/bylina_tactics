@@ -1,5 +1,5 @@
 export { CELL_SIZE, RENDER_STATUS, createFieldRenderer } from "./field-renderer.js";
-export type { FieldRenderer, FieldView } from "./field-renderer.js";
+export type { CinematicPlan, CinematicStep, CinematicTarget, FieldRenderer, FieldView } from "./field-renderer.js";
 export {
   AIM_IMPOSSIBLE,
   AIM_PRESELECT,
@@ -22,6 +22,7 @@ export {
   type BiomeLook,
   type FactionLook,
 } from "./palette.js";
+export { M1_ART, type TokenCtx } from "./token-art.js";
 export {
   TRAINING_COMFORT,
   needsTrainingFocus,
@@ -37,5 +38,6 @@ export {
   type Point,
   type ScreenSize,
   type CameraCue,
+  type CameraCueKind,
   type CameraDirectorState,
 } from "./camera.js";

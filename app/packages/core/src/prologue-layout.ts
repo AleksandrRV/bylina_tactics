@@ -13,6 +13,16 @@ import { PLAYER_OWNER, ENEMY_OWNER } from "./debug-map.js";
 
 export interface PrologueLayout {
   rows: string[];
+  /**
+   * Ярусы рельефа по строкам (0.20.37). Один символ на клетку ряда:
+   * `0`/`1`/`2` — ярус, любой другой символ (обычно `-`) — ярус по умолчанию.
+   *
+   * Отдельный параллельный массив, а не цифры внутри `rows`: любой символ
+   * строки, не входящий в служебный набор `. P W E c`, становится маркером и
+   * попадает в `markers` — цифры в `rows` засорили бы раскладку ложными
+   * маркерами.
+   */
+  heights?: string[];
   legend?: Record<string, unknown>;
 }
 
@@ -21,6 +31,27 @@ export interface CompiledLayout {
   covers: EntityState[];
   markers: Record<string, { x: number; y: number }[]>;
   extractCells: { x: number; y: number }[];
+}
+
+/**
+ * Назначить клеткам ярусы из параллельного массива `heights`. Символы
+ * `0`/`1`/`2` задают ярус; всё остальное (включая отсутствующий символ и
+ * лишние строки) оставляет клетку на ярусе по умолчанию. Расхождение числа
+ * строк и длин строк с `rows` не считается ошибкой: раскладка остаётся
+ * валидной, просто часть клеток наследует `defaultZ`.
+ */
+function applyHeights(grid: Grid, heights: readonly string[] | undefined): void {
+  if (!heights) return;
+  for (let y = 0; y < grid.height; y += 1) {
+    const row = heights[y];
+    if (!row) continue;
+    for (let x = 0; x < grid.width; x += 1) {
+      const ch = row[x];
+      if (ch !== "0" && ch !== "1" && ch !== "2") continue;
+      const tile = tileAt(grid, x, y);
+      if (tile) tile.z = Number(ch) as 0 | 1 | 2;
+    }
+  }
 }
 
 function coverEntity(id: number, x: number, y: number, z: number, coverType: 1 | 2, obstacle: boolean): EntityState {
@@ -57,6 +88,7 @@ export function compilePrologueLayout(layout: PrologueLayout, options: { default
   const width = Math.max(0, ...rows.map((row) => row.length));
   const z = options.defaultZ ?? 1;
   const grid = makeGrid(width, height, z);
+  applyHeights(grid, layout.heights);
   const covers: EntityState[] = [];
   const markers: Record<string, { x: number; y: number }[]> = {};
   const extractCells: { x: number; y: number }[] = [];

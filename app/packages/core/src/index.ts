@@ -50,6 +50,18 @@ export {
   type MissionScriptState,
 } from "./mission-script.js";
 export { compilePrologueLayout, createLayoutMatch } from "./prologue-layout.js";
+export {
+  cutsceneMatches,
+  pickCutscene,
+  withCutsceneDefaults,
+  type CutsceneConfig,
+  type CutsceneEvent,
+  type CutsceneStep,
+  type CutsceneStepKind,
+  type CutsceneTarget,
+  type CutsceneTrigger,
+  type CutsceneTriggerKind,
+} from "./cutscene.js";
 export type { PrologueLayout, CompiledLayout } from "./prologue-layout.js";
 export { createPrologueMatch } from "./prologue-match.js";
 export {
@@ -61,6 +73,7 @@ export {
   prologueHintView,
   dismissPrologueHint,
   shouldRestoreCheckpoint,
+  takePrologueSpawnEvents,
 } from "./prologue-run.js";
 export type { PrologueRunState, PrologueRunContext } from "./prologue-run.js";
 export {

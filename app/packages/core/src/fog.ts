@@ -78,12 +78,19 @@ export function createFogState(state: MatchState, owners: number[]): FogState {
   return fog;
 }
 
-/** Обновить туман после изменения состояния мира. */
+/**
+ * Обновить туман после изменения состояния мира. Запись для стороны
+ * создаётся при её первом появлении на поле: скриптовые подкрепления и
+ * противники пролога выходят на карту уже после старта партии.
+ */
 export function refreshFog(fog: FogState, state: MatchState, owners: number[]): void {
   for (const owner of owners) {
-    const entry = fog[owner];
-    if (!entry) continue;
     const visible = computeVisibleCells(state, owner);
+    const entry = fog[owner];
+    if (!entry) {
+      fog[owner] = { explored: new Set(visible), visible };
+      continue;
+    }
     for (const key of visible) entry.explored.add(key);
     entry.visible = visible;
   }

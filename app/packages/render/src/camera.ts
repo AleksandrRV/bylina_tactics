@@ -81,13 +81,31 @@ function clampAxis(target: number, mapSpan: number, screenSpan: number): number 
  * действий), затем позиция ограничивается границами поля — камера не
  * показывает пустоту за краями карты ни на одной оси.
  */
-export type CameraCueKind = "panTo" | "panThreat" | "panReturn";
+/**
+ * Виды кью камеры (0.20.20 + 0.20.37).
+ *
+ * `panTo` / `panThreat` / `panReturn` — подводка к цели обучающего указания,
+ * источнику угрозы и возврат к герою; этим же набором описываются кинемато-
+ * графические сцены миссий (doc/campaign.md §13.4). `focus` — мгновенный
+ * кадр на цели (без проезда), `hold` — удержание текущего положения,
+ * `fade` — затемнение или проявление экрана.
+ */
+export type CameraCueKind = "panTo" | "panThreat" | "panReturn" | "focus" | "hold" | "fade";
 
 export interface CameraCue {
   kind: CameraCueKind;
-  point: Point;
+  /** Цель в мировых координатах. Отсутствует у `hold` и `fade`. */
+  point?: Point;
   /** Длительность в мс (проектное). */
   durationMs?: number;
+  /** Пауза на цели после перехода. */
+  holdMs?: number;
+  /** Направление затемнения. */
+  fade?: "out" | "in";
+  /** Проиграть вбегание сущности в клетку из-за предела карты. */
+  runInMs?: number;
+  /** Сущность, которой принадлежит кадр (для вбегания и трекинга). */
+  entityId?: number;
 }
 
 export interface CameraDirectorState {

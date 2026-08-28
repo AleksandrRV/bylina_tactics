@@ -106,6 +106,9 @@ export const EXTRACT_SPARK = 0xf2dd9a;
 export const HOME_AMBER = 0xe0b34a;
 export const HOME_BLUE = 0x6aa9d9;
 
+/** Затемнение экрана: гибель героя в прологе и переходы сцен (0.20.37). */
+export const FADE_COLOR = 0x0a0d0a;
+
 /** Полоса здоровья фишки. */
 export const HP_BACK = 0x0a0a0a;
 export const HP_OK = 0x6fbf4a;

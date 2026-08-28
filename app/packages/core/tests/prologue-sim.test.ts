@@ -6,9 +6,12 @@ import {
   afterPrologueApply,
   compilePrologueLayout,
   gatePrologueCommand,
+  matchOutcome,
+  pickScriptedCommand,
   shouldRestoreCheckpoint,
   tickProloguePlayerTurn,
   weaponStatsFromRecord,
+  type GameEvent,
   type SpawnUnitConfig,
 } from "../src/index.js";
 
@@ -53,16 +56,28 @@ const TEETH = weaponStatsFromRecord({
   aimMod: 0, minDmg: 2, maxDmg: 3, crit: 10, critBonus: 1, envDmg: 0,
 });
 
+// Раскладка М1 «Хворост» (синхронна с prologue_missions.json5, 0.20.37).
 const M1_LAYOUT = {
   rows: [
-    "....................",
-    "....t.....t......t..",
+    ".t..W....t....W...t.",
+    "..t.....t...t....t..",
     "..................F.",
-    ".M..t..........t...S",
-    "....................",
-    "....t.....t......t..",
+    ".M..t.......t..t...S",
+    "..t.....t.......t...",
+    ".t..W....t....W..t..",
+  ],
+  heights: [
+    "11122221111111122111",
+    "11122211111111112211",
+    "11111211111111111111",
+    "11111111111111111111",
+    "11000011111000111111",
+    "10000011100000011111",
   ],
   legend: {
+    ".": { kind: "ground" },
+    t: { kind: "decor", decor: "bush" },
+    W: { kind: "wall" },
     M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
     S: { kind: "pickup", itemId: "stick", weaponId: "club" },
     F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
@@ -394,5 +409,341 @@ describe("prologue player script", () => {
     });
     expect(decision.forceOutcome).toBe("hit");
     expect(decision.command?.type).toBe("ATTACK");
+  });
+});
+
+/* ---------- M1: крыса как полноценный противник (0.20.37) ---------- */
+
+const M1_FOG_OFF_LAYOUT = {
+  rows: [
+    "....................",
+    "....t.....t......t..",
+    "..................F.",
+    ".M..t..........t...S",
+    "....................",
+    "....t.....t......t..",
+  ],
+  legend: {
+    ".": { kind: "ground" },
+    t: { kind: "decor", decor: "bush" },
+    M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
+    S: { kind: "pickup", itemId: "stick", weaponId: "club" },
+    F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
+  },
+};
+
+const M1_SCRIPT = {
+  priority: [],
+  actions: [
+    {
+      unitId: "forest_rat",
+      side: "enemy",
+      kind: "attack",
+      targetUnitId: "mikula_peasant",
+      weaponId: "teeth",
+      forceOutcome: "miss",
+      onlyIf: "targetAlive",
+    },
+    { kind: "endTurn" },
+  ],
+};
+
+/** Дойти до палки и подобрать её: крыса появляется скриптово. */
+function armMikula(kernel: ReturnType<typeof createTacticsKernel>) {
+  const compiled = compilePrologueLayout(M1_FOG_OFF_LAYOUT as never);
+  const stick = compiled.markers.S![0]!;
+  let state = createPrologueRunState("prologue_brushwood");
+  const ctx = {
+    missionId: "prologue_brushwood",
+    script: M1_SCRIPT as never,
+    hints: [],
+    showHints: false,
+    ratMarker: compiled.markers.F![0],
+  };
+  for (let guard = 0; guard < 60; guard += 1) {
+    const snap = kernel.getSnapshot();
+    const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant")!;
+    if (mikula.x === stick.x && mikula.y === stick.y) {
+      const applied = kernel.apply({ type: "END_TURN", playerId: "1" });
+      if (applied.ok) state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
+      break;
+    }
+    const reach = kernel.getReachable(mikula.id);
+    const best = [...reach].sort(
+      (a, b) =>
+        Math.floor(Math.hypot(a.x - stick.x, a.y - stick.y)) - Math.floor(Math.hypot(b.x - stick.x, b.y - stick.y)),
+    )[0];
+    if (!best) {
+      const applied = kernel.apply({ type: "END_TURN", playerId: "1" });
+      if (applied.ok) state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
+      continue;
+    }
+    const command = { type: "MOVE", actorId: mikula.id, to: best } as const;
+    const applied = kernel.apply(command);
+    if (applied.ok) state = afterPrologueApply(kernel, command, applied.events, state, ctx);
+    else {
+      const ended = kernel.apply({ type: "END_TURN", playerId: "1" });
+      if (ended.ok) state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, ended.events, state, ctx);
+    }
+  }
+  return { state, ctx };
+}
+
+describe("prologue M1 rat as a real enemy (0.20.37)", () => {
+  function boot(seed: number) {
+    const match = createPrologueMatch({ layout: M1_FOG_OFF_LAYOUT as never, units: [MIKULA, RAT], seed });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed,
+      fogDisabled: true,
+    });
+    return kernel;
+  }
+
+  it("gives the scripted side its own fog of war once it enters the field", () => {
+    const kernel = boot(701);
+    // Противника ещё нет: туман Нави отсутствует.
+    expect(kernel.getVisibleCells(2).size).toBe(0);
+    const compiled = compilePrologueLayout(M1_FOG_OFF_LAYOUT as never);
+    kernel.spawnScripted("forest_rat", 2, { x: compiled.markers.F![0]!.x, y: compiled.markers.F![0]!.y, z: 1 });
+    // Сторона появилась — туман для неё создан и (при fogDisabled) раскрыт.
+    expect(kernel.getVisibleCells(2).size).toBe(120);
+  });
+
+  it("the rat attacks Mikula instead of standing in overwatch", () => {
+    const kernel = boot(701);
+    const { state, ctx } = armMikula(kernel);
+    expect(state.pickupDone).toBe(true);
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "forest_rat" && !entity.dead)).toBe(true);
+
+    let run = state;
+    const outcomes: string[] = [];
+    const rejections: string[] = [];
+    let overwatch = false;
+
+    for (let round = 0; round < 6; round += 1) {
+      // Игрок ничего не делает — только завершает ход.
+      if (kernel.getSnapshot().activeOwner === 1) {
+        const ended = kernel.apply({ type: "END_TURN", playerId: "1" });
+        if (ended.ok) run = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, ended.events, run, ctx);
+      }
+      let guard = 0;
+      while (kernel.getSnapshot().activeOwner === 2 && guard < 96) {
+        guard += 1;
+        const decision = pickScriptedCommand(kernel, M1_SCRIPT as never, run.script, { activeOwner: 2 });
+        run = { ...run, script: decision.state };
+        if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
+        const command = decision.command ?? { type: "END_TURN" as const, playerId: "2" };
+        if (decision.command?.type === "OVERWATCH") overwatch = true;
+        const applied = kernel.apply(command as never);
+        if (!applied.ok) {
+          rejections.push(`${decision.command?.type ?? "END_TURN"}:${applied.reason}`);
+          kernel.apply({ type: "END_TURN", playerId: "2" });
+          break;
+        }
+        run = afterPrologueApply(kernel, command as never, applied.events, run, ctx);
+        for (const event of applied.events) {
+          if (event.type === "COMBAT_RESOLVED") outcomes.push(event.result);
+        }
+        if (!decision.command) break;
+      }
+    }
+
+    // Крыса бьёт каждый ход: алгоритм не выдаёт ни одной отвергнутой команды.
+    expect(rejections).toEqual([]);
+    expect(overwatch).toBe(false);
+    expect(outcomes.length).toBeGreaterThanOrEqual(5);
+    // Первый скриптовый удар — гарантированный промах (campaign.md §7.1.6).
+    expect(outcomes[0]).toBe("MISS");
+    // Дальше честные кости: за 6 ходов Микула обязан получить урон.
+    const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
+    expect(mikula.hp).toBeLessThan(mikula.maxHp);
+  });
+
+  it("never issues a command the kernel rejects, on any seed", () => {
+    for (const seed of [701, 733, 811, 907, 1024]) {
+      const kernel = boot(seed);
+      const { state, ctx } = armMikula(kernel);
+      let run = state;
+      for (let round = 0; round < 4; round += 1) {
+        if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
+        if (kernel.getSnapshot().activeOwner === 1) {
+          const ended = kernel.apply({ type: "END_TURN", playerId: "1" });
+          if (ended.ok) run = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, ended.events, run, ctx);
+        }
+        let guard = 0;
+        while (kernel.getSnapshot().activeOwner === 2 && guard < 96) {
+          guard += 1;
+          if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
+          const decision = pickScriptedCommand(kernel, M1_SCRIPT as never, run.script, { activeOwner: 2 });
+          run = { ...run, script: decision.state };
+          if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
+          const command = decision.command ?? { type: "END_TURN" as const, playerId: "2" };
+          const applied = kernel.apply(command as never);
+          expect(applied.ok, `seed ${seed}: ${decision.command?.type ?? "END_TURN"}`).toBe(true);
+          if (!applied.ok) break;
+          run = afterPrologueApply(kernel, command as never, applied.events, run, ctx);
+          if (!decision.command) break;
+        }
+      }
+    }
+  });
+});
+
+describe("prologue M1 relief (0.20.37)", () => {
+  it("applies per-cell heights from the parallel array", () => {
+    const compiled = compilePrologueLayout(M1_LAYOUT as never);
+    const at = (x: number, y: number) => compiled.grid.tiles.find((tile) => tile.x === x && tile.y === y)!;
+    // Северные всхолмления.
+    expect(at(4, 0).z).toBe(2);
+    // Тропа Микулы и клетка палки — ровный ярус.
+    expect(at(1, 3).z).toBe(1);
+    expect(at(19, 3).z).toBe(1);
+    // Точка выхода крысы — тот же ярус, что и клетка палки: без поправки к меткости.
+    expect(at(18, 2).z).toBe(at(19, 3).z);
+    // Низина сухого ручья на юге.
+    expect(at(3, 5).z).toBe(0);
+    // Валуны блокируют обзор и проход.
+    expect(at(4, 0).blockLOS).toBe(true);
+    expect(at(14, 0).blockLOS).toBe(true);
+  });
+
+  it("keeps all three tiers on the map and the stick out of dash range", () => {
+    const compiled = compilePrologueLayout(M1_LAYOUT as never);
+    const tiers = new Set(compiled.grid.tiles.map((tile) => tile.z));
+    expect([...tiers].sort()).toEqual([0, 1, 2]);
+
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
+    const stick = kernel.getSnapshot().entities.find((entity) => entity.configId === "stick")!;
+    // 18 клеток по прямой: полный рывок (до 10) не достаёт — второму ходу есть чему учить.
+    expect(Math.floor(Math.hypot(stick.x - mikula.x, stick.y - mikula.y))).toBeGreaterThanOrEqual(18);
+    expect(kernel.getReachable(mikula.id).some((cell) => cell.x === stick.x && cell.y === stick.y)).toBe(false);
+    // Маршрут к палке существует: миссия проходима.
+    expect(kernel.getReachable(mikula.id).length).toBeGreaterThan(0);
+  });
+});
+
+describe("prologue M1 checkpoint (0.20.37)", () => {
+  function deadMikulaSnapshot(kernel: ReturnType<typeof createTacticsKernel>) {
+    const snap = kernel.getSnapshot();
+    const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant")!;
+    return {
+      mikula,
+      events: [{ type: "ENTITY_DIED", entityId: mikula.id, causeOfDeath: "DAMAGE" }] as never[],
+      match: {
+        ...snap,
+        entities: snap.entities.map((entity) =>
+          entity.id === mikula.id ? { ...entity, hp: 0, dead: true } : entity,
+        ),
+      },
+    };
+  }
+
+  it("arms the checkpoint when the rat runs onto the field", () => {
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const fresh = createPrologueRunState("prologue_brushwood");
+    expect(fresh.ratSpawned).toBe(false);
+    const { state } = armMikula(kernel);
+    expect(state.ratSpawned).toBe(true);
+  });
+
+  it("replays the scene instead of losing once the checkpoint is armed", () => {
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const { state } = armMikula(kernel);
+    const { events, match: dead } = deadMikulaSnapshot(kernel);
+    // Контрольная точка активна — гибель Микулы откатывает сцену.
+    expect(shouldRestoreCheckpoint(state, events, dead)).toBe(true);
+    // До появления крысы контрольной точки нет: это честное поражение.
+    const before = createPrologueRunState("prologue_brushwood");
+    expect(shouldRestoreCheckpoint(before, events, dead)).toBe(false);
+  });
+
+  it("keeps the outcome ongoing on death so the defeat card cannot flash first", () => {
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const { state, ctx } = armMikula(kernel);
+    const snap = kernel.getSnapshot();
+    const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant")!;
+    mikula.dead = true;
+    mikula.hp = 0;
+    kernel.restoreMatch(snap, kernel.getFog());
+    const after = afterPrologueApply(
+      kernel,
+      { type: "END_TURN", playerId: "1" },
+      [{ type: "ENTITY_DIED", entityId: mikula.id, causeOfDeath: "DAMAGE" }] as never,
+      state,
+      ctx,
+    );
+    expect(after.ratSpawned).toBe(true);
+    expect(after.outcome).toBe("ongoing");
+  });
+});
+
+describe("prologue scripted spawns reach the screen (0.20.37)", () => {
+  it("hands the spawn event to the caller instead of dropping it", () => {
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    expect(kernel.drainSpawnEvents()).toEqual([]);
+    const compiled = compilePrologueLayout(M1_LAYOUT as never);
+    const cell = compiled.markers.F![0]!;
+    kernel.spawnScripted("forest_rat", 2, { x: cell.x, y: cell.y, z: 1 });
+    const events = kernel.drainSpawnEvents();
+    expect(events.some((event) => event.type === "ENTITY_SPAWNED")).toBe(true);
+    // Накопитель опустошён: одно и то же событие не проигрывается дважды.
+    expect(kernel.drainSpawnEvents()).toEqual([]);
+  });
+
+  it("accumulates the rat's arrival in the run state", () => {
+    const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const { state } = armMikula(kernel);
+    expect(state.pendingEvents.some((event) => event.type === "ENTITY_SPAWNED")).toBe(true);
+    const spawned = state.pendingEvents.filter((event) => event.type === "ENTITY_SPAWNED") as Extract<
+      GameEvent,
+      { type: "ENTITY_SPAWNED" }
+    >[];
+    expect(spawned.map((event) => event.entity.configId)).toEqual(["forest_rat"]);
   });
 });
