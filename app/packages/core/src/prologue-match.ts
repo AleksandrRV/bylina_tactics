@@ -65,6 +65,9 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
     for (const pos of compiled.markers[marker] ?? []) {
       const tile = tileAt(compiled.grid, pos.x, pos.y);
       const spawned = spawnUnitState(id++, pickUnit(options.units, unitId), owner, pos.x, pos.y, tile?.z ?? 1, owner === PLAYER_OWNER ? 1 : 3);
+      if (spawned.configId === "strelets") {
+        spawned.skillIds = (spawned.skillIds ?? []).filter((skillId) => skillId !== "aimed_eye");
+      }
       extra?.(spawned);
       entities.push(spawned);
     }

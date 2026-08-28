@@ -57,6 +57,7 @@ export {
   afterPrologueApply,
   gatePrologueCommand,
   tickPrologueEnemyTurn,
+  tickProloguePlayerTurn,
   prologueHintView,
   dismissPrologueHint,
   shouldRestoreCheckpoint,

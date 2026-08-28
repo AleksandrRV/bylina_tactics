@@ -55,7 +55,11 @@ import {
   prologueUnits,
   shouldRestoreCheckpoint,
   tickPrologueEnemyTurn,
+  tickProloguePlayerTurn,
+  createTelemetryLog,
+  recordTelemetry,
   type PrologueRunState,
+  type TelemetryLog,
 } from "./prologue-battle.js";
 import "./battle.css";
 
@@ -137,8 +141,11 @@ export function BattleScreenView() {
     for (const record of content.weapons) {
       base[record.id] = weaponStatsFromRecord(record);
     }
+    for (const record of content.prologueBestiary?.weapons ?? []) {
+      base[record.id] = weaponStatsFromRecord(record);
+    }
     return base;
-  }, [content.weapons]);
+  }, [content.weapons, content.prologueBestiary]);
 
   const skills = useMemo(() => {
     const result: Record<string, SkillStats> = {};
@@ -327,6 +334,10 @@ export function BattleScreenView() {
   );
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
   const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
+  const prologueTelemetryRef = useRef<TelemetryLog>(createTelemetryLog());
+  const [prologueObjectiveKey, setPrologueObjectiveKey] = useState(
+    prologueRunRef.current?.objectiveKey ?? "prologue.objective.gather",
+  );
   const trainingHints = isTraining && trainingMission
     ? trainingHintsSorted(trainingMission.hints)
     : [];
@@ -802,18 +813,23 @@ export function BattleScreenView() {
     }
     announce(result.events);
     if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
-      const ctx = buildPrologueContext(prologueMission, content, true);
+      const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
       const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
       if ((next.fedotFreed || next.firstWave || next.vasilisaJoined) && !session.hasBattleCheckpoint()) {
         session.saveBattleCheckpoint();
       }
       if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
+        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
         session.restoreBattleCheckpoint();
       } else {
         prologueRunRef.current = next;
       }
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
+      if (hint && hint !== prologueHintKey) {
+        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "hint_shown", key: hint });
+      }
       setPrologueHintKey(hint);
+      setPrologueObjectiveKey(next.objectiveKey);
       if (next.outcome !== "ongoing") setPrologueCard("outro");
     }
     // Подсказка обучения продвигается событиями действия самого игрока (0.19.1);
@@ -960,7 +976,7 @@ export function BattleScreenView() {
           enemyScriptRef.current = decision.state;
           command = decision.command;
         } else if (isPrologue && prologueMission && prologueRunRef.current) {
-          const ctx = buildPrologueContext(prologueMission, content, true);
+          const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
           const decision = tickPrologueEnemyTurn(kernel, prologueRunRef.current, ctx);
           prologueRunRef.current = decision.state;
           command = decision.command;
@@ -978,13 +994,15 @@ export function BattleScreenView() {
         announce(applied.events);
         showTrainingNote(applied.events);
         if (isPrologue && prologueMission && prologueRunRef.current && command) {
-          const ctx = buildPrologueContext(prologueMission, content, true);
+          const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
           const next = afterPrologueApply(kernel, command, applied.events, prologueRunRef.current, ctx);
           if (shouldRestoreCheckpoint(next, applied.events, kernel.getSnapshot())) {
+            prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
             session.restoreBattleCheckpoint();
           } else {
             prologueRunRef.current = next;
           }
+          setPrologueObjectiveKey(next.objectiveKey);
           if (next.outcome !== "ongoing") setPrologueCard("outro");
         }
         finishFromEvents(applied.events);
@@ -992,8 +1010,33 @@ export function BattleScreenView() {
         if (session.getBattleOutcome() !== "ongoing") break;
         await sleep(190);
       }
+      if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
+        await runProloguePlayerScript();
+      }
     } finally {
       setEnemyPhase(false);
+    }
+  };
+
+  const runProloguePlayerScript = async (): Promise<void> => {
+    if (!kernel || !prologueMission || !prologueRunRef.current) return;
+    const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
+    for (let guard = 0; guard < 8; guard += 1) {
+      if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== PLAYER_OWNER) break;
+      if (session.getBattleOutcome() !== "ongoing") break;
+      const decision = tickProloguePlayerTurn(kernel, prologueRunRef.current, ctx);
+      prologueRunRef.current = decision.state;
+      if (!decision.command) break;
+      const applied = session.applyBattleCommand(decision.command);
+      if (!applied.ok) break;
+      await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
+      announce(applied.events);
+      const next = afterPrologueApply(kernel, decision.command, applied.events, prologueRunRef.current, ctx);
+      prologueRunRef.current = next;
+      setPrologueObjectiveKey(next.objectiveKey);
+      const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
+      setPrologueHintKey(hint);
+      if (next.outcome !== "ongoing") setPrologueCard("outro");
     }
   };
 
@@ -1029,17 +1072,30 @@ export function BattleScreenView() {
       session.sendNetCommand({ type: "END_TURN", playerId: String(viewOwner) });
       return;
     }
+    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, { type: "END_TURN", playerId: String(viewOwner) })) {
+      setLog(t("prologue.hint.m2.noise"));
+      return;
+    }
     const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
     if (!result.ok) return;
     setBusy(true);
     void (async () => {
       try {
+        if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
+          const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
+          const next = afterPrologueApply(kernel, { type: "END_TURN", playerId: String(viewOwner) }, result.events, prologueRunRef.current, ctx);
+          prologueRunRef.current = next;
+          setPrologueObjectiveKey(next.objectiveKey);
+          if (next.outcome !== "ongoing") setPrologueCard("outro");
+        }
         advanceTraining(result.events);
         showTrainingNote(result.events);
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
         finishFromEvents(result.events);
         if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
+        } else if (isPrologue && session.getBattleOutcome() === "ongoing") {
+          await runProloguePlayerScript();
         }
       } finally {
         setBusy(false);
@@ -1055,6 +1111,7 @@ export function BattleScreenView() {
   // Условие — чистая функция (training-progress.ts), покрыта тестами.
   // Этап 1.5: вне обучения автозавершение включается настройкой игры.
   useEffect(() => {
+    if (isPrologue && prologueRunRef.current?.forceDefend) return;
     if (!isTraining && !hintSettings.autoEndTurn) return;
     const ownUnits = snapshot.entities.filter(
       (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
@@ -1666,12 +1723,16 @@ export function BattleScreenView() {
                 t("menu.pvp")
               ) : isTraining ? (
                 t("training.battleLabel")
+              ) : isPrologue && prologueMission ? (
+                t(prologueMission.titleKey)
               ) : (
                 t("menu.quickMatch")
               )}
             </p>
             <p>
-              {battleKind === "campaign" && mission
+              {isPrologue
+                ? t(prologueObjectiveKey)
+                : battleKind === "campaign" && mission
                 ? t(`battle.objective.${mission.type}`)
                 : isTraining && trainingMission
                   ? t(`training.objective.${trainingMission.id}`)
@@ -2168,11 +2229,24 @@ export function BattleScreenView() {
               className="hud-btn hud-btn-primary"
               onClick={() => {
                 if (prologueCard === "intro") {
+                  prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+                    type: "skip_cutscene",
+                    missionId: prologueMission.id,
+                  });
                   setPrologueCard(null);
+                  const stick = snapshot.entities.find((entity) => entity.configId === "stick");
+                  if (stick) {
+                    const pos = rendererRef.current?.getEntityScreenPosition?.(stick.id);
+                    if (pos) rendererRef.current?.pan((0.5 - pos.x) * 420, (0.42 - pos.y) * 320);
+                  }
                   return;
                 }
                 const nextId = prologueMission.nextMissionId ?? null;
                 if (prologueRunRef.current?.outcome === "defeat") {
+                  prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+                    type: "restart_pressed",
+                    missionId: prologueMission.id,
+                  });
                   session.startPrologue(prologueMission.id, true);
                   return;
                 }

@@ -6,6 +6,8 @@ import {
   afterPrologueApply,
   compilePrologueLayout,
   gatePrologueCommand,
+  shouldRestoreCheckpoint,
+  tickProloguePlayerTurn,
   weaponStatsFromRecord,
   type SpawnUnitConfig,
 } from "../src/index.js";
@@ -184,6 +186,7 @@ describe("prologue M2 gate", () => {
     expect(state.forceDefend).toBe(true);
     expect(gatePrologueCommand(state, { type: "ATTACK", actorId: mikula.id, targetId: 2, weaponId: "club" })).toBe(false);
     expect(gatePrologueCommand(state, { type: "DEFEND", actorId: mikula.id })).toBe(true);
+    expect(gatePrologueCommand(state, { type: "END_TURN", playerId: "1" })).toBe(false);
   });
 });
 
@@ -279,7 +282,9 @@ describe("prologue M3 wave", () => {
     expect(state.firstWave).toBe(true);
     const after = kernel.getSnapshot();
     expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead).length).toBeGreaterThanOrEqual(2);
-    expect(after.entities.some((entity) => entity.configId === "strelets" && !entity.dead)).toBe(true);
+    const fedot = after.entities.find((entity) => entity.configId === "strelets" && !entity.dead);
+    expect(fedot).toBeTruthy();
+    expect(fedot?.skillIds ?? []).not.toContain("aimed_eye");
   });
 });
 
@@ -330,5 +335,64 @@ describe("prologue M4 vasilisa", () => {
       { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
     );
     expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
+  });
+});
+
+
+describe("prologue checkpoint restore", () => {
+  it("restores after firstWave, not only fedotFreed", () => {
+    const match = {
+      turnNumber: 2,
+      activeOwner: 1,
+      grid: { width: 4, height: 4, tiles: [] },
+      entities: [
+        { id: 1, configId: "bogatyr", owner: 1, dead: true, coverType: 0, x: 0, y: 0, z: 1, dir: 1, ap: 0, maxAp: 2, mobility: 4, hp: 0, maxHp: 12, aim: 70, defense: 0, vision: 10, weaponId: "sword", obstacle: true, flying: false, overwatch: false, defending: false, movementSpent: 0 },
+      ],
+    };
+    const wave = createPrologueRunState("prologue_glade");
+    wave.firstWave = true;
+    expect(shouldRestoreCheckpoint(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never)).toBe(true);
+    const start = createPrologueRunState("prologue_glade");
+    expect(shouldRestoreCheckpoint(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never)).toBe(false);
+  });
+});
+
+describe("prologue player script", () => {
+  it("issues a forceHit attack for strelets on the player turn", () => {
+    const layout = {
+      rows: [".M..", "U...", "..A."],
+      legend: {
+        M: { kind: "spawn", side: "player", unitId: "bogatyr" },
+        U: { kind: "spawn", side: "enemy", unitId: "upyr" },
+        A: { kind: "spawn", side: "player", unitId: "strelets", scripted: true },
+      },
+    };
+    const match = createPrologueMatch({ layout, units: [BOGATYR, UPYR, STRELETS], seed: 705 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [BOGATYR, UPYR, STRELETS],
+      weapons: { club: CLUB, teeth: TEETH, bow: weaponStatsFromRecord({
+        id: "bow", category: "ranged", apCost: 1, endsTurn: true, range: 8, requiresLOS: true,
+        aimMod: 0, minDmg: 3, maxDmg: 5, crit: 15, critBonus: 2, envDmg: 0,
+      }) },
+      seed: 705,
+      fogDisabled: true,
+    });
+    kernel.spawnScripted("strelets", 1, { x: 2, y: 2, z: 1 });
+    const state = createPrologueRunState("prologue_glade");
+    state.firstWave = true;
+    const decision = tickProloguePlayerTurn(kernel, state, {
+      missionId: "prologue_glade",
+      hints: [],
+      showHints: true,
+      script: {
+        actions: [
+          { unitId: "strelets", side: "player", kind: "appear", at: { x: 2, y: 2 } },
+          { unitId: "strelets", side: "player", kind: "attack", targetUnitId: "upyr", weaponId: "bow", forceOutcome: "hit" },
+        ],
+      },
+    });
+    expect(decision.forceOutcome).toBe("hit");
+    expect(decision.command?.type).toBe("ATTACK");
   });
 });

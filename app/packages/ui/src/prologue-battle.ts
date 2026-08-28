@@ -6,6 +6,10 @@ import {
   gatePrologueCommand,
   shouldRestoreCheckpoint,
   tickPrologueEnemyTurn,
+  tickProloguePlayerTurn,
+  createTelemetryLog,
+  recordTelemetry,
+  type TelemetryLog,
   type PrologueRunContext,
   type PrologueRunState,
   type SpawnUnitConfig,
@@ -54,5 +58,14 @@ export function initPrologueMatch(mission: PrologueMissionConfig, content: Conte
   });
 }
 
-export { createPrologueRunState, afterPrologueApply, gatePrologueCommand, tickPrologueEnemyTurn, shouldRestoreCheckpoint };
-export type { PrologueRunState, PrologueRunContext, TacticsKernel, Command, GameEvent };
+export {
+  createPrologueRunState,
+  afterPrologueApply,
+  gatePrologueCommand,
+  tickPrologueEnemyTurn,
+  tickProloguePlayerTurn,
+  shouldRestoreCheckpoint,
+  createTelemetryLog,
+  recordTelemetry,
+};
+export type { PrologueRunState, PrologueRunContext, TacticsKernel, Command, GameEvent, TelemetryLog };

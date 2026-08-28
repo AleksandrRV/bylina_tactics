@@ -102,6 +102,7 @@ function resolveAction(kernel: TacticsKernel, action: PrologueScriptAction): Act
   if (action.kind === "endTurn") return { command: null, done: true };
   if (action.kind === "spawn" || action.kind === "appear") {
     if (!action.unitId || !action.at) return { command: null, done: true };
+    if (livingByConfigId(snap, action.unitId)) return { command: null, done: true };
     return {
       command: null,
       done: true,

@@ -117,7 +117,6 @@ function enqueue(state: PrologueRunState, ctx: PrologueRunContext, key: string, 
 
 export function gatePrologueCommand(state: PrologueRunState, command: Command): boolean {
   if (!state.forceDefend) return true;
-  if (command.type === "END_TURN") return true;
   return command.type === "DEFEND";
 }
 
@@ -168,6 +167,11 @@ function freeFedot(kernel: TacticsKernel): void {
   });
 }
 
+function stripPrologueSkills(entity: { configId: string; skillIds?: string[] }): void {
+  if (entity.configId !== "strelets") return;
+  entity.skillIds = (entity.skillIds ?? []).filter((id) => id !== "aimed_eye");
+}
+
 function spawnUnits(
   kernel: TacticsKernel,
   unitId: string,
@@ -178,12 +182,16 @@ function spawnUnits(
   for (const cell of cells) {
     const tile = tileAt(kernel.getSnapshot().grid, cell.x, cell.y);
     const spawned = kernel.spawnScripted(unitId, owner, { x: cell.x, y: cell.y, z: tile?.z ?? 1 });
-    if (spawned && !countForElim) {
-      restorePatch(kernel, (match) => {
-        const entity = match.entities.find((candidate) => candidate.id === spawned.id);
-        if (entity) entity.countsForElimination = false;
-      });
-    }
+    if (!spawned) continue;
+    restorePatch(kernel, (match) => {
+      const entity = match.entities.find((candidate) => candidate.id === spawned.id);
+      if (!entity) return;
+      stripPrologueSkills(entity);
+      if (!countForElim) entity.countsForElimination = false;
+      if (unitId === "strelets" && owner === PLAYER_OWNER) {
+        entity.ap = 0;
+      }
+    });
   }
 }
 
@@ -360,6 +368,21 @@ export function afterPrologueApply(
   return next;
 }
 
+function applyScriptDecision(
+  kernel: TacticsKernel,
+  state: PrologueRunState,
+  ctx: PrologueRunContext,
+  owner: number,
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" } {
+  const decision = pickScriptedCommand(kernel, ctx.script, state.script, { activeOwner: owner });
+  const next = { ...state, script: decision.state };
+  if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
+  if (decision.spawn) {
+    spawnUnits(kernel, decision.spawn.unitId, decision.spawn.owner, [decision.spawn.at], decision.spawn.owner === ENEMY_OWNER);
+  }
+  return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
+}
+
 export function tickPrologueEnemyTurn(
   kernel: TacticsKernel,
   state: PrologueRunState,
@@ -371,21 +394,34 @@ export function tickPrologueEnemyTurn(
     next.reinforcements = tick.state;
     spawnRats(kernel, tick.spawns.map((spawn) => spawn.at), false);
   }
-  const decision = pickScriptedCommand(kernel, ctx.script, next.script, { activeOwner: ENEMY_OWNER });
-  next.script = decision.state;
-  if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
-  if (decision.spawn) {
-    spawnUnits(kernel, decision.spawn.unitId, decision.spawn.owner, [decision.spawn.at], decision.spawn.owner === ENEMY_OWNER);
-  }
-  return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
+  return applyScriptDecision(kernel, next, ctx, ENEMY_OWNER);
+}
+
+/** Скриптовые действия стороны игрока (выстрел Федота, вход Василисы). */
+export function tickProloguePlayerTurn(
+  kernel: TacticsKernel,
+  state: PrologueRunState,
+  ctx: PrologueRunContext,
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" } {
+  return applyScriptDecision(kernel, state, ctx, PLAYER_OWNER);
+}
+
+function checkpointArmed(state: PrologueRunState): boolean {
+  return state.fedotFreed || state.firstWave || state.vasilisaJoined;
 }
 
 export function shouldRestoreCheckpoint(state: PrologueRunState, events: readonly GameEvent[], match: MatchState): boolean {
-  if (!state.fedotFreed) return false;
-  const mikula = match.entities.find((entity) => entity.configId === "mikula_peasant");
-  if (mikula && !mikula.dead) return false;
-  if (state.extracted.includes("mikula_peasant")) return false;
-  return events.some((event) => event.type === "ENTITY_DIED" || event.type === "MATCH_ENDED");
+  if (!checkpointArmed(state)) return false;
+  const died = events.some((event) => event.type === "ENTITY_DIED" || event.type === "MATCH_ENDED");
+  if (!died) return false;
+  const fallen = match.entities.filter(
+    (entity) =>
+      entity.owner === PLAYER_OWNER &&
+      entity.coverType === 0 &&
+      entity.dead &&
+      !state.extracted.includes(entity.configId),
+  );
+  return fallen.length > 0;
 }
 
 export function adjacentTo(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
