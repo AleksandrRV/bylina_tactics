@@ -36,6 +36,39 @@ export {
   type TrainingEnemyScript,
   type TrainingEnemyScriptState,
 } from "./training-ai.js";
+export {
+  pickScriptedCommand,
+  type PrologueScript,
+  type PrologueScriptAction,
+  type PrologueScriptState,
+  type ScriptedDecision,
+} from "./prologue-script.js";
+export {
+  evaluateMissionTriggers,
+  createMissionScriptState,
+  type MissionTrigger,
+  type MissionScriptState,
+} from "./mission-script.js";
+export { compilePrologueLayout, createLayoutMatch } from "./prologue-layout.js";
+export type { PrologueLayout, CompiledLayout } from "./prologue-layout.js";
+export {
+  createReinforcementsState,
+  tickReinforcements,
+  noteEnemyKill,
+  type ReinforcementsConfig,
+  type ReinforcementsState,
+} from "./reinforcements.js";
+export {
+  createHintsManagerState,
+  enqueueHint,
+  currentHint,
+  dismissHint,
+  allowedPanel,
+  type HintRecord,
+  type HintsManagerState,
+} from "./hints-manager.js";
+export { createTelemetryLog, recordTelemetry, skipCutsceneRate } from "./telemetry.js";
+export type { TelemetryEvent, TelemetryLog } from "./telemetry.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
 export { canFinish, canTransit, edgeCost, edgeCoverBetween } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";

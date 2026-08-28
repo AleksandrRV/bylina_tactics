@@ -81,6 +81,50 @@ function clampAxis(target: number, mapSpan: number, screenSpan: number): number 
  * действий), затем позиция ограничивается границами поля — камера не
  * показывает пустоту за краями карты ни на одной оси.
  */
+export type CameraCueKind = "panTo" | "panThreat" | "panReturn";
+
+export interface CameraCue {
+  kind: CameraCueKind;
+  point: Point;
+  /** Длительность в мс (проектное). */
+  durationMs?: number;
+}
+
+export interface CameraDirectorState {
+  queue: CameraCue[];
+  current: CameraCue | null;
+  returnTo: Point | null;
+  inputLocked: boolean;
+}
+
+export function createCameraDirector(origin: Point): CameraDirectorState {
+  return { queue: [], current: null, returnTo: origin, inputLocked: false };
+}
+
+export function enqueueCameraCue(state: CameraDirectorState, cue: CameraCue): CameraDirectorState {
+  return { ...state, queue: [...state.queue, cue] };
+}
+
+/** Начать следующий пан; ввод блокируется на время пана. */
+export function beginCameraCue(state: CameraDirectorState): CameraDirectorState {
+  const next = state.queue[0];
+  if (!next) return { ...state, current: null, inputLocked: false };
+  return {
+    ...state,
+    queue: state.queue.slice(1),
+    current: next,
+    inputLocked: true,
+  };
+}
+
+export function skipCameraCue(state: CameraDirectorState): CameraDirectorState {
+  return { ...state, current: null, inputLocked: false };
+}
+
+export function finishCameraCue(state: CameraDirectorState): CameraDirectorState {
+  return { ...state, current: null, inputLocked: false };
+}
+
 export function trainingGlideOffset(
   point: Point,
   plane: CameraPlane,

@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.31", () => {
-    expect(APP_VERSION).toBe("0.20.31");
+  it("reports version 0.20.32", () => {
+    expect(APP_VERSION).toBe("0.20.32");
   });
 
   it("moves between menu and settings", () => {
@@ -392,6 +392,24 @@ describe("createSession training hints (0.19.0)", () => {
     session.completeTrainingMission("combat");
     session.goTo("training");
     expect(session.get().trainingDone).toEqual(["movement", "combat"]);
+  });
+});
+
+describe("createSession battle checkpoint (0.20.32)", () => {
+  it("restores the snapshot without recording replay commands", () => {
+    const session = createSession("menu");
+    session.openQuickMatch();
+    session.selectDifficulty("easy");
+    const host = createTacticsKernel({ initial: createDebugMatch(), seed: 2 });
+    session.bindTacticsHost(host);
+    expect(session.saveBattleCheckpoint()).toBe(true);
+    const before = host.getSnapshot();
+    session.applyBattleCommand({ type: "END_TURN", playerId: "1" });
+    expect(host.getSnapshot().activeOwner).not.toBe(before.activeOwner);
+    const draftBefore = session.getReplayDraft();
+    expect(session.restoreBattleCheckpoint()).toBe(true);
+    expect(host.getSnapshot().activeOwner).toBe(before.activeOwner);
+    expect(session.getReplayDraft()).toEqual(draftBefore);
   });
 });
 

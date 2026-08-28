@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.31";
+export const APP_VERSION = "0.20.32";
 
 export type AppScreen =
   | "boot"
@@ -268,6 +268,10 @@ export interface SessionApi {
    * (поведение идентично 0.20.30). Экраны пролога — Этап 2–3.
    */
   startPrologue(missionId: string, enabled: boolean): boolean;
+  /** Снимок чекпоинта боя (не пишется в журнал повтора). */
+  saveBattleCheckpoint(): boolean;
+  restoreBattleCheckpoint(): boolean;
+  hasBattleCheckpoint(): boolean;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -327,6 +331,7 @@ export function createSession(
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
   let state: SessionState = { screen: initial, trainingDone: [], campaignHintsDone: [], ...idle, ...(restored ?? {}) };
+  let battleCheckpoint: { match: MatchState; fog: FogState } | null = null;
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -996,6 +1001,21 @@ export function createSession(
       emit({ ...state, prologueMissionId: missionId });
       return true;
     },
+    saveBattleCheckpoint: () => {
+      if (!tacticsHost) return false;
+      battleCheckpoint = {
+        match: tacticsHost.getSnapshot(),
+        fog: tacticsHost.getFog(),
+      };
+      return true;
+    },
+    restoreBattleCheckpoint: () => {
+      if (!tacticsHost || !battleCheckpoint) return false;
+      tacticsHost.restoreMatch(battleCheckpoint.match, battleCheckpoint.fog);
+      notifyBattle();
+      return true;
+    },
+    hasBattleCheckpoint: () => battleCheckpoint !== null,
     bindTacticsHost: (host) => {
       tacticsHost = host;
       // Сетевой ведущий: ядро создано (BattleScreen смонтирован) — ведомый
