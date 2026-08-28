@@ -171,6 +171,18 @@
     },
     "kikimora_pvp": {
       "name": "Kikimora warrior"
+    },
+    "forest_rat": {
+      "name": "Forest rat"
+    },
+    "mikula_peasant": {
+      "name": "Mikula"
+    },
+    "fedot_stranded": {
+      "name": "Fedot"
+    },
+    "slug": {
+      "name": "Slug"
     }
   },
   "weapon": {
@@ -203,6 +215,15 @@
     },
     "bow_debug": {
       "name": "Bow (debug)"
+    },
+    "teeth": {
+      "name": "Teeth"
+    },
+    "club": {
+      "name": "Club"
+    },
+    "spit": {
+      "name": "Spit"
     }
   },
   "combat": {
@@ -679,5 +700,65 @@
     "wall": "Solid wall",
     "terrainFull": "Full terrain cover",
     "terrainHalf": "Half terrain cover"
+  },
+  "prologue": {
+    "title": "Prologue",
+    "next": {
+      "toCry": "To the cry",
+      "toGlade": "To the glade",
+      "toVillage": "To the village",
+      "onward": "Onward",
+      "toMap": "To the map"
+    },
+    "objective": {
+      "gather": "Gather brushwood",
+      "destroyAll": "Destroy all enemies",
+      "rescueFedot": "Find Fedot and lead him to the light",
+      "clearGlade": "Clear the glade",
+      "clearStreet": "Clear the street"
+    },
+    "m1": {
+      "title": "Brushwood",
+      "intro": "The outskirts of Vyselki. Evening. The elder asked for brushwood while it is light. My hands are empty — at least I will find a stick.",
+      "outro": "The rat was not alone. A cry comes from the forest — someone is calling for help."
+    },
+    "m2": {
+      "title": "A Cry in the Thicket",
+      "intro": "Night. Someone cried out in the thicket — and the cry broke off.",
+      "outro": "Fedot is saved. The light is to the west. But he dropped his bow in the mire."
+    },
+    "m3": {
+      "title": "The Path of the Upyrs",
+      "intro": "The glade beyond the mire. The ground is full of holes. I am going for my bow. Do not wait — the skeletons are already close.",
+      "outro": "The road is strewn with bones. And further, beyond the mires, darkened the place the dead came from."
+    },
+    "m4": {
+      "title": "Vyselki",
+      "intro": "Vyselki. The shutters are closed, the huts intact. The people left for the river. There is little smoke.",
+      "outro": "These are not hungry beasts. They came from the barrow-field. If we do not stop it — Vyselki will not see the morning."
+    },
+    "hint": {
+      "m1": {
+        "endTurn": "You have had enough for today. End the turn — and you will go on again."
+      },
+      "m2": {
+        "noise": "You hear a suspicious rustle in the bushes — you should get ready.",
+        "stanceWorks": "The stance took the blow.",
+        "wave": "There will be more of them than sticks. The light is to the west.",
+        "gear": "I dropped my bow in the mire when I ran. I will find it — and come back."
+      },
+      "m3": {
+        "blow": "A heavy blow knocks back. The pit beyond it forgives no step.",
+        "pit": "You do not walk into a pit. You push into it.",
+        "more": "More.",
+        "shot": "Found it. No more stepping into the mire. This one is mine."
+      },
+      "m4": {
+        "poison": "The poison drinks not in the blow — but at the start of your turn.",
+        "join": "I am here. I will lift the blight — click, if your hands reach.",
+        "raise": "She raised the skeleton. Once for this fight. Kill it again.",
+        "source": "They came from the barrow-field. The earth there has been swelling since last autumn."
+      }
+    }
   }
 }

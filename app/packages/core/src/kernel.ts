@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.30";
+export const CORE_VERSION = "0.20.36";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -32,6 +32,11 @@ export interface KernelOptions {
   seed?: number;
   /** Восстановленный туман войны (сохранение партии, версия 0.13.0). */
   fog?: FogState;
+  /**
+   * Туман войны выключен (пролог М1–М2, закон §1.9): карта полностью
+   * разведана и наблюдается. Правила LOS не меняются.
+   */
+  fogDisabled?: boolean;
 }
 
 export interface TacticsKernel {
@@ -50,6 +55,15 @@ export interface TacticsKernel {
   /** Полный туман войны всех сторон (для сохранения партии). */
   getFog(): FogState;
   apply(command: Command): ApplyResult;
+  /**
+   * Скриптовый исход следующей атаки/умения с разрешением попадания
+   * (consume-once). После применения кости снова честные.
+   */
+  setForcedOutcome(outcome: "hit" | "miss" | null): void;
+  /** Откат к снимку чекпоинта без записи в журнал повтора. */
+  restoreMatch(match: MatchState, restoredFog?: FogState): void;
+  /** Появление подкрепления/скриптового союзника через публичный канал ядра. */
+  spawnScripted(unitId: string, owner: number, pos: CellPos): EntityState | null;
   /**
    * Отладочная автопобеда (только для разработки и QA): мгновенно уничтожает
    * всех противников и фиксирует победу текущей стороны. Не изменяет баланс
@@ -171,13 +185,22 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
     }
   }
+  const fogDisabled = Boolean(options.fogDisabled);
+  let forcedOutcome: "hit" | "miss" | null = null;
+  const revealAllFog = (): void => {
+    if (!fogDisabled) return;
+    const keys = state.grid.tiles.map((tile) => `${tile.x},${tile.y}`);
+    for (const owner of owners) {
+      fog[owner] = { explored: new Set(keys), visible: new Set(keys) };
+    }
+  };
   let ended = false;
   /** Победа по цели миссии (эвакуация при rescue/recon), фиксируется ядром. */
   let objectiveVictory = false;
   const eliminationOwners = new Set(state.entities
     .filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false)
     .map((entity) => entity.owner));
-  const eliminationEnabled = eliminationOwners.size >= 2;
+  let eliminationEnabled = eliminationOwners.size >= 2;
 
   const actorOf = (id: number): EntityState | undefined => state.entities.find((entity) => entity.id === id);
   const weaponIdsOf = (entity: EntityState): string[] => entity.weaponIds ?? (entity.weaponId ? [entity.weaponId] : []);
@@ -194,6 +217,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const refresh = (): void => {
     state.rngState = String(rng.getState());
     refreshFog(fog, state, owners);
+    revealAllFog();
   };
   const emit = (): void => {
     refresh();
@@ -842,7 +866,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     .sort((a, b) => a.id - b.id);
 
   const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
-    // Клетки области действия для предпросмотра (0.20.30, этап 2.6):
+    // Клетки области действия для предпросмотра (0.20.31, этап 2.6):
     // та же геометрия, что у areaTargets — дистанция по горизонтали и
     // перепад ярусов не более единицы; непроходимые клетки исключаются.
     const previewAreaCells = (center: CellPos): CellPos[] => {
@@ -985,6 +1009,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return { available: true, targetPos: chosen, areaCells: previewAreaCells(chosen) };
   };
 
+  const consumeForce = (): "hit" | "miss" | undefined => {
+    if (!forcedOutcome) return undefined;
+    const value = forcedOutcome;
+    forcedOutcome = null;
+    return value;
+  };
+
   const resolveCombatAgainst = (
     actor: EntityState,
     target: EntityState,
@@ -992,7 +1023,11 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     events: GameEvent[],
     options: AttackOptions = {},
   ): boolean => {
-    const resolved = resolveAttack(state.grid, state.entities, actor, target, weapon, rng, options);
+    const force = options.forceOutcome ?? consumeForce();
+    const resolved = resolveAttack(state.grid, state.entities, actor, target, weapon, rng, {
+      ...options,
+      forceOutcome: force,
+    });
     if (!resolved) return false;
     events.push({
       type: "COMBAT_RESOLVED",
@@ -1106,6 +1141,68 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         };
       }
       return copy;
+    },
+    setForcedOutcome: (outcome) => {
+      forcedOutcome = outcome;
+    },
+    restoreMatch: (match, restoredFog) => {
+      state = cloneState(match);
+      nextEntityId = Math.max(0, ...state.entities.map((entity) => entity.id)) + 1;
+      ended = false;
+      objectiveVictory = false;
+      if (restoredFog) {
+        for (const rawOwner of Object.keys(restoredFog)) {
+          const owner = Number(rawOwner);
+          const entry = restoredFog[owner];
+          if (entry) {
+            fog[owner] = {
+              explored: new Set(entry.explored),
+              visible: new Set(entry.visible),
+            };
+          }
+        }
+      }
+      revealAdjacent([]);
+      emit();
+    },
+    spawnScripted: (unitId, owner, pos) => {
+      const source: EntityState = {
+        id: -1,
+        configId: "script",
+        owner,
+        x: pos.x,
+        y: pos.y,
+        z: pos.z,
+        dir: owner === PLAYER_OWNER ? 1 : 3,
+        ap: 0,
+        maxAp: 0,
+        mobility: 0,
+        hp: 1,
+        maxHp: 1,
+        aim: 0,
+        defense: 0,
+        weaponId: "",
+        obstacle: false,
+        vision: 0,
+        dead: false,
+        flying: false,
+        coverType: 0,
+        overwatch: false,
+        defending: false,
+        movementSpent: 0,
+      };
+      const events: GameEvent[] = [];
+      const spawned = spawnAt(source, unitId, pos, "SUMMON", events);
+      if (spawned) {
+        spawned.countsForElimination = owner === ENEMY_OWNER;
+        spawned.ap = spawned.maxAp;
+        if (spawned.countsForElimination !== false && spawned.owner > 0) {
+          eliminationOwners.add(spawned.owner);
+          eliminationEnabled = eliminationOwners.size >= 2;
+        }
+        emit();
+      }
+      return spawned;
     },
     apply: (command) => {
       if (ended) return { ok: false, reason: "ILLEGAL" };
@@ -1336,7 +1433,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           // вычет, разрушающее оружие ближнего боя пробивает грань, как при одиночном ударе.
           for (const areaTarget of areaTargets(actor, skill, cellPos(actor))) {
             // Круговой взмах бьёт вокруг бойца; сам кастер не задевается,
-            // даже когда фильтр «all» допускает союзников (0.20.30).
+            // даже когда фильтр «all» допускает союзников (0.20.31).
             if (areaTarget.id === actor.id) continue;
             const breach = edgeBreach(actor, areaTarget, weapon);
             if (weapon.category === "melee" && edgeCoverOnLine(actor, areaTarget)?.coverType === 2 && !breach) continue;

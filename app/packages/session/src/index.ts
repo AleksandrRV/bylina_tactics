@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.30";
+export const APP_VERSION = "0.20.36";
 
 export type AppScreen =
   | "boot"
@@ -36,7 +36,7 @@ export type AppScreen =
 
 export type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training";
+export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue";
 
 /** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
 export type PvpSide = 1 | 2;
@@ -109,6 +109,8 @@ export interface SessionState {
   trainingDone?: string[];
   /** Показанные туториалы «первого раза» кампании (0.20.0): каждый показывается один раз. */
   campaignHintsDone?: string[];
+  /** Каркас маршрута пролога (0.20.31). UI не подключён до Этапа 3. */
+  prologueMissionId?: string | null;
   /** Победитель завершённой партии (для сохранения повтора). */
   replayWinner?: 1 | 2 | null;
   /** Черновик журнала текущего боя (команды, seed, составы). */
@@ -261,6 +263,17 @@ export interface SessionApi {
   isCampaignHintShown(hintId: string): boolean;
   /** Отметить туториал кампании показанным — повторно не появляется (0.20.0). */
   markCampaignHintShown(hintId: string): void;
+  /**
+   * Каркас старта миссии пролога (0.20.31). При `enabled: false` — no-op
+   * (поведение идентично 0.20.30). Экраны пролога — Этап 2–3.
+   */
+  startPrologue(missionId: string, enabled: boolean): boolean;
+  /** Следующая миссия пролога либо карта кампании. */
+  advancePrologue(nextMissionId: string | null): boolean;
+  /** Снимок чекпоинта боя (не пишется в журнал повтора). */
+  saveBattleCheckpoint(): boolean;
+  restoreBattleCheckpoint(): boolean;
+  hasBattleCheckpoint(): boolean;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -290,6 +303,7 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" |
   replayJournal: null,
   replayDraft: null,
   trainingMissionId: null,
+  prologueMissionId: null,
 };
 
 /**
@@ -319,6 +333,7 @@ export function createSession(
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
   let state: SessionState = { screen: initial, trainingDone: [], campaignHintsDone: [], ...idle, ...(restored ?? {}) };
+  let battleCheckpoint: { match: MatchState; fog: FogState } | null = null;
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -509,6 +524,9 @@ export function createSession(
     },
     bindCampaign: (automaton) => {
       campaign = automaton;
+      if (state.battleKind === "prologue" && campaign.getState().chapter !== "prologue") {
+        campaign.setChapter("prologue");
+      }
     },
     openCampaign: () => {
       emit({ ...idle, screen: "campaign" });
@@ -580,6 +598,23 @@ export function createSession(
       emit({ ...state, suspendedCampaign: null });
     },
     suspendCampaignBattle: () => {
+      if (state.battleKind === "prologue" && state.prologueMissionId) {
+        const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
+        const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
+        emit({
+          screen: "menu",
+          ...idle,
+          prologueMissionId: state.prologueMissionId,
+          suspendedCampaign: {
+            activeMissionId: state.prologueMissionId,
+            deployment: [],
+            matchSeed: state.matchSeed,
+            restoredMatch: snapshot ?? state.restoredMatch,
+            restoredFog: fog ?? state.restoredFog,
+          },
+        });
+        return;
+      }
       if (state.battleKind !== "campaign" || state.activeMissionId === null) {
         // Не бой кампании — обычный выход в меню; слот приостановленной
         // миссии (если был) сохраняется — emit не стирает его.
@@ -605,6 +640,19 @@ export function createSession(
     },
     resumeCampaign: () => {
       const slot = state.suspendedCampaign ?? null;
+      if (slot && slot.activeMissionId.startsWith("prologue_")) {
+        emit({
+          ...idle,
+          screen: "battle",
+          battleKind: "prologue",
+          prologueMissionId: slot.activeMissionId,
+          matchSeed: slot.matchSeed,
+          restoredMatch: slot.restoredMatch,
+          restoredFog: slot.restoredFog,
+          suspendedCampaign: null,
+        });
+        return;
+      }
       const active = requireCampaign().getState().activeMissionId;
       // Слот действителен, только пока миссия начата в автомате кампании:
       // завершённая либо покинутая миссия боем/высадкой не считается.
@@ -983,6 +1031,62 @@ export function createSession(
       if (done.includes(hintId)) return;
       emit({ ...state, campaignHintsDone: [...done, hintId] });
     },
+    startPrologue: (missionId, enabled) => {
+      if (!enabled) return false;
+      if (campaign && campaign.getState().chapter !== "prologue") campaign.setChapter("prologue");
+      const SEED: Record<string, number> = {
+        prologue_brushwood: 701,
+        prologue_cry: 702,
+        prologue_glade: 703,
+        prologue_village: 704,
+      };
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "prologue",
+        prologueMissionId: missionId,
+        matchSeed: SEED[missionId] ?? 701,
+        suspendedCampaign: null,
+      });
+      return true;
+    },
+    advancePrologue: (nextMissionId) => {
+      if (!nextMissionId) {
+        campaign?.openSandboxFromPrologue();
+        emit({ ...idle, screen: "campaign", prologueMissionId: null });
+        return true;
+      }
+      const SEED: Record<string, number> = {
+        prologue_brushwood: 701,
+        prologue_cry: 702,
+        prologue_glade: 703,
+        prologue_village: 704,
+      };
+      emit({
+        ...idle,
+        screen: "battle",
+        battleKind: "prologue",
+        prologueMissionId: nextMissionId,
+        matchSeed: SEED[nextMissionId] ?? 701,
+        suspendedCampaign: null,
+      });
+      return true;
+    },
+    saveBattleCheckpoint: () => {
+      if (!tacticsHost) return false;
+      battleCheckpoint = {
+        match: tacticsHost.getSnapshot(),
+        fog: tacticsHost.getFog(),
+      };
+      return true;
+    },
+    restoreBattleCheckpoint: () => {
+      if (!tacticsHost || !battleCheckpoint) return false;
+      tacticsHost.restoreMatch(battleCheckpoint.match, battleCheckpoint.fog);
+      notifyBattle();
+      return true;
+    },
+    hasBattleCheckpoint: () => battleCheckpoint !== null,
     bindTacticsHost: (host) => {
       tacticsHost = host;
       // Сетевой ведущий: ядро создано (BattleScreen смонтирован) — ведомый

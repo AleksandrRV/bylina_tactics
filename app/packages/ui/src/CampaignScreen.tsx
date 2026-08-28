@@ -233,6 +233,7 @@ export function CampaignScreen() {
   const { session, content } = useServices();
   const campaign = session.getCampaign();
   const state = campaign.getState();
+  const sandboxOpen = state.chapter !== "prologue";
   const missions = campaign.getMissions();
   const items = campaign.getItems();
   const settings = useSettingsState();
@@ -420,8 +421,8 @@ export function CampaignScreen() {
             </p>
             <button
               type="button"
-              className={`scan-btn${canScan && lockedCount > 0 ? "" : " is-disabled"}`}
-              disabled={!canScan || lockedCount === 0}
+              className={`scan-btn${sandboxOpen && canScan && lockedCount > 0 ? "" : " is-disabled"}`}
+              disabled={!sandboxOpen || !canScan || lockedCount === 0}
               onClick={doScan}
               title={t("scan.cost", { gold: scanCost.gold, herbs: scanCost.herbs, artifacts: scanCost.artifacts })}
             >
@@ -916,7 +917,8 @@ export function CampaignScreen() {
         <button
           type="button"
           className={`campaign-tab${tab === "chamber" ? " is-active" : ""}`}
-          onClick={() => setTab("chamber")}
+          onClick={() => sandboxOpen && setTab("chamber")}
+          disabled={!sandboxOpen}
         >
           <ChamberIcon />
           {t("campaign.tabChamber")}

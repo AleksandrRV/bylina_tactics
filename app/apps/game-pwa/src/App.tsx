@@ -106,6 +106,8 @@ export function App() {
       items: content.data.items,
       initialState: campaignRestore !== "pending" && campaignRestore ? campaignRestore : undefined,
       classUnitIds,
+      prologueFinalMissionId: content.data.prologue.prologueFinalMissionId,
+      chapter: session.get().battleKind === "prologue" ? "prologue" : undefined,
     });
     // Привязка СИНХРОННО, до первого рендера экранов (исправление 0.20.2):
     // экраны кампании читают автомат в первом же рендере; мемо исполняется
@@ -153,6 +155,11 @@ export function App() {
   const startNewCampaign = (): void => {
     setCampaignRestore(null);
     session.clearSuspendedCampaign();
+    if (contentData?.prologue.enabled) {
+      const first = contentData.prologue.missions[0]?.id ?? "prologue_brushwood";
+      session.startPrologue(first, true);
+      return;
+    }
     session.openMode("campaign");
   };
 

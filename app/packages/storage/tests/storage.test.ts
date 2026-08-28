@@ -22,6 +22,7 @@ function sampleSave(): SaveData {
     version: "0.13.0",
     savedAt: 123,
     campaign: {
+      chapter: "open",
       darkness: 4,
       darknessMax: 20,
       phase: "active",

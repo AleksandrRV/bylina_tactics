@@ -15,6 +15,11 @@ export interface AttackOptions {
   damageReduction?: number;
   /** Area skills with filter all/allies may intentionally hit the source side. */
   allowFriendly?: boolean;
+  /**
+   * Скриптовый исход (пролог, §13.2): попадание или промах без броска
+   * попадания. Урон при «hit» бросается честно; крит не форсируется.
+   */
+  forceOutcome?: "hit" | "miss";
 }
 
 export interface HitBreakdown {
@@ -176,6 +181,18 @@ export function resolveAttack(
   if (!preview.available || preview.chance === undefined) return null;
 
   const critChance = Math.max(0, Math.min(100, Math.round(weapon.crit + (preview.flanked ? 40 : 0))));
+  const flanked = preview.flanked ?? false;
+  const heightMod = preview.heightMod ?? 0;
+  const cover = preview.cover ?? 0;
+  const actionType = preview.actionType ?? "RANGED";
+  if (options.forceOutcome === "miss") {
+    return { result: "MISS", damage: 0, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
+  }
+  if (options.forceOutcome === "hit") {
+    const base = rng.nextInt(weapon.minDmg, weapon.maxDmg);
+    const damage = Math.max(0, base - (target.defending ? 2 : 0) - (options.damageReduction ?? 0));
+    return { result: "HIT", damage, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
+  }
   const hitRoll = rng.nextInt(1, 100);
   if (hitRoll > preview.chance) {
     return {
@@ -183,10 +200,10 @@ export function resolveAttack(
       damage: 0,
       chance: preview.chance,
       critChance,
-      flanked: preview.flanked ?? false,
-      heightMod: preview.heightMod ?? 0,
-      cover: preview.cover ?? 0,
-      actionType: preview.actionType ?? "RANGED",
+      flanked,
+      heightMod,
+      cover,
+      actionType,
     };
   }
   const critRoll = rng.nextInt(1, 100);

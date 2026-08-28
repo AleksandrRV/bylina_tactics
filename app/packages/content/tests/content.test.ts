@@ -401,3 +401,61 @@ describe("campaign onboarding chain (0.20.0)", () => {
     expect(Math.max(...generalIds)).toBe(missions.length - 1);
   });
 });
+
+describe("prologue content (0.20.31)", () => {
+  it("parses the four prologue files and keeps bestiary isolated", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.data.prologue.enabled).toBe(true);
+    expect(result.data.prologue.missions.map((mission: { id: string }) => mission.id)).toEqual([
+      "prologue_brushwood",
+      "prologue_cry",
+      "prologue_glade",
+      "prologue_village",
+    ]);
+    expect(result.data.prologue.prologueFinalMissionId).toBe("prologue_village");
+    expect(result.data.prologue.missions.map((mission: { fog: boolean }) => mission.fog)).toEqual([false, false, true, true]);
+    expect(result.data.prologue.missions.map((mission: { map: { biome?: string } }) => mission.map.biome)).toEqual([
+      "meadow", "swamp", "thicket", "meadow",
+    ]);
+    const prologueUnitIds = result.data.prologueBestiary.units.map((unit: { id: string }) => unit.id).sort();
+    expect(prologueUnitIds).toEqual(["fedot_stranded", "forest_rat", "mikula_peasant", "slug"]);
+    expect(result.data.units.some((unit) => unit.id === "forest_rat")).toBe(false);
+    expect(result.data.prologueBestiary.weapons.map((weapon: { id: string }) => weapon.id).sort()).toEqual(["club", "spit", "teeth"]);
+    const hintKeys = result.data.prologueHints.hints.map((hint: { key: string }) => hint.key);
+    expect(hintKeys).toContain("m1.endTurn");
+    expect(hintKeys).toContain("m4.source");
+    expect(result.data.reinforcements.profiles?.m2_cry_wave?.mode).toBe("onKill");
+    expect(result.data.prologueBestiary.units.find((unit: { id: string }) => unit.id === "mikula_peasant")?.weapons).toEqual([]);
+    expect(result.data.prologue.missions[0]?.enemies).toEqual([]);
+  });
+
+  it("rejects an unknown unit referenced by a prologue mission", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
+    files[key] = files[key]!.replace(
+      'playerSlots: ["mikula_peasant"],',
+      'playerSlots: ["unknown_hero"],',
+    );
+    const result = parseContent(files);
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown player unit"))).toBe(true);
+  });
+
+  it("rejects a broken prologue mission record (strict schema)", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
+    files[key] = files[key]!.replace('titleKey: "prologue.m1.title",\n', "");
+    expect(parseContent(files).ok).toBe(false);
+  });
+
+  it("rejects a hint key that is missing from the hints catalog", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
+    files[key] = files[key]!.replace('hints: ["m1.endTurn"],', 'hints: ["m1.ghost"],');
+    const result = parseContent(files);
+    expect(result.ok).toBe(false);
+    expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown hint key"))).toBe(true);
+  });
+});
