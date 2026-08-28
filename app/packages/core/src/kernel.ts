@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.36";
+export const CORE_VERSION = "0.20.37";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -64,6 +64,13 @@ export interface TacticsKernel {
   restoreMatch(match: MatchState, restoredFog?: FogState): void;
   /** Появление подкрепления/скриптового союзника через публичный канал ядра. */
   spawnScripted(unitId: string, owner: number, pos: CellPos): EntityState | null;
+  /**
+   * События скриптовых появлений, накопленные с прошлого вызова (0.20.37).
+   * Появление происходит внутри `spawnScripted`, а не внутри `apply`, поэтому
+   * без этого канала `ENTITY_SPAWNED` не доходил бы до средства отображения:
+   * противник пролога возникал на поле без всякой анимации.
+   */
+  drainSpawnEvents(): GameEvent[];
   /**
    * Отладочная автопобеда (только для разработки и QA): мгновенно уничтожает
    * всех противников и фиксирует победу текущей стороны. Не изменяет баланс
@@ -172,17 +179,29 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   state.rngSeed ??= String((options.seed ?? seed) >>> 0);
   state.rngState = String(rng.getState());
   const listeners = new Set<() => void>();
-  const owners = [...new Set(state.entities.filter((entity) => entity.owner > 0).map((entity) => entity.owner))];
-  const fog: FogState = createFogState(state, owners);
+  /**
+   * Стороны, присутствующие на поле прямо сейчас. Множество пересчитывается
+   * на каждом обновлении, а не фиксируется при создании ядра: в прологе
+   * противник появляется скриптово уже после старта партии (крыса М1, волны
+   * М2), и у стороны, которой не было в начальном снимке, туман войны
+   * должен появиться в момент выхода на поле. Иначе `visibleTo` для неё
+   * ложен всегда: алгоритм не видит противника, не может атаковать и не
+   * учитывает занятые клетки при построении пути.
+   */
+  // Накопитель событий скриптовых появлений (0.20.37): забирается вызовом
+  // drainSpawnEvents и проигрывается средством отображения.
+  let pendingSpawnEvents: GameEvent[] = [];
+  const activeOwners = (): number[] =>
+    [...new Set(state.entities.filter((entity) => entity.owner > 0).map((entity) => entity.owner))].sort((a, b) => a - b);
+  const fog: FogState = createFogState(state, activeOwners());
   // Восстановление сохранённой партии: туман войны переносится из снимка.
   if (options.fog) {
     for (const rawOwner of Object.keys(options.fog)) {
       const owner = Number(rawOwner);
       const entry = options.fog[owner];
-      if (entry && fog[owner]) {
-        fog[owner].explored = entry.explored;
-        fog[owner].visible = entry.visible;
-      }
+      if (!entry) continue;
+      // Сторона могла появиться уже после создания ядра — запись создаётся.
+      fog[owner] = { explored: new Set(entry.explored), visible: new Set(entry.visible) };
     }
   }
   const fogDisabled = Boolean(options.fogDisabled);
@@ -190,7 +209,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const revealAllFog = (): void => {
     if (!fogDisabled) return;
     const keys = state.grid.tiles.map((tile) => `${tile.x},${tile.y}`);
-    for (const owner of owners) {
+    for (const owner of activeOwners()) {
+      const entry = fog[owner];
+      if (entry) {
+        for (const key of keys) entry.explored.add(key);
+        entry.visible = new Set(keys);
+        continue;
+      }
       fog[owner] = { explored: new Set(keys), visible: new Set(keys) };
     }
   };
@@ -216,7 +241,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const refresh = (): void => {
     state.rngState = String(rng.getState());
-    refreshFog(fog, state, owners);
+    refreshFog(fog, state, activeOwners());
     revealAllFog();
   };
   const emit = (): void => {
@@ -1200,9 +1225,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           eliminationOwners.add(spawned.owner);
           eliminationEnabled = eliminationOwners.size >= 2;
         }
+        // События появления отдаются наружу, а не гасятся внутри ядра.
+        pendingSpawnEvents = [...pendingSpawnEvents, ...events];
         emit();
       }
       return spawned;
+    },
+    drainSpawnEvents: () => {
+      const drained = pendingSpawnEvents;
+      pendingSpawnEvents = [];
+      return drained;
     },
     apply: (command) => {
       if (ended) return { ok: false, reason: "ILLEGAL" };

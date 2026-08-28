@@ -51,7 +51,20 @@ export interface PrologueRunState {
   firstWave: boolean;
   fedotJoined: boolean;
   vasilisaJoined: boolean;
+  /**
+   * М1: крыса вышла на поле (0.20.37). С этого момента миссия имеет
+   * контрольную точку — гибель Микулы откатывает сцену к появлению крысы,
+   * а не завершает миссию поражением (campaign.md §1.5, §13.8).
+   */
+  ratSpawned: boolean;
   pendingCommand: Command | null;
+  /**
+   * События скриптовых появлений, ещё не отданные средству отображения
+   * (0.20.37). Появление происходит внутри `afterPrologueApply`, а не внутри
+   * `apply`, поэтому события собираются здесь и проигрываются экраном боя
+   * отдельно — иначе противник возникает на поле без всякой анимации.
+   */
+  pendingEvents: GameEvent[];
 }
 
 export function createPrologueRunState(missionId: string): PrologueRunState {
@@ -77,7 +90,9 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
     firstWave: false,
     fedotJoined: false,
     vasilisaJoined: false,
+    ratSpawned: false,
     pendingCommand: null,
+    pendingEvents: [],
   };
 }
 
@@ -172,6 +187,14 @@ function stripPrologueSkills(entity: { configId: string; skillIds?: string[] }):
   entity.skillIds = (entity.skillIds ?? []).filter((id) => id !== "aimed_eye");
 }
 
+/**
+ * События появлений, накопленные за один вызов `afterPrologueApply`
+ * (0.20.37). Модульный накопитель, а не поле состояния: `spawnUnits`
+ * вызывается из нескольких ветвей сценария, и все они работают в рамках
+ * одного применения команды.
+ */
+let spawnEvents: GameEvent[] = [];
+
 function spawnUnits(
   kernel: TacticsKernel,
   unitId: string,
@@ -182,6 +205,7 @@ function spawnUnits(
   for (const cell of cells) {
     const tile = tileAt(kernel.getSnapshot().grid, cell.x, cell.y);
     const spawned = kernel.spawnScripted(unitId, owner, { x: cell.x, y: cell.y, z: tile?.z ?? 1 });
+    spawnEvents = [...spawnEvents, ...kernel.drainSpawnEvents()];
     if (!spawned) continue;
     restorePatch(kernel, (match) => {
       const entity = match.entities.find((candidate) => candidate.id === spawned.id);
@@ -223,12 +247,17 @@ export function afterPrologueApply(
   state: PrologueRunState,
   ctx: PrologueRunContext,
 ): PrologueRunState {
+  spawnEvents = [];
   const next: PrologueRunState = {
     ...state,
     mission: { fired: [...state.mission.fired], flags: { ...state.mission.flags } },
     extracted: [...state.extracted],
+    // Накопитель: события появления живут в состоянии, пока экран боя их не
+    // заберёт и не очистит. Иначе второй подряд вызов сценария потерял бы
+    // выход крысы, поставленный первым.
+    pendingEvents: [...state.pendingEvents],
   };
-  if (next.outcome !== "ongoing") return next;
+  if (next.outcome !== "ongoing") return harvest(next);
 
   const match = kernel.getSnapshot();
   const triggers =
@@ -250,13 +279,19 @@ export function afterPrologueApply(
       next.pickupDone = true;
       armClubAndRemoveStick(kernel);
       next.objectiveKey = "prologue.objective.destroyAll";
-      if (ctx.ratMarker) spawnRats(kernel, [ctx.ratMarker], true);
+      if (ctx.ratMarker) {
+        spawnRats(kernel, [ctx.ratMarker], true);
+        next.ratSpawned = true;
+      }
       enqueue(next, ctx, "m1.endTurn");
     }
     const mikula = living(kernel.getSnapshot(), "mikula_peasant");
     if (!mikula) {
-      next.outcome = "defeat";
-      return next;
+      // Контрольная точка уже поставлена: провал — это повтор сцены, а не
+      // поражение (§1.5). Исход остаётся «ongoing» — иначе экран боя показал
+      // бы карточку поражения до отката.
+      next.outcome = next.ratSpawned ? "ongoing" : "defeat";
+      return harvest(next);
     }
     if (next.pickupDone && !kernel.getSnapshot().entities.some((entity) => entity.configId === "forest_rat" && !entity.dead)) {
       next.outcome = "victory";
@@ -365,7 +400,22 @@ export function afterPrologueApply(
     else if (!livingEnemies(after).length) next.outcome = "victory";
   }
 
-  return next;
+  return harvest(next);
+}
+
+/** Присоединить к состоянию события появлений, накопленные за вызов. */
+function harvest(state: PrologueRunState): PrologueRunState {
+  if (spawnEvents.length === 0) return state;
+  return { ...state, pendingEvents: [...state.pendingEvents, ...spawnEvents] };
+}
+
+/** Забрать накопленные события появлений и опустошить накопитель. */
+export function takePrologueSpawnEvents(state: PrologueRunState): {
+  events: GameEvent[];
+  state: PrologueRunState;
+} {
+  if (state.pendingEvents.length === 0) return { events: [], state };
+  return { events: state.pendingEvents, state: { ...state, pendingEvents: [] } };
 }
 
 function applyScriptDecision(
@@ -407,7 +457,7 @@ export function tickProloguePlayerTurn(
 }
 
 function checkpointArmed(state: PrologueRunState): boolean {
-  return state.fedotFreed || state.firstWave || state.vasilisaJoined;
+  return state.fedotFreed || state.firstWave || state.vasilisaJoined || state.ratSpawned;
 }
 
 export function shouldRestoreCheckpoint(state: PrologueRunState, events: readonly GameEvent[], match: MatchState): boolean {

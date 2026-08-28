@@ -403,6 +403,13 @@ export const trainingConfigSchema = z.object({
  */
 export const prologueLayoutSchema = z.object({
   rows: z.array(z.string()).min(1),
+  /**
+   * Ярусы рельефа по строкам (0.20.37): по одному символу на клетку ряда.
+   * `0`/`1`/`2` — ярус клетки, любой другой символ — ярус по умолчанию.
+   * Отдельный массив, а не цифры в `rows`: любой символ строки вне
+   * служебного набора `. P W E c` становится маркером.
+   */
+  heights: z.array(z.string()).optional(),
   legend: z.record(z.string(), z.unknown()).optional(),
 }).strict();
 
@@ -458,6 +465,85 @@ export const prologueCheckpointSchema = z.object({
   description: z.string().optional(),
 }).strict();
 
+/* ---------- катсцены миссии (0.20.37, doc/campaign.md §13.4) ----------
+ *
+ * Режиссура камеры описывается данными миссии, а не кодом экрана: один и тот
+ * же проигрыватель обслуживает вступление М1, выход крысы, Федота в трясине
+ * (М2), новую волну (М3) и посадку корабля (М6). Схема описывает только
+ * намерение; интерпретация — за пакетом отрисовки.
+ */
+
+/** Цель шага: клетка, сущность по записи бестиария или маркер раскладки. */
+const cutsceneTargetSchema = z
+  .object({
+    cell: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
+    configId: id.optional(),
+    marker: z.string().min(1).optional(),
+  })
+  .strict()
+  .refine(
+    (target) => Number(target.cell !== undefined) + Number(target.configId !== undefined) + Number(target.marker !== undefined) === 1,
+    "cutscene step target must name exactly one of: cell, configId, marker",
+  );
+
+export const cutsceneStepSchema = z
+  .object({
+    /**
+     * `focus` — навести камеру на цель (быстрый кадр), `pan` — плавный
+     * переход, `hold` — удержать текущее положение, `fade` — затемнение
+     * или проявление экрана.
+     */
+    kind: z.enum(["focus", "pan", "hold", "fade"]),
+    target: cutsceneTargetSchema.optional(),
+    /** Длительность перехода в мс. */
+    durationMs: z.number().int().min(0).max(5000).optional(),
+    /** Пауза на цели после перехода. */
+    holdMs: z.number().int().min(0).max(5000).optional(),
+    /** Направление затемнения: `out` — в темноту, `in` — из темноты. */
+    fade: z.enum(["out", "in"]).optional(),
+    /**
+     * Проиграть вбегание сущности из-за предела карты в её клетку.
+     * Применяется к шагам с целью-сущностью (крыса М1).
+     */
+    runInMs: z.number().int().min(0).max(3000).optional(),
+  })
+  .strict()
+  .refine((step) => step.kind !== "fade" || step.fade !== undefined, "fade step requires direction")
+  .refine((step) => step.kind === "hold" || step.kind === "fade" || step.target !== undefined, "step requires a target");
+
+export const cutsceneTriggerSchema = z
+  .object({
+    /** `missionStart` — при входе в миссию; `onSpawn` — выход сущности на поле;
+     *  `onFlag` — срабатывание флага сценария; `onPickup` — подбор предмета. */
+    kind: z.enum(["missionStart", "onSpawn", "onFlag", "onPickup"]),
+    configId: id.optional(),
+    flag: z.string().min(1).optional(),
+    itemId: id.optional(),
+  })
+  .strict()
+  .refine(
+    (trigger) =>
+      (trigger.kind === "onSpawn" && trigger.configId !== undefined) ||
+      (trigger.kind === "onFlag" && trigger.flag !== undefined) ||
+      (trigger.kind === "onPickup" && trigger.itemId !== undefined) ||
+      trigger.kind === "missionStart",
+    "trigger arguments must match its kind",
+  );
+
+export const cutsceneConfigSchema = z.object({
+  id: z.string().min(1),
+  trigger: cutsceneTriggerSchema,
+  steps: z.array(cutsceneStepSchema).min(1),
+  /** Блокировать ввод игрока на время сцены. */
+  lockInput: z.boolean().default(true),
+  /** Сцену можно пропустить кнопкой или клавишей (campaign.md §1.8). */
+  skippable: z.boolean().default(true),
+}).strict();
+
+export type CutsceneConfig = z.infer<typeof cutsceneConfigSchema>;
+export type CutsceneStep = z.infer<typeof cutsceneStepSchema>;
+export type CutsceneTrigger = z.infer<typeof cutsceneTriggerSchema>;
+
 export const prologueMissionConfigSchema = z.object({
   id,
   titleKey: z.string().min(1),
@@ -470,6 +556,8 @@ export const prologueMissionConfigSchema = z.object({
   enemies: z.array(z.object({ unitId: id, count: z.number().int().min(1) }).strict()),
   objective: prologueObjectiveSchema.optional(),
   script: prologueScriptSchema.optional(),
+  /** Режиссура камеры (0.20.37): воспроизводится экраном боя по триггерам. */
+  cutscenes: z.array(cutsceneConfigSchema).optional(),
   hints: z.array(z.string()),
   checkpoints: z.array(prologueCheckpointSchema).optional(),
   reinforcements: z.string().optional(),

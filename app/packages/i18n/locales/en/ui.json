@@ -118,8 +118,8 @@
       "NO_LOS": "The target is hidden behind an obstacle.",
       "OUT_OF_RANGE": "Out of range."
     },
-    "controlsTitle": "Controls"
-  },
+    "controlsTitle": "Controls",
+    "cutscene": {"skip": "Skip"}},
   "unit": {
     "bogatyr": {
       "name": "Bogatyr"
@@ -759,6 +759,6 @@
         "raise": "She raised the skeleton. Once for this fight. Kill it again.",
         "source": "They came from the barrow-field. The earth there has been swelling since last autumn."
       }
-    }
-  }
+    },
+    "scene": {"revive": "Steady yourself."}}
 }

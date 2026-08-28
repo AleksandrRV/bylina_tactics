@@ -431,6 +431,30 @@ describe("prologue content (0.20.31)", () => {
     expect(result.data.prologue.missions[0]?.enemies).toEqual([]);
   });
 
+  it("carries per-cell heights in the M1 layout (0.20.37)", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const layout = result.data.prologue.missions[0]?.map.layout;
+    expect(layout?.heights).toBeTruthy();
+    const heights = layout?.heights ?? [];
+    const rows = layout?.rows ?? [];
+    expect(heights).toHaveLength(rows.length);
+    for (const row of heights) expect(row).toHaveLength(rows[0]!.length);
+    // Три яруса: низина, луг, всхолмление.
+    const joined = heights.join("");
+    expect(joined).toMatch(/0/);
+    expect(joined).toMatch(/1/);
+    expect(joined).toMatch(/2/);
+  });
+
+  it("rejects an unknown layout field (strict layout schema)", () => {
+    const files = readDataTree();
+    const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
+    files[key] = files[key]!.replace('heights: [', 'relief: [');
+    expect(parseContent(files).ok).toBe(false);
+  });
+
   it("rejects an unknown unit referenced by a prologue mission", () => {
     const files = readDataTree();
     const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
