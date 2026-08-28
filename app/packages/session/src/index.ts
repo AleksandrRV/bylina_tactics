@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.37";
+export const APP_VERSION = "0.20.38";
 
 export type AppScreen =
   | "boot"
@@ -111,6 +111,16 @@ export interface SessionState {
   campaignHintsDone?: string[];
   /** Каркас маршрута пролога (0.20.31). UI не подключён до Этапа 3. */
   prologueMissionId?: string | null;
+  /**
+   * Счётчик запусков боя (0.20.38). Прирастает при КАЖДОМ переходе в
+   * сражение — в том числе когда бой начинается с уже смонтированным
+   * экраном боя (цепочка миссий пролога: итог М1 → М2, повтор миссии).
+   * Экран сражения держит ядро, счётчик хода, подсказку и карточку итога
+   * в собственном состоянии; без новой «эпохи» оболочка не перемонтирует
+   * его, и следующая миссия не начинается — игрок видит подряд итоги
+   * миссий, в которые не играл.
+   */
+  battleEpoch?: number;
   /** Победитель завершённой партии (для сохранения повтора). */
   replayWinner?: 1 | 2 | null;
   /** Черновик журнала текущего боя (команды, seed, составы). */
@@ -324,7 +334,7 @@ export interface CampaignContinuation {
 }
 
 /** Экран активного тактического боя: обычное сражение и сражение обучения. */
-function isBattleScreen(screen: string): boolean {
+export function isBattleScreen(screen: string): boolean {
   return screen === "battle" || screen === "trainingBattle";
 }
 
@@ -381,6 +391,19 @@ export function createSession(
         : state.suspendedCampaign ?? null,
     };
     for (const listener of listeners) listener(state);
+  };
+
+  /**
+   * Переход в сражение (0.20.38): единственный канал запуска боя. Помимо
+   * навигации он открывает новую «эпоху» экрана — счётчик, по которому
+   * оболочка перемонтирует экран боя. Ядро партии, счётчик хода, подсказка
+   * обучения и карточка миссии живут в состоянии компонента, поэтому вход
+   * в следующий бой с тем же экраном (цепочка миссий пролога, повтор
+   * миссии, «ещё раз») обязан дать компоненту новый ключ — иначе бой
+   * продолжается на поле предыдущей миссии.
+   */
+  const openBattle = (next: SessionState): void => {
+    emit({ ...next, battleEpoch: (state.battleEpoch ?? 0) + 1 });
   };
 
   /** Ведущий: снимок подключённого (0.15.0/0.16.0). Гость получает свою сторону
@@ -485,7 +508,7 @@ export function createSession(
       emit({ ...idle, screen: "difficulty" });
     },
     selectDifficulty: (id) => {
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "quick",
@@ -536,7 +559,8 @@ export function createSession(
       // BattleScreen не смонтируется — возвращаемся на карту корабля.
       const screen =
         entry.screen === "battle" && !entry.restoredMatch ? "campaign" : entry.screen;
-      emit({
+      const open = screen === "battle" ? openBattle : emit;
+      open({
         ...idle,
         screen,
         battleKind: screen === "battle" ? "campaign" : null,
@@ -577,7 +601,7 @@ export function createSession(
       // create duplicate entities despite passing the roster-size check.
       const unique = new Set(fighterIds).size === fighterIds.length;
       if (!unique || !alive || fighterIds.length < limits.min || fighterIds.length > limits.max) return false;
-      emit({ ...state, screen: "battle", deployment: [...fighterIds] });
+      openBattle({ ...state, screen: "battle", deployment: [...fighterIds] });
       return true;
     },
     finishCampaignMission: (outcome, participants, generalDeaths) => {
@@ -641,7 +665,7 @@ export function createSession(
     resumeCampaign: () => {
       const slot = state.suspendedCampaign ?? null;
       if (slot && slot.activeMissionId.startsWith("prologue_")) {
-        emit({
+        openBattle({
           ...idle,
           screen: "battle",
           battleKind: "prologue",
@@ -658,7 +682,7 @@ export function createSession(
       // завершённая либо покинутая миссия боем/высадкой не считается.
       if (slot && slot.activeMissionId === active) {
         if (slot.restoredMatch) {
-          emit({
+          openBattle({
             ...idle,
             screen: "battle",
             battleKind: "campaign",
@@ -746,7 +770,7 @@ export function createSession(
           });
         }
       });
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "pvp",
@@ -845,7 +869,7 @@ export function createSession(
           });
         }
       });
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "pvpNet",
@@ -869,7 +893,7 @@ export function createSession(
         reachable: new Map(),
         hit: new Map(),
       };
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "pvpNet",
@@ -953,7 +977,7 @@ export function createSession(
         reachable: new Map(),
         hit: new Map(),
       };
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "pvpNet",
@@ -994,7 +1018,7 @@ export function createSession(
       emit({ ...state, replayWinner: winner });
     },
     startReplay: (journal) => {
-      emit({ ...idle, screen: "battle", battleKind: "replay", replayJournal: journal });
+      openBattle({ ...idle, screen: "battle", battleKind: "replay", replayJournal: journal });
     },
     openTraining: () => {
       emit({ ...idle, screen: "training" });
@@ -1008,7 +1032,7 @@ export function createSession(
       // за укрытием, а игрок появляется на возвышении — текст подсказки про
       // укрытие и высоту соответствует полю (см. тесты обучения).
       const TRAINING_SEED = { movement: 101, combat: 46, skills: 303 } as const;
-      emit({
+      openBattle({
         ...idle,
         screen: "trainingBattle",
         battleKind: "training",
@@ -1040,7 +1064,7 @@ export function createSession(
         prologue_glade: 703,
         prologue_village: 704,
       };
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "prologue",
@@ -1062,7 +1086,7 @@ export function createSession(
         prologue_glade: 703,
         prologue_village: 704,
       };
-      emit({
+      openBattle({
         ...idle,
         screen: "battle",
         battleKind: "prologue",
