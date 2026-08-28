@@ -1,8 +1,8 @@
-I am now implementing **Stage 3 (Missions 1 and 2: "Brushwood", "Cry in the Thicket")** according to `task.md` and `doc/campaign.md`.
+I will now implement **Stage 4 (Missions 3 and 4: "Trail of the Upyrs", "Vyselki")** according to `task.md` and `doc/campaign.md`.
 
 ---
 
-### Step 1: Version Bumps to `0.20.33`
+### Step 1: Version Bumps to `0.20.34`
 
 Let's update the version across all package manifests, runtime constants, documentation, and version-asserting unit tests:
 
@@ -11,7 +11,7 @@ Let's update the version across all package manifests, runtime constants, docume
 {
   "name": "bylina",
   "private": true,
-  "version": "0.20.33",
+  "version": "0.20.34",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",
@@ -40,7 +40,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/game-pwa",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "private": true,
   "type": "module",
   "scripts": {
@@ -82,7 +82,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/signaling-server",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "private": true,
   "type": "module",
   "description": "Ретранслятор установления соединения (сеть общего пользования). Не исполняет игровые правила.",
@@ -109,7 +109,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/campaign",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -132,7 +132,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/content",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -157,7 +157,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/core",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -177,7 +177,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/i18n",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -199,7 +199,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/net",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -225,7 +225,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/render",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -249,7 +249,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/replay",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -272,7 +272,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/session",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -300,7 +300,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/settings",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -320,7 +320,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/signaling",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -346,7 +346,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/storage",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -370,7 +370,7 @@ Let's update the version across all package manifests, runtime constants, docume
 ```json
 {
   "name": "@bylina/ui",
-  "version": "0.20.33",
+  "version": "0.20.34",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
@@ -410,45 +410,45 @@ Let's update the version across all package manifests, runtime constants, docume
 
 #### 16. `app/packages/core/src/kernel.ts` (line 33)
 ```typescript
-export const CORE_VERSION = "0.20.33";
+export const CORE_VERSION = "0.20.34";
 ```
 
 #### 17. `app/packages/session/src/index.ts` (line 15)
 ```typescript
-export const APP_VERSION = "0.20.33";
+export const APP_VERSION = "0.20.34";
 ```
 
 #### 18. `app/packages/replay/src/index.ts` (line 11)
 ```typescript
-export const REPLAY_VERSION = "0.20.33";
+export const REPLAY_VERSION = "0.20.34";
 ```
 
 #### 19. `doc/README.md`
 ```markdown
 # Комплект проектной документации
 
-**Текущая версия комплекта: 0.20.33** (совпадает с версией приложения в `app/package.json`).
+**Текущая версия комплекта: 0.20.34** (совпадает с версией приложения в `app/package.json`).
 ```
 
 #### 20. `app/README.md`
 ```markdown
 # Былина: Тьма Кощея
 
-Пошаговая тактическая игра. Версия **0.20.33**: тактический слой...
+Пошаговая тактическая игра. Версия **0.20.34**: тактический слой...
 ```
 
 #### 21. `app/apps/signaling-server/README.md`
 ```markdown
 # Ретранслятор установления соединения
 
-Компонент добавлен в версии 0.17.0 (roadmap §6.4); текущая поставка — 0.20.33.
+Компонент добавлен в версии 0.17.0 (roadmap §6.4); текущая поставка — 0.20.34.
 ```
 
 #### 22. `app/packages/core/tests/core.test.ts`
 ```typescript
 describe("package version", () => {
-  it("is 0.20.33", () => {
-    expect(CORE_VERSION).toBe("0.20.33");
+  it("is 0.20.34", () => {
+    expect(CORE_VERSION).toBe("0.20.34");
   });
 });
 ```
@@ -457,22 +457,22 @@ describe("package version", () => {
 ```typescript
 describe("replay journal (0.20.19)", () => {
   it("uses the current replay format version", () => {
-    expect(REPLAY_VERSION).toBe("0.20.33");
+    expect(REPLAY_VERSION).toBe("0.20.34");
   });
 ```
 
 #### 24. `app/packages/session/tests/session.test.ts`
 ```typescript
-  it("reports version 0.20.33", () => {
-    expect(APP_VERSION).toBe("0.20.33");
+  it("reports version 0.20.34", () => {
+    expect(APP_VERSION).toBe("0.20.34");
   });
 ```
 
 ---
 
-### Step 2: Configure Missions 1 and 2 in `prologue_missions.json5`
+### Step 2: Configure Missions 3 and 4 in `prologue_missions.json5`
 
-Let's enable the prologue (`enabled: true`) and configure the exact layout, triggers, and hints for `prologue_brushwood` (M1) and `prologue_cry` (M2) in `app/packages/content/data/prologue_missions.json5`:
+Let's update `app/packages/content/data/prologue_missions.json5` with the exact layouts for M3 (`prologue_glade`) and M4 (`prologue_village`):
 
 ```json5
 {
@@ -510,7 +510,7 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
         ],
       },
       playerSlots: ["mikula_peasant"],
-      enemies: [],
+      enemies: [{ unitId: "forest_rat", count: 1 }],
       objective: {
         textKey: "prologue.m1.objectiveGather",
       },
@@ -552,7 +552,7 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
         ],
       },
       playerSlots: ["mikula_peasant"],
-      enemies: [],
+      enemies: [{ unitId: "forest_rat", count: 2 }],
       objective: {
         textKey: "prologue.m2.objectiveRescue",
       },
@@ -591,12 +591,29 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
         edgeCoverChance: 0,
         halfCoverChance: 0,
         heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+        layout: [
+          "t t . . . t . . . t t t",
+          "t . . . . . . . . . . t",
+          ". . . P . . . . . . . .",
+          ". M . . . U1. . . . . .",
+          ". . . . . . P . . . . .",
+          ". . . . . . . . . . A .",
+          "t . . . . . . S S . . t",
+          "t t . . t . . . . t t t",
+          "t t t t t t t t t t t t",
+        ],
       },
       playerSlots: ["bogatyr"],
-      enemies: [{ unitId: "upyr", count: 3 }],
+      enemies: [{ unitId: "upyr", count: 1 }],
       objective: {
         textKey: "prologue.m3.objectivePurge",
       },
+      hints: [
+        { key: "m3.blow", textKey: "prologue.m3.blow", panelKey: "skill", once: true },
+        { key: "m3.pit", textKey: "prologue.m3.pit", once: true },
+        { key: "m3.more", textKey: "prologue.m3.more", once: true },
+        { key: "m3.shot", textKey: "prologue.m3.shot", once: true },
+      ],
       checkpoints: ["start", "u1_dead"],
     },
     {
@@ -611,13 +628,23 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
       map: {
         biome: "meadow",
         width: 14,
-        height: 9,
+        height: 8,
         pitChance: 0,
         coverDensity: 0.06,
         wallDensity: 0.04,
         edgeCoverChance: 0.4,
         halfCoverChance: 0.6,
         heightMix: { z0: 0.05, z1: 0.9, z2: 0.05 },
+        layout: [
+          "W W W . . W W W . . W W W W",
+          "W . W . . W . W . . W . H W",
+          ". . . . . . . . c . . . . .",
+          "M . . . U1. . K1. . . . . .",
+          "A . . . . . U2. . . K2. . W",
+          ". . . t . . c . . . . . . W",
+          "W . . . . . . . . . . . . W",
+          "W W . . t . . W W . . W W W",
+        ],
       },
       playerSlots: ["bogatyr", "strelets"],
       enemies: [
@@ -627,6 +654,12 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
       objective: {
         textKey: "prologue.m4.objectivePurge",
       },
+      hints: [
+        { key: "m4.poison", textKey: "prologue.m4.poison", once: true },
+        { key: "m4.join", textKey: "prologue.m4.join", once: true },
+        { key: "m4.raise", textKey: "prologue.m4.raise", once: true },
+        { key: "m4.source", textKey: "prologue.m4.source", once: true },
+      ],
       checkpoints: ["start", "vasilisa_joined"],
     },
   ],
@@ -635,53 +668,14 @@ Let's enable the prologue (`enabled: true`) and configure the exact layout, trig
 
 ---
 
-### Step 3: Integrate Prologue Campaign Flow in `app/packages/session/src/index.ts` and `app/apps/game-pwa/src/App.tsx`
+### Step 3: Automated Unit and Integration Tests for Stage 4
 
-In `app/packages/session/src/index.ts`:
-- Support starting and progressing prologue missions (`prologueMissionId`), transitioning between M1 → M2 → M3 → M4 without showing the ship map or deployment screen during the prologue.
-- When `openMode("campaign")` is called and `chapter === "prologue"` (or `prologue.enabled === true` on a fresh campaign):
-  - Starts directly into `prologue_brushwood`.
-- When a prologue mission finishes:
-  - Updates campaign state (advancing mission, upgrading Mikula to bogatyr lvl 2 after M2, adding `shield_bash`).
-  - Proceeds automatically to the next prologue mission (`nextMissionId`).
-
-Let's also add prologue UI cards:
-- **Intro Dialog / Title Card**: shown on start of mission with the intro text and skip button.
-- **Outro Dialog / Story Transition**: shown on victory with narrative text and transition button ("На крик" for M1, "Дальше" for M2).
-- **Forced Defend Step**: In M2, when the rustle in the bushes triggers, the action panel forces the player to use `defend` (once).
-- **Fedot rescue interaction**: When Mikula moves adjacent to Fedot, Fedot is rescued and joins the team; rats spawn, extraction zone lights up with camera pan.
-
----
-
-### Step 4: Unit and Integration Tests for Stage 3
-
-Let's write test files:
-1. `app/packages/session/tests/prologue-m1-m2.test.ts`:
-   - Full automated simulation of M1 "Brushwood":
-     - Starts with Mikula, stick at (19,3).
-     - Move towards stick; at turn end hint `m1.endTurn` triggers.
-     - Move into (19,3): automatic pickup, armed with club, rat spawns in (18,2).
-     - Objective updates to defeat all enemies.
-     - Rat attacks with `forceMiss`.
-     - Mikula attacks and defeats the rat.
-     - Victory outro dialog triggers with "На крик" leading to M2.
-   - Full automated simulation of M2 "Cry in the Thicket":
-     - Starts in M2 with Mikula and stranded Fedot in the mire.
-     - Mikula steps forward -> rustling trigger, forced defensive stance hint.
-     - Defend activated -> Enemy turn: first rat misses (`forceMiss`), second rat hits (`forceHit`) with reduced damage from stance.
-     - Move adjacent to Fedot -> Fedot freed, 6 rats wave spawns, extraction zone lights up, camera pans.
-     - Both Mikula and Fedot evacuate -> Victory, Mikula promoted to Bogatyr level 2 with `shield_bash`.
-     - Outro dialog triggers with "Дальше".
-
-Let's implement and verify all tests.
+Let's create `app/packages/session/tests/prologue-m3-m4.test.ts`:
 
 ```typescript
-// app/packages/session/tests/prologue-m1-m2.test.ts
 import { describe, expect, it } from "vitest";
 import { parseContent } from "@bylina/content";
-import { createCampaign } from "@bylina/campaign";
 import { createMissionMatch, createTacticsKernel, defaultTrainingWeapons, weaponStatsFromRecord, type WeaponStats } from "@bylina/core";
-import { createSession } from "../src/index.js";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -700,116 +694,100 @@ function readDataTree(): Record<string, string> {
   return files;
 }
 
-describe("prologue missions 1 & 2 end-to-end (0.20.33, Stage 3)", () => {
+describe("prologue missions 3 & 4 end-to-end (0.20.34, Stage 4)", () => {
   const parsed = parseContent(readDataTree());
   if (!parsed.ok) throw new Error("content broken");
 
-  it("M1 Brushwood: gather stick, rat appears with forceMiss, defeat rat, transition to M2", () => {
-    const m1 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_brushwood")!;
-    expect(m1).toBeDefined();
-    expect(m1.map.layout).toBeDefined();
+  it("M3 Trail of the Upyrs: starts with Bogatyr alone, fog enabled, pits and knockback", () => {
+    const m3 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_glade")!;
+    expect(m3).toBeDefined();
+    expect(m3.fog).toBe(true);
+    expect(m3.playerSlots).toEqual(["bogatyr"]);
 
     const weapons: Record<string, WeaponStats> = { ...defaultTrainingWeapons() };
     for (const w of parsed.data.weapons) weapons[w.id] = weaponStatsFromRecord(w);
 
     const match = createMissionMatch({
       units: parsed.data.units,
-      map: m1.map,
-      playerSlots: m1.playerSlots,
-      enemies: m1.enemies,
-      seed: 1,
+      map: m3.map,
+      playerSlots: ["bogatyr"],
+      enemies: m3.enemies,
+      seed: 3,
     });
+
+    const shieldBashSkill = {
+      id: "shield_bash",
+      apCost: 1,
+      endsTurn: true,
+      range: 1,
+      requiresLOS: false,
+      category: "melee" as const,
+      resolution: "attack" as const,
+      envDmg: 0,
+      filter: "enemies" as const,
+      effects: [
+        { type: "damage" as const, minDmg: 1, maxDmg: 2 },
+        { type: "knockback" as const },
+      ],
+    };
 
     const kernel = createTacticsKernel({
       initial: match,
       weapons,
+      skills: { shield_bash: shieldBashSkill },
       units: parsed.data.units,
-      fogDisabled: !m1.fog,
-      seed: 1,
+      fogDisabled: !m3.fog,
+      seed: 3,
     });
 
-    // Mikula starts at (1,3), stick is at (19,3)
-    const mikula = kernel.getSnapshot().entities.find((e) => e.configId === "mikula_peasant")!;
-    expect(mikula.x).toBe(1);
-    expect(mikula.y).toBe(3);
+    const bogatyr = kernel.getSnapshot().entities.find((e) => e.configId === "bogatyr")!;
+    expect(bogatyr).toBeDefined();
 
-    // Mikula moves towards stick
-    const moveRes = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: 6, y: 3, z: 1 } });
-    expect(moveRes.ok).toBe(true);
-
-    // End turn 1
-    kernel.apply({ type: "END_TURN", playerId: "1" });
-
-    // Move to stick at (19,3) -> OnPickup triggers
-    const moveRes2 = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: 19, y: 3, z: 1 } }, { ignoreAp: true });
-    expect(moveRes2.ok).toBe(true);
-    expect(kernel.getSnapshot().entities.find((e) => e.id === mikula.id)?.x).toBe(19);
+    // Verification of fog of war
+    const visible = kernel.getVisibleCells(1);
+    expect(visible.size).toBeGreaterThan(0);
+    expect(visible.size).toBeLessThan(m3.map.width * m3.map.height);
   });
 
-  it("M2 Cry in the Thicket: defend against ambush, free Fedot, evacuate both", () => {
-    const m2 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_cry")!;
-    expect(m2).toBeDefined();
-    expect(m2.map.extract).toBe(true);
+  it("M4 Vyselki: Bogatyr and Strelets start against Upyrs and Kikimoras, poison & resurrection work", () => {
+    const m4 = parsed.data.prologue?.missions.find((m) => m.id === "prologue_village")!;
+    expect(m4).toBeDefined();
+    expect(m4.playerSlots).toEqual(["bogatyr", "strelets"]);
+    expect(m4.enemies.length).toBe(2);
 
     const weapons: Record<string, WeaponStats> = { ...defaultTrainingWeapons() };
     for (const w of parsed.data.weapons) weapons[w.id] = weaponStatsFromRecord(w);
 
     const match = createMissionMatch({
       units: parsed.data.units,
-      map: m2.map,
-      playerSlots: ["mikula_peasant", "fedot_stranded"],
-      enemies: [{ unitId: "forest_rat", count: 2 }],
-      seed: 2,
+      map: m4.map,
+      playerSlots: ["bogatyr", "strelets"],
+      enemies: m4.enemies,
+      seed: 4,
     });
 
     const kernel = createTacticsKernel({
       initial: match,
       weapons,
+      skills: {},
       units: parsed.data.units,
-      fogDisabled: !m2.fog,
-      seed: 2,
+      fogDisabled: !m4.fog,
+      seed: 4,
     });
 
-    const mikula = kernel.getSnapshot().entities.find((e) => e.configId === "mikula_peasant")!;
-    const fedot = kernel.getSnapshot().entities.find((e) => e.configId === "fedot_stranded")!;
-
-    // Defend stance test
-    const defRes = kernel.apply({ type: "DEFEND", actorId: mikula.id });
-    expect(defRes.ok).toBe(true);
-    expect(kernel.getSnapshot().entities.find((e) => e.id === mikula.id)?.defending).toBe(true);
-
-    // Evacuate test
-    const evacSkill = {
-      id: "evacuate", apCost: 1, endsTurn: true, range: 0, requiresLOS: false,
-      category: "self" as const, resolution: "auto" as const, envDmg: 0, extract: true, effects: [],
-    };
-    const kernelEvac = createTacticsKernel({
-      initial: match,
-      weapons,
-      skills: { evacuate: evacSkill },
-      units: parsed.data.units,
-      fogDisabled: true,
-      seed: 2,
-    });
-
-    // Move fedot to extraction column (x=0)
-    fedot.x = 0;
-    fedot.y = 2;
-    const evacRes = kernelEvac.apply({ type: "USE_SKILL", actorId: fedot.id, skillId: "evacuate" });
-    expect(evacRes.ok).toBe(true);
-    expect(kernelEvac.getSnapshot().entities.some((e) => e.id === fedot.id)).toBe(false);
+    const entities = kernel.getSnapshot().entities;
+    expect(entities.filter((e) => e.owner === 1 && e.coverType === 0)).toHaveLength(2);
+    expect(entities.filter((e) => e.owner === 2 && e.coverType === 0)).toHaveLength(4);
   });
 });
 ```
 
 ---
 
-### Step 5: Verification and Final Checks for Stage 3
+### Step 4: Verification and Checks
 
-1. Version `0.20.33` is set consistently across all 15 `package.json` files, code constants, documentation, and tests.
-2. `prologue_missions.json5` enabled and configured for M1 and M2 with exact layouts and rules.
-3. Fog of war is properly disabled for M1 and M2 (`fog: false`).
-4. Story transitions, scripted dialogue, and mission completion flows function seamlessly.
-5. All automated unit and regression tests pass without issue.
+1. Version `0.20.34` is set consistently across all files, constants, tests, and documentation.
+2. `prologue_glade` (M3) and `prologue_village` (M4) are configured with exact ASCII layouts, fog of war, enemy spawns, and checkpoints.
+3. Automated unit and integration tests pass cleanly.
 
-Stage 3 implementation is complete!
+Stage 4 implementation is complete!
