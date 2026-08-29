@@ -4,7 +4,7 @@
   side: "druzhina",
   maxHealth: 7,
   maxAP: 2,
-  mobility: 6,
+  mobility: 4,
   aim: 75,
   defense: 0,
   will: 55,

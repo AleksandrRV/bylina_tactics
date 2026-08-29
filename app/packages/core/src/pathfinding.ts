@@ -125,7 +125,9 @@ export function findPath(
     const recorded = bestG.get(key(current.x, current.y));
     if (recorded !== undefined && current.g > recorded) continue;
     if (current.x === toX && current.y === toY) {
-      return reconstruct(grid, came, walker, toX, toY, current.g);
+      // Итог пути округляется вверх (0.20.43): сумма стоимостей шагов,
+      // где диагональ стоит полтора очка.
+      return reconstruct(grid, came, walker, toX, toY, Math.ceil(current.g));
     }
 
     for (const [dx, dy] of NEIGHBORS) {
@@ -221,7 +223,9 @@ export function listReachable(
       const cost = edgeCost(grid, entities, walker, current.x, current.y, nx, ny);
       if (!Number.isFinite(cost)) continue;
       const g = current.g + cost;
-      if (g > maxMp) continue;
+      // Клетка доступна, если округлённая вверх цена пути влезает в бюджет
+      // (0.20.43): полтора очка за диагональ округляются до двух.
+      if (Math.ceil(g) > maxMp) continue;
       const id = key(nx, ny);
       const prev = best.get(id);
       if (prev !== undefined && g >= prev) continue;
@@ -239,12 +243,14 @@ export function listReachable(
   }
 
   const result: ReachableCell[] = [];
-  for (const [id, mp] of best) {
+  for (const [id, raw] of best) {
     const [xs, ys] = id.split(",");
     const x = Number(xs);
     const y = Number(ys);
     if (x === walker.x && y === walker.y) continue;
     if (!canFinish(grid, entities, walker, x, y)) continue;
+    // Цена клетки — округлённая вверх сумма шагов (0.20.43).
+    const mp = Math.ceil(raw);
     const ap = apCostFor(mp, walker.mobility);
     if (ap === null || ap > walker.ap) continue;
     const tile = tileAt(grid, x, y);

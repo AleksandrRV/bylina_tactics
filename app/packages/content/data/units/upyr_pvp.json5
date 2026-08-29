@@ -5,7 +5,7 @@
   side: "pvp",
   maxHealth: 9,
   maxAP: 2,
-  mobility: 5,
+  mobility: 3, // 0.20.43: упырь тяжелее дружины (норма 4)
   aim: 62,
   defense: 2,
   will: 25,

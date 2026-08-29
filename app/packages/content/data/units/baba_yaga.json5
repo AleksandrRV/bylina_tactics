@@ -10,7 +10,7 @@
   side: "nav",
   maxHealth: 24,
   maxAP: 2,
-  mobility: 6,
+  mobility: 4,
   aim: 80,
   defense: 5,
   will: 90,

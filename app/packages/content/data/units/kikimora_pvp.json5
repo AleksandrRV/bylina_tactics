@@ -5,7 +5,7 @@
   side: "pvp",
   maxHealth: 8,
   maxAP: 2,
-  mobility: 6,
+  mobility: 4,
   aim: 70,
   defense: 2,
   will: 30,

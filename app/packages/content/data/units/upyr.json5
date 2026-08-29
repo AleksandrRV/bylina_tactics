@@ -1,10 +1,12 @@
 {
+  // Подвижность 3 (0.20.43): упырь тяжелее дружины — норма 4, упырь ходит
+  // на одно очко движения меньше.
   id: "upyr",
   classId: "upyr",
   side: "nav",
   maxHealth: 8,
   maxAP: 2,
-  mobility: 5,
+  mobility: 3,
   aim: 60,
   defense: 0,
   will: 20,

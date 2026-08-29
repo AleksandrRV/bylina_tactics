@@ -104,14 +104,23 @@ function farthestCell(reachable: readonly ReachableCell[], apCost: 1 | 2): Reach
 }
 
 /**
- * Клетка укрытия шага «приблизьтесь»: соседняя с целью, предпочтительно
- * выше ярусом (преимущество высоты), детерминированный порядок при
- * равенстве. Соседних нет — ближайшая достижимая к цели.
+ * Клетка шага «приблизьтесь»: соседняя с целью, предпочтительно дешёвая —
+ * подход за 1 ОД оставляет бойцу удар в том же ходу (0.20.43: с новыми
+ * правилами движения рывок съедает весь ход, поэтому цена важнее высоты).
+ * Затем выше ярусом (преимущество высоты), затем детерминированный порядок.
+ * Соседних нет — ближайшая достижимая к цели.
  */
 function approachCell(reachable: readonly ReachableCell[], target: { x: number; y: number }): ReachableCell | null {
   const adjacent = reachable
     .filter((cell) => distH(cell.x, cell.y, target.x, target.y) === 1)
-    .sort((a, b) => (b.z ?? 0) - (a.z ?? 0) || a.y - b.y || a.x - b.x);
+    .sort(
+      (a, b) =>
+        a.apCost - b.apCost ||
+        a.mpCost - b.mpCost ||
+        (b.z ?? 0) - (a.z ?? 0) ||
+        a.y - b.y ||
+        a.x - b.x,
+    );
   if (adjacent.length > 0) return adjacent[0]!;
   return (
     [...reachable].sort((a, b) => {
