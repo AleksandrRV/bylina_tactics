@@ -10,6 +10,7 @@ import {
   pickEnemyCommand,
   pickCutscene,
   pickScriptedEnemyCommand,
+  withCutsceneDefaults,
   weaponStatsFromRecord,
   type CellPos,
   type Command,
@@ -49,8 +50,10 @@ import { unitPortrait } from "./portraits.js";
 import {
   buildCinematicPlan,
   splitSpawnEvents,
+  stagedEntityIds,
   type LayoutMarkers,
 } from "./prologue-cutscene.js";
+import { createOutcomeGate, type OutcomeGate } from "./outcome-gate.js";
 import { useBattleNetwork } from "./useBattleNetwork.js";
 import { useBattleInput } from "./useBattleInput.js";
 import { useReplayControls } from "./useReplayControls.js";
@@ -350,6 +353,16 @@ export function BattleScreenView() {
   const prologueRunRef = useRef<PrologueRunState | null>(
     isPrologue && prologueMission ? createPrologueRunState(prologueMission.id) : null,
   );
+  /**
+   * Итог боя показывается не сразу (0.20.39): сначала доигрывают анимации
+   * последнего действия, затем выдерживается пауза — игрок успевает увидеть
+   * числа урона, гибель и понять, что бой кончился. Гейт один на партию:
+   * новое сражение монтирует экран заново.
+   */
+  const outcomeGateRef = useRef<OutcomeGate | null>(null);
+  if (outcomeGateRef.current === null) outcomeGateRef.current = createOutcomeGate();
+  const outcomeGate = outcomeGateRef.current;
+  useEffect(() => () => outcomeGate.reset(), [outcomeGate]);
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
   const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
   const prologueTelemetryRef = useRef<TelemetryLog>(createTelemetryLog());
@@ -505,10 +518,11 @@ export function BattleScreenView() {
     const complete = missionHasEnemies ? outcome === "victory" : trainingDone;
     if (complete) {
       if (trainingMission) session.completeTrainingMission(trainingMission.id);
-      setTrainingOver("victory");
+      // Итог обучения — так же после анимаций и паузы (0.20.39).
+      outcomeGate.report(() => setTrainingOver("victory"));
       return;
     }
-    if (outcome === "defeat") setTrainingOver("defeat");
+    if (outcome === "defeat") outcomeGate.report(() => setTrainingOver("defeat"));
   }, [snapshot.turnNumber, snapshot.entities, busy, isTraining, trainingDone, trainingHints.length, hintStep, trainingOver, trainingMission]);
 
   // Ограничение действий в обучении (строгий сценарий, 0.20.13): игрок может
@@ -733,7 +747,7 @@ export function BattleScreenView() {
     if (isReplay || isTraining || isPrologue) return;
     if (battleKind === "pvp" || battleKind === "pvpNet") {
       const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
-      if (winner) session.finishPvpMatch(winner);
+      if (winner) outcomeGate.report(() => session.finishPvpMatch(winner));
       return;
     }
     const outcome = ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
@@ -767,16 +781,20 @@ export function BattleScreenView() {
         if (extracted) return { fighterId, survived: true, hp: extracted.hp };
         return { fighterId, survived: false, hp: 0 };
       });
-      session.finishCampaignMission(outcome, participants, generalDeaths);
+      outcomeGate.report(() => session.finishCampaignMission(outcome, participants, generalDeaths));
       return;
     }
-    session.finishMatch(outcome);
+    outcomeGate.report(() => session.finishMatch(outcome));
   };
 
   const playThen = (events: GameEvent[], after?: () => void): void => {
     setBusy(true);
+    // Пока события играют, итог не показывается (0.20.39): пауза
+    // отсчитывается от конца проигрывания, а не от момента команды.
+    outcomeGate.playbackStart();
     void (rendererRef.current?.play(events) ?? Promise.resolve()).finally(() => {
       setBusy(false);
+      outcomeGate.playbackEnd();
       finishFromEvents(events);
       after?.();
     });
@@ -789,7 +807,7 @@ export function BattleScreenView() {
     if (!prologueMission?.cutscenes || !kernel) return;
     const config = pickCutscene(prologueMission.cutscenes, event);
     if (!config) return;
-    const plan = buildCinematicPlan(config, prologueMarkers);
+    const plan = buildCinematicPlan(withCutsceneDefaults(config), prologueMarkers);
     setCutscenePlaying(true);
     setBusy(true);
     try {
@@ -807,6 +825,18 @@ export function BattleScreenView() {
   };
 
   /**
+   * Скрыть сущности, чьё появление ставит сцена (0.20.39). Ядро создаёт их
+   * сразу же — в тот же момент, когда срабатывает триггер, — а увидеть их
+   * нужно только вбегающими в кадр. Вызывается до проигрывания событий
+   * хода: иначе противник успевает показаться в клетке спавна.
+   */
+  const hideStagedSpawns = (events: readonly GameEvent[]): void => {
+    if (!prologueMission) return;
+    const ids = stagedEntityIds(events, prologueMission.cutscenes);
+    if (ids.length > 0) rendererRef.current?.setHiddenEntities?.(ids);
+  };
+
+  /**
    * Появления противника, накопленные внутри `afterPrologueApply`: событие
    * рождается ядром не в `apply`, поэтому без этого канала крыса возникала
    * бы на поле без всякой анимации. Появление, за которое отвечает сцена,
@@ -819,6 +849,8 @@ export function BattleScreenView() {
     for (const entry of staged) {
       await runPrologueCutscene(entry.event);
     }
+    // Сцена открыла своих героев: больше ничего не скрыто.
+    if (staged.length > 0) rendererRef.current?.setHiddenEntities?.([]);
   };
 
   /**
@@ -849,6 +881,8 @@ export function BattleScreenView() {
         await (renderer?.playCinematic?.({
           id: "checkpoint_focus",
           lockInput: false,
+          // Кадр возврата: приближение не нужно — сцена играет под затемнением.
+          zoom: 1,
           steps: [{ kind: "focus", target: { cell: { x: hero.x, y: hero.y } } }],
         }) ?? Promise.resolve());
       }
@@ -912,6 +946,8 @@ export function BattleScreenView() {
     }
     announce(result.events);
     let prologueAfter: (() => void) | null = null;
+    // Итог миссии: показывается после анимаций и паузы (0.20.39).
+    let prologueFinished = false;
     if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
       const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
       const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
@@ -929,12 +965,18 @@ export function BattleScreenView() {
         } else {
           // Контрольной точки нет — честное поражение, а не «живой» труп на поле.
           prologueRunRef.current = { ...next, outcome: "defeat" };
-          setPrologueCard("outro");
+          prologueFinished = true;
         }
       } else {
         const taken = takePrologueSpawnEvents(next);
         prologueRunRef.current = taken.state;
-        if (taken.events.length > 0) prologueAfter = () => void runPrologueSpawnBeats(taken.events);
+        if (taken.events.length > 0) {
+          // Сущность уже создана ядром, но на поле её не показываем до
+          // вбегания по сцене (0.20.39): иначе она возникает в клетке,
+          // пропадает и выбегает заново.
+          hideStagedSpawns(taken.events);
+          prologueAfter = () => void runPrologueSpawnBeats(taken.events);
+        }
       }
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
       if (hint && hint !== prologueHintKey) {
@@ -942,7 +984,7 @@ export function BattleScreenView() {
       }
       setPrologueHintKey(hint);
       setPrologueObjectiveKey(next.objectiveKey);
-      if (next.outcome !== "ongoing") setPrologueCard("outro");
+      if (next.outcome !== "ongoing") prologueFinished = true;
     }
     // Подсказка обучения продвигается событиями действия самого игрока (0.19.1);
     // реактивные плашки (яд, воскрешение, призыв) показываются любыми событиями (0.20.1).
@@ -953,6 +995,9 @@ export function BattleScreenView() {
     setSkillTargetPos(null);
     setPreview(null);
     playThen(result.events, prologueAfter ?? undefined);
+    // После playThen: проигрывание уже началось, и гейт выдержит паузу
+    // от его конца, а не от момента команды.
+    if (prologueFinished) outcomeGate.report(() => setPrologueCard("outro"));
   };
 
   const tryMove = (to: CellPos): void => {
@@ -1066,6 +1111,8 @@ export function BattleScreenView() {
     // Отложенные постановочные действия: откат к контрольной точке или выход
     // противника — исполняются после проигрывания событий хода.
     let enemyAfter: (() => void) | null = null;
+    // Весь ход Нави — проигрывание: итог показывается после него (0.20.39).
+    outcomeGate.playbackStart();
     try {
       // В обучении без противника («Первые шаги») ход Нави отсутствует:
       // завершаем его сразу, возвращая управление игроку. В миссиях с
@@ -1119,15 +1166,19 @@ export function BattleScreenView() {
               enemyAfter = () => void restorePrologueScene();
             } else {
               prologueRunRef.current = { ...next, outcome: "defeat" };
-              setPrologueCard("outro");
+              outcomeGate.report(() => setPrologueCard("outro"));
             }
           } else {
             const taken = takePrologueSpawnEvents(next);
             prologueRunRef.current = taken.state;
-            if (taken.events.length > 0) enemyAfter = () => void runPrologueSpawnBeats(taken.events);
+            if (taken.events.length > 0) {
+              // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
+              hideStagedSpawns(taken.events);
+              enemyAfter = () => void runPrologueSpawnBeats(taken.events);
+            }
           }
           setPrologueObjectiveKey(next.objectiveKey);
-          if (next.outcome !== "ongoing") setPrologueCard("outro");
+          if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
         }
         finishFromEvents(applied.events);
         if (!command) break;
@@ -1139,6 +1190,7 @@ export function BattleScreenView() {
       }
       if (enemyAfter) await enemyAfter();
     } finally {
+      outcomeGate.playbackEnd();
       setEnemyPhase(false);
     }
   };
@@ -1163,8 +1215,12 @@ export function BattleScreenView() {
       setPrologueHintKey(hint);
       const taken = takePrologueSpawnEvents(next);
       prologueRunRef.current = taken.state;
-      if (taken.events.length > 0) await runPrologueSpawnBeats(taken.events);
-      if (next.outcome !== "ongoing") setPrologueCard("outro");
+      if (taken.events.length > 0) {
+        // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
+        hideStagedSpawns(taken.events);
+        await runPrologueSpawnBeats(taken.events);
+      }
+      if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
     }
   };
 
@@ -1207,6 +1263,8 @@ export function BattleScreenView() {
     const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
     if (!result.ok) return;
     setBusy(true);
+    // Проигрывание хода: итог показывается после него и паузы (0.20.39).
+    outcomeGate.playbackStart();
     void (async () => {
       try {
         if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
@@ -1214,11 +1272,12 @@ export function BattleScreenView() {
           const next = afterPrologueApply(kernel, { type: "END_TURN", playerId: String(viewOwner) }, result.events, prologueRunRef.current, ctx);
           prologueRunRef.current = next;
           setPrologueObjectiveKey(next.objectiveKey);
-          if (next.outcome !== "ongoing") setPrologueCard("outro");
+          if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
         }
         advanceTraining(result.events);
         showTrainingNote(result.events);
         await (rendererRef.current?.play(result.events) ?? Promise.resolve());
+        outcomeGate.playbackEnd();
         finishFromEvents(result.events);
         if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
           await runEnemyPhase();
@@ -1226,6 +1285,7 @@ export function BattleScreenView() {
           await runProloguePlayerScript();
         }
       } finally {
+        outcomeGate.playbackEnd();
         setBusy(false);
       }
     })();

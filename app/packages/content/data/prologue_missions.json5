@@ -80,6 +80,9 @@
           trigger: { kind: "missionStart" },
           lockInput: true,
           skippable: true,
+          // Крупнее игрового кадра: при подгонке «поле целиком» камере
+          // некуда ехать. После сцены масштаб возвращается.
+          zoom: 1.9,
           steps: [
             // Акцент на герое: кто перед нами и где он стоит.
             { kind: "focus", target: { configId: "mikula_peasant" }, holdMs: 600 },

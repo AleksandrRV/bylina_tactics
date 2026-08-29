@@ -1,4 +1,10 @@
-export { CELL_SIZE, RENDER_STATUS, createFieldRenderer } from "./field-renderer.js";
+export {
+  CELL_SIZE,
+  CINEMATIC_ZOOM,
+  CINEMATIC_ZOOM_MS,
+  RENDER_STATUS,
+  createFieldRenderer,
+} from "./field-renderer.js";
 export type { CinematicPlan, CinematicStep, CinematicTarget, FieldRenderer, FieldView } from "./field-renderer.js";
 export {
   AIM_IMPOSSIBLE,

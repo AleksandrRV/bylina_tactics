@@ -132,6 +132,14 @@ export interface FieldRenderer {
   fadeScreen?(mode: "out" | "in", durationMs?: number): Promise<void>;
   /** Заблокировать жесты холста на время сцены. */
   setInputLocked?(locked: boolean): void;
+  /**
+   * Скрыть сущности до их появления сценой (0.20.39). Скриптованное
+   * появление происходит в ядре сразу, а на поле сущность должна возникнуть
+   * только когда сцена проиграет вбегание: иначе противник появляется
+   * в своей клетке, пропадает и выбегает заново. Список заменяет прежний;
+   * пустой список — больше ничего не скрыто.
+   */
+  setHiddenEntities?(ids: readonly number[]): void;
 }
 
 /* ---------- палитра и примитивы ---------- */
@@ -832,7 +840,24 @@ export interface CinematicPlan {
   lockInput?: boolean;
   /** Сцену можно пропустить (по умолчанию — да). */
   skippable?: boolean;
+  /**
+   * Приближение камеры на время сцены: множитель к игровому масштабу
+   * (0.20.39). При подгонке «поле целиком» проезд невозможен — камера
+   * упирается в границы поля, — поэтому масштаб сцены задаётся здесь:
+   * герой и цель читаются крупно, а между ними есть куда ехать.
+   * После сцены камера возвращается к игровому масштабу.
+   */
+  zoom?: number;
 }
+
+/**
+ * Приближение сцены по умолчанию (0.20.39): примерно вдвое крупнее
+ * подгонки поля — клетка занимает заметную долю кадра, но соседние
+ * клетки остаются в кадре и сцена не распадается на «крупный план».
+ */
+export const CINEMATIC_ZOOM = 1.9;
+/** Длительность приближения и обратного отъезда (мс). */
+export const CINEMATIC_ZOOM_MS = 420;
 
 export function createFieldRenderer(): FieldRenderer {
   const app = new Application();
@@ -2016,6 +2041,9 @@ export function createFieldRenderer(): FieldRenderer {
           if (!explored) continue;
         }
       }
+      // Сцена владеет появлением: пока вбегание не началось, сущности на
+      // поле нет — иначе она возникает в клетке и выбегает повторно (0.20.39).
+      if (hiddenIds.has(entity.id)) continue;
       const shown = display.get(entity.id);
       const dead = shown?.dead ?? entity.dead;
       if (dead && entity.coverType === 0 && !dying.has(entity.id)) {
@@ -2624,6 +2652,11 @@ export function createFieldRenderer(): FieldRenderer {
   let cinematicSkip = false;
   /** Идёт ли сцена прямо сейчас (для блокировки жестов и панели). */
   let cinematicPlaying = false;
+  /**
+   * Сущности, которых не должно быть видно до вбегания по сцене (0.20.39):
+   * ядро создаёт их сразу, а кадр обязан открыть их в момент анимации.
+   */
+  let hiddenIds = new Set<number>();
 
   const waitCinematic = (ms: number): Promise<void> => {
     if (cinematicSkip || reducedMotion || ms <= 0) return Promise.resolve();
@@ -2679,14 +2712,46 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   /**
+   * Приближение камеры (0.20.39): масштаб мира меняется так, что мировая
+   * точка `anchor` остаётся на месте на экране — герой не уезжает из кадра
+   * на въезде и не «прыгает» на обратном отъезде. При подгонке «поле
+   * целиком» проезд камеры невозможен (окно камеры не меньше поля), поэтому
+   * сцена начинается с приближения и заканчивается возвратом к игровому
+   * масштабу. Длительности уважают «уменьшить движение» и темп боя.
+   */
+  const zoomTo = async (scale: number, durationMs: number, anchor?: Point | null): Promise<void> => {
+    if (!mounted || destroyed) return;
+    const from = world.scale.x;
+    const to = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+    if (to === from) return;
+    const plane = mapPlane();
+    const ax = anchor?.x ?? plane.width / 2;
+    const ay = anchor?.y ?? plane.height / 2;
+    const screenX = world.x + ax * from;
+    const screenY = world.y + ay * from;
+    const apply = (s: number): void => {
+      world.scale.set(s);
+      world.x = screenX - ax * s;
+      world.y = screenY - ay * s;
+    };
+    await tweenCinematic(durationMs, (t) => apply(from + (to - from) * easeInOut(t)));
+    apply(to);
+    userMoved = true;
+  };
+
+  /**
    * Вбегание сущности в свою клетку из-за предела карты. Смещение задаётся
    * существующим механизмом выпада (`lunges`) — пиксельным сдвигом фишки,
    * который уже учитывается в `entityPixel` и стирается по окончании
    * проигрывания событий. Направление — от ближайшего края карты.
+   *
+   * Момент начала вбегания — и есть момент появления: скрытая сценой
+   * сущность открывается здесь, уже за пределами кадра (0.20.39).
    */
   const runInEntity = async (entityId: number, durationMs: number): Promise<void> => {
     const entity = entityById(entityId);
     if (!entity) return;
+    hiddenIds.delete(entityId);
     const gridWidth = view?.snapshot.grid.width ?? 0;
     const gridHeight = view?.snapshot.grid.height ?? 0;
     const toWest = entity.x;
@@ -2752,6 +2817,16 @@ export function createFieldRenderer(): FieldRenderer {
     return { point: null };
   };
 
+  /** Точка первого шага с целью: на ней камера стоит при приближении. */
+  const firstPointOf = (plan: CinematicPlan): Point | null => {
+    for (const step of plan.steps) {
+      if (!step || step.kind === "hold" || step.kind === "fade") continue;
+      const { point } = cinematicPoint(step.target);
+      if (point) return point;
+    }
+    return null;
+  };
+
   /** Точка последнего шага с целью: на неё камера встаёт при пропуске сцены. */
   const finalPointOf = (plan: CinematicPlan): Point | null => {
     for (let i = plan.steps.length - 1; i >= 0; i -= 1) {
@@ -2768,7 +2843,14 @@ export function createFieldRenderer(): FieldRenderer {
     cinematicSkip = false;
     cinematicPlaying = true;
     if (plan.lockInput !== false) inputLocked = true;
+    // Игровой масштаб и точка возврата: после сцены кадр отдаётся игроку
+    // таким же, каким был до неё (0.20.39).
+    const gameScale = world.scale.x;
+    const exit = finalPointOf(plan);
     try {
+      // Приближение: без него проезд невозможен — при подгонке «поле
+      // целиком» камера упирается в границы поля и стоит на месте.
+      await zoomTo(gameScale * (plan.zoom ?? CINEMATIC_ZOOM), CINEMATIC_ZOOM_MS, firstPointOf(plan));
       for (const step of plan.steps) {
         if (destroyed) break;
         if (cinematicSkip) break;
@@ -2794,9 +2876,11 @@ export function createFieldRenderer(): FieldRenderer {
       }
       if (cinematicSkip) {
         // Пропуск: камера сразу встаёт на финальную точку сцены.
-        const finish = finalPointOf(plan);
-        if (finish) await glideTo(finish, 0);
+        if (exit) await glideTo(exit, 0);
       }
+      // Обратный отъезд: игрок получает привычный игровой масштаб.
+      await zoomTo(gameScale, CINEMATIC_ZOOM_MS, exit);
+      if (exit) await glideTo(exit, 0);
       return cinematicSkip;
     } finally {
       cinematicPlaying = false;
@@ -2806,6 +2890,12 @@ export function createFieldRenderer(): FieldRenderer {
 
   const skipCinematic = (): void => {
     if (cinematicPlaying) cinematicSkip = true;
+  };
+
+  /** Скрыть сущности до вбегания по сцене (0.20.39). */
+  const setHiddenEntities = (ids: readonly number[]): void => {
+    hiddenIds = new Set(ids);
+    paint();
   };
 
   const playCombat = async (event: Extract<GameEvent, { type: "COMBAT_RESOLVED" }>): Promise<void> => {
@@ -3387,6 +3477,7 @@ export function createFieldRenderer(): FieldRenderer {
     setInputLocked(locked) {
       inputLocked = locked;
     },
+    setHiddenEntities,
     setOnActivate(handler) {
       onActivate = handler;
     },

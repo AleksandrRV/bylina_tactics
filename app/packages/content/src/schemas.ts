@@ -538,6 +538,13 @@ export const cutsceneConfigSchema = z.object({
   lockInput: z.boolean().default(true),
   /** Сцену можно пропустить кнопкой или клавишей (campaign.md §1.8). */
   skippable: z.boolean().default(true),
+  /**
+   * Приближение камеры на время сцены: множитель к игровому масштабу
+   * (0.20.39). При подгонке «поле целиком» проезд камеры невозможен,
+   * поэтому сцена начинается с приближения; после сцены масштаб
+   * возвращается. Значение задаёт автор сцены, разумный предел — 4.
+   */
+  zoom: z.number().min(1).max(4).optional(),
 }).strict();
 
 export type CutsceneConfig = z.infer<typeof cutsceneConfigSchema>;

@@ -54,6 +54,7 @@ export {
   cutsceneMatches,
   pickCutscene,
   withCutsceneDefaults,
+  DEFAULT_CUTSCENE_ZOOM,
   type CutsceneConfig,
   type CutsceneEvent,
   type CutsceneStep,
