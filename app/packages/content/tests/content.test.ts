@@ -483,3 +483,44 @@ describe("prologue content (0.20.31)", () => {
     expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown hint key"))).toBe(true);
   });
 });
+
+describe("movement allowance in shipped content (0.20.43)", () => {
+  it("keeps the base norm 4, упырь 3 and слизень 2", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const units = result.data.units as Array<{ id: string; mobility: number }>;
+    const bestiary = result.data.prologueBestiary.units as Array<{ id: string; mobility: number }>;
+    const mobilityOf = (list: Array<{ id: string; mobility: number }>, id: string): number | undefined =>
+      list.find((unit) => unit.id === id)?.mobility;
+
+    // Базовая норма: 4 очка движения за одно очко действия, рывок — 8 за два.
+    const norm = [
+      "bogatyr",
+      "strelets",
+      "znaharka",
+      "recruit",
+      "volkhv",
+      "kikimora",
+      "kikimora_pvp",
+      "leshy",
+      "leshy_pvp",
+      "baba_yaga",
+      "solovey",
+      "forest_beast",
+      "captive",
+      "illusion",
+    ];
+    for (const id of norm) expect(mobilityOf(units, id), id).toBe(4);
+    // Упырь тяжелее дружины — 3 очка движения за одно очко действия.
+    expect(mobilityOf(units, "upyr")).toBe(3);
+    expect(mobilityOf(units, "upyr_pvp")).toBe(3);
+    // Пролог: та же норма, слизень ползёт вдвое медленнее — 2 очка.
+    expect(mobilityOf(bestiary, "forest_rat")).toBe(4);
+    expect(mobilityOf(bestiary, "mikula_peasant")).toBe(4);
+    expect(mobilityOf(bestiary, "fedot_stranded")).toBe(4);
+    expect(mobilityOf(bestiary, "slug")).toBe(2);
+    // Идол — объект уничтожения, не ходит: норма на него не распространяется.
+    expect(mobilityOf(units, "idol")).toBe(1);
+  });
+});
