@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.42";
+export const CORE_VERSION = "0.20.43";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -1576,7 +1576,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if (triggerOverwatch(actor, events)) break;
       }
       updateAppleCarrier(actor, events);
-      actor.movementSpent = (actor.movementSpent ?? 0) + traversedMp;
+      // Очки движения списываются округлением вверх (0.20.43): перемещение
+      // из полутора очков стоит два, а не «полтора в долг».
+      actor.movementSpent = (actor.movementSpent ?? 0) + Math.ceil(traversedMp);
       appendOutcome(events);
       emit();
       return { ok: true, events };

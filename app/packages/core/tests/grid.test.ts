@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  apCostFor,
   canFinish,
   canTransit,
   createTacticsKernel,
@@ -7,10 +8,23 @@ import {
   edgeCost,
   facingAfterStep,
   findPath,
+  listReachable,
   makeGrid,
   tileAt,
   type EntityState,
 } from "../src/index.js";
+
+/** Восемь смещений соседних клеток — эталонный перебор в тестах. */
+const NEIGHBOR_STEPS: readonly (readonly [number, number])[] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+];
 
 function walker(partial: Partial<EntityState> = {}): EntityState {
   return {
@@ -88,12 +102,45 @@ describe("edges and occupancy", () => {
     expect(edgeCost(grid, [self], self, 0, 0, 1, 0)).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("forbids cutting a corner through a wall", () => {
+  it("allows a diagonal when only one of the two adjacent cells blocks it", () => {
+    // 0.20.43: диагональ закрыта, только если непроходимы оба плеча.
     const grid = makeGrid(3, 3, 1);
     const wall = tileAt(grid, 1, 0);
     if (wall) wall.blockLOS = true;
     const self = walker({ x: 0, y: 0 });
+    // Маршрут «вправо» закрыт стеной, маршрут «вверх, потом вправо» жив:
+    // min(Infinity, 1 + 1) / 2 + 0.5 = 1.5.
+    expect(edgeCost(grid, [self], self, 0, 0, 1, 1)).toBe(1.5);
+  });
+
+  it("forbids a diagonal when both adjacent cells block it", () => {
+    const grid = makeGrid(3, 3, 1);
+    const blockers: Array<[number, number]> = [
+      [1, 0],
+      [0, 1],
+    ];
+    for (const [x, y] of blockers) {
+      const wall = tileAt(grid, x, y);
+      if (wall) wall.blockLOS = true;
+    }
+    const self = walker({ x: 0, y: 0 });
     expect(edgeCost(grid, [self], self, 0, 0, 1, 1)).toBe(Number.POSITIVE_INFINITY);
+  });
+
+  it("prices a diagonal as half of the cheapest shoulder route plus a half point", () => {
+    const grid = makeGrid(3, 3, 1);
+    const self = walker({ x: 0, y: 0 });
+    // Ровное поле: (1 + 1) / 2 + 0.5 = 1.5.
+    expect(edgeCost(grid, [self], self, 0, 0, 1, 1)).toBe(1.5);
+
+    const hill = makeGrid(3, 3, 1);
+    const shoulder = tileAt(hill, 0, 1);
+    if (shoulder) shoulder.z = 2;
+    const wall = tileAt(hill, 1, 0);
+    if (wall) wall.blockLOS = true;
+    const climber = walker({ x: 0, y: 0 });
+    // Правое плечо — стена, верхнее — подъём: min(Infinity, 2 + 1) / 2 + 0.5 = 2.
+    expect(edgeCost(hill, [climber], climber, 0, 0, 1, 1)).toBe(2);
   });
 
   it("allows walking through an ally but not stopping on that cell", () => {
@@ -128,15 +175,77 @@ describe("path optimality", () => {
       else tile.z = Number(value);
     }));
     const self = walker({ x: 0, y: 0, z: 1, mobility: 20 });
+    // Эталон — полный перебор Дейкстрой на тех же рёбрах: A* с admissible-
+    // эвристикой обязан дать ту же сумму шагов, округлённую вверх (0.20.43).
+    const reference = (() => {
+      const costs = new Map<string, number>();
+      costs.set("0,0", 0);
+      const queue = [{ x: 0, y: 0, g: 0 }];
+      while (queue.length > 0) {
+        queue.sort((a, b) => a.g - b.g);
+        const current = queue.shift()!;
+        if (current.g > (costs.get(`${current.x},${current.y}`) ?? Infinity)) continue;
+        for (const step of NEIGHBOR_STEPS) {
+          const nx = current.x + step[0];
+          const ny = current.y + step[1];
+          const cost = edgeCost(grid, [self], self, current.x, current.y, nx, ny);
+          if (!Number.isFinite(cost)) continue;
+          const g = current.g + cost;
+          if (g >= (costs.get(`${nx},${ny}`) ?? Infinity)) continue;
+          costs.set(`${nx},${ny}`, g);
+          queue.push({ x: nx, y: ny, g });
+        }
+      }
+      return costs.get("7,7");
+    })();
+    expect(reference).toBeDefined();
     const path = findPath(grid, [self], self, 7, 7);
-    expect(path?.mpCost).toBe(9);
+    expect(path?.mpCost).toBe(Math.ceil(reference!));
+    // Диагональ дороже ортогонали, поэтому цена выросла против прежних 9.
+    expect(path?.mpCost).toBe(13);
+  });
+
+  it("rounds the sum of the steps up to a whole movement point", () => {
+    const grid = makeGrid(4, 4, 1);
+    const self = walker({ x: 0, y: 0, mobility: 20 });
+    // Одна диагональ: 1.5 -> 2 очка движения.
+    expect(findPath(grid, [self], self, 1, 1)?.mpCost).toBe(2);
+    // Диагональ и ортогональ: 1.5 + 1 = 2.5 -> 3.
+    expect(findPath(grid, [self], self, 2, 1)?.mpCost).toBe(3);
+    // Две диагонали: 1.5 + 1.5 = 3 -> 3.
+    expect(findPath(grid, [self], self, 2, 2)?.mpCost).toBe(3);
+  });
+});
+
+describe("movement allowance (0.20.43)", () => {
+  it("spends one action point for 4 MP and two for 5-8 MP", () => {
+    // Базовая норма: 4 очка движения за 1 ОД, рывок — 8 очков за 2 ОД.
+    expect(apCostFor(1, 4)).toBe(1);
+    expect(apCostFor(4, 4)).toBe(1);
+    expect(apCostFor(5, 4)).toBe(2);
+    expect(apCostFor(8, 4)).toBe(2);
+    expect(apCostFor(9, 4)).toBeNull();
+    // Упырь ходит на 3 очка, слизень — на 2.
+    expect(apCostFor(3, 3)).toBe(1);
+    expect(apCostFor(4, 3)).toBe(2);
+    expect(apCostFor(2, 2)).toBe(1);
+  });
+
+  it("does not sell a diagonal for a single movement point", () => {
+    // Диагональ стоит полтора очка и округляется до двух: при бюджете в
+    // одно очко клетка по диагонали недоступна.
+    const grid = makeGrid(3, 3, 1);
+    const self = walker({ x: 0, y: 0, mobility: 1, ap: 1 });
+    const reachable = listReachable(grid, [self], self);
+    expect(reachable.find((cell) => cell.x === 1 && cell.y === 1)).toBeUndefined();
+    expect(reachable.find((cell) => cell.x === 1 && cell.y === 0)?.mpCost).toBe(1);
   });
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.20.42 and does not touch the document object", () => {
+  it("reports 0.20.43 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.20.42");
+    expect(kernel.version).toBe("0.20.43");
     expect(typeof globalThis.document).toBe("undefined");
   });
 

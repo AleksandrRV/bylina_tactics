@@ -220,7 +220,7 @@ describe("clampCameraOffset (0.20.41)", () => {
   });
 });
 
-describe("fitScale (0.20.42)", () => {
+describe("fitScale (0.20.43)", () => {
   /**
    * Базовый кадр: по меньшей оси экрана помещается
    * {@link CAMERA_CELLS_IN_VIEW} клеток. Прежде поле подгонялось целиком

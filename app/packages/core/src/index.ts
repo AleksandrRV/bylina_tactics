@@ -96,7 +96,15 @@ export {
 export { createTelemetryLog, recordTelemetry, skipCutsceneRate } from "./telemetry.js";
 export type { TelemetryEvent, TelemetryLog } from "./telemetry.js";
 export { distH, facingAfterStep, inBounds, makeGrid, tileAt } from "./grid.js";
-export { canFinish, canTransit, edgeCost, edgeCoverBetween } from "./occupancy.js";
+export {
+  DIAGONAL_SURCHARGE,
+  canFinish,
+  canTransit,
+  diagonalEdgeCost,
+  edgeCost,
+  edgeCoverBetween,
+  orthogonalEdgeCost,
+} from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";
 export { effectiveCoverTier, evaluateObstacles, hasLineOfSight, supercover, terrainCoverTier, traceRay } from "./los.js";
 export type { IntersectionType, ObstacleResult, TracedCell } from "./los.js";

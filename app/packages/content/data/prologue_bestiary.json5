@@ -8,7 +8,7 @@
       side: "nav",
       maxHealth: 4,
       maxAP: 2,
-      mobility: 6,
+      mobility: 4,
       aim: 50,
       defense: 0,
       will: 10,
@@ -24,7 +24,7 @@
       side: "druzhina",
       maxHealth: 8,
       maxAP: 2,
-      mobility: 5,
+      mobility: 4,
       aim: 60,
       defense: 0,
       will: 10,
@@ -51,12 +51,13 @@
     },
     {
       // Слизень — задел на М5; в этой итерации миссии не используют.
+      // Подвижность 2 (0.20.43): слизни ползут вдвое медленнее дружины.
       id: "slug",
       classId: "slug",
       side: "nav",
       maxHealth: 5,
       maxAP: 2,
-      mobility: 1,
+      mobility: 2,
       aim: 90,
       defense: 0,
       will: 10,
