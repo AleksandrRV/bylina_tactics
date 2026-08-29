@@ -841,10 +841,18 @@ export function BattleScreenView() {
     const config = pickCutscene(prologueMission.cutscenes, event);
     if (!config) return;
     const { before, after } = splitAtHandOff(config);
+    // Игровой масштаб запоминаем до первой половины: она удерживает
+    // приближение (чтобы укус игрался крупным планом), и вторая половина
+    // обязана вернуться к игровому кадру, а не к удвоенному приближению.
+    const baseScale = rendererRef.current?.getCameraScale?.() ?? null;
     setCutscenePlaying(true);
     setBusy(true);
     try {
-      const skipped = await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers));
+      // Приближение держим до конца первой половины: укус крысы играется
+      // крупным планом, а не между двумя переездами камеры (0.20.41).
+      const skipped = await playCinematicPlan(
+        buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers, { holdZoom: after !== null }),
+      );
       if (skipped) {
         prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
           type: "skip_cutscene",
@@ -853,7 +861,7 @@ export function BattleScreenView() {
       }
       if (!after) return;
       await handOffTurnToEnemy();
-      await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(after), prologueMarkers));
+      await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(after), prologueMarkers, { baseScale }));
     } finally {
       setCutscenePlaying(false);
       setBusy(false);

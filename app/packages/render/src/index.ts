@@ -4,7 +4,6 @@ export {
   CINEMATIC_SCALE_MAX,
   CINEMATIC_ZOOM,
   CINEMATIC_ZOOM_MS,
-  FRINGE_CELLS,
   RUN_IN_CELLS,
   RENDER_STATUS,
   createFieldRenderer,
@@ -33,6 +32,7 @@ export {
   type FactionLook,
 } from "./palette.js";
 export { M1_ART, type TokenCtx } from "./token-art.js";
+export { FRINGE_CELLS, fringeDecor, fringeDepth, type FringeDecor, type FringeKind } from "./fringe.js";
 export {
   CINEMATIC_OVERSCROLL,
   TRAINING_COMFORT,

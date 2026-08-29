@@ -10,9 +10,11 @@ import {
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, TilingSprite, Texture, type FederatedPointerEvent } from "pixi.js";
+import { FRINGE_CELLS, fringeDecor } from "./fringe.js";
 import {
   CINEMATIC_OVERSCROLL,
   cinematicGlideOffset,
+  clampCameraOffset,
   needsTrainingFocus,
   trainingGlideOffset,
   TRAINING_COMFORT,
@@ -136,6 +138,12 @@ export interface FieldRenderer {
   skipCinematic?(): void;
   /** Идёт ли сцена прямо сейчас. */
   isCinematicPlaying?(): boolean;
+  /**
+   * Текущий масштаб камеры (0.20.41). Экран запоминает его перед первой
+   * половиной сцены, чтобы вторая половина вернулась к игровому кадру, а не
+   * к приближению, оставшемуся от первой.
+   */
+  getCameraScale?(): number;
   /** Затемнение (`out`) или проявление (`in`) экрана. */
   fadeScreen?(mode: "out" | "in", durationMs?: number): Promise<void>;
   /** Заблокировать жесты холста на время сцены. */
@@ -859,6 +867,21 @@ export interface CinematicPlan {
   /** Сцену можно пропустить (по умолчанию — да). */
   skippable?: boolean;
   /**
+   * Держать приближение до конца сцены (0.20.41): сцена — лишь половина
+   * кадра, вторую доигрывают события боя (передача хода шагом `handOff`).
+   * Отъезд делают следующие шаги, а не эта половина: укус крысы читается
+   * крупным планом, а не «отъехали — укусили — приехали».
+   */
+  holdZoom?: boolean;
+  /**
+   * Масштаб, к которому сцена возвращается (0.20.41). По умолчанию —
+   * масштаб на входе. Сцена-продолжение (вторая половина разрезанной
+   * `handOff` сцены) получает масштаб первой половины: иначе её `zoom`
+   * домножился бы на уже приближённый кадр, и вторая половина уехала бы
+   * в крупность, которой нет в данных.
+   */
+  baseScale?: number;
+  /**
    * Приближение камеры на время сцены: множитель к игровому масштабу
    * (0.20.39). При подгонке «поле целиком» проезд невозможен — камера
    * упирается в границы поля, — поэтому масштаб сцены задаётся здесь:
@@ -888,8 +911,6 @@ export const CINEMATIC_SCALE_MAX = 3.2;
  * в интерфейсе, — подсветка читается как «это цель».
  */
 export const CINEMATIC_ACCENT = 0xe0b34a;
-/** На сколько клеток окантовка рельефа выходит за кромку карты (0.20.40). */
-export const FRINGE_CELLS = 12;
 /**
  * Из какого расчёта сущность вбегает в клетку: клетки за кромкой карты
  * (0.20.40). Две клетки — ровно кромка поля: точка вбегания ложится на
@@ -1358,6 +1379,37 @@ export function createFieldRenderer(): FieldRenderer {
     fringeLayer
       .rect(-grow * 0.4, -grow * 0.4, width - grow * 1.2, height - grow * 1.2)
       .fill({ color: mix(ground, 0x05080a, 0.42) });
+    // Опушка (0.20.41): лес из которого выбегает противник, а не ровная
+    // заливка. Кроны темнее подложки, подсветка крон светлее — на любой
+    // из двух полос деталь читается. Порядок детерминирован, рисуется один
+    // раз на карту, слоем ниже рельефа: свесы за клетку перекрыты полем.
+    const canopy = mix(ground, 0x05080a, 0.8);
+    const leaf = mix(ground, 0x05080a, 0.56);
+    for (const item of fringeDecor(cols, rows, FRINGE_CELLS)) {
+      const { cx, cy } = centerOf(item.cellX, item.cellY, 0);
+      const x = cx + item.dx * CELL_SIZE;
+      const y = cy + item.dy * CELL_SIZE;
+      const r = item.size * CELL_SIZE;
+      if (item.kind === "canopy") {
+        fringeLayer.ellipse(x, y, r * 0.62, r * 0.5).fill({ color: canopy, alpha: item.alpha });
+        fringeLayer.ellipse(x - r * 0.14, y - r * 0.18, r * 0.4, r * 0.3).fill({ color: leaf, alpha: item.alpha * 0.7 });
+        // Ствол виден только у самой кромки: в глубине лес сливается в тень.
+        if (item.alpha > 0.45) {
+          fringeLayer.rect(x - r * 0.05, y + r * 0.24, r * 0.1, r * 0.52).fill({ color: canopy, alpha: item.alpha * 0.8 });
+        }
+      } else if (item.kind === "bush") {
+        fringeLayer.ellipse(x, y, r * 0.58, r * 0.44).fill({ color: canopy, alpha: item.alpha });
+        fringeLayer.ellipse(x + r * 0.24, y + r * 0.08, r * 0.34, r * 0.26).fill({ color: leaf, alpha: item.alpha * 0.8 });
+      } else {
+        // Трава: три штриха — кромка поля не кончается обрывом.
+        for (let i = -1; i <= 1; i += 1) {
+          fringeLayer
+            .moveTo(x + i * r * 0.24, y + r * 0.3)
+            .lineTo(x + i * r * 0.34, y - r * 0.36)
+            .stroke({ width: 1.6, color: leaf, alpha: item.alpha * 0.9 });
+        }
+      }
+    }
   };
 
   const paintStatic = (): void => {
@@ -2824,6 +2876,43 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   /**
+   * Допустимое положение камеры при текущем масштабе (0.20.41): без выхода
+   * за кромку поля. Поле вмещается в окно — оно выровнено по центру; не
+   * вмещается — окно прижато к полю ближайшим из допустимых положений.
+   */
+  const fittedOffset = (): Point => {
+    const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
+    return clampCameraOffset(
+      { x: world.x, y: world.y },
+      plane,
+      { width: app.renderer.width, height: app.renderer.height },
+      mapPlane(),
+    );
+  };
+
+  /**
+   * Вернуть кадр игроку (0.20.41). Сцена ставит камеру на цель, а не на
+   * поле целиком: если после отъезда оставить её как есть, край карты
+   * уезжает за кадр, а половину экрана занимает опушка. Поэтому последним
+   * движением сцена прижимает камеру к полю обычным правилом боя — плавно,
+   * чтобы возврат не читался скачком.
+   */
+  const settleCamera = async (): Promise<void> => {
+    if (!mounted || destroyed) return;
+    const fromX = world.x;
+    const fromY = world.y;
+    const to = fittedOffset();
+    userMoved = true;
+    await tweenCinematic(CINEMATIC_ZOOM_MS, (t) => {
+      const e = easeInOut(t);
+      world.x = fromX + (to.x - fromX) * e;
+      world.y = fromY + (to.y - fromY) * e;
+    });
+    world.x = to.x;
+    world.y = to.y;
+  };
+
+  /**
    * Мгновенно привести мировую точку в центр кадра (0.20.40). Тем же
    * правилом, что и проезд, пользуется трекинг вбегания: камера едет за
    * сущностью, не давая ей уйти к краю.
@@ -3001,8 +3090,9 @@ export function createFieldRenderer(): FieldRenderer {
     cinematicPlaying = true;
     if (plan.lockInput !== false) inputLocked = true;
     // Игровой масштаб и точка возврата: после сцены кадр отдаётся игроку
-    // таким же, каким был до неё (0.20.39).
-    const gameScale = world.scale.x;
+    // таким же, каким был до неё (0.20.39). Половина сцены, продолжающая
+    // предыдущую, берёт масштаб, с которого та начиналась (0.20.41).
+    const gameScale = plan.baseScale ?? world.scale.x;
     const exit = finalPointOf(plan);
     try {
       // Приближение: без него проезд невозможен — при подгонке «поле
@@ -3048,9 +3138,14 @@ export function createFieldRenderer(): FieldRenderer {
         // Пропуск: камера сразу встаёт на финальную точку сцены.
         if (exit) await glideTo(exit, 0);
       }
-      // Обратный отъезд: игрок получает привычный игровой масштаб.
-      await zoomTo(gameScale, CINEMATIC_ZOOM_MS, exit);
-      if (exit) await glideTo(exit, 0);
+      // Обратный отъезд: игрок получает привычный игровой масштаб. Половина
+      // сцены, за которой следуют события боя, приближение не отдаёт (0.20.41).
+      if (plan.holdZoom !== true) {
+        await zoomTo(gameScale, CINEMATIC_ZOOM_MS, exit);
+        if (exit) await glideTo(exit, 0);
+        // И последним движением — кадр, в котором видно поле целиком.
+        await settleCamera();
+      }
       return cinematicSkip;
     } finally {
       cinematicPlaying = false;
@@ -3645,6 +3740,7 @@ export function createFieldRenderer(): FieldRenderer {
     playCinematic,
     skipCinematic,
     isCinematicPlaying: () => cinematicPlaying,
+    getCameraScale: () => world.scale.x,
     fadeScreen,
     setInputLocked(locked) {
       inputLocked = locked;
