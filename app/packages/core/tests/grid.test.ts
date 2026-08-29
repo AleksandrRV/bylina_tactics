@@ -102,7 +102,7 @@ describe("edges and occupancy", () => {
     expect(edgeCost(grid, [self], self, 0, 0, 1, 0)).toBe(Number.POSITIVE_INFINITY);
   });
 
-  it("allows a diagonal when only one of the two adjacent cells blocks it", () => {
+  it("allows the up-right diagonal when only the right cell is blocked", () => {
     // 0.20.43: диагональ закрыта, только если непроходимы оба плеча.
     const grid = makeGrid(3, 3, 1);
     const wall = tileAt(grid, 1, 0);
@@ -113,7 +113,9 @@ describe("edges and occupancy", () => {
     expect(edgeCost(grid, [self], self, 0, 0, 1, 1)).toBe(1.5);
   });
 
-  it("forbids a diagonal when both adjacent cells block it", () => {
+  it("forbids the up-right diagonal when both up and right are blocked", () => {
+    // Пример из правил: «двигаться вверх-вправо нельзя, если движение вверх
+    // заблокировано и движение вправо заблокировано».
     const grid = makeGrid(3, 3, 1);
     const blockers: Array<[number, number]> = [
       [1, 0],
