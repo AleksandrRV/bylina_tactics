@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
+  CINEMATIC_OVERSCROLL,
   TRAINING_COMFORT,
+  cinematicGlideOffset,
   needsTrainingFocus,
   trainingGlideOffset,
   worldToScreen,
@@ -115,5 +117,61 @@ describe("trainingGlideOffset (0.20.14)", () => {
     // не показывает пустоту за полем), но цель полностью видна.
     expect(after.x).toBeGreaterThanOrEqual(screen.width * TRAINING_COMFORT.x0);
     expect(after.x).toBeLessThanOrEqual(screen.width * TRAINING_COMFORT.x1);
+  });
+});
+
+describe("cinematicGlideOffset (0.20.40)", () => {
+  /**
+   * Кадр сцены: цель обязана встать точно в центр кадра, даже если она у
+   * самой кромки карты. Прежде сцена пользовалась подводкой обучения:
+   * та держит цель чуть выше середины (под плашку наставника) и не выходит
+   * за кромку поля, поэтому объект у края карты оставался у края экрана.
+   */
+  const screen = { width: 1280, height: 800 };
+  // Крупный план: карта шире и выше экрана — обе оси можно вести.
+  const camera = plane(2.5, 0, 0);
+
+  it("puts the target exactly in the center of the frame", () => {
+    const point = { x: 300, y: 260 };
+    const target = cinematicGlideOffset(point, camera, screen, MAP);
+    const at = worldToScreen(point, { scale: camera.scale, offset: target });
+    expect(at.x).toBeCloseTo(screen.width / 2, 5);
+    expect(at.y).toBeCloseTo(screen.height / 2, 5);
+    // Подводка обучения держит цель выше середины — у сцены плашки нет.
+    const training = trainingGlideOffset(point, camera, screen, MAP);
+    expect(worldToScreen(point, { scale: camera.scale, offset: training }).y).toBeLessThan(screen.height / 2);
+  });
+
+  it("centers a target at the very edge of the map, leaving the field bounds", () => {
+    // Палка М1 стоит в последней колонке: без выхода за кромку поля
+    // привести её в центр невозможно — окно камеры шире расстояния
+    // от клетки до края карты.
+    const point = { x: 20, y: 260 };
+    const target = cinematicGlideOffset(point, camera, screen, MAP);
+    expect(worldToScreen(point, { scale: camera.scale, offset: target }).x).toBeCloseTo(screen.width / 2, 5);
+    // Подводка обучения здесь «не доезжает»: камера упирается в границу поля.
+    const training = trainingGlideOffset(point, camera, screen, MAP);
+    expect(worldToScreen(point, { scale: camera.scale, offset: training }).x).toBeLessThan(screen.width / 2);
+  });
+
+  it("keeps the overscroll within the allowed share of the screen", () => {
+    // Цель далеко за полем (точка вбегания крысы за кромкой карты):
+    // допустимый выход за кромку ограничен половиной экрана.
+    const point = { x: -400, y: 260 };
+    const target = cinematicGlideOffset(point, camera, screen, MAP);
+    expect(target.x).toBeCloseTo(screen.width * CINEMATIC_OVERSCROLL, 5);
+    // Явный допуск сужает выход за кромку (доля ширины холста).
+    const tight = cinematicGlideOffset(point, camera, screen, MAP, 0.05);
+    expect(tight.x).toBeCloseTo(screen.width * 0.05, 5);
+  });
+
+  it("centers the target on the axis where the map fits the screen", () => {
+    // Карта ниже экрана: ось центрируется, но цель всё равно в центре кадра,
+    // а не по центру поля.
+    const small = plane(1, 0, 0);
+    const point = { x: 100, y: MAP.height - 10 };
+    const target = cinematicGlideOffset(point, small, screen, MAP);
+    const at = worldToScreen(point, { scale: small.scale, offset: target });
+    expect(at.y).toBeCloseTo(screen.height / 2, 5);
   });
 });

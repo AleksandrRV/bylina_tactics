@@ -441,7 +441,9 @@ const M1_SCRIPT = {
       kind: "attack",
       targetUnitId: "mikula_peasant",
       weaponId: "teeth",
-      forceOutcome: "miss",
+      // Синхронно с prologue_missions.json5 (0.20.40): укус обязан
+      // состояться, но это минимальный урон зубов.
+      forceOutcome: "min",
       onlyIf: "targetAlive",
     },
     { kind: "endTurn" },
@@ -524,13 +526,14 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
     let overwatch = false;
 
     for (let round = 0; round < 6; round += 1) {
+      if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
       // Игрок ничего не делает — только завершает ход.
       if (kernel.getSnapshot().activeOwner === 1) {
         const ended = kernel.apply({ type: "END_TURN", playerId: "1" });
         if (ended.ok) run = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, ended.events, run, ctx);
       }
       let guard = 0;
-      while (kernel.getSnapshot().activeOwner === 2 && guard < 96) {
+      while (kernel.getSnapshot().activeOwner === 2 && matchOutcome(kernel.getSnapshot()) === "ongoing" && guard < 96) {
         guard += 1;
         const decision = pickScriptedCommand(kernel, M1_SCRIPT as never, run.script, { activeOwner: 2 });
         run = { ...run, script: decision.state };
@@ -545,7 +548,8 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
         }
         run = afterPrologueApply(kernel, command as never, applied.events, run, ctx);
         for (const event of applied.events) {
-          if (event.type === "COMBAT_RESOLVED") outcomes.push(event.result);
+          // Результат и урон: первый удар обязан быть минимальным (0.20.40).
+          if (event.type === "COMBAT_RESOLVED") outcomes.push(`${event.result}:${event.damageDealt}`);
         }
         if (!decision.command) break;
       }
@@ -554,10 +558,11 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
     // Крыса бьёт каждый ход: алгоритм не выдаёт ни одной отвергнутой команды.
     expect(rejections).toEqual([]);
     expect(overwatch).toBe(false);
-    expect(outcomes.length).toBeGreaterThanOrEqual(5);
-    // Первый скриптовый удар — гарантированный промах (campaign.md §7.1.6).
-    expect(outcomes[0]).toBe("MISS");
-    // Дальше честные кости: за 6 ходов Микула обязан получить урон.
+    expect(outcomes.length).toBeGreaterThanOrEqual(2);
+    // Первый скриптовый удар — минимальный урон зубов (0.20.40): укус
+    // состоялся, но учебный бой не калечит героя случайным максимумом.
+    expect(outcomes[0]).toBe("HIT:2");
+    // Дальше честные кости: за оставшиеся ходы Микула получает ещё урон.
     const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
     expect(mikula.hp).toBeLessThan(mikula.maxHp);
   });

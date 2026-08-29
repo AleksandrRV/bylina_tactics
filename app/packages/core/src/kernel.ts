@@ -1,4 +1,4 @@
-import { previewAttack, resolveAttack, type AttackOptions, type HitPreview } from "./combat.js";
+import { previewAttack, resolveAttack, type AttackOptions, type ForceOutcome, type HitPreview } from "./combat.js";
 import { isCoverCandidate, isCoverOnFireLine } from "./cover.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import type { SpawnUnitConfig } from "./defaults.js";
@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.39";
+export const CORE_VERSION = "0.20.40";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -59,7 +59,7 @@ export interface TacticsKernel {
    * Скриптовый исход следующей атаки/умения с разрешением попадания
    * (consume-once). После применения кости снова честные.
    */
-  setForcedOutcome(outcome: "hit" | "miss" | null): void;
+  setForcedOutcome(outcome: ForceOutcome | null): void;
   /** Откат к снимку чекпоинта без записи в журнал повтора. */
   restoreMatch(match: MatchState, restoredFog?: FogState): void;
   /** Появление подкрепления/скриптового союзника через публичный канал ядра. */
@@ -205,7 +205,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     }
   }
   const fogDisabled = Boolean(options.fogDisabled);
-  let forcedOutcome: "hit" | "miss" | null = null;
+  let forcedOutcome: ForceOutcome | null = null;
   const revealAllFog = (): void => {
     if (!fogDisabled) return;
     const keys = state.grid.tiles.map((tile) => `${tile.x},${tile.y}`);
@@ -1034,7 +1034,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return { available: true, targetPos: chosen, areaCells: previewAreaCells(chosen) };
   };
 
-  const consumeForce = (): "hit" | "miss" | undefined => {
+  const consumeForce = (): ForceOutcome | undefined => {
     if (!forcedOutcome) return undefined;
     const value = forcedOutcome;
     forcedOutcome = null;

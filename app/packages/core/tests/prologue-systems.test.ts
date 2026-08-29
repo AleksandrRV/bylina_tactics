@@ -72,6 +72,21 @@ describe("forceOutcome combat channel", () => {
     const honestB = resolveAttack(grid, [a, b], a, b, SWORD, createMulberry32(99));
     expect(honestA).toEqual(honestB);
   });
+
+  it("force min lands the smallest weapon damage and spends no roll (0.20.40)", () => {
+    const grid = makeGrid(8, 6, 1);
+    const a = fighter(1, 1, 1, 1);
+    const b = fighter(2, 2, 2, 1);
+    // Исход «min» — постановочный укус крысы М1: урон известен заранее.
+    const min = resolveAttack(grid, [a, b], a, b, SWORD, createMulberry32(11), { forceOutcome: "min" });
+    expect(min?.result).toBe("HIT");
+    expect(min?.damage).toBe(SWORD.minDmg);
+    // Бросок не делается: тот же генератор даёт тот же результат и на
+    // следующем честном броске — канал сцены не сдвигает последовательность.
+    const ranges = resolveAttack(grid, [a, b], a, b, SWORD, createMulberry32(11));
+    expect(ranges?.damage).toBeGreaterThanOrEqual(SWORD.minDmg);
+    expect(ranges?.damage).toBeLessThanOrEqual(SWORD.maxDmg + SWORD.critBonus);
+  });
 });
 
 describe("mission triggers", () => {

@@ -441,7 +441,13 @@ export const prologueScriptActionSchema = z.object({
   weaponId: id.optional(),
   skillId: id.optional(),
   corpseUnitId: id.optional(),
-  forceOutcome: z.enum(["hit", "miss"]).optional(),
+  /**
+   * Исход действия: `hit` — попадание со случайным уроном, `miss` — промах,
+   * `min` — попадание с минимальным уроном оружия (0.20.40). Последнее —
+   * для постановочного первого удара: крыса М1 обязана укусить, но не
+   * вправе искалечить героя случайным максимумом.
+   */
+  forceOutcome: z.enum(["hit", "miss", "min"]).optional(),
   at: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
   onlyIf: z.enum(["targetAlive", "targetNotPoisoned", "targetWounded", "corpseExists"]).optional(),
 }).strict();
@@ -491,9 +497,11 @@ export const cutsceneStepSchema = z
     /**
      * `focus` — навести камеру на цель (быстрый кадр), `pan` — плавный
      * переход, `hold` — удержать текущее положение, `fade` — затемнение
-     * или проявление экрана.
+     * или проявление экрана, `handOff` — передать ход сопернику прямо
+     * внутри сцены (0.20.40): его действия разыгрываются обычными
+     * событиями боя, а следующие шаги сцены идут уже после них.
      */
-    kind: z.enum(["focus", "pan", "hold", "fade"]),
+    kind: z.enum(["focus", "pan", "hold", "fade", "handOff"]),
     target: cutsceneTargetSchema.optional(),
     /** Длительность перехода в мс. */
     durationMs: z.number().int().min(0).max(5000).optional(),
@@ -506,10 +514,23 @@ export const cutsceneStepSchema = z
      * Применяется к шагам с целью-сущностью (крыса М1).
      */
     runInMs: z.number().int().min(0).max(3000).optional(),
+    /**
+     * Вести камеру за сущностью во время вбегания (0.20.40): кадр встаёт
+     * на точку у кромки карты, откуда сущность выбегает, и едет следом.
+     */
+    follow: z.boolean().optional(),
+    /**
+     * Подсветить цель шага пульсирующим янтарным кольцом (0.20.40):
+     * кадр называет предмет не только приближением, но и светом.
+     */
+    accent: z.boolean().optional(),
   })
   .strict()
   .refine((step) => step.kind !== "fade" || step.fade !== undefined, "fade step requires direction")
-  .refine((step) => step.kind === "hold" || step.kind === "fade" || step.target !== undefined, "step requires a target");
+  .refine(
+    (step) => step.kind === "hold" || step.kind === "fade" || step.kind === "handOff" || step.target !== undefined,
+    "step requires a target",
+  );
 
 export const cutsceneTriggerSchema = z
   .object({
@@ -566,6 +587,19 @@ export const prologueMissionConfigSchema = z.object({
   /** Режиссура камеры (0.20.37): воспроизводится экраном боя по триггерам. */
   cutscenes: z.array(cutsceneConfigSchema).optional(),
   hints: z.array(z.string()),
+  /**
+   * Подсветка кнопки действия (0.20.40): пока жив названный противник,
+   * кнопка оружия пульсирует янтарным — сцена не объясняет словами, что
+   * делать дальше. `whileAlive` — запись бестиария, `weaponId` — оружие,
+   * кнопку которого подсвечиваем.
+   */
+  actionAccent: z
+    .object({
+      weaponId: id,
+      whileAlive: id.optional(),
+    })
+    .strict()
+    .optional(),
   checkpoints: z.array(prologueCheckpointSchema).optional(),
   reinforcements: z.string().optional(),
   onboarding: z.array(z.string()),

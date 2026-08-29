@@ -23,7 +23,7 @@ export interface PrologueScriptAction {
   skillId?: string;
   corpseUnitId?: string;
   onlyIf?: TrainingEnemyCondition;
-  forceOutcome?: "hit" | "miss";
+  forceOutcome?: "hit" | "miss" | "min";
   at?: { x: number; y: number };
 }
 
@@ -39,7 +39,7 @@ export interface PrologueScriptState {
 export interface ScriptedDecision {
   command: Command | null;
   state: PrologueScriptState;
-  forceOutcome?: "hit" | "miss";
+  forceOutcome?: "hit" | "miss" | "min";
   spawn?: { unitId: string; at: { x: number; y: number }; owner: number };
 }
 
@@ -95,7 +95,7 @@ function approachStep(
   return best ? { type: "MOVE", actorId: actor.id, to: best } : null;
 }
 
-type ActionResolution = { command: Command | null; done: boolean; forceOutcome?: "hit" | "miss"; spawn?: ScriptedDecision["spawn"] };
+type ActionResolution = { command: Command | null; done: boolean; forceOutcome?: "hit" | "miss" | "min"; spawn?: ScriptedDecision["spawn"] };
 
 function resolveAction(kernel: TacticsKernel, action: PrologueScriptAction): ActionResolution {
   const snap = kernel.getSnapshot();

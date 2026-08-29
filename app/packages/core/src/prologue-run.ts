@@ -283,7 +283,9 @@ export function afterPrologueApply(
         spawnRats(kernel, [ctx.ratMarker], true);
         next.ratSpawned = true;
       }
-      enqueue(next, ctx, "m1.endTurn");
+      // Подсказку «закончи ход» больше не ставим (0.20.40): сцена выхода
+      // крысы сама передаёт ход Нави шагом `handOff`, и кнопка «Конец
+      // хода» игроку не нужна — укус приходит сразу за вбеганием.
     }
     const mikula = living(kernel.getSnapshot(), "mikula_peasant");
     if (!mikula) {
@@ -423,7 +425,7 @@ function applyScriptDecision(
   state: PrologueRunState,
   ctx: PrologueRunContext,
   owner: number,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
   const decision = pickScriptedCommand(kernel, ctx.script, state.script, { activeOwner: owner });
   const next = { ...state, script: decision.state };
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
@@ -437,7 +439,7 @@ export function tickPrologueEnemyTurn(
   kernel: TacticsKernel,
   state: PrologueRunState,
   ctx: PrologueRunContext,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
   let next = { ...state, reinforcements: { ...state.reinforcements } };
   if (ctx.missionId === "prologue_cry" && next.waveArmed && ctx.reinforcements) {
     const tick = tickReinforcements(kernel.getSnapshot(), ctx.reinforcements, next.reinforcements);
@@ -452,7 +454,7 @@ export function tickProloguePlayerTurn(
   kernel: TacticsKernel,
   state: PrologueRunState,
   ctx: PrologueRunContext,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
   return applyScriptDecision(kernel, state, ctx, PLAYER_OWNER);
 }
 

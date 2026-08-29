@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { CutsceneConfig, GameEvent } from "@bylina/core";
-import { buildCinematicPlan, spawnedConfigIds, splitSpawnEvents, stagedEntityIds } from "../src/prologue-cutscene.js";
+import {
+  buildCinematicPlan,
+  spawnedConfigIds,
+  splitAtHandOff,
+  splitSpawnEvents,
+  stagedEntityIds,
+} from "../src/prologue-cutscene.js";
 
 const MARKERS = {
   S: [{ x: 19, y: 3 }],
@@ -29,6 +35,23 @@ const RAT: CutsceneConfig = {
     { kind: "pan", target: { configId: "forest_rat" }, durationMs: 320 },
     { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 420, holdMs: 700 },
     { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 700 },
+  ],
+};
+
+/**
+ * Сцена с передачей хода (0.20.40): крыса кусает сразу после вбегания,
+ * поэтому между кадрами сцены разыгрывается чужой ход.
+ */
+const RAT_HANDOFF: CutsceneConfig = {
+  id: "m1_rat_appear",
+  trigger: { kind: "onSpawn", configId: "forest_rat" },
+  lockInput: true,
+  skippable: true,
+  zoom: 1.9,
+  steps: [
+    { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 620, follow: true, holdMs: 300 },
+    { kind: "handOff" },
+    { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 600 },
   ],
 };
 
@@ -80,6 +103,44 @@ describe("prologue cutscene plan (0.20.37)", () => {
     const events = [spawnEvent("forest_rat", 42), spawnEvent("upyr", 43)];
     expect(stagedEntityIds(events, [INTRO, RAT])).toEqual([42]);
     expect(stagedEntityIds(events, [INTRO])).toEqual([]);
+  });
+
+  it("carries the accent and the run-in tracking to the renderer (0.20.40)", () => {
+    const plan = buildCinematicPlan({ ...INTRO, steps: [{ kind: "pan", target: { marker: "S" }, accent: true }] }, MARKERS);
+    // Кадр называет палку не только приближением, но и светом.
+    expect(plan.steps[0]?.accent).toBe(true);
+    const rat = buildCinematicPlan(RAT_HANDOFF, MARKERS);
+    expect(rat.steps[0]?.follow).toBe(true);
+    expect(rat.steps[0]?.runInMs).toBe(620);
+  });
+
+  it("splits the scene at the hand-off step (0.20.40)", () => {
+    const { before, after } = splitAtHandOff(RAT_HANDOFF);
+    // До передачи хода: кадр на опушке и вбегание с трекингом.
+    expect(before.steps).toHaveLength(1);
+    expect(before.steps[0]?.kind).toBe("pan");
+    // После: камера возвращается к герою, когда чужой ход доигран.
+    expect(after, "the scene continues after the hand-off").not.toBeNull();
+    expect(after?.id).toBe("m1_rat_appear_after");
+    expect(after?.steps.map((step) => step.kind)).toEqual(["pan"]);
+    // Приближение наследуется обеими частями: кадр не меняет крупность.
+    expect(after?.zoom).toBe(1.9);
+    // Шаг передачи хода — граница сцены, а не кадр: проигрывателю поля он
+    // достаётся пустой паузой, кадром не становится.
+    const handOffPlan = buildCinematicPlan({ ...RAT_HANDOFF, steps: [{ kind: "handOff" }] }, MARKERS);
+    expect(handOffPlan.steps.map((step) => step.kind)).toEqual(["hold"]);
+  });
+
+  it("does not split a scene without a hand-off", () => {
+    const { before, after } = splitAtHandOff(RAT);
+    expect(after).toBeNull();
+    expect(before).toBe(RAT);
+  });
+
+  it("drops a trailing hand-off with nothing after it", () => {
+    const { before, after } = splitAtHandOff({ ...RAT_HANDOFF, steps: [{ kind: "handOff" }] });
+    expect(before.steps).toEqual([]);
+    expect(after).toBeNull();
   });
 
   it("splits spawns between the staged scene and the generic playback", () => {

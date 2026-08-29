@@ -6,6 +6,13 @@ import { clampChance, type Rng } from "./rng.js";
 import type { CellPos, EntityState, Grid } from "./types.js";
 import type { WeaponStats } from "./weapons.js";
 
+/**
+ * Исход атаки, заданный сценой миссии: `hit` — попадание со случайным
+ * уроном, `miss` — промах, `min` — попадание минимальным уроном оружия
+ * (0.20.40).
+ */
+export type ForceOutcome = "hit" | "miss" | "min";
+
 export interface AttackOptions {
   ignoreAp?: boolean;
   coverPenaltyOverride?: number;
@@ -19,7 +26,7 @@ export interface AttackOptions {
    * Скриптовый исход (пролог, §13.2): попадание или промах без броска
    * попадания. Урон при «hit» бросается честно; крит не форсируется.
    */
-  forceOutcome?: "hit" | "miss";
+  forceOutcome?: ForceOutcome;
 }
 
 export interface HitBreakdown {
@@ -187,6 +194,13 @@ export function resolveAttack(
   const actionType = preview.actionType ?? "RANGED";
   if (options.forceOutcome === "miss") {
     return { result: "MISS", damage: 0, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
+  }
+  if (options.forceOutcome === "min") {
+    // Постановочный удар (0.20.40): попадание строго минимальным уроном
+    // оружия — сцена обещает игроку укус, а не случайное увечье. Бросок
+    // не делается вовсе: исход и урон определены данными миссии.
+    const damage = Math.max(0, weapon.minDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0));
+    return { result: "HIT", damage, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
   }
   if (options.forceOutcome === "hit") {
     const base = rng.nextInt(weapon.minDmg, weapon.maxDmg);

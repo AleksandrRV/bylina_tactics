@@ -67,7 +67,11 @@
       script: {
         priority: [],
         actions: [
-          { unitId: "forest_rat", side: "enemy", kind: "attack", targetUnitId: "mikula_peasant", weaponId: "teeth", forceOutcome: "miss", onlyIf: "targetAlive" },
+          // Крыса кусает сразу после вбегания. Исход «min» — укус обязан
+          // состояться (сцена обещает опасность), но это минимальный урон
+          // зубов: учебный бой не вправе искалечить героя случайным
+          // максимумом (0.20.40).
+          { unitId: "forest_rat", side: "enemy", kind: "attack", targetUnitId: "mikula_peasant", weaponId: "teeth", forceOutcome: "min", onlyIf: "targetAlive" },
           { kind: "endTurn" },
         ],
       },
@@ -84,10 +88,13 @@
           // некуда ехать. После сцены масштаб возвращается.
           zoom: 1.9,
           steps: [
-            // Акцент на герое: кто перед нами и где он стоит.
-            { kind: "focus", target: { configId: "mikula_peasant" }, holdMs: 600 },
-            // Камера уходит к палке — цель названа изображением, без текста.
-            { kind: "pan", target: { marker: "S" }, durationMs: 1000, holdMs: 800 },
+            // Акцент на герое: кто перед нами и где он стоит. Первый шаг —
+            // проездом, а не мгновенным кадром: приближение уже держит героя
+            // в центре, подводка доводит кадр без скачка.
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 420, holdMs: 600 },
+            // Камера уходит к палке и подсвечивает её янтарным кольцом:
+            // цель названа изображением и светом, без текста (0.20.40).
+            { kind: "pan", target: { marker: "S" }, durationMs: 1000, holdMs: 800, accent: true },
             // Возврат к герою, после которого управление отдаётся игроку.
             { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 800 },
           ],
@@ -98,15 +105,23 @@
           lockInput: true,
           skippable: true,
           steps: [
-            // Камера успевает к опушке, пока крысы ещё нет в кадре.
-            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 320 },
-            // Крыса выбегает из-за предела карты.
-            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 420, holdMs: 700 },
-            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 700 },
+            // Камера встаёт на опушку — туда, откуда выбежит крыса, — и
+            // ведёт её до клетки: появление не телепортация, а пробег
+            // (0.20.40, follow).
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 620, follow: true, holdMs: 300 },
+            // Передача хода Нави: крыса кусает героя сразу, а не когда
+            // игрок догадается нажать «Конец хода». Удар разыгрывается
+            // обычными событиями боя — камера берёт его в кадр сама.
+            { kind: "handOff" },
+            // Возврат к герою — и начало хода игрока.
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 600 },
           ],
         },
       ],
       hints: ["m1.endTurn"],
+      // Пока крыса жива, кнопка дубины пульсирует янтарным: сцена
+      // показывает, что делать дальше, не объясняя словами (0.20.40).
+      actionAccent: { weaponId: "club", whileAlive: "forest_rat" },
       onboarding: [],
       checkpoints: [
         { id: "start", description: "Вход в миссию" },
