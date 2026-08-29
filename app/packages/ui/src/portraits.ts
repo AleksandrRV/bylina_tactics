@@ -12,8 +12,11 @@ const PORTRAIT_FILES: Record<string, string> = {
   idol: "idol.jpg",
   captive: "captive.jpg",
   mikula_peasant: "recruit.jpg",
-  fedot_stranded: "captive.jpg",
-  forest_rat: "upyr.jpg",
+  // Федот — крестьянин, а не княжна: тот же образ, что у рекрута (0.20.43).
+  fedot_stranded: "recruit.jpg",
+  // Крыса Нави получила собственный портрет: прежде в полосе противников
+  // вместо неё стоял упырь (0.20.43).
+  forest_rat: "forest_rat.jpg",
   slug: "kikimora.jpg",
   // Состязательные записи рядовых (0.16.0) используют образы исходных типов.
   upyr_pvp: "upyr.jpg",

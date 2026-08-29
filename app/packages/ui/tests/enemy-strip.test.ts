@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "../src/enemy-strip.js";
 
 /**
- * Полоса противников (0.20.43): снимок стороны отдаёт только видимых
+ * Полоса противников (0.20.42): снимок стороны отдаёт только видимых
  * (math §8.3), но игрок не должен терять счёт врагам, которые вышли из поля
  * зрения. Видимый ведёт камеру кликом, невидимый — приглушён и не кликается.
  */
@@ -11,7 +11,7 @@ function enemy(id: number, configId: string, dead = false): never {
   return { id, configId, dead } as never;
 }
 
-describe("enemy strip (0.20.43)", () => {
+describe("enemy strip (0.20.42)", () => {
   it("marks the enemies the host sees right now", () => {
     const known = [enemy(1, "forest_rat"), enemy(2, "forest_rat")];
     const remembered = rememberEnemies(known, new Map<number, RememberedEnemy>());

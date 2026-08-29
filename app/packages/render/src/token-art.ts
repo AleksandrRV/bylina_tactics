@@ -1,5 +1,5 @@
 /**
- * Иллюстрации фишек пролога (0.20.37): Микула-мужик, лесная крыса, палка.
+ * Иллюстрации фишек (0.20.37): Микула-мужик, лесная крыса, палка, рекрут.
  *
  * Вынесены из field-renderer.ts, потому что это самостоятельный слой: здесь
  * нет ни PixiJS-контейнеров, ни состояния поля — только примитивы Graphics и
@@ -182,9 +182,71 @@ function drawStick({ g, cx, cy, motionNow }: TokenCtx): void {
 }
 
 
+/** Раскладка рекрута (0.20.43): холстина, шапка, рогатина. */
+const RECRUIT_LOOK = {
+  shirt: 0x8e9a63,
+  shirtDark: 0x697345,
+  sash: 0x7a4a2a,
+  skin: 0xd9b183,
+  cap: 0x5b4a34,
+  hair: 0x3f3222,
+  boot: 0x4a3a24,
+  shaft: 0x8a6a3e,
+  blade: 0xc2c9d0,
+} as const;
+
+/**
+ * Рекрут: холщовая рубаха с кушаком, шапка, рогатина в руке. Без доспеха и
+ * шлема — силуэт беднее богатырского: сразу видно, что перед нами мужик с
+ * палкой, которой колют. Тот же образ несёт Федот в М2 пролога (0.20.43):
+ * спасаемый крестьянин читается как крестьянин, а не как круглая заглушка.
+ */
+function drawRecruit({ g, cx, cy }: TokenCtx): void {
+  // Рогатина стоит за фигурой: древко от земли к правому плечу.
+  g.moveTo(cx + 6.5, cy + 11)
+    .lineTo(cx + 12.5, cy - 11)
+    .stroke({ width: 2.6, color: RECRUIT_LOOK.shaft, cap: "round" });
+
+  // Сапоги.
+  g.rect(cx - 6, cy + 9, 4.6, 3).fill(RECRUIT_LOOK.boot);
+  g.rect(cx + 1.4, cy + 9, 4.6, 3).fill(RECRUIT_LOOK.boot);
+
+  // Холщовая рубаха до колен с тёмным подолом.
+  g.poly([cx - 6, cy + 2, cx + 6, cy + 2, cx + 7.5, cy + 10, cx - 7.5, cy + 10]).fill(RECRUIT_LOOK.shirt);
+  g.poly([cx - 7.5, cy + 10, cx + 7.5, cy + 10, cx + 6, cy + 12, cx - 6, cy + 12]).fill(RECRUIT_LOOK.shirtDark);
+  // Кушак.
+  g.rect(cx - 6.5, cy + 4.5, 13, 2).fill(RECRUIT_LOOK.sash);
+
+  // Левая рука вдоль тела, правая — в хвате на древке.
+  g.circle(cx - 6.5, cy + 6, 2).fill(RECRUIT_LOOK.skin);
+  g.poly([cx + 4.5, cy + 3, cx + 8, cy + 4.5, cx + 8.5, cy, cx + 5, cy]).fill(RECRUIT_LOOK.skin);
+
+  // Голова, волосы, шапка с мягким отворотом.
+  g.circle(cx, cy - 3.5, 6).fill(RECRUIT_LOOK.skin);
+  g.ellipse(cx, cy - 5.5, 6.4, 3.4).fill(RECRUIT_LOOK.hair);
+  g.ellipse(cx, cy - 8, 6.8, 3.6).fill(RECRUIT_LOOK.cap);
+  g.ellipse(cx, cy - 6.4, 7.2, 1.8).fill(RECRUIT_LOOK.hair);
+  g.circle(cx - 2.1, cy - 3.6, 0.9).fill(0x2a1d12);
+  g.circle(cx + 2.1, cy - 3.6, 0.9).fill(0x2a1d12);
+
+  // Лопасть рогатины: листовидный наконечник с перекрестием.
+  g.poly([cx + 12.5, cy - 11.5, cx + 15.8, cy - 5.5, cx + 13.4, cy - 4.4, cx + 11.2, cy - 5.8]).fill(RECRUIT_LOOK.blade);
+  g.rect(cx + 9.6, cy - 5.2, 6.4, 1.4).fill(RECRUIT_LOOK.shaft);
+}
+
 /** Иллюстрации этой миссии: ключ — запись бестиария или предмета. */
 export const M1_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   mikula_peasant: drawMikulaPeasant,
   forest_rat: drawForestRat,
   stick: drawStick,
+};
+
+/**
+ * Образ рекрута (0.20.43): одна иллюстрация на две записи — самого рекрута
+ * (Сенька, пополнение дружины) и Федота-крестьянина из М2 пролога. Прежде
+ * на карте Федот не имел иллюстрации вовсе и рисовался кругом-заглушкой.
+ */
+export const RECRUIT_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
+  recruit: drawRecruit,
+  fedot_stranded: drawRecruit,
 };
