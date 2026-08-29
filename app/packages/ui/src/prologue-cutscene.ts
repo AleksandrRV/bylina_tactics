@@ -22,6 +22,8 @@ export function buildCinematicPlan(config: CutsceneConfig, markers: LayoutMarker
     id: config.id,
     lockInput: config.lockInput ?? true,
     skippable: config.skippable ?? true,
+    // Приближение сцены: множитель к игровому масштабу (0.20.39).
+    zoom: config.zoom,
     steps: config.steps.map((step) => {
       const raw = step.target;
       let target: CinematicPlan["steps"][number]["target"];
@@ -61,19 +63,31 @@ export function spawnedConfigIds(events: readonly GameEvent[]): string[] {
 export function splitSpawnEvents(
   events: readonly GameEvent[],
   cutscenes: readonly CutsceneConfig[] | undefined,
-): { staged: { configId: string; event: CutsceneEvent }[]; generic: GameEvent[] } {
-  const staged: { configId: string; event: CutsceneEvent }[] = [];
+): { staged: { configId: string; entityId: number; event: CutsceneEvent }[]; generic: GameEvent[] } {
+  const staged: { configId: string; entityId: number; event: CutsceneEvent }[] = [];
   const generic: GameEvent[] = [];
   for (const event of events) {
     if (event.type === "ENTITY_SPAWNED") {
       const configId = event.entity.configId;
       const config = pickCutscene(cutscenes, { type: "spawn", configId });
       if (config) {
-        staged.push({ configId, event: { type: "spawn", configId } });
+        staged.push({ configId, entityId: event.entity.id, event: { type: "spawn", configId } });
         continue;
       }
     }
     generic.push(event);
   }
   return { staged, generic };
+}
+
+/**
+ * Идентификаторы сущностей, чьё появление ставит сцена (0.20.39). Они уже
+ * созданы ядром, но экран скрывает их до вбегания — список уходит в средство
+ * отображения до проигрывания событий хода.
+ */
+export function stagedEntityIds(
+  events: readonly GameEvent[],
+  cutscenes: readonly CutsceneConfig[] | undefined,
+): number[] {
+  return splitSpawnEvents(events, cutscenes).staged.map((entry) => entry.entityId);
 }

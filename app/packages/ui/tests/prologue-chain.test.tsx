@@ -25,12 +25,21 @@ import { dataTree } from "./training-sim.js";
  * в свободную былину.
  */
 
+/** Журнал обращений к средству отображения: порядок и аргументы. */
+const calls: { name: string; args: unknown[] }[] = [];
+
+const record = (name: string) => (...args: unknown[]): void => {
+  calls.push({ name, args });
+};
+
 let activate: ((x: number, y: number) => void) | null = null;
 
 const rendererStub: FieldRenderer = {
   mount: vi.fn(async () => undefined),
   update: vi.fn(),
-  play: vi.fn(async () => undefined),
+  play: vi.fn(async () => {
+    calls.push({ name: "play", args: [] });
+  }),
   pan: vi.fn(),
   destroy: vi.fn(),
   setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
@@ -39,12 +48,19 @@ const rendererStub: FieldRenderer = {
   setOnHover: vi.fn(),
   setReducedMotion: vi.fn(),
   setSpeed: vi.fn(),
-  playCinematic: vi.fn(async () => false),
+  playCinematic: vi.fn(async (plan) => {
+    calls.push({ name: "playCinematic", args: [plan] });
+    return false;
+  }),
   skipCinematic: vi.fn(),
   isCinematicPlaying: vi.fn(() => false),
   fadeScreen: vi.fn(async () => undefined),
   setInputLocked: vi.fn(),
+  setHiddenEntities: vi.fn(record("setHiddenEntities")),
 };
+
+/** Порядок имён в журнале. */
+const order = (): string[] => calls.map((entry) => entry.name);
 
 vi.mock("@bylina/render", () => ({
   createFieldRenderer: (): FieldRenderer => rendererStub,
@@ -70,6 +86,7 @@ beforeEach(() => {
 afterEach(() => {
   document.body.innerHTML = "";
   activate = null;
+  calls.length = 0;
 });
 
 const tick = (ms: number): Promise<void> =>
@@ -234,6 +251,10 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
         await tick(220);
       });
       expect(liveRat(), "rat is destroyed by the hero").toBeNull();
+      // Итог не перекрывает поле мгновенно (0.20.39): сначала доигрывают
+      // последние числа урона и гибель, затем выдерживается пауза.
+      expect(cardText(), "outcome waits for the animations").toBe("");
+      await waitFor(() => cardText().length > 0, 8000);
 
       // Итог М1.
       expect(cardText(), "M1 outro card").toContain("Из леса доносится крик");
@@ -259,6 +280,100 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       ).toBe(true);
       expect(cardText(), "M2 intro, not M2 outro").toContain("Кто-то кричал в чаще");
       expect(cardText(), "no M2 spoiler").not.toContain("Федот спасён");
+
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    { timeout: 60000 },
+  );
+
+  it(
+    "zooms the camera for the scene and hides the rat until it runs in",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session } = services;
+
+      await act(async () => {
+        session.startPrologue("prologue_brushwood", true);
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      const dismiss = cardButton();
+      await act(async () => {
+        dismiss!.click();
+      });
+      // Вступление: сцена уходит в средство отображения с приближением —
+      // при подгонке «поле целиком» камера не смогла бы ехать.
+      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
+      const plan = calls.find((entry) => entry.name === "playCinematic")?.args[0] as { id: string; zoom?: number };
+      expect(plan.id).toBe("m1_intro");
+      expect(plan.zoom ?? 0, "camera zooms in for the scene").toBeGreaterThan(1);
+
+      // Поход к палке: крыса выходит по триггеру подбора.
+      const clickCell = async (x: number, y: number): Promise<void> => {
+        await act(async () => {
+          activate?.(x, y);
+        });
+        await act(async () => {
+          await tick(30);
+        });
+      };
+      const endTurn = async (): Promise<void> => {
+        const button = document.querySelector<HTMLButtonElement>(".end-turn");
+        if (!button || button.disabled) return;
+        await act(async () => {
+          button.click();
+        });
+        await act(async () => {
+          await tick(700);
+        });
+      };
+      calls.length = 0;
+      for (let guard = 0; guard < 60; guard += 1) {
+        const snap = session.getBattleSnapshot(1);
+        const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
+        const stick = snap.entities.find((entity) => entity.configId === "stick");
+        if (!mikula || !stick) break;
+        const distance = (x: number, y: number): number => Math.abs(x - stick.x) + Math.abs(y - stick.y);
+        const here = distance(mikula.x, mikula.y);
+        const reach = mikula.ap > 0 ? session.getBattleReachable(mikula.id) : [];
+        let best: { x: number; y: number; d: number } | null = null;
+        for (const cell of reach) {
+          const d = distance(cell.x, cell.y);
+          if (d >= here) continue;
+          if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
+        }
+        if (!best) {
+          await endTurn();
+          continue;
+        }
+        await clickCell(best.x, best.y);
+      }
+      await waitFor(() => calls.some((entry) => entry.name === "setHiddenEntities"), 8000);
+
+      // Крыса рождается ядром сразу, но на поле её не показывают: скрытие
+      // приходит ДО проигрывания событий хода, иначе она мелькнула бы
+      // в клетке появления, а потом выбегала заново.
+      const rat = session
+        .getBattleSnapshot(1)
+        .entities.find((entity) => entity.configId === "forest_rat" && !entity.dead);
+      expect(rat, "rat has spawned in the kernel").toBeDefined();
+      const at = calls.findIndex((entry) => entry.name === "setHiddenEntities");
+      expect(at, "the rat is hidden").toBeGreaterThanOrEqual(0);
+      expect(calls[at]?.args[0], "exactly the rat is hidden").toEqual([rat!.id]);
+      // Скрытие приходит ДО проигрывания событий того же хода: иначе крыса
+      // мелькнула бы в клетке появления, а потом выбегала заново.
+      expect(order()[at + 1], "events play after the hide").toBe("play");
+
+      // После вбегания сцена возвращает видимость.
+      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"), 8000);
+      await waitFor(
+        () =>
+          calls.some(
+            (entry) => entry.name === "setHiddenEntities" && Array.isArray(entry.args[0]) && entry.args[0].length === 0,
+          ),
+        8000,
+      );
 
       await act(async () => {
         root.unmount();

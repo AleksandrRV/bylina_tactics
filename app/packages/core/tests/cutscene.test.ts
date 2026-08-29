@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { cutsceneMatches, pickCutscene, type CutsceneConfig } from "../src/index.js";
+import {
+  DEFAULT_CUTSCENE_ZOOM,
+  cutsceneMatches,
+  pickCutscene,
+  withCutsceneDefaults,
+  type CutsceneConfig,
+} from "../src/index.js";
 
 const INTRO: CutsceneConfig = {
   id: "m1_intro",
@@ -44,5 +50,18 @@ describe("cutscene triggers (0.20.37)", () => {
     expect(pickCutscene([INTRO, RAT], { type: "spawn", configId: "forest_rat" })?.id).toBe("m1_rat_appear");
     expect(pickCutscene([INTRO, RAT], { type: "spawn", configId: "slug" })).toBeNull();
     expect(pickCutscene(undefined, { type: "missionStart" })).toBeNull();
+  });
+});
+
+describe("cutscene camera zoom (0.20.39)", () => {
+  it("zooms the camera in by default: otherwise the pan cannot move", () => {
+    // При подгонке «поле целиком» окно камеры не меньше поля: без
+    // приближения проезд камеры стоит на месте.
+    expect(DEFAULT_CUTSCENE_ZOOM).toBeGreaterThan(1);
+    expect(withCutsceneDefaults(INTRO).zoom).toBe(DEFAULT_CUTSCENE_ZOOM);
+  });
+
+  it("keeps the zoom set by the author of the scene", () => {
+    expect(withCutsceneDefaults({ ...INTRO, zoom: 1.4 }).zoom).toBe(1.4);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CutsceneConfig, GameEvent } from "@bylina/core";
-import { buildCinematicPlan, spawnedConfigIds, splitSpawnEvents } from "../src/prologue-cutscene.js";
+import { buildCinematicPlan, spawnedConfigIds, splitSpawnEvents, stagedEntityIds } from "../src/prologue-cutscene.js";
 
 const MARKERS = {
   S: [{ x: 19, y: 3 }],
@@ -24,6 +24,7 @@ const RAT: CutsceneConfig = {
   trigger: { kind: "onSpawn", configId: "forest_rat" },
   lockInput: true,
   skippable: true,
+  zoom: 1.9,
   steps: [
     { kind: "pan", target: { configId: "forest_rat" }, durationMs: 320 },
     { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 420, holdMs: 700 },
@@ -31,10 +32,10 @@ const RAT: CutsceneConfig = {
   ],
 };
 
-function spawnEvent(configId: string): GameEvent {
+function spawnEvent(configId: string, id = 7): GameEvent {
   return {
     type: "ENTITY_SPAWNED",
-    entity: { id: 7, configId } as never,
+    entity: { id, configId } as never,
     cause: "SUMMON",
   };
 }
@@ -67,11 +68,27 @@ describe("prologue cutscene plan (0.20.37)", () => {
     expect(plan.steps[1]?.holdMs).toBe(700);
   });
 
+  it("carries the camera zoom of the scene (0.20.39)", () => {
+    // Без приближения проезд камеры невозможен: при подгонке «поле целиком»
+    // окно камеры не меньше поля и камера стоит на месте.
+    expect(buildCinematicPlan(RAT, MARKERS).zoom).toBe(1.9);
+    expect(buildCinematicPlan(INTRO, MARKERS).zoom).toBeUndefined();
+  });
+
+  it("names the entities the scene must hide until the run-in (0.20.39)", () => {
+    // Крыса уже создана ядром; до вбегания её на поле быть не должно.
+    const events = [spawnEvent("forest_rat", 42), spawnEvent("upyr", 43)];
+    expect(stagedEntityIds(events, [INTRO, RAT])).toEqual([42]);
+    expect(stagedEntityIds(events, [INTRO])).toEqual([]);
+  });
+
   it("splits spawns between the staged scene and the generic playback", () => {
     const events = [spawnEvent("forest_rat"), spawnEvent("upyr")];
     const { staged, generic } = splitSpawnEvents(events, [INTRO, RAT]);
     expect(staged.map((entry) => entry.configId)).toEqual(["forest_rat"]);
     expect(staged[0]?.event).toEqual({ type: "spawn", configId: "forest_rat" });
+    // Идентификатор сущности нужен экрану: скрыть её до вбегания (0.20.39).
+    expect(staged[0]?.entityId).toBe(7);
     // Упырь постановки не имеет — уходит обычным порядком событий.
     expect(generic).toHaveLength(1);
     expect(spawnedConfigIds(generic)).toEqual(["upyr"]);

@@ -49,6 +49,12 @@ export interface CutsceneConfig {
   lockInput?: boolean;
   /** Допустим пропуск кнопкой или клавишей (campaign.md §1.8, по умолчанию — да). */
   skippable?: boolean;
+  /**
+   * Приближение камеры на время сцены: множитель к игровому масштабу
+   * (0.20.39). Без приближения проезд камеры невозможен: при подгонке
+   * «поле целиком» окно камеры не меньше поля.
+   */
+  zoom?: number;
 }
 
 /** Событие, на которое откликается проигрыватель сцен. */
@@ -84,7 +90,19 @@ export function pickCutscene(
   return configs.find((config) => cutsceneMatches(config, event)) ?? null;
 }
 
+/**
+ * Приближение камеры сцены по умолчанию (0.20.39): множитель к игровому
+ * масштабу. При подгонке «поле целиком» проезд камеры невозможен — окно
+ * камеры не меньше поля, — поэтому сцена начинается с приближения.
+ */
+export const DEFAULT_CUTSCENE_ZOOM = 1.9;
+
 /** Значения по умолчанию для необязательных полей (валидатор выдаёт их же). */
 export function withCutsceneDefaults(config: CutsceneConfig): CutsceneConfig {
-  return { ...config, lockInput: config.lockInput ?? true, skippable: config.skippable ?? true };
+  return {
+    ...config,
+    lockInput: config.lockInput ?? true,
+    skippable: config.skippable ?? true,
+    zoom: config.zoom ?? DEFAULT_CUTSCENE_ZOOM,
+  };
 }
