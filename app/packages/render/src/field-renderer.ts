@@ -12,9 +12,13 @@ import {
 import { Application, Container, Graphics, Rectangle, Text, TilingSprite, Texture, type FederatedPointerEvent } from "pixi.js";
 import { FRINGE_CELLS, fringeDecor } from "./fringe.js";
 import {
+  CAMERA_CELLS_IN_VIEW,
   CINEMATIC_OVERSCROLL,
   cinematicGlideOffset,
   clampCameraOffset,
+  fitScale,
+  ZOOM_MAX,
+  ZOOM_MIN,
   needsTrainingFocus,
   trainingGlideOffset,
   TRAINING_COMFORT,
@@ -105,6 +109,14 @@ export interface FieldView {
   /** Биом карты (0.20.25, этап 3.1): палитра поверхности, стиль укрытий и декор. */
   biome?: string;
   /**
+   * Сторона, бойцов которой камера держит в кадре при подгонке (0.20.42).
+   * Базовый кадр рассчитан на {@link CAMERA_CELLS_IN_VIEW} клеток по
+   * меньшей оси экрана, поэтому крупное поле больше не влезает целиком:
+   * без этого кадра начало боя показывало бы середину карты, а отряд
+   * оставался за краем.
+   */
+  homeOwner?: number;
+  /**
    * Наступающая Тьма (этап 3.6): доля счётчика Тьмы кампании 0..1.
    * Холодный полупрозрачный слой поверх сцены; вне кампании не задаётся.
    */
@@ -138,6 +150,14 @@ export interface FieldRenderer {
   skipCinematic?(): void;
   /** Идёт ли сцена прямо сейчас. */
   isCinematicPlaying?(): boolean;
+  /**
+   * Плавно привести клетку в кадр (0.20.42): верхняя панель ведёт камеру
+   * к выбранному персонажу или противнику. Во время сцены жест
+   * игнорируется: кадром владеет режиссура.
+   */
+  focusCell?(cell: CellPos, durationMs?: number): void;
+  /** Плавно привести бойца в кадр (0.20.42): то же, что по клетке бойца. */
+  focusEntity?(entityId: number, durationMs?: number): void;
   /**
    * Текущий масштаб камеры (0.20.41). Экран запоминает его перед первой
    * половиной сцены, чтобы вторая половина вернулась к игровому кадру, а не
@@ -974,6 +994,8 @@ export function createFieldRenderer(): FieldRenderer {
   let onActivate: ((x: number, y: number) => void) | null = null;
   let onHover: ((x: number, y: number) => void) | null = null;
   let userMoved = false;
+  /** Базовый кадр уже поставлен на своих бойцов (0.20.42). */
+  let homeFramed = false;
   let animFrame = 0;
   /** Ввод игрока заблокирован на время кинематографической сцены (0.20.37). */
   let inputLocked = false;
@@ -1006,7 +1028,10 @@ export function createFieldRenderer(): FieldRenderer {
   let lastTapKey: string | null = null;
   let lastTapTime = 0;
   const pointers = new Map<number, { x: number; y: number }>();
+  /** Дистанция между двумя указателями при щипке; 0 — щипок не идёт. */
   let pinch = 0;
+  /** Центр щипка: точка, относительно которой масштабируется карта (0.20.42). */
+  let pinchCenter: Point | null = null;
 
   /* ---------- геометрия ---------- */
 
@@ -1162,19 +1187,60 @@ export function createFieldRenderer(): FieldRenderer {
     return null;
   };
 
+  /**
+   * Центр тяжести живых бойцов своей стороны в мировых координатах
+   * (0.20.42): точка, которую базовый кадр держит в середине, когда поле
+   * крупнее окна. Считается по живым и не спрятанным в укрытии-объекте.
+   */
+  const homePoint = (): Point | null => {
+    const owner = view?.homeOwner;
+    if (owner === undefined || !view) return null;
+    let sumX = 0;
+    let sumY = 0;
+    let count = 0;
+    for (const entity of view.snapshot.entities) {
+      if (entity.dead || entity.owner !== owner || entity.coverType !== 0) continue;
+      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === entity.x && candidate.y === entity.y);
+      const { cx, cy } = centerOf(entity.x, entity.y, tile ? visualLevel(tile) : entity.z);
+      sumX += cx;
+      sumY += cy;
+      count += 1;
+    }
+    return count > 0 ? { x: sumX / count, y: sumY / count } : null;
+  };
+
+  /**
+   * Подгонка камеры (0.20.42): масштаб — из расчёта
+   * {@link CAMERA_CELLS_IN_VIEW} клеток по меньшей оси экрана (по высоте в
+   * горизонтальной ориентации, по ширине в вертикальной), а не «поле
+   * целиком, но не крупнее 1,25». Поле крупнее окна больше не влезает,
+   * поэтому кадр ставится на своих бойцов, а не на середину карты: иначе
+   * начало боя показывало бы пустой угол. Положение прижато к полю — за
+   * кромку камера не выходит.
+   *
+   * Один раз поставив кадр, подгонка его не дёргает: пока игрок сам не
+   * сдвинул камеру, поле не должно ездить под бойцами при каждом их шаге.
+   * Смена размера окна кадр пересчитывает заново.
+   */
   const fit = (): void => {
     if (!view || userMoved || !mounted) return;
-    const cols = view.snapshot.grid.width;
-    const rows = view.snapshot.grid.height;
-    const bw = cols * CELL_SIZE + PAD * 2;
-    const bh = rows * CELL_SIZE + PAD * 2 + RISE * 4;
     const w = app.renderer.width;
     const h = app.renderer.height;
     if (w <= 0 || h <= 0) return;
-    const scale = Math.min(w / bw, h / bh, 1.25);
+    const scale = fitScale({ width: w, height: h }, CELL_SIZE);
     world.scale.set(scale);
-    world.x = (w - bw * scale) / 2;
-    world.y = (h - bh * scale) / 2;
+    if (homeFramed) return;
+    const home = homePoint();
+    if (!home) return;
+    const offset = clampCameraOffset(
+      { x: w / 2 - home.x * scale, y: h / 2 - home.y * scale },
+      { scale, offset: { x: 0, y: 0 } },
+      { width: w, height: h },
+      mapPlane(),
+    );
+    world.x = offset.x;
+    world.y = offset.y;
+    homeFramed = true;
   };
 
   /* ---------- статичный слой: рельеф ---------- */
@@ -3444,7 +3510,10 @@ export function createFieldRenderer(): FieldRenderer {
       const pts = [...pointers.values()];
       const a = pts[0];
       const b = pts[1];
-      if (a && b) pinch = Math.hypot(a.x - b.x, a.y - b.y);
+      if (a && b) {
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+        pinchCenter = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      }
       drag = false;
       return;
     }
@@ -3465,9 +3534,22 @@ export function createFieldRenderer(): FieldRenderer {
       const b = pts[1];
       if (!a || !b) return;
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
-      world.scale.set(Math.min(1.8, Math.max(0.55, world.scale.x * (dist / pinch))));
+      const cx = (a.x + b.x) / 2;
+      const cy = (a.y + b.y) / 2;
+      // Масштаб — вокруг центра щипка (0.20.42): мировая точка под пальцами
+      // остаётся под пальцами. Прежде менялся один масштаб, и мир вырастал
+      // от своего нуля — верхнего левого угла карты: поле уезжало из-под
+      // пальцев, а вернуть его можно было лишь отдельным жестом панорамы.
+      zoomAt(cx, cy, dist / pinch);
+      // Сдвиг самого щипка тянет карту: двумя пальцами ведут и масштаб,
+      // и панораму — так делает любое картографическое приложение.
+      if (pinchCenter) {
+        world.x += cx - pinchCenter.x;
+        world.y += cy - pinchCenter.y;
+        userMoved = true;
+      }
+      pinchCenter = { x: cx, y: cy };
       pinch = dist;
-      userMoved = true;
       return;
     }
     if (!drag) {
@@ -3491,7 +3573,10 @@ export function createFieldRenderer(): FieldRenderer {
   const onUp = (event: FederatedPointerEvent): void => {
     if (inputLocked) return;
     pointers.delete(event.pointerId);
-    if (pointers.size < 2) pinch = 0;
+    if (pointers.size < 2) {
+      pinch = 0;
+      pinchCenter = null;
+    }
     if (!drag) return;
     drag = false;
     if (dragged) return;
@@ -3521,13 +3606,12 @@ export function createFieldRenderer(): FieldRenderer {
   const onCancel = (event: FederatedPointerEvent): void => {
     if (inputLocked) return;
     pointers.delete(event.pointerId);
-    if (pointers.size < 2) pinch = 0;
+    if (pointers.size < 2) {
+      pinch = 0;
+      pinchCenter = null;
+    }
     drag = false;
   };
-
-  /** Диапазон масштаба — прежний (как у pinch-жеста). */
-  const ZOOM_MIN = 0.55;
-  const ZOOM_MAX = 1.8;
 
   /**
    * Смена масштаба вокруг точки экрана (этап 1.6): мировая точка под курсором
@@ -3544,8 +3628,13 @@ export function createFieldRenderer(): FieldRenderer {
     userMoved = true;
   };
 
-  /** Плавное центрирование камеры на бойце (двойное касание/щелчок, этап 1.6). */
-  const centerOnEntityCell = (x: number, y: number): void => {
+  /**
+   * Плавное центрирование камеры на клетке (двойное касание/щелчок,
+   * этап 1.6; клик по бойцу в верхней панели — 0.20.42). Кадр тот же, что
+   * у подводки обучения: цель приходит в «зону комфорта» выше середины,
+   * за кромку поля камера не выходит.
+   */
+  const centerOnEntityCell = (x: number, y: number, durationMs = 260): void => {
     if (!mounted || destroyed) return;
     const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
     if (!tile) return;
@@ -3556,7 +3645,9 @@ export function createFieldRenderer(): FieldRenderer {
     const target = trainingGlideOffset({ x: cx, y: cy }, plane, screen, mapPlane());
     const fromX = world.x;
     const fromY = world.y;
-    void tween(260, (t) => {
+    // Камера уходит из-под автоматической подгонки: игрок выбрал кадр сам.
+    userMoved = true;
+    void tween(durationMs, (t) => {
       const e = easeInOut(t);
       world.x = fromX + (target.x - fromX) * e;
       world.y = fromY + (target.y - fromY) * e;
@@ -3597,6 +3688,9 @@ export function createFieldRenderer(): FieldRenderer {
    * перепланируется к подводке по новым границам экрана. */
   const onCanvasResize = (): void => {
     paintAtmosphere();
+    // Окно сменилось: базовый кадр считаем заново — иначе при повороте
+    // устройства отряд остаётся за кадром (0.20.42).
+    homeFramed = false;
     if (!view?.trainingFocus || !view.trainingHighlight) return;
     const point = trainingHighlightPoint(view.trainingHighlight);
     if (point) pendingTrainingFocus = point;
@@ -3691,7 +3785,11 @@ export function createFieldRenderer(): FieldRenderer {
       }
       // The map seed changes only when a battlefield is generated. State updates
       // redraw overlays/tokens, never the cached terrain graphics.
-      if (terrainSeed !== next.matchSeed) paintStatic();
+      if (terrainSeed !== next.matchSeed) {
+        paintStatic();
+        // Новое поле — новый базовый кадр на своих бойцов (0.20.42).
+        homeFramed = false;
+      }
       paintDebug();
       fit();
       paint();
@@ -3741,6 +3839,15 @@ export function createFieldRenderer(): FieldRenderer {
     skipCinematic,
     isCinematicPlaying: () => cinematicPlaying,
     getCameraScale: () => world.scale.x,
+    focusCell(cell, durationMs) {
+      if (inputLocked || destroyed || !mounted) return;
+      centerOnEntityCell(cell.x, cell.y, durationMs ?? 260);
+    },
+    focusEntity(entityId, durationMs) {
+      if (inputLocked || destroyed || !mounted) return;
+      const entity = entityById(entityId);
+      if (entity) centerOnEntityCell(entity.x, entity.y, durationMs ?? 260);
+    },
     fadeScreen,
     setInputLocked(locked) {
       inputLocked = locked;

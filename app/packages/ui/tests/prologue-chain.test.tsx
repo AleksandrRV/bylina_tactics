@@ -60,6 +60,8 @@ const rendererStub: FieldRenderer = {
   fadeScreen: vi.fn(async () => undefined),
   setInputLocked: vi.fn(),
   setHiddenEntities: vi.fn(record("setHiddenEntities")),
+  // Ведение камеры кликом по портрету в верхней панели (0.20.42).
+  focusEntity: vi.fn(record("focusEntity")),
 };
 
 /** Порядок имён в журнале. */
@@ -503,6 +505,61 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       });
     },
     { timeout: 90000 },
+  );
+
+  it(
+    "sends the camera to a fighter from the top panel portraits (0.20.42)",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session } = services;
+
+      await act(async () => {
+        session.startPrologue("prologue_brushwood", true);
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      const dismiss = cardButton();
+      await act(async () => {
+        dismiss!.click();
+      });
+      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
+
+      // Свой боец: клик по портрету в верхней панели ведёт камеру к нему.
+      const hero = session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
+      const cards = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".roster .roster-card"));
+      await waitFor(() => cards().length > 0);
+      calls.length = 0;
+      await act(async () => {
+        cards()[0]!.click();
+      });
+      expect(
+        calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
+        "camera is sent to the clicked fighter",
+      ).toEqual([hero!.id]);
+
+      // Противник: пока крыса не вышла, полосы противников нет.
+      expect(document.querySelector(".enemies-strip"), "no enemies on the field yet").toBeNull();
+      await walkToStick(session);
+      await waitFor(() => document.querySelector(".enemies-strip .enemy-face") !== null, 12000);
+
+      const rat = session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "forest_rat" && !entity.dead);
+      const face = () => document.querySelector<HTMLButtonElement>(".enemies-strip .enemy-face");
+      // Крыса в поле зрения дружины: портрет кликабелен и ведёт камеру.
+      expect(face()!.className, "a visible enemy is not dimmed").not.toContain("is-unseen");
+      expect(face()!.disabled, "a visible enemy is clickable").toBe(false);
+      calls.length = 0;
+      await act(async () => {
+        face()!.click();
+      });
+      expect(
+        calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
+        "camera is sent to the visible enemy",
+      ).toEqual([rat!.id]);
+
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    { timeout: 60000 },
   );
 
   it(
