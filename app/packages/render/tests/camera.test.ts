@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  CAMERA_CELLS_IN_VIEW,
   CINEMATIC_OVERSCROLL,
   TRAINING_COMFORT,
+  ZOOM_MAX,
+  ZOOM_MIN,
   cinematicGlideOffset,
   clampCameraOffset,
+  fitScale,
   needsTrainingFocus,
   trainingGlideOffset,
   worldToScreen,
@@ -213,5 +217,51 @@ describe("clampCameraOffset (0.20.41)", () => {
     const back = clampCameraOffset(shot, camera, screen, MAP);
     expect(back.x, "камера вернулась в пределы поля").not.toBeCloseTo(shot.x, 3);
     expect(back.x).toBeCloseTo(0, 5);
+  });
+});
+
+describe("fitScale (0.20.42)", () => {
+  /**
+   * Базовый кадр: по меньшей оси экрана помещается
+   * {@link CAMERA_CELLS_IN_VIEW} клеток. Прежде поле подгонялось целиком
+   * («min(w/bw, h/bh, 1.25)»): на телефоне двадцать клеток влезали в экран
+   * мельчайшими фишками, а крупное поле на десктопе не влезало вовсе.
+   */
+  const CELL = 52;
+  const inView = (scale: number, screen: { width: number; height: number }): number =>
+    Math.min(screen.width, screen.height) / scale / CELL;
+
+  it("fits 11 cells along the shorter axis in landscape", () => {
+    const screen = { width: 1440, height: 900 };
+    expect(inView(fitScale(screen, CELL), screen)).toBeCloseTo(CAMERA_CELLS_IN_VIEW, 4);
+  });
+
+  it("fits 11 cells along the shorter axis in portrait", () => {
+    // Вертикальный телефон: считаем по ширине, а не по высоте.
+    const screen = { width: 390, height: 844 };
+    expect(inView(fitScale(screen, CELL), screen)).toBeCloseTo(CAMERA_CELLS_IN_VIEW, 4);
+    expect(fitScale(screen, CELL)).toBeCloseTo(390 / (CAMERA_CELLS_IN_VIEW * CELL), 6);
+  });
+
+  it("keeps the scale inside the zoom range", () => {
+    // Огромный экран: базовый кадр не должен уходить за верхний предел
+    // ручного зума — иначе игрок не смог бы приблизить поле вовсе.
+    expect(fitScale({ width: 4096, height: 2160 }, CELL)).toBe(ZOOM_MAX);
+    // Крошечное окно — за нижний.
+    expect(fitScale({ width: 120, height: 90 }, CELL)).toBe(ZOOM_MIN);
+  });
+
+  it("degenerate screen keeps the unit scale", () => {
+    expect(fitScale({ width: 0, height: 0 }, CELL)).toBe(1);
+    expect(fitScale({ width: 800, height: 600 }, 0)).toBe(1);
+  });
+
+  it("gives a large field a readable base frame instead of the whole map", () => {
+    // Поле 20×6 (М1) на десктопе: базовая клетка крупнее прежней, поэтому
+    // двадцать колонок уже не влезают целиком — игрок пролистывает поле.
+    const screen = { width: 1440, height: 900 };
+    const scale = fitScale(screen, CELL);
+    expect(scale).toBeGreaterThan(1.25);
+    expect((20 * CELL + 52) * scale).toBeGreaterThan(screen.width);
   });
 });

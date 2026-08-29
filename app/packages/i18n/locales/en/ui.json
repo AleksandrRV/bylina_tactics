@@ -62,7 +62,8 @@
     "legendCover": "Cover",
     "legendEnemy": "Enemy",
     "sidePlayer": "Host",
-    "sideEnemy": "Nav"
+    "sideEnemy": "Nav",
+    "enemyUnseen": "Out of sight"
   },
   "battle": {
     "title": "Staff clash",

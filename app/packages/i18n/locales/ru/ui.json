@@ -62,7 +62,8 @@
     "legendCover": "Укрытие",
     "legendEnemy": "Противник",
     "sidePlayer": "Дружина",
-    "sideEnemy": "Навь"
+    "sideEnemy": "Навь",
+    "enemyUnseen": "Вне поля зрения"
   },
   "battle": {
     "title": "Служебная стычка",

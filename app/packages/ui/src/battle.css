@@ -154,15 +154,41 @@
 .enemy-face {
   width: 30px;
   height: 30px;
+  padding: 0;
   border-radius: 50%;
-  object-fit: cover;
   border: 2px solid #6d9a3a;
   background: #131b10;
+  /* Клик ведёт камеру к противнику (0.20.42): кнопка, а не картинка. */
+  cursor: pointer;
+  overflow: hidden;
+  line-height: 0;
+}
+
+.enemy-face > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
 }
 
 .enemy-face.is-dead {
   filter: grayscale(1) brightness(0.5);
   border-color: #3a4550;
+  cursor: default;
+}
+
+/* Противник вышел из поля зрения дружины (0.20.42): портрет остаётся в
+   полосе — игрок помнит, кто на поле, — но приглушён и камеру не ведёт:
+   вести её некуда, клетка невидимого врага неизвестна. */
+.enemy-face.is-unseen {
+  opacity: 0.34;
+  border-style: dashed;
+  cursor: default;
+}
+
+.enemy-face:focus-visible {
+  outline: 2px solid var(--amber, #e0b34a);
+  outline-offset: 2px;
 }
 
 .diamonds {

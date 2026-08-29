@@ -46,6 +46,7 @@ import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
+import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "./enemy-strip.js";
 import { unitPortrait } from "./portraits.js";
 import {
   buildCinematicPlan,
@@ -1672,6 +1673,9 @@ export function BattleScreenView() {
       debugMovement,
       visibleCells,
       exploredCells,
+      // Базовый кадр держит своих бойцов: поле крупнее окна больше не
+      // влезает целиком, и середина карты оставила бы отряд за кадром (0.20.42).
+      homeOwner: viewOwner,
       aimBreakCell,
       hoverCell,
       trainingHighlight,
@@ -1840,6 +1844,16 @@ export function BattleScreenView() {
     // погибший противник остаётся в полосе, пока его клетка наблюдаема.
     return visibleCells.has(cellKey(entity.x, entity.y));
   });
+
+  /**
+   * Запомненные противники (0.20.42). Снимок стороны отдаёт только тех,
+   * кого дружина видит сейчас, поэтому вышедший из поля зрения противник
+   * просто исчезал бы из полосы — игрок терял бы счёт врагам. Портрет
+   * остаётся, но приглушён: камеру к такому врагу вести некуда.
+   */
+  const seenEnemiesRef = useRef(new Map<number, RememberedEnemy>());
+  rememberEnemies(knownEnemies, seenEnemiesRef.current);
+  const enemyStrip = buildEnemyStrip(seenEnemiesRef.current, knownEnemies);
 
   return (
     <div
@@ -2051,19 +2065,28 @@ export function BattleScreenView() {
                 </span>
               </div>
             ) : null}
-            {knownEnemies.length > 0 ? (
+            {enemyStrip.length > 0 ? (
               <div className="enemies-strip" aria-label={t("field.sideEnemy")}>
-                {knownEnemies.map((entity) => {
-                  const face = unitPortrait(entity.configId);
+                {enemyStrip.map((enemy) => {
+                  const face = unitPortrait(enemy.configId);
+                  const name = t(unitNameKey(enemy.configId));
+                  const label = enemy.seen || enemy.dead ? name : `${name} · ${t("field.enemyUnseen")}`;
                   return face ? (
-                    <img
-                      key={entity.id}
-                      className={`enemy-face${entity.dead ? " is-dead" : ""}`}
-                      src={face}
-                      alt={t(unitNameKey(entity.configId))}
-                      title={t(unitNameKey(entity.configId))}
-                      draggable={false}
-                    />
+                    <button
+                      key={enemy.id}
+                      type="button"
+                      className={`enemy-face${enemy.dead ? " is-dead" : ""}${enemy.seen ? "" : " is-unseen"}`}
+                      title={label}
+                      aria-label={label}
+                      disabled={!enemy.seen || enemy.dead}
+                      onClick={() => {
+                        // Клик ведёт камеру к противнику — но только к тому,
+                        // кого видит хоть один боец дружины (0.20.42).
+                        rendererRef.current?.focusEntity?.(enemy.id);
+                      }}
+                    >
+                      <img src={face} alt="" draggable={false} />
+                    </button>
                   ) : null;
                 })}
               </div>
@@ -2105,6 +2128,9 @@ export function BattleScreenView() {
                     setAction(null);
                     setSkillTargetPos(null);
                     setAimId(null);
+                    // Камера плавно приходит к выбранному бойцу (0.20.42):
+                    // поле крупнее окна, и боец мог стоять за кадром.
+                    rendererRef.current?.focusEntity?.(entity.id);
                   }}
                 >
                   {face ? <img className="roster-face" src={face} alt="" draggable={false} /> : null}
