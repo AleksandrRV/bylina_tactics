@@ -114,6 +114,24 @@ describe("prologue cutscene plan (0.20.37)", () => {
     expect(rat.steps[0]?.runInMs).toBe(620);
   });
 
+  it("keeps the camera zoom through the hand-off (0.20.41)", () => {
+    // Первая половина сцены не отъезжает: укус по передаче хода играется
+    // крупным планом, а не между двумя переездами камеры.
+    expect(buildCinematicPlan(RAT_HANDOFF, MARKERS, { holdZoom: true }).holdZoom).toBe(true);
+    expect(buildCinematicPlan(RAT_HANDOFF, MARKERS).holdZoom).toBe(false);
+    // Отъезд берёт на себя вторая половина: без неё сцена обязана вернуть
+    // игровой масштаб сама.
+    expect(buildCinematicPlan(RAT, MARKERS, { holdZoom: false }).holdZoom).toBe(false);
+  });
+
+  it("returns the continuation to the game scale, not to the doubled zoom (0.20.41)", () => {
+    // Вторая половина начинается с кадра, который оставила первая: её `zoom`
+    // — множитель к игровому масштабу, а не к текущему приближению.
+    expect(buildCinematicPlan(RAT_HANDOFF, MARKERS, { baseScale: 1.25 }).baseScale).toBe(1.25);
+    expect(buildCinematicPlan(RAT_HANDOFF, MARKERS, { baseScale: null }).baseScale).toBeUndefined();
+    expect(buildCinematicPlan(RAT_HANDOFF, MARKERS).baseScale).toBeUndefined();
+  });
+
   it("splits the scene at the hand-off step (0.20.40)", () => {
     const { before, after } = splitAtHandOff(RAT_HANDOFF);
     // До передачи хода: кадр на опушке и вбегание с трекингом.

@@ -54,6 +54,9 @@ const rendererStub: FieldRenderer = {
   }),
   skipCinematic: vi.fn(),
   isCinematicPlaying: vi.fn(() => false),
+  // Игровой масштаб камеры: его сцена запоминает перед первой половиной,
+  // чтобы вторая вернулась к игровому кадру (0.20.41).
+  getCameraScale: vi.fn(() => 1.25),
   fadeScreen: vi.fn(async () => undefined),
   setInputLocked: vi.fn(),
   setHiddenEntities: vi.fn(record("setHiddenEntities")),
@@ -416,7 +419,15 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       );
       const plans = calls
         .filter((entry) => entry.name === "playCinematic")
-        .map((entry) => entry.args[0] as { id: string; steps: { kind: string; follow?: boolean; runInMs?: number }[] });
+        .map(
+          (entry) =>
+            entry.args[0] as {
+              id: string;
+              holdZoom?: boolean;
+              baseScale?: number;
+              steps: { kind: string; follow?: boolean; runInMs?: number }[];
+            },
+        );
       const appear = plans.find((plan) => plan.id === "m1_rat_appear");
       expect(appear, "the rat scene is played").toBeDefined();
       expect(
@@ -428,6 +439,11 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       const after = plans.find((plan) => plan.id === "m1_rat_appear_after");
       expect(after, "the scene continues after the hand-off").toBeDefined();
       expect(after!.steps.some((step) => step.kind === "pan"), "camera returns to the hero").toBe(true);
+      // Первая половина держит приближение: укус играется крупным планом,
+      // а вторая возвращает игровой масштаб, а не удвоенное приближение.
+      expect(appear!.holdZoom, "the first half keeps the close-up").toBe(true);
+      expect(after!.holdZoom, "the second half gives the camera back").not.toBe(true);
+      expect(after!.baseScale, "the second half knows the game scale").toBe(1.25);
 
       // Ход вернулся игроку сам, без нажатия кнопки.
       await waitFor(() => session.getBattleSnapshot(1).activeOwner === 1, 12000);

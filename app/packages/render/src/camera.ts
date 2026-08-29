@@ -87,6 +87,20 @@ function clampAxis(target: number, mapSpan: number, screenSpan: number, overscro
 }
 
 /**
+ * Прижать камеру к полю обычным правилом боя (0.20.41): без выхода за
+ * кромку. Если поле вмещается в окно — оно выровнено по центру оси; иначе
+ * окно лежит в пределах поля ближайшим к заданному смещением. Этим правилом
+ * сцена возвращает кадр игроку: после проезда с точным центрированием
+ * камера стоит на цели, а не на поле целиком, и край карты уезжал бы за кадр.
+ */
+export function clampCameraOffset(offset: Point, plane: CameraPlane, screen: ScreenSize, map: MapPlane): Point {
+  return {
+    x: clampAxis(offset.x, map.width * plane.scale, screen.width),
+    y: clampAxis(offset.y, map.height * plane.scale, screen.height),
+  };
+}
+
+/**
  * Доля холста, на которую камера сцены вправо выйти за кромку карты
  * (0.20.40). Половина экрана — предел, при котором в центр кадра встаёт
  * любая клетка поля: окно камеры шире расстояния от любой клетки до

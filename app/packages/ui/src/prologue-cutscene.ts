@@ -17,11 +17,21 @@ export type LayoutMarkers = Record<string, { x: number; y: number }[]>;
  * выхода крысы) разрешаются в конкретные клетки: средство отображения о
  * раскладке миссии ничего не знает.
  */
-export function buildCinematicPlan(config: CutsceneConfig, markers: LayoutMarkers | null): CinematicPlan {
+export function buildCinematicPlan(
+  config: CutsceneConfig,
+  markers: LayoutMarkers | null,
+  options: { holdZoom?: boolean; baseScale?: number | null } = {},
+): CinematicPlan {
   return {
     id: config.id,
     lockInput: config.lockInput ?? true,
     skippable: config.skippable ?? true,
+    // Сцена — только первая половина кадра: приближение держим до конца,
+    // чтобы события боя (укус по передаче хода) шли крупным планом (0.20.41).
+    holdZoom: options.holdZoom === true,
+    // Масштаб возврата второй половины — игровой кадр, а не приближение,
+    // которое осталось от первой (0.20.41).
+    baseScale: options.baseScale ?? undefined,
     // Приближение сцены: множитель к игровому масштабу (0.20.39).
     zoom: config.zoom,
     steps: config.steps.map((step) => {

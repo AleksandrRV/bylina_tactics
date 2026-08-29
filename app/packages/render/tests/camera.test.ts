@@ -3,6 +3,7 @@ import {
   CINEMATIC_OVERSCROLL,
   TRAINING_COMFORT,
   cinematicGlideOffset,
+  clampCameraOffset,
   needsTrainingFocus,
   trainingGlideOffset,
   worldToScreen,
@@ -173,5 +174,44 @@ describe("cinematicGlideOffset (0.20.40)", () => {
     const target = cinematicGlideOffset(point, small, screen, MAP);
     const at = worldToScreen(point, { scale: small.scale, offset: target });
     expect(at.y).toBeCloseTo(screen.height / 2, 5);
+  });
+});
+
+describe("clampCameraOffset (0.20.41)", () => {
+  /**
+   * Возврат кадра игроку: сцена ставит камеру на цель, а не на поле целиком,
+   * поэтому последним движением камера прижимается к полю обычным правилом
+   * боя — иначе край карты уезжает за кадр.
+   */
+  const screen = { width: 1280, height: 800 };
+
+  it("centers the field when it fits the screen", () => {
+    // Игровой масштаб: поле целиком влезает в окно — камера выровнена по центру.
+    const camera = plane(1.25, 600, -200);
+    const target = clampCameraOffset({ x: camera.offset.x, y: camera.offset.y }, camera, screen, MAP);
+    expect(target.x).toBeCloseTo((screen.width - MAP.width * 1.25) / 2, 5);
+    expect(target.y).toBeCloseTo((screen.height - MAP.height * 1.25) / 2, 5);
+  });
+
+  it("keeps the camera inside a field larger than the screen", () => {
+    // Карта шире экрана: окно камеры обязано лежать в пределах поля.
+    const camera = plane(2.5, -900, -600);
+    const target = clampCameraOffset({ x: camera.offset.x, y: camera.offset.y }, camera, screen, MAP);
+    expect(target.x).toBeCloseTo(screen.width - MAP.width * 2.5, 5);
+    expect(target.y).toBeCloseTo(screen.height - MAP.height * 2.5, 5);
+    // И в противоположную сторону: за кромку не выходит ни в одну.
+    const other = clampCameraOffset({ x: 500, y: 400 }, plane(2.5, 0, 0), screen, MAP);
+    expect(other.x).toBeCloseTo(0, 5);
+    expect(other.y).toBeCloseTo(0, 5);
+  });
+
+  it("does not widen the cinematic frame, only returns it to the field", () => {
+    // Кадр сцены смещён за кромку (цель у края поля) — прижим возвращает его.
+    const camera = plane(2.5, 0, 0);
+    const point = { x: 20, y: 260 };
+    const shot = cinematicGlideOffset(point, camera, screen, MAP);
+    const back = clampCameraOffset(shot, camera, screen, MAP);
+    expect(back.x, "камера вернулась в пределы поля").not.toBeCloseTo(shot.x, 3);
+    expect(back.x).toBeCloseTo(0, 5);
   });
 });
