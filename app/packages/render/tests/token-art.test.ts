@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { M1_ART } from "../src/token-art.js";
+import { M1_ART, RECRUIT_ART } from "../src/token-art.js";
 import type { EntityState } from "@bylina/core";
 
 /**
@@ -70,7 +70,7 @@ function entity(configId: string, weaponIds?: string[]): EntityState {
 }
 
 function draw(configId: string, target: EntityState, motionNow = 0) {
-  const art = M1_ART[configId];
+  const art = M1_ART[configId] ?? RECRUIT_ART[configId];
   expect(art, `нет иллюстрации для ${configId}`).toBeTruthy();
   const { g, points } = recordingGraphics();
   art!({ g: g as never, cx: 0, cy: 0, entity: target, motionNow });
@@ -127,5 +127,27 @@ describe("M1 token art (0.20.37)", () => {
       expect(Math.abs(point.x)).toBeLessThanOrEqual(26);
       expect(Math.abs(point.y)).toBeLessThanOrEqual(26);
     }
+  });
+});
+
+describe("образ рекрута (0.20.43)", () => {
+  it("dresses the recruit and the stranded peasant alike", () => {
+    const recruit = draw("recruit", entity("recruit"));
+    const fedot = draw("fedot_stranded", entity("fedot_stranded"));
+    // Одна иллюстрация на две записи: крестьянин М2 больше не заглушка.
+    expect(recruit.length).toBeGreaterThan(8);
+    expect(JSON.stringify(fedot)).toBe(JSON.stringify(recruit));
+    for (const point of recruit) {
+      expect(Math.abs(point.x)).toBeLessThanOrEqual(26);
+      expect(Math.abs(point.y)).toBeLessThanOrEqual(26);
+    }
+  });
+
+  it("shows the boar spear in the silhouette", () => {
+    const points = draw("recruit", entity("recruit"));
+    // Рогатина выходит вправо и вверх за корпус — оружие читается в силуэте
+    // даже на малом масштабе, как дубина у вооружённого Микулы.
+    expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(12);
+    expect(Math.min(...points.map((point) => point.y))).toBeLessThan(-10);
   });
 });

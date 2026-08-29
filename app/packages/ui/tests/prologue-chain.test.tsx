@@ -60,7 +60,7 @@ const rendererStub: FieldRenderer = {
   fadeScreen: vi.fn(async () => undefined),
   setInputLocked: vi.fn(),
   setHiddenEntities: vi.fn(record("setHiddenEntities")),
-  // Ведение камеры кликом по портрету в верхней панели (0.20.43).
+  // Ведение камеры кликом по портрету в верхней панели (0.20.42).
   focusEntity: vi.fn(record("focusEntity")),
 };
 
@@ -508,7 +508,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
   );
 
   it(
-    "sends the camera to a fighter from the top panel portraits (0.20.43)",
+    "sends the camera to a fighter from the top panel portraits (0.20.42)",
     async () => {
       const { root, services } = await mountShell();
       const { session } = services;

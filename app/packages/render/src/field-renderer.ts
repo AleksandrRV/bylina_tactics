@@ -25,7 +25,7 @@ import {
   worldToScreen,
   type Point,
 } from "./camera.js";
-import { M1_ART, type TokenCtx } from "./token-art.js";
+import { M1_ART, RECRUIT_ART, type TokenCtx } from "./token-art.js";
 import {
   AIM_IMPOSSIBLE,
   AIM_PRESELECT,
@@ -517,6 +517,7 @@ function drawSolovey({ g, cx, cy }: TokenCtx): void {
 
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   ...M1_ART,
+  ...RECRUIT_ART,
   bogatyr: drawBogatyr,
   strelets: drawStrelets,
   znaharka: drawZnaharka,
