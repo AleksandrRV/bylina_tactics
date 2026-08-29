@@ -10,9 +10,11 @@ import { OUTCOME_SETTLE_MS, createOutcomeGate } from "../src/outcome-gate.js";
 /** Исполняемое вручную расписание: никаких настоящих таймеров. */
 function harness(delayMs?: number) {
   const fired: string[] = [];
+  const pendingLog: boolean[] = [];
   let queue: { fn: () => void; ms: number }[] = [];
   const gate = createOutcomeGate({
     delayMs,
+    onPendingChange: (pending) => pendingLog.push(pending),
     schedule: (fn, ms) => {
       queue.push({ fn, ms });
       return queue.length;
@@ -24,6 +26,7 @@ function harness(delayMs?: number) {
   return {
     gate,
     fired,
+    pendingLog,
     /** Выполнить все отложенные вызовы. */
     flush(): void {
       const pending = queue;
@@ -87,5 +90,29 @@ describe("outcome gate (0.20.39)", () => {
     expect(pendingCount()).toBe(0);
     flush();
     expect(fired).toEqual([]);
+  });
+
+  it("reports the pause so the controls can be hidden and the input locked (0.20.40)", () => {
+    const { gate, fired, flush, pendingLog } = harness(50);
+    // До исхода паузы нет — кнопки управления видны.
+    expect(pendingLog).toEqual([]);
+    gate.playbackStart();
+    gate.report(() => fired.push("victory"));
+    // Исход зафиксирован, но ещё не показан: экран закрывает управление.
+    expect(pendingLog).toEqual([true]);
+    gate.playbackEnd();
+    flush();
+    // Итог на экране — пауза кончилась.
+    expect(pendingLog).toEqual([true, false]);
+    expect(fired).toEqual(["victory"]);
+  });
+
+  it("releases the pause on reset even before the outcome is shown", () => {
+    const { gate, fired, pendingLog } = harness();
+    gate.report(() => fired.push("defeat"));
+    expect(pendingLog).toEqual([true]);
+    // Выход из боя (размонтирование экрана) не оставляет экран запертым.
+    gate.reset();
+    expect(pendingLog).toEqual([true, false]);
   });
 });

@@ -36,15 +36,35 @@ export function buildCinematicPlan(config: CutsceneConfig, markers: LayoutMarker
         target = { cell: raw.cell };
       }
       return {
-        kind: step.kind,
+        kind: step.kind === "handOff" ? "hold" : step.kind,
         target,
         durationMs: step.durationMs,
         holdMs: step.holdMs,
         fade: step.fade,
         runInMs: step.runInMs,
+        // Трекинг вбегания и акцент цели (0.20.40).
+        follow: step.follow,
+        accent: step.accent,
       };
     }),
   };
+}
+
+/**
+ * Разрезать сцену по шагу передачи хода (0.20.40).
+ *
+ * Шаг `handOff` — не кадр, а граница: шаги до него проигрываются средством
+ * отображения, затем ход передаётся сопернику (крыса М1 бьёт Микулу сразу,
+ * без кнопки «Конец хода»), его действия разыгрываются обычными событиями
+ * боя, и только после этого сцена продолжается оставшимися шагами —
+ * камера возвращается к герою. Исполнитель передачи — экран боя: средство
+ * отображения о правилах боя не знает, поэтому шаг в план не попадает.
+ */
+export function splitAtHandOff(config: CutsceneConfig): { before: CutsceneConfig; after: CutsceneConfig | null } {
+  const at = config.steps.findIndex((step) => step.kind === "handOff");
+  if (at < 0) return { before: config, after: null };
+  const after = { ...config, id: `${config.id}_after`, steps: config.steps.slice(at + 1) };
+  return { before: { ...config, steps: config.steps.slice(0, at) }, after: after.steps.length > 0 ? after : null };
 }
 
 /** Записи бестиария, появившиеся на поле в этом пакете событий. */

@@ -49,6 +49,7 @@ import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { unitPortrait } from "./portraits.js";
 import {
   buildCinematicPlan,
+  splitAtHandOff,
   splitSpawnEvents,
   stagedEntityIds,
   type LayoutMarkers,
@@ -334,6 +335,13 @@ export function BattleScreenView() {
   // Кинематографическая сцена (0.20.37): пока идёт, ввод игрока закрыт и на
   // экране доступна кнопка пропуска (campaign.md §1.8).
   const [cutscenePlaying, setCutscenePlaying] = useState(false);
+  /**
+   * Исход известен, но ещё не показан (0.20.40): от момента последнего
+   * события до карточки итога кнопки управления скрыты, а управление
+   * закрыто — иначе игрок успевает нажать лишнее в кадре, который
+   * принадлежит проигрыванию боя.
+   */
+  const [outcomePending, setOutcomePending] = useState(false);
 
   useEffect(
     () =>
@@ -360,7 +368,9 @@ export function BattleScreenView() {
    * новое сражение монтирует экран заново.
    */
   const outcomeGateRef = useRef<OutcomeGate | null>(null);
-  if (outcomeGateRef.current === null) outcomeGateRef.current = createOutcomeGate();
+  if (outcomeGateRef.current === null) {
+    outcomeGateRef.current = createOutcomeGate({ onPendingChange: setOutcomePending });
+  }
   const outcomeGate = outcomeGateRef.current;
   useEffect(() => () => outcomeGate.reset(), [outcomeGate]);
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
@@ -800,28 +810,60 @@ export function BattleScreenView() {
     });
   };
 
+  /**
+   * Подсветка кнопки действия (0.20.40): пока жив противник, названный
+   * миссией (`actionAccent.whileAlive`), кнопка его оружия пульсирует
+   * янтарным. Сцена показывает, что делать дальше, не объясняя словами:
+   * в М1 дубина светится, пока крыса не уничтожена.
+   */
+  const accentWeaponId = ((): string | null => {
+    const accent = prologueMission?.actionAccent;
+    if (!accent) return null;
+    // Без `whileAlive` подсветка живёт до конца миссии.
+    if (!accent.whileAlive) return accent.weaponId;
+    return snapshot.entities.some((entity) => entity.configId === accent.whileAlive && !entity.dead)
+      ? accent.weaponId
+      : null;
+  })();
+
   /* ---------- режиссура камеры (0.20.37, campaign.md §13.4) ---------- */
 
-  /** Проиграть сцену миссии, если для этого события она описана в данных. */
+  /**
+   * Проиграть сцену миссии, если для этого события она описана в данных.
+   *
+   * Шаг `handOff` делит сцену надвое (0.20.40): между частями ход
+   * передаётся сопернику, и его действие разыгрывается обычными событиями
+   * боя — крыса М1 кусает Микулу сразу после вбегания, а не когда игрок
+   * догадается нажать «Конец хода».
+   */
   const runPrologueCutscene = async (event: CutsceneEvent): Promise<void> => {
     if (!prologueMission?.cutscenes || !kernel) return;
     const config = pickCutscene(prologueMission.cutscenes, event);
     if (!config) return;
-    const plan = buildCinematicPlan(withCutsceneDefaults(config), prologueMarkers);
+    const { before, after } = splitAtHandOff(config);
     setCutscenePlaying(true);
     setBusy(true);
     try {
-      const skipped = (await rendererRef.current?.playCinematic?.(plan)) ?? false;
+      const skipped = await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers));
       if (skipped) {
         prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
           type: "skip_cutscene",
           missionId: prologueMission.id,
         });
       }
+      if (!after) return;
+      await handOffTurnToEnemy();
+      await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(after), prologueMarkers));
     } finally {
       setCutscenePlaying(false);
       setBusy(false);
     }
+  };
+
+  /** Отдать план средству отображения; «true» — сцену пропустили. */
+  const playCinematicPlan = async (plan: ReturnType<typeof buildCinematicPlan>): Promise<boolean> => {
+    if (plan.steps.length === 0) return false;
+    return (await rendererRef.current?.playCinematic?.(plan)) ?? false;
   };
 
   /**
@@ -916,6 +958,9 @@ export function BattleScreenView() {
   /** Единственный канал команд: поочерёдная игра — через транспорт (0.14.0/0.15.0). */
   const applyCommand = (command: Command): void => {
     if (isSpectator || isReplay) return;
+    // Исход известен, но ещё не показан (0.20.40): поле доигрывает бой,
+    // команды игрока в этот кадр не принадлежат.
+    if (outcomePending) return;
     if (battleKind === "pvp") {
       session.sendPvpCommand(command);
       return;
@@ -1001,7 +1046,7 @@ export function BattleScreenView() {
   };
 
   const tryMove = (to: CellPos): void => {
-    if (selectedId === null || paused || busy) return;
+    if (selectedId === null || paused || busy || outcomePending) return;
     if (snapshot.activeOwner !== viewOwner) return;
     // Обучение: перемещение допустимо только в подсвеченную клетку текущего
     // указания и только предписанным исполнителем (строгий сценарий, 0.20.13).
@@ -1236,8 +1281,44 @@ export function BattleScreenView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel]);
 
+  /**
+   * Собственно конец хода: команда, проигрывание событий, ход Нави и
+   * возврат управления игроку. Вынесено из `endTurn`, потому что тем же
+   * порядком сцена передаёт ход сопернику сама (шаг `handOff`, 0.20.40) —
+   * кнопка при этом не нажата и проверок кнопки быть не должно.
+   */
+  const runEndTurnSequence = async (): Promise<void> => {
+    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
+    if (!result.ok) return;
+    setBusy(true);
+    // Проигрывание хода: итог показывается после него и паузы (0.20.39).
+    outcomeGate.playbackStart();
+    try {
+      if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
+        const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
+        const next = afterPrologueApply(kernel, { type: "END_TURN", playerId: String(viewOwner) }, result.events, prologueRunRef.current, ctx);
+        prologueRunRef.current = next;
+        setPrologueObjectiveKey(next.objectiveKey);
+        if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
+      }
+      advanceTraining(result.events);
+      showTrainingNote(result.events);
+      await (rendererRef.current?.play(result.events) ?? Promise.resolve());
+      outcomeGate.playbackEnd();
+      finishFromEvents(result.events);
+      if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
+        await runEnemyPhase();
+      } else if (isPrologue && session.getBattleOutcome() === "ongoing") {
+        await runProloguePlayerScript();
+      }
+    } finally {
+      outcomeGate.playbackEnd();
+      setBusy(false);
+    }
+  };
+
   const endTurn = (): void => {
-    if (paused || busy) return;
+    if (paused || busy || outcomePending) return;
     if (snapshot.activeOwner !== viewOwner) return;
     // Обучение: завершение хода — само по себе шаг сценария (0.20.13);
     // вне такого шага оно запрещено.
@@ -1260,35 +1341,19 @@ export function BattleScreenView() {
       setLog(t("prologue.hint.m2.noise"));
       return;
     }
-    const result = session.applyBattleCommand({ type: "END_TURN", playerId: String(viewOwner) });
-    if (!result.ok) return;
-    setBusy(true);
-    // Проигрывание хода: итог показывается после него и паузы (0.20.39).
-    outcomeGate.playbackStart();
-    void (async () => {
-      try {
-        if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
-          const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
-          const next = afterPrologueApply(kernel, { type: "END_TURN", playerId: String(viewOwner) }, result.events, prologueRunRef.current, ctx);
-          prologueRunRef.current = next;
-          setPrologueObjectiveKey(next.objectiveKey);
-          if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
-        }
-        advanceTraining(result.events);
-        showTrainingNote(result.events);
-        await (rendererRef.current?.play(result.events) ?? Promise.resolve());
-        outcomeGate.playbackEnd();
-        finishFromEvents(result.events);
-        if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
-          await runEnemyPhase();
-        } else if (isPrologue && session.getBattleOutcome() === "ongoing") {
-          await runProloguePlayerScript();
-        }
-      } finally {
-        outcomeGate.playbackEnd();
-        setBusy(false);
-      }
-    })();
+    void runEndTurnSequence();
+  };
+
+  /**
+   * Передача хода сопернику сценой (0.20.40). Кнопка игрока не нажата:
+   * сцена сама открывает ход Нави, чтобы поставленное появление сразу
+   * перешло в действие — крыса М1 кусает героя, едва выбежав из леса.
+   */
+  const handOffTurnToEnemy = async (): Promise<void> => {
+    if (paused || isReplay || isSpectator) return;
+    // Свежий снимок: сцена идёт асинхронно, состояние рендера могло устареть.
+    if (session.getBattleSnapshot(viewOwner).activeOwner !== viewOwner) return;
+    await runEndTurnSequence();
   };
 
   // Конец хода стороны наступает сам, когда ни один боец стороны не имеет
@@ -1323,7 +1388,7 @@ export function BattleScreenView() {
   }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint, hintSettings.autoEndTurn]);
 
   const onCell = (x: number, y: number): void => {
-    if (paused || busy || snapshot.activeOwner !== viewOwner) return;
+    if (paused || busy || outcomePending || snapshot.activeOwner !== viewOwner) return;
     // Ознакомительный шаг обучения (until "noop", 0.20.1): действие не
     // предполагается — шаг завершается кликом в любое место поля, сам клик
     // не выполняет перемещения/атаки (иначе подсказка «застревала» бы до
@@ -1606,6 +1671,14 @@ export function BattleScreenView() {
     });
   }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, action, t, battleBiome, darknessRatio, areaPreview]);
 
+  // Жесты холста закрыты, пока исход боя ещё не показан (0.20.40): пауза
+  // принадлежит проигрыванию боя, а не игроку. Сцена держит замок сама,
+  // поэтому снятие замка считается по обоим источникам — иначе экран
+  // разблокировал бы поле в хвосте ещё идущей сцены.
+  useEffect(() => {
+    rendererRef.current?.setInputLocked?.(outcomePending || cutscenePlaying);
+  }, [outcomePending, cutscenePlaying]);
+
   // Этап 2.10: переключатель темпа боя — двойная скорость для всех пауз,
   // перемещений и эффектов поля, а также автоматического проигрывания
   // повторов (повторы идут через тот же конвейер play() рендерера).
@@ -1639,7 +1712,7 @@ export function BattleScreenView() {
         session.setPaused(!paused);
         return;
       }
-      if (paused || busy) return;
+      if (paused || busy || outcomePending) return;
       if (event.key === "Tab") {
         event.preventDefault();
         // Обучение: перебор бойцов запрещён — действует исполнитель указания.
@@ -2170,7 +2243,7 @@ export function BattleScreenView() {
             </div>
           </footer>
         ) : (
-        <footer className="battle-bottom">
+        <footer className={`battle-bottom${outcomePending ? " is-outcome-pending" : ""}`}>
           <div className="battle-selected">
             {selected ? (
               <div className="sel-row">
@@ -2211,7 +2284,7 @@ export function BattleScreenView() {
               <button
                 key={`weapon-${weaponId}`}
                 type="button"
-                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId) ? " hint-pulse" : ""}`}
+                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId) ? " hint-pulse" : ""}${accentWeaponId === weaponId ? " action-accent" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
                 disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId)}

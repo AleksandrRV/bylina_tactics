@@ -21,6 +21,12 @@ export const OUTCOME_SETTLE_MS = 1000;
 export interface OutcomeGateOptions {
   /** Пауза после проигрывания событий (мс). */
   delayMs?: number;
+  /**
+   * Уведомление о паузе (0.20.40): `true` — исход зафиксирован, но ещё не
+   * показан (кнопки управления скрыты, ввод закрыт); `false` — итог на
+   * экране или отменён. Вызывается только при смене состояния.
+   */
+  onPendingChange?: (pending: boolean) => void;
   /** Поставить отложенный вызов; возвращает описатель для отмены. */
   schedule?: (fn: () => void, ms: number) => number;
   /** Отменить отложенный вызов. */
@@ -45,11 +51,20 @@ export function createOutcomeGate(options: OutcomeGateOptions = {}): OutcomeGate
   const delayMs = options.delayMs ?? OUTCOME_SETTLE_MS;
   const schedule = options.schedule ?? ((fn: () => void, ms: number): number => window.setTimeout(fn, ms));
   const cancel = options.cancel ?? ((handle: number): void => window.clearTimeout(handle));
+  const notify = options.onPendingChange ?? ((): void => undefined);
   /** Отложенный показ итога. */
   let pending: (() => void) | null = null;
+  /** Исход зафиксирован, но ещё не показан. */
+  let waiting = false;
   /** Сколько проигрываний идёт сейчас (вложенные вызовы допустимы). */
   let playing = 0;
   let timer: number | null = null;
+
+  const setWaiting = (next: boolean): void => {
+    if (waiting === next) return;
+    waiting = next;
+    notify(next);
+  };
 
   const arm = (): void => {
     if (timer !== null || playing > 0 || pending === null) return;
@@ -57,6 +72,7 @@ export function createOutcomeGate(options: OutcomeGateOptions = {}): OutcomeGate
     pending = null;
     timer = schedule(() => {
       timer = null;
+      setWaiting(false);
       show();
     }, delayMs);
   };
@@ -64,6 +80,7 @@ export function createOutcomeGate(options: OutcomeGateOptions = {}): OutcomeGate
   return {
     report(show) {
       if (pending === null) pending = show;
+      setWaiting(true);
       arm();
     },
     playbackStart() {
@@ -80,6 +97,7 @@ export function createOutcomeGate(options: OutcomeGateOptions = {}): OutcomeGate
       }
       pending = null;
       playing = 0;
+      setWaiting(false);
     },
   };
 }

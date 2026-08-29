@@ -106,6 +106,55 @@ async function waitFor(condition: () => boolean, timeoutMs = 8000): Promise<void
   throw new Error("condition was not met in time");
 }
 
+/**
+ * Поход Микулы к палке (М1). Клетка с предметом занята, поэтому маршрут
+ * до палки ядро не строит: идём по достижимым клеткам, каждый раз выбирая
+ * ближайшую к цели. Подбор вооружает героя и выводит крысу.
+ */
+async function walkToStick(session: AppServices["session"]): Promise<void> {
+  const clickCell = async (x: number, y: number): Promise<void> => {
+    await act(async () => {
+      activate?.(x, y);
+    });
+    await act(async () => {
+      await tick(30);
+    });
+  };
+  const endTurn = async (): Promise<void> => {
+    const button = document.querySelector<HTMLButtonElement>(".end-turn");
+    if (!button || button.disabled) return;
+    await act(async () => {
+      button.click();
+    });
+    await act(async () => {
+      await tick(700);
+    });
+  };
+  for (let guard = 0; guard < 60; guard += 1) {
+    const snap = session.getBattleSnapshot(1);
+    const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
+    const stick = snap.entities.find((entity) => entity.configId === "stick");
+    if (!mikula || !stick) break;
+    const distance = (x: number, y: number): number => Math.abs(x - stick.x) + Math.abs(y - stick.y);
+    const here = distance(mikula.x, mikula.y);
+    const reach = mikula.ap > 0 ? session.getBattleReachable(mikula.id) : [];
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const cell of reach) {
+      const d = distance(cell.x, cell.y);
+      if (d >= here) continue;
+      if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
+    }
+    if (!best) {
+      await endTurn();
+      continue;
+    }
+    await clickCell(best.x, best.y);
+  }
+  await act(async () => {
+    await tick(150);
+  });
+}
+
 /** Текст сюжетной карточки (вступление либо итог миссии). */
 const cardText = (): string => document.querySelector(".training-over-card")?.textContent ?? "";
 
@@ -168,6 +217,20 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       });
       expect(document.querySelector(".training-over-card"), "card is dismissed").toBeNull();
 
+      // М1: Микула идёт к палке — подбор вооружает его и выводит крысу.
+      await walkToStick(session);
+
+      // Палка подобрана, крыса вышла (сцена появления доигрывается заглушкой).
+      const afterPickup = session.getBattleSnapshot(1);
+      expect(afterPickup.entities.some((entity) => entity.configId === "stick"), "stick is taken").toBe(false);
+      expect(
+        afterPickup.entities.some((entity) => entity.configId === "forest_rat" && !entity.dead),
+        "rat has entered",
+      ).toBe(true);
+
+      // Крыса — полноценный враг: Микула бьёт её дубиной (сценарий М1 требует
+      // подобрать палку и очистить поле). Клик по врагу включает основное
+      // оружие, повторный клик по той же цели — удар.
       const clickCell = async (x: number, y: number): Promise<void> => {
         await act(async () => {
           activate?.(x, y);
@@ -186,45 +249,6 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
           await tick(700);
         });
       };
-
-      // М1: Микула идёт к палке — подбор вооружает его и выводит крысу.
-      for (let guard = 0; guard < 60; guard += 1) {
-        const snap = session.getBattleSnapshot(1);
-        const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
-        const stick = snap.entities.find((entity) => entity.configId === "stick");
-        if (!mikula || !stick) break;
-        // Клетка с предметом занята, поэтому маршрут до палки ядро не строит:
-        // идём по достижимым клеткам, каждый раз выбирая ближайшую к цели.
-        const distance = (x: number, y: number): number => Math.abs(x - stick.x) + Math.abs(y - stick.y);
-        const here = distance(mikula.x, mikula.y);
-        const reach = mikula.ap > 0 ? session.getBattleReachable(mikula.id) : [];
-        let best: { x: number; y: number; d: number } | null = null;
-        for (const cell of reach) {
-          const d = distance(cell.x, cell.y);
-          if (d >= here) continue;
-          if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
-        }
-        if (!best) {
-          await endTurn();
-          continue;
-        }
-        await clickCell(best.x, best.y);
-      }
-      await act(async () => {
-        await tick(150);
-      });
-
-      // Палка подобрана, крыса вышла (сцена появления доигрывается заглушкой).
-      const afterPickup = session.getBattleSnapshot(1);
-      expect(afterPickup.entities.some((entity) => entity.configId === "stick"), "stick is taken").toBe(false);
-      expect(
-        afterPickup.entities.some((entity) => entity.configId === "forest_rat" && !entity.dead),
-        "rat has entered",
-      ).toBe(true);
-
-      // Крыса — полноценный враг: Микула бьёт её дубиной (сценарий М1 требует
-      // подобрать палку и очистить поле). Клик по врагу включает основное
-      // оружие, повторный клик по той же цели — удар.
       const liveRat = (): { x: number; y: number } | null => {
         const entity = session
           .getBattleSnapshot(1)
@@ -254,6 +278,12 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       // Итог не перекрывает поле мгновенно (0.20.39): сначала доигрывают
       // последние числа урона и гибель, затем выдерживается пауза.
       expect(cardText(), "outcome waits for the animations").toBe("");
+      // Пауза перед итогом (0.20.40): кнопки управления скрыты, а ввод
+      // закрыт — кадр принадлежит проигрыванию боя, а не игроку.
+      expect(
+        document.querySelector(".battle-bottom.is-outcome-pending"),
+        "controls are hidden while the outcome is pending",
+      ).not.toBeNull();
       await waitFor(() => cardText().length > 0, 8000);
 
       // Итог М1.
@@ -310,45 +340,8 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       expect(plan.zoom ?? 0, "camera zooms in for the scene").toBeGreaterThan(1);
 
       // Поход к палке: крыса выходит по триггеру подбора.
-      const clickCell = async (x: number, y: number): Promise<void> => {
-        await act(async () => {
-          activate?.(x, y);
-        });
-        await act(async () => {
-          await tick(30);
-        });
-      };
-      const endTurn = async (): Promise<void> => {
-        const button = document.querySelector<HTMLButtonElement>(".end-turn");
-        if (!button || button.disabled) return;
-        await act(async () => {
-          button.click();
-        });
-        await act(async () => {
-          await tick(700);
-        });
-      };
       calls.length = 0;
-      for (let guard = 0; guard < 60; guard += 1) {
-        const snap = session.getBattleSnapshot(1);
-        const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
-        const stick = snap.entities.find((entity) => entity.configId === "stick");
-        if (!mikula || !stick) break;
-        const distance = (x: number, y: number): number => Math.abs(x - stick.x) + Math.abs(y - stick.y);
-        const here = distance(mikula.x, mikula.y);
-        const reach = mikula.ap > 0 ? session.getBattleReachable(mikula.id) : [];
-        let best: { x: number; y: number; d: number } | null = null;
-        for (const cell of reach) {
-          const d = distance(cell.x, cell.y);
-          if (d >= here) continue;
-          if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
-        }
-        if (!best) {
-          await endTurn();
-          continue;
-        }
-        await clickCell(best.x, best.y);
-      }
+      await walkToStick(session);
       await waitFor(() => calls.some((entry) => entry.name === "setHiddenEntities"), 8000);
 
       // Крыса рождается ядром сразу, но на поле её не показывают: скрытие
@@ -380,6 +373,120 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       });
     },
     { timeout: 60000 },
+  );
+
+  it(
+    "makes the rat bite the hero right after the run-in and hands the turn back (0.20.40)",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session } = services;
+
+      await act(async () => {
+        session.startPrologue("prologue_brushwood", true);
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      // Сцена вступления играется после закрытия сюжетной карточки.
+      const dismiss = cardButton();
+      await act(async () => {
+        dismiss!.click();
+      });
+      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
+      // Палка подсвечена акцентом: кадр называет цель светом (0.20.40).
+      const intro = calls.find((entry) => entry.name === "playCinematic")?.args[0] as {
+        steps: { kind: string; accent?: boolean }[];
+      };
+      expect(intro.steps.some((step) => step.accent === true), "the stick is accented").toBe(true);
+
+      calls.length = 0;
+      const hero = () =>
+        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
+      await walkToStick(session);
+      const before = hero()!.hp;
+
+      // Укус: крыса бьёт минимальным уроном зубов (2) сразу после вбегания,
+      // не дожидаясь кнопки «Конец хода» — сцена передаёт ход сама.
+      await waitFor(() => (hero()?.hp ?? before) < before, 12000);
+      expect(before - hero()!.hp, "the bite is the minimum weapon damage").toBe(2);
+
+      // Сцена выхода крысы: кадр на опушке, вбегание с трекингом, передача
+      // хода Нави и возврат камеры к герою.
+      await waitFor(
+        () => calls.filter((entry) => entry.name === "playCinematic").length >= 2,
+        12000,
+      );
+      const plans = calls
+        .filter((entry) => entry.name === "playCinematic")
+        .map((entry) => entry.args[0] as { id: string; steps: { kind: string; follow?: boolean; runInMs?: number }[] });
+      const appear = plans.find((plan) => plan.id === "m1_rat_appear");
+      expect(appear, "the rat scene is played").toBeDefined();
+      expect(
+        appear!.steps.some((step) => step.follow === true && (step.runInMs ?? 0) > 0),
+        "camera follows the running rat",
+      ).toBe(true);
+      // Шаг передачи хода делит сцену: вторая половина играется после
+      // чужого хода — камера возвращается к герою.
+      const after = plans.find((plan) => plan.id === "m1_rat_appear_after");
+      expect(after, "the scene continues after the hand-off").toBeDefined();
+      expect(after!.steps.some((step) => step.kind === "pan"), "camera returns to the hero").toBe(true);
+
+      // Ход вернулся игроку сам, без нажатия кнопки.
+      await waitFor(() => session.getBattleSnapshot(1).activeOwner === 1, 12000);
+
+      // Пока крыса жива, кнопка дубины пульсирует янтарным.
+      const clubButton = (): HTMLButtonElement | null =>
+        Array.from(document.querySelectorAll<HTMLButtonElement>(".skill-row .hud-btn")).find((button) =>
+          button.className.includes("action-accent"),
+        ) ?? null;
+      expect(clubButton(), "the club button is accented while the rat lives").not.toBeNull();
+
+      // Крыса уничтожена — подсветка снята.
+      const liveRat = (): { x: number; y: number } | null => {
+        const entity = session
+          .getBattleSnapshot(1)
+          .entities.find((candidate) => candidate.configId === "forest_rat" && !candidate.dead);
+        return entity ? { x: entity.x, y: entity.y } : null;
+      };
+      const clickCell = async (x: number, y: number): Promise<void> => {
+        await act(async () => {
+          activate?.(x, y);
+        });
+        await act(async () => {
+          await tick(30);
+        });
+      };
+      for (let guard = 0; guard < 12 && liveRat(); guard += 1) {
+        await waitFor(() => session.getBattleSnapshot(1).activeOwner === 1 || liveRat() === null, 12000);
+        const rat = liveRat();
+        if (!rat) break;
+        const ap = session
+          .getBattleSnapshot(1)
+          .entities.filter((entity) => !entity.dead && entity.owner === 1 && entity.maxAp > 0)
+          .reduce((sum, entity) => sum + entity.ap, 0);
+        if (ap === 0) {
+          const button = document.querySelector<HTMLButtonElement>(".end-turn");
+          if (!button || button.disabled) break;
+          await act(async () => {
+            button.click();
+          });
+          await act(async () => {
+            await tick(700);
+          });
+          continue;
+        }
+        await clickCell(rat.x, rat.y);
+        await clickCell(rat.x, rat.y);
+      }
+      await act(async () => {
+        await tick(80);
+      });
+      expect(liveRat(), "rat is destroyed by the hero").toBeNull();
+      expect(clubButton(), "the accent is gone with the rat").toBeNull();
+
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    { timeout: 90000 },
   );
 
   it(

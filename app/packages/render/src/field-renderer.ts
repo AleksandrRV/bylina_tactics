@@ -10,7 +10,15 @@ import {
   type Tile,
 } from "@bylina/core";
 import { Application, Container, Graphics, Rectangle, Text, TilingSprite, Texture, type FederatedPointerEvent } from "pixi.js";
-import { needsTrainingFocus, trainingGlideOffset, TRAINING_COMFORT, worldToScreen, type Point } from "./camera.js";
+import {
+  CINEMATIC_OVERSCROLL,
+  cinematicGlideOffset,
+  needsTrainingFocus,
+  trainingGlideOffset,
+  TRAINING_COMFORT,
+  worldToScreen,
+  type Point,
+} from "./camera.js";
 import { M1_ART, type TokenCtx } from "./token-art.js";
 import {
   AIM_IMPOSSIBLE,
@@ -831,6 +839,16 @@ export interface CinematicStep {
   fade?: "out" | "in";
   /** Вбегание сущности в клетку из-за предела карты (мс). */
   runInMs?: number;
+  /**
+   * Вести камеру за сущностью во время вбегания (0.20.40): кадр встаёт на
+   * точку у кромки карты, откуда сущность выбегает, и едет следом за ней.
+   */
+  follow?: boolean;
+  /**
+   * Подсветить цель шага пульсирующим янтарным кольцом (0.20.40): кадр
+   * называет предмет или клетку не только приближением, но и светом.
+   */
+  accent?: boolean;
 }
 
 export interface CinematicPlan {
@@ -858,6 +876,27 @@ export interface CinematicPlan {
 export const CINEMATIC_ZOOM = 1.9;
 /** Длительность приближения и обратного отъезда (мс). */
 export const CINEMATIC_ZOOM_MS = 420;
+/**
+ * Потолок масштаба сцены (0.20.40): приближение задаётся множителем к
+ * игровому масштабу, поэтому не обязано укладываться в предел ручного
+ * зума игрока: множитель 1,9 на крупном экране даёт масштаб больше 1,8,
+ * прежде он срезался, и сцена выходила мельче задуманной.
+ */
+export const CINEMATIC_SCALE_MAX = 3.2;
+/**
+ * Янтарный акцент цели кадра (0.20.40): тот же цвет, что у готовой атаки
+ * в интерфейсе, — подсветка читается как «это цель».
+ */
+export const CINEMATIC_ACCENT = 0xe0b34a;
+/** На сколько клеток окантовка рельефа выходит за кромку карты (0.20.40). */
+export const FRINGE_CELLS = 12;
+/**
+ * Из какого расчёта сущность вбегает в клетку: клетки за кромкой карты
+ * (0.20.40). Две клетки — ровно кромка поля: точка вбегания ложится на
+ * границу карты, и кадр сцены, центрированный на ней, показывает не больше
+ * половины экрана за полем (зазор закрыт окантовкой рельефа).
+ */
+export const RUN_IN_CELLS = 2;
 
 export function createFieldRenderer(): FieldRenderer {
   const app = new Application();
@@ -878,7 +917,12 @@ export function createFieldRenderer(): FieldRenderer {
   // Всплывающие числа (этап 2.1) — отдельный слой поверх тумана и эффектов.
   const labelsLayer = new Container();
   const debugLayer = new Container();
-  world.addChild(terrain, fogBaseLayer, fogDriftLayer, fxLayer, glowLayer, labelsLayer, debugLayer);
+  // Окантовка рельефа за кромкой карты (0.20.40): кадр сцены вправе выйти
+  // за поле, чтобы привести объект в центр, — зазор не должен быть пустым.
+  const fringeLayer = new Graphics();
+  // Акцент сцены (0.20.40): пульсирующая подсветка цели кадра.
+  const accentLayer = new Graphics();
+  world.addChild(fringeLayer, terrain, fogBaseLayer, fogDriftLayer, fxLayer, accentLayer, glowLayer, labelsLayer, debugLayer);
   // Атмосфера экрана (0.20.25, этапы 3.6/3.7): живёт в экранных координатах
   // поверх мира — холодный слой Тьмы, виньетка и статичное зерно.
   const atmosphere = new Container();
@@ -1291,8 +1335,34 @@ export function createFieldRenderer(): FieldRenderer {
     return g;
   };
 
+  /**
+   * Окантовка рельефа за кромкой карты (0.20.40). Кадр сцены вправе выйти
+   * за поле: чтобы привести объект в центр кадра, камера иногда показывает
+   * пространство за кромкой. Пустая подложка холста читалась бы как обрыв
+   * мира, поэтому зазор закрыт тёмной землёй биома — той же, что под
+   * клетками, только темнее: опушка, из которой выбегает крыса, и край луга,
+   * к которому стоит спиной герой.
+   */
+  const paintFringe = (): void => {
+    fringeLayer.clear();
+    if (!view || destroyed || !mounted) return;
+    const cols = view.snapshot.grid.width;
+    const rows = view.snapshot.grid.height;
+    const grow = CELL_SIZE * FRINGE_CELLS;
+    const width = cols * CELL_SIZE + PAD * 2 + grow * 2;
+    const height = rows * CELL_SIZE + PAD * 2 + RISE * 4 + grow * 2;
+    const look = biomeLookOf(view.biome);
+    const ground = look.face[1] ?? look.face[0];
+    // Дальний край темнее: взгляд не ищет границу поля.
+    fringeLayer.rect(-grow, -grow, width, height).fill({ color: mix(ground, 0x05080a, 0.66) });
+    fringeLayer
+      .rect(-grow * 0.4, -grow * 0.4, width - grow * 1.2, height - grow * 1.2)
+      .fill({ color: mix(ground, 0x05080a, 0.42) });
+  };
+
   const paintStatic = (): void => {
     if (!view || destroyed || !mounted) return;
+    paintFringe();
     terrain.removeChildren().forEach((child) => child.destroy());
     for (const tile of view.snapshot.grid.tiles) {
       terrain.addChild(drawTile(tile));
@@ -2318,6 +2388,40 @@ export function createFieldRenderer(): FieldRenderer {
     });
   };
 
+  /**
+   * Акцент кадра сцены (0.20.40): по цели шага с `accent` пульсирует
+   * янтарное кольцо со вспышкой — палка М1 названа изображением, кадр
+   * подсвечивает её, а не просто привозит в центр. Пульсацию ведёт
+   * кадровый цикл, поэтому подсветка живёт и на удержании кадра; при
+   * «уменьшить движение» кольцо замирает на средней фазе.
+   */
+  const paintCinematicAccent = (now: number): void => {
+    accentLayer.clear();
+    const point = cinematicAccent;
+    if (!point || destroyed || !mounted) return;
+    const pulse = reducedMotion ? 0.5 : 0.5 + Math.sin(now * 0.0055) * 0.5;
+    const C = CELL_SIZE;
+    // Тёплое пятно под целью: предмет отделён от поверхности.
+    accentLayer.circle(point.x, point.y, C * 0.44).fill({ color: CINEMATIC_ACCENT, alpha: 0.05 + pulse * 0.07 });
+    // Внешнее кольцо дышит, внутреннее держит форму цели.
+    accentLayer
+      .circle(point.x, point.y, C * (0.4 + pulse * 0.09))
+      .stroke({ width: 1.6 + pulse * 1.8, color: CINEMATIC_ACCENT, alpha: 0.3 + pulse * 0.5 });
+    accentLayer
+      .circle(point.x, point.y, C * 0.3)
+      .stroke({ width: 1.2, color: 0xf3ecdc, alpha: 0.16 + pulse * 0.22 });
+    // Четыре засечки по сторонам света: взгляд сходится к центру.
+    for (let i = 0; i < 4; i += 1) {
+      const angle = (Math.PI / 2) * i + Math.PI / 4;
+      const inner = C * (0.5 + pulse * 0.05);
+      const outer = C * (0.62 + pulse * 0.07);
+      accentLayer
+        .moveTo(point.x + Math.cos(angle) * inner, point.y + Math.sin(angle) * inner)
+        .lineTo(point.x + Math.cos(angle) * outer, point.y + Math.sin(angle) * outer)
+        .stroke({ width: 2, color: CINEMATIC_ACCENT, alpha: 0.25 + pulse * 0.45 });
+    }
+  };
+
   const paintAtmosphere = (): void => {
     paintVignette();
     paintDarkness();
@@ -2657,6 +2761,12 @@ export function createFieldRenderer(): FieldRenderer {
    * ядро создаёт их сразу, а кадр обязан открыть их в момент анимации.
    */
   let hiddenIds = new Set<number>();
+  /**
+   * Цель акцента кадра (0.20.40): мировая точка, которую сцена подсвечивает
+   * пульсирующим янтарным кольцом. Пульсацию ведёт кадровый цикл, поэтому
+   * подсветка живёт и на удержании, когда проигрыватель ничего не двигает.
+   */
+  let cinematicAccent: Point | null = null;
 
   const waitCinematic = (ms: number): Promise<void> => {
     if (cinematicSkip || reducedMotion || ms <= 0) return Promise.resolve();
@@ -2690,17 +2800,19 @@ export function createFieldRenderer(): FieldRenderer {
     });
 
   /**
-   * Проезд камеры к мировой точке. Положение ограничено границами поля той же
-   * математикой, что и подводка обучения: камера не показывает пустоту за
-   * краем карты. Ручное панорамирование игрока после сцены не перебивается
-   * автоматической подгонкой поля (`userMoved`).
+   * Проезд камеры к мировой точке (0.20.40): цель приходит точно в центр
+   * кадра. Границы поля ослаблены на {@link CINEMATIC_OVERSCROLL} — иначе
+   * объект у кромки карты (палка М1 стоит в последней колонке) остаётся у
+   * края экрана, и проезд читается как «камера не доехала». Зазор за полем
+   * закрыт окантовкой рельефа. Ручное панорамирование игрока после сцены
+   * не перебивается автоматической подгонкой поля (`userMoved`).
    */
   const glideTo = async (point: Point, durationMs: number): Promise<void> => {
     if (!mounted || destroyed) return;
     const screen = { width: app.renderer.width, height: app.renderer.height };
     if (screen.width <= 0 || screen.height <= 0) return;
     const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
-    const target = trainingGlideOffset(point, plane, screen, mapPlane());
+    const target = cinematicGlideOffset(point, plane, screen, mapPlane());
     const fromX = world.x;
     const fromY = world.y;
     userMoved = true;
@@ -2709,6 +2821,21 @@ export function createFieldRenderer(): FieldRenderer {
       world.x = fromX + (target.x - fromX) * e;
       world.y = fromY + (target.y - fromY) * e;
     });
+  };
+
+  /**
+   * Мгновенно привести мировую точку в центр кадра (0.20.40). Тем же
+   * правилом, что и проезд, пользуется трекинг вбегания: камера едет за
+   * сущностью, не давая ей уйти к краю.
+   */
+  const centerOnNow = (point: Point): void => {
+    const screen = { width: app.renderer.width, height: app.renderer.height };
+    if (screen.width <= 0 || screen.height <= 0) return;
+    const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
+    const target = cinematicGlideOffset(point, plane, screen, mapPlane());
+    world.x = target.x;
+    world.y = target.y;
+    userMoved = true;
   };
 
   /**
@@ -2722,7 +2849,7 @@ export function createFieldRenderer(): FieldRenderer {
   const zoomTo = async (scale: number, durationMs: number, anchor?: Point | null): Promise<void> => {
     if (!mounted || destroyed) return;
     const from = world.scale.x;
-    const to = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, scale));
+    const to = Math.min(CINEMATIC_SCALE_MAX, Math.max(ZOOM_MIN, scale));
     if (to === from) return;
     const plane = mapPlane();
     const ax = anchor?.x ?? plane.width / 2;
@@ -2740,18 +2867,13 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   /**
-   * Вбегание сущности в свою клетку из-за предела карты. Смещение задаётся
-   * существующим механизмом выпада (`lunges`) — пиксельным сдвигом фишки,
-   * который уже учитывается в `entityPixel` и стирается по окончании
-   * проигрывания событий. Направление — от ближайшего края карты.
-   *
-   * Момент начала вбегания — и есть момент появления: скрытая сценой
-   * сущность открывается здесь, уже за пределами кадра (0.20.39).
+   * Смещение вбегания: откуда сущность выходит в свою клетку (0.20.40).
+   * Направление — от ближайшего края карты, вылет за кромку читается как
+   * «из леса». Смещение задаётся существующим механизмом выпада
+   * (`lunges`) — пиксельным сдвигом фишки, который уже учитывается
+   * в `entityPixel` и стирается по окончании проигрывания.
    */
-  const runInEntity = async (entityId: number, durationMs: number): Promise<void> => {
-    const entity = entityById(entityId);
-    if (!entity) return;
-    hiddenIds.delete(entityId);
+  const runInOffset = (entity: EntityState): { dx: number; dy: number } => {
     const gridWidth = view?.snapshot.grid.width ?? 0;
     const gridHeight = view?.snapshot.grid.height ?? 0;
     const toWest = entity.x;
@@ -2759,20 +2881,42 @@ export function createFieldRenderer(): FieldRenderer {
     const toNorth = entity.y;
     const toSouth = Math.max(0, gridHeight - 1 - entity.y);
     const nearest = Math.min(toWest, toEast, toNorth, toSouth);
-    // Вылет за кромку: 3 клетки за ближайшим краем читаются как «из леса».
-    const over = 3 * CELL_SIZE;
-    let dx = 0;
-    let dy = 0;
-    if (nearest === toEast) dx = over;
-    else if (nearest === toWest) dx = -over;
-    else if (nearest === toSouth) dy = over;
-    else dy = -over;
+    const over = RUN_IN_CELLS * CELL_SIZE;
+    if (nearest === toEast) return { dx: over, dy: 0 };
+    if (nearest === toWest) return { dx: -over, dy: 0 };
+    if (nearest === toSouth) return { dx: 0, dy: over };
+    return { dx: 0, dy: -over };
+  };
 
+  /**
+   * Вбегание сущности в свою клетку из-за предела карты.
+   *
+   * Момент начала вбегания — и есть момент появления: скрытая сценой
+   * сущность открывается здесь, уже за пределами кадра (0.20.39). Смещение
+   * назначается ДО снятия скрытия (0.20.40): иначе между ними успевает
+   * отрисоваться кадр, где сущность стоит в своей клетке, — то самое
+   * мелькание на долю секунды.
+   *
+   * С `follow` камера едет за сущностью: каждый кадр её текущее положение
+   * приводится в центр кадра, поэтому вбегание не уходит за край экрана.
+   */
+  const runInEntity = async (entityId: number, durationMs: number, follow = false): Promise<void> => {
+    const entity = entityById(entityId);
+    if (!entity) return;
+    const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === entity.x && candidate.y === entity.y);
+    const at = centerOf(entity.x, entity.y, tile ? visualLevel(tile) : entity.z);
+    const { dx, dy } = runInOffset(entity);
+    lunges.set(entityId, { dx, dy });
+    hiddenIds.delete(entityId);
     await tweenCinematic(durationMs, (t) => {
       const e = easeOut(t);
-      lunges.set(entityId, { dx: dx * (1 - e), dy: dy * (1 - e) });
+      const shiftX = dx * (1 - e);
+      const shiftY = dy * (1 - e);
+      lunges.set(entityId, { dx: shiftX, dy: shiftY });
+      if (follow) centerOnNow({ x: at.cx + shiftX, y: at.cy + shiftY });
     });
     lunges.delete(entityId);
+    if (follow) centerOnNow({ x: at.cx, y: at.cy });
   };
 
   /** Затемнение (`out`) или проявление (`in`) экрана поверх мира и атмосферы. */
@@ -2817,12 +2961,25 @@ export function createFieldRenderer(): FieldRenderer {
     return { point: null };
   };
 
+  /**
+   * Точка, на которой камера стоит в начале шага (0.20.40). Для шага с
+   * трекингом это точка вбегания у кромки карты, а не клетка сущности:
+   * сцена приходит на опушку до того, как из неё кто-то выбежит.
+   */
+  const anchorPointOf = (step: CinematicStep, point: Point | null, entityId?: number): Point | null => {
+    if (!point || !step.follow || step.runInMs === undefined || entityId === undefined) return point;
+    const entity = entityById(entityId);
+    if (!entity) return point;
+    const offset = runInOffset(entity);
+    return { x: point.x + offset.dx, y: point.y + offset.dy };
+  };
+
   /** Точка первого шага с целью: на ней камера стоит при приближении. */
   const firstPointOf = (plan: CinematicPlan): Point | null => {
     for (const step of plan.steps) {
       if (!step || step.kind === "hold" || step.kind === "fade") continue;
-      const { point } = cinematicPoint(step.target);
-      if (point) return point;
+      const { point, entityId } = cinematicPoint(step.target);
+      if (point) return anchorPointOf(step, point, entityId);
     }
     return null;
   };
@@ -2850,11 +3007,18 @@ export function createFieldRenderer(): FieldRenderer {
     try {
       // Приближение: без него проезд невозможен — при подгонке «поле
       // целиком» камера упирается в границы поля и стоит на месте.
-      await zoomTo(gameScale * (plan.zoom ?? CINEMATIC_ZOOM), CINEMATIC_ZOOM_MS, firstPointOf(plan));
+      // Сначала кадр на первой цели игровым масштабом, потом приближение с
+      // якорем на ней: цель остаётся в центре, пока мир растёт вокруг (0.20.40).
+      const entry = firstPointOf(plan);
+      if (entry) await glideTo(entry, 0);
+      await zoomTo(gameScale * (plan.zoom ?? CINEMATIC_ZOOM), CINEMATIC_ZOOM_MS, entry);
       for (const step of plan.steps) {
         if (destroyed) break;
         if (cinematicSkip) break;
         const { point, entityId } = cinematicPoint(step.target);
+        // Акцент кадра (0.20.40): пока длится шаг с акцентом, его цель
+        // подсвечена — палка М1 названа не только приближением, но и светом.
+        cinematicAccent = step.accent && point ? point : null;
         if (step.kind === "fade") {
           await fadeScreen(step.fade ?? "out", step.durationMs ?? 500);
           continue;
@@ -2864,15 +3028,21 @@ export function createFieldRenderer(): FieldRenderer {
           continue;
         }
         if (!point) continue;
+        const runner = step.runInMs !== undefined && entityId !== undefined ? entityById(entityId) : undefined;
+        // Трекинг вбегания: камера встаёт на точку у кромки карты, откуда
+        // сущность выбегает, и едет следом за ней (0.20.40).
+        const follow = runner !== undefined && step.follow === true;
         if (step.kind === "focus") {
           await glideTo(point, step.durationMs ?? 0);
+        } else if (follow && runner) {
+          const offset = runInOffset(runner);
+          await glideTo({ x: point.x + offset.dx, y: point.y + offset.dy }, step.durationMs ?? 320);
         } else {
           await glideTo(point, step.durationMs ?? 600);
         }
-        // Вбегание совмещено с проездом: сущность входит в кадр, пока камера
-        // занимает позицию, — так появление не выглядит телепортацией.
-        if (step.runInMs && entityId !== undefined) await runInEntity(entityId, step.runInMs);
+        if (step.runInMs !== undefined && runner) await runInEntity(runner.id, step.runInMs, follow);
         if (step.holdMs) await waitCinematic(step.holdMs);
+        cinematicAccent = null;
       }
       if (cinematicSkip) {
         // Пропуск: камера сразу встаёт на финальную точку сцены.
@@ -2884,6 +3054,7 @@ export function createFieldRenderer(): FieldRenderer {
       return cinematicSkip;
     } finally {
       cinematicPlaying = false;
+      cinematicAccent = null;
       if (plan.lockInput !== false) inputLocked = false;
     }
   };
@@ -3342,6 +3513,7 @@ export function createFieldRenderer(): FieldRenderer {
     const now = performance.now();
     paintLabels(now);
     paintEdgeArrow(now);
+    paintCinematicAccent(now);
     if (!playing) {
       // Туман: база перестраивается по подписи клеток, дрейф — не чаще ~15 Гц.
       if (view?.visibleCells) paintFog(performance.now());

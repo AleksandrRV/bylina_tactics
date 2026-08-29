@@ -1,7 +1,11 @@
 export {
   CELL_SIZE,
+  CINEMATIC_ACCENT,
+  CINEMATIC_SCALE_MAX,
   CINEMATIC_ZOOM,
   CINEMATIC_ZOOM_MS,
+  FRINGE_CELLS,
+  RUN_IN_CELLS,
   RENDER_STATUS,
   createFieldRenderer,
 } from "./field-renderer.js";
@@ -30,7 +34,9 @@ export {
 } from "./palette.js";
 export { M1_ART, type TokenCtx } from "./token-art.js";
 export {
+  CINEMATIC_OVERSCROLL,
   TRAINING_COMFORT,
+  cinematicGlideOffset,
   needsTrainingFocus,
   trainingGlideOffset,
   worldToScreen,

@@ -67,12 +67,57 @@ export function needsTrainingFocus(point: Point, plane: CameraPlane, screen: Scr
   );
 }
 
-/** Ограничение камеры по одной оси: поле не уводится за край экрана. */
-function clampAxis(target: number, mapSpan: number, screenSpan: number): number {
+/**
+ * Ограничение камеры по одной оси: поле не уводится за край экрана.
+ *
+ * `overscroll` — допустимый выход за кромку карты в пикселях (0.20.40).
+ * Нулевой допуск — прежнее правило боя; кинематографическая сцена задаёт
+ * допуск, чтобы привести в центр кадра объект у края карты: без этого
+ * палка М1 (последняя колонка) остаётся у края экрана, и проезд камеры
+ * читается как «камера не доехала».
+ */
+function clampAxis(target: number, mapSpan: number, screenSpan: number, overscroll = 0): number {
   // Поле уже вмещается в экран — выровнять по центру оси.
-  if (mapSpan <= screenSpan) return (screenSpan - mapSpan) / 2;
+  if (mapSpan <= screenSpan) {
+    const center = (screenSpan - mapSpan) / 2;
+    return Math.min(center + overscroll, Math.max(center - overscroll, target));
+  }
   // Иначе окно камеры лежит в пределах поля: [screenSpan − mapSpan, 0].
-  return Math.min(0, Math.max(screenSpan - mapSpan, target));
+  return Math.min(overscroll, Math.max(screenSpan - mapSpan - overscroll, target));
+}
+
+/**
+ * Доля холста, на которую камера сцены вправо выйти за кромку карты
+ * (0.20.40). Половина экрана — предел, при котором в центр кадра встаёт
+ * любая клетка поля: окно камеры шире расстояния от любой клетки до
+ * кромки. Зазор за полем закрыт окантовкой рельефа (`paintFringe`).
+ */
+export const CINEMATIC_OVERSCROLL = 0.5;
+
+/**
+ * Целевое положение камеры сцены: цель приходит точно в центр кадра
+ * (0.20.40). Подводка обучения (`trainingGlideOffset`) намеренно держит
+ * цель чуть выше середины — под плашку наставника; у сцены плашки нет,
+ * и сдвиг читался бы как промах камеры.
+ *
+ * `overscroll` — допустимый выход за кромку карты в долях соответствующей
+ * оси холста (0..0.5); при {@link CINEMATIC_OVERSCROLL} в центр кадра
+ * встаёт любая клетка поля.
+ */
+export function cinematicGlideOffset(
+  point: Point,
+  plane: CameraPlane,
+  screen: ScreenSize,
+  map: MapPlane,
+  overscroll = CINEMATIC_OVERSCROLL,
+): Point {
+  const at = worldToScreen(point, plane);
+  const rawX = plane.offset.x + (screen.width * 0.5 - at.x);
+  const rawY = plane.offset.y + (screen.height * 0.5 - at.y);
+  return {
+    x: clampAxis(rawX, map.width * plane.scale, screen.width, screen.width * overscroll),
+    y: clampAxis(rawY, map.height * plane.scale, screen.height, screen.height * overscroll),
+  };
 }
 
 /**
