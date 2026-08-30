@@ -12,14 +12,12 @@
  * действия, дальность, урон, конец хода.
  */
 
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useT } from "./context.js";
 import type { ActionInfo } from "./action-info.js";
-
-/** Длительность долгого нажатия: длиннее обычного клика, короче ожидания. */
-export const LONG_PRESS_MS = 420;
-/** Допустимый сдвиг пальца: больше — нажатие считают прокруткой ленты. */
-const MOVE_TOLERANCE_PX = 10;
+// Долгое нажатие (0.20.53) живёт в общем хуке: тот же жест нужен и
+// портретам бойцов в верхней панели.
+import { useLongPress } from "./use-long-press.js";
 
 export interface ActionSlotProps {
   /** Идентификатор оружия, умения или служебного действия. */
@@ -63,46 +61,7 @@ export function ActionSlot({
   onPress,
 }: ActionSlotProps) {
   const t = useT();
-  /** Окно уже открыто этим нажатием: обычный клик после него не срабатывает. */
-  const pressedRef = useRef(false);
-  const timerRef = useRef<number | null>(null);
-  const originRef = useRef<{ x: number; y: number } | null>(null);
-
-  const cancel = (): void => {
-    if (timerRef.current !== null) {
-      window.clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
-  };
-  useEffect(() => cancel, []);
-
-  const inspect = (): void => {
-    cancel();
-    pressedRef.current = true;
-    onInspect?.();
-  };
-
-  const onPointerDown = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    pressedRef.current = false;
-    if (!onInspect) return;
-    originRef.current = { x: event.clientX, y: event.clientY };
-    cancel();
-    timerRef.current = window.setTimeout(() => {
-      timerRef.current = null;
-      inspect();
-    }, LONG_PRESS_MS);
-  };
-
-  const onPointerMove = (event: React.PointerEvent<HTMLButtonElement>): void => {
-    const origin = originRef.current;
-    if (!origin) return;
-    if (
-      Math.abs(event.clientX - origin.x) > MOVE_TOLERANCE_PX ||
-      Math.abs(event.clientY - origin.y) > MOVE_TOLERANCE_PX
-    ) {
-      cancel();
-    }
-  };
+  const press = useLongPress({ onLongPress: onInspect, onClick: onPress });
 
   const classes = [
     "hud-btn",
@@ -128,24 +87,10 @@ export function ActionSlot({
       aria-haspopup={onInspect ? "dialog" : undefined}
       disabled={disabled}
       title={title ?? (onInspect ? t("action.hold") : undefined)}
-      onPointerDown={onPointerDown}
-      onPointerUp={cancel}
-      onPointerLeave={cancel}
-      onPointerCancel={cancel}
-      onPointerMove={onPointerMove}
-      // Правый клик — тот же жест для мыши: окно информации вместо меню браузера.
-      onContextMenu={(event) => {
-        event.preventDefault();
-        if (onInspect) inspect();
-      }}
-      onClick={() => {
-        // Долгое нажатие уже открыло окно: выбирать действие не надо.
-        if (pressedRef.current) {
-          pressedRef.current = false;
-          return;
-        }
-        onPress();
-      }}
+      // Правый клик — тот же жест для мыши — обрабатывает сам хук.
+      {...press.handlers}
+      // Долгое нажатие уже открыло окно: выбирать действие не надо.
+      onClick={press.onClick}
     >
       {shortcut ? <kbd>{shortcut}</kbd> : null}
       {art ? (

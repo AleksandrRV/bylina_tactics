@@ -1,6 +1,6 @@
 {
   "name": "@bylina/session",
-  "version": "0.20.52",
+  "version": "0.20.53",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

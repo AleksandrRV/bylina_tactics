@@ -130,67 +130,110 @@
   },
   "unit": {
     "bogatyr": {
-      "name": "Bogatyr"
+      "name": "Bogatyr",
+      "desc": "The wall of the host: sword, mace and shield. Takes the first blow and answers so the foe regrets closing in."
     },
     "strelets": {
-      "name": "Strelets"
+      "name": "Strelets",
+      "desc": "Strikes from afar: the bow finds the gap in cover, the hand cannon buys range with two action points and smoke in the face."
     },
     "znaharka": {
-      "name": "Znaharka"
+      "name": "Znaharka",
+      "desc": "Vasilisa keeps her people standing: heals at range, washes off poison and delusion, and calls a forest beast when it comes to it."
     },
     "upyr": {
-      "name": "Upyr"
+      "name": "Upyr",
+      "desc": "A skeleton of Nav. Heavy, and slower than the host, but it comes straight on and claws until it is put down."
     },
     "leshy": {
-      "name": "Leshy"
+      "name": "Leshy",
+      "desc": "Master of the thicket. Strikes with a branch from range, sets roots, and beside forest camouflage he is hard to reach even in the open."
     },
     "kikimora": {
-      "name": "Kikimora"
+      "name": "Kikimora",
+      "desc": "A poisoned needle and a borrowed skeleton: she poisons the wound and raises a fallen upyr that lies nearby."
     },
     "volkhv": {
-      "name": "Volkhv"
+      "name": "Volkhv",
+      "desc": "A master of delusion: panics the foe, leaves an illusion in his place and pulls an ally out from under the blow."
     },
     "forest_beast": {
-      "name": "Forest beast"
+      "name": "Forest beast",
+      "desc": "A beast on the healer's short leash: it lives two turns, holds its tile and gives its side camouflage."
     },
     "illusion": {
-      "name": "Illusion"
+      "name": "Illusion",
+      "desc": "The volkhv's phantom: one tile and a single point of health, yet to the foe a living target that draws the blow."
     },
     "recruit": {
-      "name": "Recruit"
+      "name": "Recruit",
+      "desc": "A recruit without a class. The sling gives him reach but not experience: he does not last long under fire."
     },
     "idol": {
-      "name": "Idol of Nav"
+      "name": "Idol of Nav",
+      "desc": "An idol of Nav. It neither moves nor strikes: it stands until it is broken."
     },
     "captive": {
-      "name": "Princess"
+      "name": "Princess",
+      "desc": "The princess waits to be led out: she does not fight and keeps behind the host's shields."
     },
     "baba_yaga": {
-      "name": "Baba Yaga"
+      "name": "Baba Yaga",
+      "desc": "A general of Nav, and flying: neither pit nor level slows her, and panic and roots clear the way. Pushed to her threshold, she leaves alive."
     },
     "solovey": {
-      "name": "Solovey the Brigand"
+      "name": "Solovey the Brigand",
+      "desc": "He opens the battle hidden and strikes first: his whistle wounds and knocks the target off its feet."
     },
     "upyr_pvp": {
-      "name": "Upyr warrior"
+      "name": "Upyr warrior",
+      "desc": "A warrior upyr: the same skeleton, but harder and meaner — made for a fight between even sides."
     },
     "leshy_pvp": {
-      "name": "Leshy guard"
+      "name": "Leshy guard",
+      "desc": "A warden leshy: branch, roots and the thicket's camouflage on the side of whoever fielded him."
     },
     "kikimora_pvp": {
-      "name": "Kikimora warrior"
+      "name": "Kikimora warrior",
+      "desc": "A warrior kikimora: poisons with her needle and raises the fallen, keeping her side from losing numbers."
     },
     "forest_rat": {
-      "name": "Forest rat"
+      "name": "Forest rat",
+      "desc": "A rat of Nav. One is a mere nuisance; the swarm takes you by numbers, and each bites until it is swatted."
     },
     "mikula_peasant": {
-      "name": "Mikula"
+      "name": "Mikula",
+      "desc": "A peasant from Vyselki. Bare hands are worth little in the thicket, but give him a branch and he holds his own."
     },
     "fedot_stranded": {
-      "name": "Fedot"
+      "name": "Fedot",
+      "desc": "Mikula's neighbour, stuck in the mire. Until he is pulled out he can only wait, and hold on to his friend's boot."
     },
     "slug": {
-      "name": "Slug"
+      "name": "Slug",
+      "desc": "A slug crawls half as fast as the host, but it spits venom from afar and rarely misses."
+    },
+    "info": {
+      "hold": "Hold the portrait for fighter details",
+      "state": "Condition",
+      "fallen": "Fallen",
+      "hp": "Health",
+      "mobility": "Mobility",
+      "aim": "Aim",
+      "defense": "Defence",
+      "will": "Will",
+      "vision": "Vision",
+      "equipment": "Equipment",
+      "skills": "Skills",
+      "inHands": "in hands",
+      "stateDefend": "defensive stance",
+      "stateOverwatch": "on overwatch",
+      "stateHidden": "hidden",
+      "stateFlying": "flying",
+      "stateImmobile": "immobile ({turns})",
+      "statePoison": "poisoned ({turns})",
+      "statePanic": "panicked ({turns})",
+      "stateTimed": "vanishes in {turns}"
     }
   },
   "weapon": {
