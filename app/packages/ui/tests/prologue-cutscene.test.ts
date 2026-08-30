@@ -173,3 +173,20 @@ describe("prologue cutscene plan (0.20.37)", () => {
     expect(spawnedConfigIds(generic)).toEqual(["upyr"]);
   });
 });
+
+describe("buildCinematicPlan: вывод стаи (0.20.52)", () => {
+  it("несёт в план всех, кого сцена выводит на поле", () => {
+    const plan = buildCinematicPlan(RAT, MARKERS, { revealIds: [11, 12] });
+    expect(plan.revealIds).toEqual([11, 12]);
+  });
+
+  it("без явно переданных сущностей ничего не выводит", () => {
+    const plan = buildCinematicPlan(RAT, MARKERS);
+    expect(plan.revealIds).toBeUndefined();
+  });
+
+  it("сохраняет шаг вбегания: именно он открывает скрытых", () => {
+    const plan = buildCinematicPlan(RAT, MARKERS, { revealIds: [11, 12] });
+    expect(plan.steps.some((step) => step.runInMs !== undefined)).toBe(true);
+  });
+});

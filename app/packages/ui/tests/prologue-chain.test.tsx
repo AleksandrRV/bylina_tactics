@@ -408,10 +408,13 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       await walkToStick(session);
       const before = hero()!.hp;
 
-      // Укус: крыса бьёт минимальным уроном зубов (2) сразу после вбегания,
+      // Укус: крыса бьёт минимальным уроном зубов сразу после вбегания,
       // не дожидаясь кнопки «Конец хода» — сцена передаёт ход сама.
+      // Величина берётся из данных, а не вписана числом: баланс пролога
+      // правят чаще, чем код (0.20.52 — укус 1–2).
+      const teeth = services.content.weapons.find((weapon) => weapon.id === "teeth");
       await waitFor(() => (hero()?.hp ?? before) < before, 12000);
-      expect(before - hero()!.hp, "the bite is the minimum weapon damage").toBe(2);
+      expect(before - hero()!.hp, "the bite is the minimum weapon damage").toBe(teeth?.minDmg ?? 1);
 
       // Сцена выхода крысы: кадр на опушке, вбегание с трекингом, передача
       // хода Нави и возврат камеры к герою.

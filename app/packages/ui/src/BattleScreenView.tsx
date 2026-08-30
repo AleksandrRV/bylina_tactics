@@ -392,6 +392,13 @@ export function BattleScreenView() {
    * `chargeArmed` — игрок подтвердил намерение нажатием, следующее
    * нажатие по той же цели исполняет подход и удар.
    */
+  /**
+   * Сюжетное сообщение (0.20.52): реплика миссии, которую игроку нужно
+   * прочесть. Прежде такие тексты уходили в строку журнала над панелью
+   * действий и перекрывали кнопки — теперь это отдельное окно, как
+   * вступление и итог миссии.
+   */
+  const [storyNote, setStoryNote] = useState<string | null>(null);
   const [charge, setCharge] = useState<ChargePlan | null>(null);
   const [chargeArmed, setChargeArmed] = useState(false);
   /**
@@ -617,6 +624,15 @@ export function BattleScreenView() {
 
   const isOwn = (entity: EntityState): boolean =>
     !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+
+  /**
+   * Показать сюжетное сообщение окном (0.20.52): строка журнала гасится,
+   * чтобы короткая реплика боя не соседствовала с карточкой.
+   */
+  const showStoryNote = (text: string): void => {
+    setLog(null);
+    setStoryNote(text);
+  };
 
   /** Снять прицеливание, маршрут пути и рывок (0.20.50). */
   const clearAim = (): void => {
@@ -887,7 +903,7 @@ export function BattleScreenView() {
    * боя — крыса М1 кусает Микулу сразу после вбегания, а не когда игрок
    * догадается нажать «Конец хода».
    */
-  const runPrologueCutscene = async (event: CutsceneEvent): Promise<void> => {
+  const runPrologueCutscene = async (event: CutsceneEvent, revealIds: readonly number[] = []): Promise<void> => {
     if (!prologueMission?.cutscenes || !kernel) return;
     const fired = [...firedCutscenesRef.current];
     const config = pickCutscene(prologueMission.cutscenes, event, fired);
@@ -906,7 +922,7 @@ export function BattleScreenView() {
       // Приближение держим до конца первой половины: укус крысы играется
       // крупным планом, а не между двумя переездами камеры (0.20.41).
       const skipped = await playCinematicPlan(
-        buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers, { holdZoom: after !== null }),
+        buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers, { holdZoom: after !== null, revealIds }),
       );
       if (skipped) {
         prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
@@ -916,6 +932,7 @@ export function BattleScreenView() {
       }
       if (!after) return;
       await handOffTurnToEnemy();
+      // Вторая половина сцены ничего не выводит: стая уже выбежала.
       await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(after), prologueMarkers, { baseScale }));
     } finally {
       setCutscenePlaying(false);
@@ -954,7 +971,12 @@ export function BattleScreenView() {
     if (staged.length === 0) return;
     // Стая выбегает разом (0.20.45): одна сцена на пакет появлений, а не
     // сцена на каждую крысу — иначе шесть выходов игрались бы по очереди.
-    await runPrologueCutscene(staged[0]!.event);
+    // Сцена одна на весь пакет появлений (0.20.45), и выводит она всех,
+    // кого скрыла: в засаде М2 обе крысы выбегают вместе (0.20.52).
+    await runPrologueCutscene(
+      staged[0]!.event,
+      staged.map((entry) => entry.entityId),
+    );
     // Сцена открыла своих героев: больше ничего не скрыто.
     rendererRef.current?.setHiddenEntities?.([]);
   };
@@ -988,7 +1010,7 @@ export function BattleScreenView() {
     // разыгрывается заново, и держать кнопки закрытыми было бы нечем.
     setPrologueStanceLock(false);
     setBusy(true);
-    setLog(t("prologue.scene.revive"));
+    showStoryNote(t("prologue.scene.revive"));
     try {
       await (renderer?.fadeScreen?.("out", 600) ?? Promise.resolve());
       session.restoreBattleCheckpoint();
@@ -1070,7 +1092,7 @@ export function BattleScreenView() {
       issued = clampPrologueCommand(kernel, prologueRunRef.current, command, prologueMission?.playerSlots);
     }
     if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, issued)) {
-      setLog(t("prologue.hint.m2.noise"));
+      showStoryNote(t("prologue.hint.m2.noise"));
       return;
     }
     const result = session.applyBattleCommand(issued);
@@ -1500,7 +1522,7 @@ export function BattleScreenView() {
       return;
     }
     if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, { type: "END_TURN", playerId: String(viewOwner) })) {
-      setLog(t("prologue.hint.m2.noise"));
+      showStoryNote(t("prologue.hint.m2.noise"));
       return;
     }
     void runEndTurnSequence();
@@ -2777,6 +2799,32 @@ export function BattleScreenView() {
               }}
             >
               {t(prologueCard === "intro" ? "common.ok" : prologueMission.nextMissionId && prologueMission.id === "prologue_brushwood" ? "prologue.next.toCry" : "prologue.next.toMap")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {storyNote ? (
+        // Сюжетное сообщение (0.20.52): окно поверх поля, закрывается
+        // кнопкой либо щелчком по фону; кнопки панели оно не задевает.
+        <div
+          className="pause-root story-note-root"
+          role="presentation"
+          onClick={() => setStoryNote(null)}
+        >
+          <div
+            className="pause-card story-note-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="story-note-text"
+            onClick={(event) => event.stopPropagation()}
+          >
+            {isPrologue && prologueMission ? <p className="eyebrow">{t(prologueMission.titleKey)}</p> : null}
+            <p id="story-note-text" className="story-note-text">
+              {storyNote}
+            </p>
+            <button type="button" className="hud-btn hud-btn-primary" onClick={() => setStoryNote(null)}>
+              {t("common.ok")}
             </button>
           </div>
         </div>
