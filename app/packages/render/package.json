@@ -1,6 +1,6 @@
 {
   "name": "@bylina/render",
-  "version": "0.20.49",
+  "version": "0.20.50",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"

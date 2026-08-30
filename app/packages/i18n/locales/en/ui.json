@@ -66,39 +66,9 @@
     "enemyUnseen": "Out of sight"
   },
   "battle": {
-    "title": "Staff clash",
-    "objective": {
-      "purge": "Defeat all enemies",
-      "destroy": "Destroy the idol of Nav",
-      "rescue": "Lead the princess to the extraction zone",
-      "recon": "Reach the extraction zone and leave the field"
-    },
-    "objectiveQuick": "Destroy all enemies",
-    "enemyTurn": "The Nav advances",
-    "pause": "Pause",
-    "fastPace": "Speed up battle",
-    "fastPaceHint": "Double speed is on: pauses, movement and effects run faster. Press to return to normal speed.",
-    "resume": "Resume",
-    "toMenu": "Return to menu",
-    "hp": "Health {current} / {max}",
-    "weapon": "Weapon",
-    "empty": "None selected",
     "apLeft": "AP",
-    "overwatch": "Overwatch",
-    "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
-    "debugMovement": "Movement cost",
-    "debugMovementHint": "Hide movement cost",
-    "defend": "Defensive stance",
-    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
-    "statuses": "Statuses",
-    "cooldownHint": "Cooldown: {turns} turn(s).",
-    "noUsesHint": "No uses remain in this battle.",
-    "cooldownShort": "CD {turns}",
-    "usesShort": "×{uses}",
-    "toCampaignMap": "To the ship map",
-    "debugAutoWin": "Finish mission",
-    "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission.",
-    "saved": "Saved",
+    "chargeBroken": "The approach is made, but the strike did not happen.",
+    "chargeHint": "Close in and strike: press the target once more.",
     "controls": {
       "weapons": "weapon and skill slots (select and use)",
       "defend": "defensive stance",
@@ -107,6 +77,36 @@
       "pause": "pause",
       "touch": "touch controls: tap to select and act, drag to pan the field"
     },
+    "controlsTitle": "Controls",
+    "cooldownHint": "Cooldown: {turns} turn(s).",
+    "cooldownShort": "CD {turns}",
+    "cutscene": {
+      "skip": "Skip"
+    },
+    "debugAutoWin": "Finish mission",
+    "debugAutoWinHint": "Debug: instantly destroy all enemies and win the mission.",
+    "debugMovement": "Movement cost",
+    "debugMovementHint": "Hide movement cost",
+    "defend": "Defensive stance",
+    "defendFlavor": "Set your feet, raise the shield, and ride it out.",
+    "defendHint": "Defensive stance: −25 enemy hit chance and −2 attack damage taken. Ends activation.",
+    "empty": "None selected",
+    "enemyTurn": "The Nav advances",
+    "fastPace": "Speed up battle",
+    "fastPaceHint": "Double speed is on: pauses, movement and effects run faster. Press to return to normal speed.",
+    "hp": "Health {current} / {max}",
+    "noUsesHint": "No uses remain in this battle.",
+    "objective": {
+      "purge": "Defeat all enemies",
+      "destroy": "Destroy the idol of Nav",
+      "rescue": "Lead the princess to the extraction zone",
+      "recon": "Reach the extraction zone and leave the field"
+    },
+    "objectiveQuick": "Destroy all enemies",
+    "overwatch": "Overwatch",
+    "overwatchFlavor": "Still as a mouse by the stone: wait, and do not blink.",
+    "overwatchHint": "Enter overwatch: reaction shot when an enemy moves. Ends activation.",
+    "pause": "Pause",
     "reject": {
       "generic": "That action is unavailable right now.",
       "ILLEGAL": "That action is unavailable right now.",
@@ -119,12 +119,14 @@
       "NO_LOS": "The target is hidden behind an obstacle.",
       "OUT_OF_RANGE": "Out of range."
     },
-    "controlsTitle": "Controls",
-    "cutscene": {
-      "skip": "Skip"
-    },
-    "defendFlavor": "Set your feet, raise the shield, and ride it out.",
-    "overwatchFlavor": "Still as a mouse by the stone: wait, and do not blink."
+    "resume": "Resume",
+    "saved": "Saved",
+    "statuses": "Statuses",
+    "title": "Staff clash",
+    "toCampaignMap": "To the ship map",
+    "toMenu": "Return to menu",
+    "usesShort": "×{uses}",
+    "weapon": "Weapon"
   },
   "unit": {
     "bogatyr": {

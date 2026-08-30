@@ -43,6 +43,7 @@ import {
   type TrainingDirectiveView,
 } from "./training-scenario.js";
 import { ActionInfoDialog, ActionSlot } from "./action-panel.js";
+import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./charge-attack.js";
 import { actionArt } from "./action-art.js";
 import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
 import { useServices, useT } from "./context.js";
@@ -387,6 +388,13 @@ export function BattleScreenView() {
    */
   const [actionInfo, setActionInfo] = useState<ActionInfo | null>(null);
   /**
+   * Рывок к цели ближнего боя (0.20.50): показанный план подхода.
+   * `chargeArmed` — игрок подтвердил намерение нажатием, следующее
+   * нажатие по той же цели исполняет подход и удар.
+   */
+  const [charge, setCharge] = useState<ChargePlan | null>(null);
+  const [chargeArmed, setChargeArmed] = useState(false);
+  /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
    * действия закрыты — включая «Конец хода». Единственное принуждение
@@ -610,6 +618,15 @@ export function BattleScreenView() {
   const isOwn = (entity: EntityState): boolean =>
     !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
 
+  /** Снять прицеливание, маршрут пути и рывок (0.20.50). */
+  const clearAim = (): void => {
+    setAimId(null);
+    setSkillTargetPos(null);
+    setPreview(null);
+    setCharge(null);
+    setChargeArmed(false);
+  };
+
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
   // локальный — на одном устройстве, сетевой — ведомому от ведущего.
   useEffect(() => {
@@ -617,9 +634,7 @@ export function BattleScreenView() {
     const unlisten = session.subscribePvpEvents((events) => {
       announce(events);
       setAction(null);
-      setAimId(null);
-      setSkillTargetPos(null);
-      setPreview(null);
+      clearAim();
       playThen(events);
     });
     return unlisten;
@@ -707,9 +722,7 @@ export function BattleScreenView() {
       : undefined) ?? snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
     setAction(null);
-    setAimId(null);
-    setSkillTargetPos(null);
-    setPreview(null);
+    clearAim();
   }, [snapshot.turnNumber, viewOwner, trainingActorId]);
 
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
@@ -981,9 +994,7 @@ export function BattleScreenView() {
       session.restoreBattleCheckpoint();
       setSelectedId(null);
       setAction(null);
-      setAimId(null);
-      setSkillTargetPos(null);
-      setPreview(null);
+      clearAim();
       // Клетку героя берём из свежего снимка: состояние `view` обновится
       // только после перерисовки, и опора на него дала бы гонку.
       const heroId = prologueMission?.playerSlots[0];
@@ -1026,8 +1037,12 @@ export function BattleScreenView() {
     playThen(result.events);
   };
 
-  /** Единственный канал команд: поочерёдная игра — через транспорт (0.14.0/0.15.0). */
-  const applyCommand = (command: Command): void => {
+  /**
+   * Единственный канал команд: поочерёдная игра — через транспорт
+   * (0.14.0/0.15.0). `after` вызывается, когда события команды уже
+   * отыграны полем: рывок к цели исполняет удар именно так (0.20.50).
+   */
+  const applyCommand = (command: Command, after?: () => void): void => {
     if (isSpectator || isReplay) return;
     // Исход известен, но ещё не показан (0.20.40): поле доигрывает бой,
     // команды игрока в этот кадр не принадлежат.
@@ -1118,10 +1133,12 @@ export function BattleScreenView() {
     advanceTraining(result.events);
     showTrainingNote(result.events);
     setAction(null);
-    setAimId(null);
-    setSkillTargetPos(null);
-    setPreview(null);
-    playThen(result.events, prologueAfter ?? undefined);
+    clearAim();
+    // Рывок: удар подаётся после того, как боец дошёл (0.20.50).
+    playThen(result.events, after || prologueAfter ? () => {
+      prologueAfter?.();
+      after?.();
+    } : undefined);
     // После playThen: проигрывание уже началось, и гейт выдержит паузу
     // от его конца, а не от момента команды.
     if (prologueFinished) outcomeGate.report(() => setPrologueCard("outro"));
@@ -1178,6 +1195,69 @@ export function BattleScreenView() {
       ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
       : { type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id };
     applyCommand(command);
+  };
+
+  /**
+   * План рывка к цели (0.20.50): `null`, если подойти нечем или режим
+   * не позволяет соединить две команды в один замысел. В поочерёдной и
+   * сетевой игре команды уходят транспортом, дождаться подхода здесь
+   * нельзя; в обучении шаги предписаны сценарием.
+   */
+  const chargeFor = (target: EntityState): ChargePlan | null => {
+    if (isTraining || isReplay || isSpectator || usesNetSnapshot) return null;
+    if (!kernel || selectedId === null) return null;
+    const actor = snapshot.entities.find((entity) => entity.id === selectedId);
+    const strike = meleeStrikeOf(action, weapons, skills);
+    if (!actor || !strike || actor.dead) return null;
+    return planCharge({
+      snapshot,
+      actor,
+      target,
+      strike,
+      reachable: session.getBattleReachable(actor.id),
+      pathOf: (cell) => session.getBattlePath(actor.id, cell),
+    });
+  };
+
+  /**
+   * Рывок к цели: подход и удар одним замыслом (0.20.50).
+   *
+   * Подход исполняется обычной командой перемещения, удар — обычной
+   * командой атаки уже после того, как боец дошёл. Если за время подхода
+   * удар стал невозможен — дозорный выстрел, гибель, помеха, — он не
+   * исполняется: экран сообщает об этом, боец остаётся на клетке подхода.
+   */
+  const executeCharge = (plan: ChargePlan): void => {
+    if (!action || selectedId === null) return;
+    const strike: MeleeStrike | null = meleeStrikeOf(action, weapons, skills);
+    if (!strike) return;
+    const actorId = selectedId;
+    const targetId = plan.targetId;
+    setCharge(null);
+    setChargeArmed(false);
+    setAimId(null);
+    setPreview(null);
+    applyCommand({ type: "MOVE", actorId, to: plan.step, path: plan.path }, () => {
+      const fresh = session.getBattleSnapshot(viewOwner);
+      const actor = fresh.entities.find((entity) => entity.id === actorId);
+      if (!actor || actor.dead || fresh.activeOwner !== viewOwner || actor.ap < strike.apCost) {
+        setLog(t("battle.chargeBroken"));
+        return;
+      }
+      const available =
+        strike.kind === "weapon"
+          ? session.getBattleHitPreview(actorId, targetId, strike.id).available
+          : session.getBattleSkillPreview(actorId, strike.id, targetId).available;
+      if (!available) {
+        setLog(t("battle.chargeBroken"));
+        return;
+      }
+      applyCommand(
+        strike.kind === "weapon"
+          ? { type: "ATTACK", actorId, targetId, weaponId: strike.id }
+          : { type: "USE_SKILL", actorId, targetId, skillId: strike.id },
+      );
+    });
   };
 
   const useSelfSkill = (skillId: string): void => {
@@ -1547,7 +1627,17 @@ export function BattleScreenView() {
         tryAttack(entity.id);
         return;
       }
+      // Рывок к цели ближнего боя (0.20.50): первое нажатие показывает
+      // подход и линию удара, повторное по той же цели — подходит и бьёт.
+      if (aimId === entity.id && charge && charge.targetId === entity.id && chargeArmed) {
+        executeCharge(charge);
+        return;
+      }
+      const plan = chargeFor(entity);
       setAimId(entity.id);
+      setCharge(plan);
+      setChargeArmed(plan !== null);
+      if (plan) setLog(t("battle.chargeHint"));
       if (!selectedSkill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
       setPreview(null);
       return;
@@ -1593,9 +1683,34 @@ export function BattleScreenView() {
     const id = cellKey(x, y);
     if (hoverRef.current === id) return;
     hoverRef.current = id;
-    if (byReach.has(id) && !window.matchMedia("(pointer: coarse)").matches) {
+    const coarse = window.matchMedia("(pointer: coarse)").matches;
+    if (byReach.has(id) && !coarse) {
       setPreview(id);
     }
+    // Рывок (0.20.50): наведение мышью показывает подход и линию удара
+    // до нажатия. Сенсорный экран наведения не имеет — там тот же
+    // предпросмотр даёт первое нажатие.
+    if (coarse || action === null) return;
+    const hovered = snapshot.entities.find(
+      (candidate) => !candidate.dead && candidate.coverType === 0 && candidate.x === x && candidate.y === y,
+    );
+    // Цель, выбранную нажатием, наведение не отнимает: снимается только
+    // неподтверждённый рывок, показанный самим наведением.
+    const dropPreview = (): void => {
+      if (charge && !chargeArmed) setCharge(null);
+    };
+    if (!hovered || hovered.owner === viewOwner) {
+      dropPreview();
+      return;
+    }
+    const plan = chargeFor(hovered);
+    if (!plan) {
+      dropPreview();
+      return;
+    }
+    setAimId(hovered.id);
+    setCharge(plan);
+    setChargeArmed(false);
   };
 
   inputRef.current = { onCell, onHover };
@@ -1726,11 +1841,22 @@ export function BattleScreenView() {
       selectedId,
       aimId,
       reachable,
-      path: previewPath,
-      aimOk: Boolean(hit?.available),
+      // Рывок (0.20.50): маршрут ведёт в клетку подхода, а луч
+      // прицеливания начинается там же — игрок видит, откуда ударит.
+      path: charge ? charge.path : previewPath,
+      aimFrom: charge ? charge.step : null,
+      aimOk: Boolean(hit?.available) || Boolean(charge),
       // Этап 1.4: состояние кольца цели — белое (предварительно выбрана),
       // янтарное (атака готова), красное (невозможно).
-      aimState: aimId === null ? undefined : !hit ? "preselect" : hit.available ? "ready" : "blocked",
+      aimState: aimId === null
+        ? undefined
+        : charge
+          ? "ready"
+          : !hit
+            ? "preselect"
+            : hit.available
+              ? "ready"
+              : "blocked",
       // Этап 2.7: цель открыта с фланга — красные уголки-скобки.
       aimFlanked: Boolean(hit?.available && hit.flanked),
       // Этап 2.6 (правка): областной прицел — центр и радиус из определения
@@ -1754,7 +1880,7 @@ export function BattleScreenView() {
       trainingHighlight,
       trainingFocus,
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, action, t, battleBiome, darknessRatio, areaPreview]);
+  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, action, t, battleBiome, darknessRatio, areaPreview, charge]);
 
   // Жесты холста закрыты, пока исход боя ещё не показан (0.20.40): пауза
   // принадлежит проигрыванию боя, а не игроку. Сцена держит замок сама,
@@ -2412,6 +2538,9 @@ export function BattleScreenView() {
                   onInspect={info ? () => setActionInfo(info) : undefined}
                   onPress={() => {
                     setAction(active ? null : { type: "weapon", id: weaponId });
+                    // Рывок считался под прежнее оружие: снимаем (0.20.50).
+                    setCharge(null);
+                    setChargeArmed(false);
                     setSkillTargetPos(null);
                     setAimId(null);
                     setPreview(null);
@@ -2444,6 +2573,9 @@ export function BattleScreenView() {
                   info={info}
                   onInspect={info ? () => setActionInfo(info) : undefined}
                   onPress={() => {
+                    // Рывок считался под прежнее действие: снимаем (0.20.50).
+                    setCharge(null);
+                    setChargeArmed(false);
                     // Этап-правка: умение «на себя» с областью (круговой взмах)
                     // подтверждается вторым тапом — первый показывает область.
                     if (skill?.category === "self") {
