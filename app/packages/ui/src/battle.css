@@ -688,6 +688,41 @@
   padding: 22px 20px 18px;
 }
 
+/* Сюжетное сообщение отдельным окном (0.20.52): реплика миссии читается
+   в собственной карточке и не ложится поверх кнопок действий. */
+.story-note-root {
+  /* Выше панелей боя, но ниже окна информации о действии (96). */
+  z-index: 74;
+  background: rgba(8, 10, 12, 0.72);
+}
+
+.story-note-card {
+  width: min(100%, 340px);
+  text-align: center;
+  border-color: rgba(224, 179, 74, 0.45);
+  animation: story-note-in 220ms ease-out both;
+}
+
+.story-note-text {
+  margin: 0 0 4px;
+  color: #f3ecdc;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+
+@keyframes story-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* Карточка туториала «первого раза» кампании (0.20.0, ui-design §4.5) */
 .campaign-hint-card {
   border-color: rgba(224, 179, 74, 0.5);
@@ -1881,6 +1916,7 @@
   .apple-hud-icon,
   .cutscene-skip,
   .action-info-backdrop,
+  .story-note-card,
   .objective-hp i {
     animation: none !important;
     transition: none !important;

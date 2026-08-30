@@ -43,7 +43,9 @@ const rendererStub: FieldRenderer = {
   setReducedMotion: vi.fn(),
   setSpeed: vi.fn(),
   playCinematic: vi.fn(async (plan: CinematicPlan) => {
-    calls.push({ name: "playCinematic", args: [plan.id] });
+    // План целиком (0.20.52): тесту нужны не только имя сцены, но и
+    // сущности, которых она выводит на поле.
+    calls.push({ name: "playCinematic", args: [plan] });
     return false;
   }),
   skipCinematic: vi.fn(),
@@ -132,7 +134,14 @@ async function mountShell(): Promise<{ root: Root; services: AppServices }> {
 
 /** Сыгранные сцены в порядке вызова. */
 const playedScenes = (): string[] =>
-  calls.filter((entry) => entry.name === "playCinematic").map((entry) => String(entry.args[0]));
+  calls
+    .filter((entry) => entry.name === "playCinematic")
+    .map((entry) => String((entry.args[0] as CinematicPlan | undefined)?.id));
+
+/** План сыгранной сцены по её имени. */
+const scenePlan = (id: string): CinematicPlan | undefined =>
+  calls.find((entry) => entry.name === "playCinematic" && (entry.args[0] as CinematicPlan | undefined)?.id === id)
+    ?.args[0] as CinematicPlan | undefined;
 
 /** Начать М2: экран боя, вступительная карточка закрыта. */
 async function startM2(root: Root, session: AppServices["session"]): Promise<void> {
@@ -264,6 +273,115 @@ describe("prologue M2 beat (0.20.45)", () => {
       // Крысы появляются скрытыми: на поле их выводит сцена.
       expect(calls.some((entry) => entry.name === "setHiddenEntities")).toBe(true);
 
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    { timeout: 90000 },
+  );
+
+  it(
+    "выводит обеих крыс засады той же сценой, а не после неё (0.20.52)",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session } = services;
+      await startM2(root, session);
+
+      const hero = () =>
+        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const rats = () =>
+        session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead);
+      const clickCell = async (x: number, y: number): Promise<void> => {
+        await act(async () => {
+          activate?.(x, y);
+        });
+        await act(async () => {
+          await tick(60);
+        });
+      };
+      const clickButton = async (label: string): Promise<void> => {
+        const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) =>
+          (candidate.textContent ?? "").includes(label),
+        );
+        await act(async () => {
+          button?.click();
+        });
+        await act(async () => {
+          await tick(120);
+        });
+      };
+
+      // Рывок и стойка: засада выходит на поле.
+      const start = hero();
+      const dash = session
+        .getBattleReachable(start.id)
+        .filter((cell) => cell.apCost === 2)
+        .sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
+      await clickCell(dash.x, dash.y);
+      await clickButton("Защитная стойка");
+      await waitFor(() => rats().length >= 2);
+
+      // Сцена засады выводит обеих: вторая крыса больше не ждёт за кадром.
+      const ambush = scenePlan("m2_ambush");
+      expect(ambush, "сцена засады сыграна").not.toBeUndefined();
+      expect(ambush!.revealIds?.length, "обе крысы вбегают по сцене").toBe(2);
+      const spawned = new Set(rats().map((entity) => entity.id));
+      for (const id of ambush!.revealIds ?? []) {
+        expect(spawned.has(id), `крыса ${id} вышла на поле`).toBe(true);
+      }
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    { timeout: 90000 },
+  );
+
+  it(
+    "сообщение засады показывается окном, а не строкой над кнопками (0.20.52)",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session } = services;
+      await startM2(root, session);
+
+      const hero = () =>
+        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const clickCell = async (x: number, y: number): Promise<void> => {
+        await act(async () => {
+          activate?.(x, y);
+        });
+        await act(async () => {
+          await tick(60);
+        });
+      };
+
+      // Рывок: второе ОД заперто — ход не отдаётся, пока не принята стойка.
+      const start = hero();
+      const dash = session
+        .getBattleReachable(start.id)
+        .filter((cell) => cell.apCost === 2)
+        .sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
+      await clickCell(dash.x, dash.y);
+
+      // Гейт миссии: пока стойка не принята, любой шаг отклоняется — и
+      // реплика приходит окном, а не строкой над кнопками действий.
+      const onward = hero();
+      const step = session.getBattleReachable(onward.id).filter((cell) => cell.apCost === 1)[0]!;
+      await clickCell(step.x, step.y);
+
+      const card = document.querySelector<HTMLElement>(".story-note-card");
+      expect(card, "окно сообщения").not.toBeNull();
+      expect(card?.textContent ?? "", "текст реплики").toContain("шум в кустах");
+      // Журнал боя остаётся за короткими репликами боя, а не за сюжетом.
+      expect(document.querySelector(".battle-log")?.textContent ?? "", "журнал не дублирует реплику").not.toContain("шум в кустах");
+
+      // Окно закрывается кнопкой.
+      await act(async () => {
+        card?.querySelector<HTMLButtonElement>("button")?.click();
+      });
+      await act(async () => {
+        await tick(60);
+      });
+      expect(document.querySelector(".story-note-card"), "окно закрыто").toBeNull();
       await act(async () => {
         root.unmount();
       });

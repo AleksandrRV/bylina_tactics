@@ -20,10 +20,13 @@ export type LayoutMarkers = Record<string, { x: number; y: number }[]>;
 export function buildCinematicPlan(
   config: CutsceneConfig,
   markers: LayoutMarkers | null,
-  options: { holdZoom?: boolean; baseScale?: number | null } = {},
+  options: { holdZoom?: boolean; baseScale?: number | null; revealIds?: readonly number[] } = {},
 ): CinematicPlan {
   return {
     id: config.id,
+    // Появление кого сцена выводит на поле (0.20.52): все скрытые ею
+    // сущности вбегают одним шагом, а не только первая под камерой.
+    revealIds: options.revealIds,
     lockInput: config.lockInput ?? true,
     skippable: config.skippable ?? true,
     // Сцена — только первая половина кадра: приближение держим до конца,

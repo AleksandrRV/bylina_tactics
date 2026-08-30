@@ -889,6 +889,14 @@ export interface CinematicStep {
 export interface CinematicPlan {
   id: string;
   steps: CinematicStep[];
+  /**
+   * Сущности, чьё появление ставит эта сцена (0.20.52). Они скрыты до
+   * вбегания, и вбегают ВСЕ сразу: камера ведёт первого (`follow`), остальные
+   * приходят тем же шагом рядом. Прежде сцена открывала лишь ту сущность,
+   * за которой ехала, а вторая крыса засады возникала на поле уже после
+   * сцены — «выбегала невидимой».
+   */
+  revealIds?: readonly number[];
   /** Блокировать ввод игрока на время сцены (по умолчанию — да). */
   lockInput?: boolean;
   /** Сцену можно пропустить (по умолчанию — да). */
@@ -3217,7 +3225,15 @@ export function createFieldRenderer(): FieldRenderer {
         } else {
           await glideTo(point, step.durationMs ?? 600);
         }
-        if (step.runInMs !== undefined && runner) await runInEntity(runner.id, step.runInMs, follow);
+        if (step.runInMs !== undefined && runner) {
+          // Стая выбегает разом (0.20.52): скрытые сценой сущности вбегают
+          // одним шагом, камера ведёт только первого.
+          const pack = plan.revealIds?.length ? [...plan.revealIds] : [runner.id];
+          const lead = pack.indexOf(runner.id);
+          await Promise.all(
+            pack.map((id, index) => runInEntity(id, step.runInMs!, index === lead && follow)),
+          );
+        }
         if (step.holdMs) await waitCinematic(step.holdMs);
         cinematicAccent = null;
       }
