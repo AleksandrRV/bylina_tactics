@@ -245,9 +245,9 @@ describe("movement allowance (0.20.43)", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.20.47 and does not touch the document object", () => {
+  it("reports 0.20.48 and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.20.47");
+    expect(kernel.version).toBe("0.20.48");
     expect(typeof globalThis.document).toBe("undefined");
   });
 
