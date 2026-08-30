@@ -148,7 +148,7 @@
         heightMix: { z0: 0.0, z1: 1.0, z2: 0.0 },
         extract: true,
         layout: {
-          // Дизайн карты М2 (0.20.44). Болото: запад — сухая кромка, откуда
+          // Дизайн карты М2 (0.20.44, клетки стаи — 0.20.45). Болото: запад — сухая кромка, откуда
           // уходят к эвакуации; восток и юго-восток — низина трясины, в
           // которой увяз Федот; север — чаща, из кустов выбегают крысы.
           // Рельеф ведёт бой: кочки (ярус 2) дают выигрыш высоты и меткости,
@@ -158,8 +158,8 @@
           // (ряд 6 у кочки и ряд 7 у кромки), и выбор между ними — первый
           // тактический выбор миссии.
           rows: [
-            "Ett..c..t.W.",
-            "E...c...t..t",
+            "Ett..c.StSWS",
+            "E...c..StS.S",
             "E.M...t.....",
             "..c..t..t...",
             "........cF..",
@@ -190,8 +190,13 @@
             "c": { kind: "cover", coverType: 1 },
             "W": { kind: "wall" },
             "E": { kind: "extract" },
-            "M": { kind: "spawn", side: "player", unitId: "mikula_peasant" },
+            // Герой выходит на ночь с дубиной, найденной в М1 (0.20.45):
+            // канон §6.1 и реплика «их будет больше, чем палки».
+            "M": { kind: "spawn", side: "player", unitId: "mikula_peasant", weapons: ["club"] },
             "V": { kind: "stranded", unitId: "fedot_stranded", state: "immobile" },
+            // `F` — точка засады: первая пара крыс выбегает отсюда, когда
+            // герой примет стойку. `S` — шесть клеток стаи: крысы
+            // выбегают из чащи разом, как только Федот освобождён.
             "F": { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
           },
         },
@@ -209,6 +214,69 @@
         ],
       },
       hints: ["m2.noise", "m2.stanceWorks", "m2.wave", "m2.gear"],
+      // Режиссура камеры М2 (0.20.45, campaign.md §7.2 и §13.4). Четыре
+      // сцены ведут миссию: вступление называет цель, засада показывает
+      // первую пару крыс и передаёт им ход, стая — шесть крыс разом, и
+      // последняя сцена открывает зону эвакуации, когда она загорелась.
+      cutscenes: [
+        {
+          id: "m2_intro",
+          trigger: { kind: "missionStart" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.7,
+          steps: [
+            // Кто перед нами и где он стоит.
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 420, holdMs: 600 },
+            // Крик из чащи: камера уходит к Федоту и подсвечивает его —
+            // цель миссии названа изображением, без слов.
+            { kind: "pan", target: { marker: "V" }, durationMs: 1100, holdMs: 900, accent: true },
+            // Возврат к герою: дальше играет игрок.
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 800 },
+          ],
+        },
+        {
+          // Засада — единственный раз, когда появление крыс передаёт им
+          // ход: обе кусают сразу, промах и попадание по канону (§7.2).
+          id: "m2_ambush",
+          trigger: { kind: "onSpawn", configId: "forest_rat" },
+          once: true,
+          lockInput: true,
+          skippable: true,
+          zoom: 1.7,
+          steps: [
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 620, follow: true, holdMs: 300 },
+            { kind: "handOff" },
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 600 },
+          ],
+        },
+        {
+          // Стая. Ход Нави не передаётся: игроку оставляют его ход, чтобы
+          // он успел побежать к выходу.
+          id: "m2_swarm",
+          trigger: { kind: "onSpawn", configId: "forest_rat" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.5,
+          steps: [
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 620, follow: true, holdMs: 500 },
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 600 },
+          ],
+        },
+        {
+          // Зона эвакуации загорелась: камера показывает выход и
+          // возвращается к отряду.
+          id: "m2_extract",
+          trigger: { kind: "onFlag", flag: "extractRevealed" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.5,
+          steps: [
+            { kind: "pan", target: { cell: { x: 0, y: 7 } }, durationMs: 900, holdMs: 800, accent: true },
+            { kind: "pan", target: { configId: "mikula_peasant" }, durationMs: 700 },
+          ],
+        },
+      ],
       onboarding: [],
       checkpoints: [
         { id: "start", description: "Вход в миссию" },

@@ -71,6 +71,13 @@ export interface CutsceneConfig {
    * «поле целиком» окно камеры не меньше поля.
    */
   zoom?: number;
+  /**
+   * Играть сцену один раз за бой (0.20.45). Триггер `onSpawn` срабатывает
+   * на каждое появление записи бестиария, и сцена первого выхода —
+   * засады в М2 — не должна повторяться на каждой волне: следующая
+   * подходящая сцена из данных миссии играется вместо неё.
+   */
+  once?: boolean;
 }
 
 /** Событие, на которое откликается проигрыватель сцен. */
@@ -80,8 +87,19 @@ export type CutsceneEvent =
   | { type: "flag"; flag: string }
   | { type: "pickup"; itemId: string };
 
-/** Отвечает ли триггер сцены произошедшему событию. */
-export function cutsceneMatches(config: CutsceneConfig, event: CutsceneEvent): boolean {
+/**
+ * Отвечает ли триггер сцены произошедшему событию.
+ *
+ * `fired` — идентификаторы уже сыгранных сцен: сцена с `once` повторно
+ * не выбирается (0.20.45), и её триггер достаётся следующей подходящей
+ * сцене из данных миссии.
+ */
+export function cutsceneMatches(
+  config: CutsceneConfig,
+  event: CutsceneEvent,
+  fired: readonly string[] = [],
+): boolean {
+  if (config.once && fired.includes(config.id)) return false;
   const trigger = config.trigger;
   switch (trigger.kind) {
     case "missionStart":
@@ -97,13 +115,17 @@ export function cutsceneMatches(config: CutsceneConfig, event: CutsceneEvent): b
   }
 }
 
-/** Первая подходящая сцена: порядок в данных миссии задаёт приоритет. */
+/**
+ * Первая подходящая сцена: порядок в данных миссии задаёт приоритет.
+ * `fired` — уже сыгранные сцены (0.20.45): помеченные `once` пропускаются.
+ */
 export function pickCutscene(
   configs: readonly CutsceneConfig[] | undefined,
   event: CutsceneEvent,
+  fired: readonly string[] = [],
 ): CutsceneConfig | null {
   if (!configs) return null;
-  return configs.find((config) => cutsceneMatches(config, event)) ?? null;
+  return configs.find((config) => cutsceneMatches(config, event, fired)) ?? null;
 }
 
 /**

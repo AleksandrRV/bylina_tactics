@@ -65,3 +65,17 @@ describe("cutscene camera zoom (0.20.39)", () => {
     expect(withCutsceneDefaults({ ...INTRO, zoom: 1.4 }).zoom).toBe(1.4);
   });
 });
+
+describe("однократные сцены (0.20.45)", () => {
+  it("сыгранная сцена с once уступает триггер следующей", () => {
+    const ambush: CutsceneConfig = { ...RAT, id: "m2_ambush", once: true };
+    const swarm: CutsceneConfig = { ...RAT, id: "m2_swarm" };
+    const event = { type: "spawn", configId: "forest_rat" } as const;
+    // Первое появление крысы в М2 — засада: сцена передаёт ход Нави.
+    expect(pickCutscene([ambush, swarm], event)?.id).toBe("m2_ambush");
+    // Сцена уже сыграна: следующие крысы — стая, без передачи хода.
+    expect(pickCutscene([ambush, swarm], event, ["m2_ambush"])?.id).toBe("m2_swarm");
+    // Без пометки once сцена игралась бы на каждой волне.
+    expect(pickCutscene([{ ...ambush, once: false }, swarm], event, ["m2_ambush"])?.id).toBe("m2_ambush");
+  });
+});

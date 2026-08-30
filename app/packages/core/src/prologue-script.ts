@@ -207,6 +207,20 @@ export function pickScriptedCommand(
     if (action.kind === "endTurn") {
       return { command: null, state: { index: index + 1 } };
     }
+    // Исполнитель ещё не вышел на поле — сценарий ждёт его, а не теряет
+    // шаг (0.20.45). Крыса М1 появляется только после подбора палки: без
+    // этого ожидания первые же пустые ходы Нави пролистывали всю очередь,
+    // и укус, обещанный сценой, разыгрывался бы обычным алгоритмом —
+    // с обычным шансом промаха. Появление (`spawn`/`appear`) ждать не
+    // надо: оно само выводит исполнителя на поле.
+    if (
+      action.unitId &&
+      action.kind !== "spawn" &&
+      action.kind !== "appear" &&
+      !snap.entities.some((entity) => entity.configId === action.unitId)
+    ) {
+      return { command: null, state: { index } };
+    }
     const resolution = resolveAction(kernel, action);
     if (resolution.command || resolution.spawn) {
       return {
