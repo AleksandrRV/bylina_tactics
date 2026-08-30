@@ -74,8 +74,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.50", () => {
-    expect(APP_VERSION).toBe("0.20.50");
+  it("reports version 0.20.51", () => {
+    expect(APP_VERSION).toBe("0.20.51");
   });
 
   it("moves between menu and settings", () => {
@@ -540,6 +540,26 @@ describe("continueCampaign (0.20.19)", () => {
     session.continueCampaign({ screen: "battle" });
     expect(session.get().screen).toBe("campaign");
     expect(session.get().restoredMatch).toBeUndefined();
+  });
+
+  it("restores a prologue battle as a story mission, not a map point (0.20.51)", () => {
+    const session = createSession("menu");
+    bindCampaignAutomaton(session);
+    const match = createDebugMatch();
+    session.continueCampaign({
+      screen: "battle",
+      prologueMissionId: "prologue_brushwood",
+      restoredMatch: match,
+      matchSeed: 701,
+    });
+    const state = session.get();
+    expect(state.screen).toBe("battle");
+    // Пролог — не точка карты: иначе экран боя искал бы миссию среди
+    // миссий кампании и падал («Unknown campaign mission»).
+    expect(state.battleKind).toBe("prologue");
+    expect(state.prologueMissionId).toBe("prologue_brushwood");
+    expect(state.activeMissionId).toBeNull();
+    expect(state.restoredMatch).toBe(match);
   });
 
   it("falls back to the ship map for unknown saved screens", () => {

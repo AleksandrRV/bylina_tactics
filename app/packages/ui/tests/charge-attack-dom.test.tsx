@@ -87,6 +87,18 @@ async function waitFor(condition: () => boolean, timeoutMs = 12000): Promise<voi
   throw new Error("condition was not met in time");
 }
 
+/** Тот же опрос, но без исключения: вызывающий решает, что делать дальше. */
+async function waitUntil(condition: () => boolean, timeoutMs = 8000): Promise<boolean> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (condition()) return true;
+    await act(async () => {
+      await tick(40);
+    });
+  }
+  return condition();
+}
+
 async function mountShell(): Promise<{ root: Root; services: AppServices }> {
   const parsed = parseContent(dataTree());
   if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
@@ -172,17 +184,33 @@ describe("рывок к цели в экране боя (0.20.50)", () => {
 
       // Раскладка случайна: сближаемся, пока рывок не станет возможен.
       // Противник идёт к дружине сам, поэтому пара находится за 2–3 хода.
+      const endTurnButton = (): HTMLButtonElement | undefined => {
+        const found = document.querySelector<HTMLButtonElement>(".end-turn");
+        return found && !found.disabled ? found : undefined;
+      };
+      /** Свежая раскладка: прежний бой мог закончиться. */
+      const newLayout = async (): Promise<void> => {
+        await act(async () => {
+          session.selectDifficulty("normal");
+        });
+        await waitUntil(() => document.querySelector(".battle-screen") !== null);
+        await act(async () => {
+          await tick(80);
+        });
+      };
       let found = findOpportunity();
-      for (let attempt = 0; attempt < 5 && !found; attempt += 1) {
-        const endTurn = [...document.querySelectorAll<HTMLButtonElement>(".hud-btn-primary")].find(
-          (button) => !button.disabled,
-        );
-        if (!endTurn) break;
+      for (let attempt = 0; attempt < 12 && !found; attempt += 1) {
+        const endTurn = endTurnButton();
+        if (!endTurn) {
+          await newLayout();
+          found = findOpportunity();
+          continue;
+        }
         const turn = session.getBattleSnapshot(1).turnNumber;
         await act(async () => {
           endTurn.click();
         });
-        await waitFor(() => {
+        const advanced = await waitUntil(() => {
           const current = session.getBattleSnapshot(1);
           return current.turnNumber > turn && current.activeOwner === 1;
         });
@@ -190,6 +218,11 @@ describe("рывок к цели в экране боя (0.20.50)", () => {
           await tick(120);
         });
         found = findOpportunity();
+        // Ход не перешёл и поля нет — бой завершился: берём новую раскладку.
+        if (!advanced && document.querySelector(".battle-screen") === null) {
+          await newLayout();
+          found = findOpportunity();
+        }
       }
       expect(found, "в раскладке быстрого матча нашлась цель для рывка").not.toBeNull();
       const { actorId, targetId, stepX, stepY } = found!;

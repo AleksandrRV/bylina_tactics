@@ -13,6 +13,13 @@ import type { FogState, MatchState } from "@bylina/core";
 export interface SessionSaveState {
   screen: string;
   battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue" | null;
+  /**
+   * Сюжетная миссия пролога, в которой игрок вышел из боя (0.20.51).
+   * Пролог — не точка карты кампании, поэтому её идентификатор живёт
+   * отдельно от `activeMissionId`; без него выход из сюжетного боя
+   * выбрасывал игрока из начатой былины.
+   */
+  prologueMissionId?: string | null;
   activeMissionId: string | null;
   deployment: number[];
   matchSeed: number;

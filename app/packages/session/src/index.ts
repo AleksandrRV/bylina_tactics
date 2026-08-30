@@ -17,7 +17,7 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.50";
+export const APP_VERSION = "0.20.51";
 
 export type AppScreen =
   | "boot"
@@ -324,6 +324,12 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" |
 export interface CampaignContinuation {
   /** Сохранённый экран ветки кампании. */
   screen: "campaign" | "deployment" | "missionResult" | "battle";
+  /**
+   * Сюжетная миссия пролога (0.20.51): бой восстанавливается своим родом,
+   * а не как точка карты кампании. Пролог не значится в списке миссий
+   * автомата, поэтому его идентификатор приходит отдельно.
+   */
+  prologueMissionId?: string | null;
   activeMissionId?: string | null;
   deployment?: number[];
   matchSeed?: number;
@@ -559,12 +565,16 @@ export function createSession(
       // BattleScreen не смонтируется — возвращаемся на карту корабля.
       const screen =
         entry.screen === "battle" && !entry.restoredMatch ? "campaign" : entry.screen;
+      // Сюжетная миссия (0.20.51): бой пролога восстанавливается как пролог,
+      // иначе экран боя искал бы миссию среди точек карты и падал.
+      const story = screen === "battle" ? (entry.prologueMissionId ?? null) : null;
       const open = screen === "battle" ? openBattle : emit;
       open({
         ...idle,
         screen,
-        battleKind: screen === "battle" ? "campaign" : null,
-        activeMissionId: entry.activeMissionId ?? null,
+        battleKind: screen === "battle" ? (story ? "prologue" : "campaign") : null,
+        prologueMissionId: story,
+        activeMissionId: story ? null : entry.activeMissionId ?? null,
         deployment: entry.deployment ?? [],
         matchSeed: entry.matchSeed ?? 0,
         outcome: entry.outcome ?? null,
