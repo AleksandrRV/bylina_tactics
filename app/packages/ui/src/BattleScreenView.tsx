@@ -42,6 +42,9 @@ import {
   type TrainingActionKind,
   type TrainingDirectiveView,
 } from "./training-scenario.js";
+import { ActionInfoDialog, ActionSlot } from "./action-panel.js";
+import { actionArt } from "./action-art.js";
+import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -378,6 +381,11 @@ export function BattleScreenView() {
   useEffect(() => () => outcomeGate.reset(), [outcomeGate]);
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
   const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
+  /**
+   * Окно информации о действии (0.20.46): открывается долгим нажатием
+   * кнопки или правым кликом и лежит поверх боя.
+   */
+  const [actionInfo, setActionInfo] = useState<ActionInfo | null>(null);
   /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
@@ -2385,26 +2393,32 @@ export function BattleScreenView() {
             )}
           </div>
           <div className="skill-row">
-            {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => (
-              <button
-                key={`weapon-${weaponId}`}
-                type="button"
-                className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId) ? " hint-pulse" : ""}${accentWeaponId === weaponId ? " action-accent" : ""}`}
-                aria-pressed={action?.type === "weapon" && action.id === weaponId}
-                data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
-                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId) || prologueStanceLock}
-                onClick={() => {
-                  const active = action?.type === "weapon" && action.id === weaponId;
-                  setAction(active ? null : { type: "weapon", id: weaponId });
-                  setSkillTargetPos(null);
-                  setAimId(null);
-                  setPreview(null);
-                }}
-              >
-                {ACTION_SHORTCUTS[index] ? <kbd>{ACTION_SHORTCUTS[index]}</kbd> : null}
-                {t(`weapon.${weaponId}.name`)}
-              </button>
-            ))}
+            {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => {
+              const weapon = weapons[weaponId];
+              const active = action?.type === "weapon" && action.id === weaponId;
+              const info = weapon ? weaponActionInfo(weaponId, weapon, t) : null;
+              return (
+                <ActionSlot
+                  key={`weapon-${weaponId}`}
+                  id={weaponId}
+                  name={t(`weapon.${weaponId}.name`)}
+                  art={actionArt(weaponId)}
+                  shortcut={ACTION_SHORTCUTS[index]}
+                  active={active}
+                  hinted={hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId)}
+                  accent={accentWeaponId === weaponId}
+                  disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId) || prologueStanceLock}
+                  info={info}
+                  onInspect={info ? () => setActionInfo(info) : undefined}
+                  onPress={() => {
+                    setAction(active ? null : { type: "weapon", id: weaponId });
+                    setSkillTargetPos(null);
+                    setAimId(null);
+                    setPreview(null);
+                  }}
+                />
+              );
+            })}
             {(selected?.skillIds ?? []).map((skillId) => {
               const skill = skills[skillId];
               const active = action?.type === "skill" && action.id === skillId;
@@ -2413,16 +2427,23 @@ export function BattleScreenView() {
               const uses = selected?.skillUses?.[skillId] ?? 0;
               const usesLeft = skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses);
               const exhausted = usesLeft === 0;
+              const info = skill ? skillActionInfo(skillId, skill, t) : null;
               return (
-                <button
+                <ActionSlot
                   key={`skill-${skillId}`}
-                  type="button"
-                  className={`hud-btn skill-slot${active ? " is-active" : ""}${cooldown > 0 ? " is-cooldown" : ""}${exhausted ? " is-exhausted" : ""}${hintPanelKey === "skill" && trainingSkillAllowed(skillId) ? " hint-pulse" : ""}`}
-                  aria-pressed={active}
-                  data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
+                  id={skillId}
+                  name={t(`skill.${skillId}.name`)}
+                  art={actionArt(skillId)}
+                  shortcut={shortcut}
+                  active={active}
+                  hinted={hintPanelKey === "skill" && trainingSkillAllowed(skillId)}
+                  cooldown={cooldown}
+                  usesLeft={usesLeft}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
                   disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId) || prologueStanceLock}
-                  onClick={() => {
+                  info={info}
+                  onInspect={info ? () => setActionInfo(info) : undefined}
+                  onPress={() => {
                     // Этап-правка: умение «на себя» с областью (круговой взмах)
                     // подтверждается вторым тапом — первый показывает область.
                     if (skill?.category === "self") {
@@ -2445,22 +2466,21 @@ export function BattleScreenView() {
                       setPreview(null);
                     }
                   }}
-                >
-                  {shortcut ? <kbd>{shortcut}</kbd> : null}
-                  {t(`skill.${skillId}.name`)}
-                  {cooldown > 0 ? <span className="skill-resource cooldown">{t("battle.cooldownShort", { turns: cooldown })}</span> : null}
-                  {usesLeft !== undefined ? <span className="skill-resource uses">{t("battle.usesShort", { uses: usesLeft })}</span> : null}
-                </button>
+                />
               );
             })}
-            <button
-              type="button"
-              className={`hud-btn skill-slot${selected?.defending ? " is-active" : ""}${hintPanelKey === "defend" ? " hint-pulse" : ""}`}
-              aria-pressed={Boolean(selected?.defending)}
-              data-action-state={selected?.defending ? "active" : "inactive"}
+            <ActionSlot
+              id="defend"
+              name={t("battle.defend")}
+              art={actionArt("defend")}
+              shortcut="9"
+              active={Boolean(selected?.defending)}
+              hinted={hintPanelKey === "defend"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("defend")}
               title={t("battle.defendHint")}
-              onClick={() => {
+              info={stanceActionInfo("defend", t)}
+              onInspect={() => setActionInfo(stanceActionInfo("defend", t))}
+              onPress={() => {
                 if (selectedId === null) return;
                 // Единый путь команд (0.19.2): как и клавиша 9 — через
                 // applyCommand (транспорт в состязательном режиме, анимация
@@ -2471,18 +2491,19 @@ export function BattleScreenView() {
                 setAimId(null);
                 setPreview(null);
               }}
-            >
-              <kbd>9</kbd>
-              {t("battle.defend")}
-            </button>
-            <button
-              type="button"
-              className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}${hintPanelKey === "overwatch" ? " hint-pulse" : ""}`}
-              aria-pressed={Boolean(selected?.overwatch)}
-              data-action-state={selected?.overwatch ? "active" : "inactive"}
+            />
+            <ActionSlot
+              id="overwatch"
+              name={t("battle.overwatch")}
+              art={actionArt("overwatch")}
+              shortcut="0"
+              active={Boolean(selected?.overwatch)}
+              hinted={hintPanelKey === "overwatch"}
               disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("overwatch") || prologueStanceLock}
               title={t("battle.overwatchHint")}
-              onClick={() => {
+              info={stanceActionInfo("overwatch", t)}
+              onInspect={() => setActionInfo(stanceActionInfo("overwatch", t))}
+              onPress={() => {
                 if (selectedId === null) return;
                 // Единый путь команд (0.19.2): как и клавиша 0 — через
                 // applyCommand (транспорт в состязательном режиме, анимация
@@ -2493,10 +2514,7 @@ export function BattleScreenView() {
                 setAimId(null);
                 setPreview(null);
               }}
-            >
-              <kbd>0</kbd>
-              {t("battle.overwatch")}
-            </button>
+            />
           </div>
           <button
             type="button"
@@ -2706,6 +2724,8 @@ export function BattleScreenView() {
           </div>
         </div>
       ) : null}
+      {/* Окно информации о действии: поверх боя, всё остальное затемнено. */}
+      {actionInfo ? <ActionInfoDialog info={actionInfo} onClose={() => setActionInfo(null)} /> : null}
     </div>
   );
 }
