@@ -4,8 +4,8 @@ import type { EntityState, MatchState } from "../src/types.js";
 import type { WeaponStats } from "../src/weapons.js";
 
 describe("package version", () => {
-  it("is 0.20.48", () => {
-    expect(CORE_VERSION).toBe("0.20.48");
+  it("is 0.20.49", () => {
+    expect(CORE_VERSION).toBe("0.20.49");
   });
 });
 
