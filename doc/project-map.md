@@ -64,6 +64,10 @@
 | `app/packages/content/src/schemas.ts` | Zod-схемы |
 | `app/packages/i18n/locales/` | Словари ru/en |
 | `app/packages/ui/src/` | Экраны React |
+| `app/packages/ui/src/action-art.ts` | Образы действий и умений, карта файлов `public/actions` (0.20.46) |
+| `app/packages/ui/src/action-info.ts` | Содержимое окна информации: числа из боевых данных, текст из словарей (0.20.46) |
+| `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
+| `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
 | `app/scripts/check-version-consistency.mjs` | Единая версия пакетов и констант |
 
 ## 3. Владелец темы

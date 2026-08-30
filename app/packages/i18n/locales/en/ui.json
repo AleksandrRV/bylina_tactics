@@ -120,7 +120,12 @@
       "OUT_OF_RANGE": "Out of range."
     },
     "controlsTitle": "Controls",
-    "cutscene": {"skip": "Skip"}},
+    "cutscene": {
+      "skip": "Skip"
+    },
+    "defendFlavor": "Set your feet, raise the shield, and ride it out.",
+    "overwatchFlavor": "Still as a mouse by the stone: wait, and do not blink."
+  },
   "unit": {
     "bogatyr": {
       "name": "Bogatyr"
@@ -188,43 +193,56 @@
   },
   "weapon": {
     "sword": {
-      "name": "Sword"
+      "name": "Sword",
+      "flavor": "The blade knows one job and does it honestly."
     },
     "bow": {
-      "name": "Bow"
+      "name": "Bow",
+      "flavor": "The string sings, and the arrow finds the throat on its own."
     },
     "sling": {
-      "name": "Sling"
+      "name": "Sling",
+      "flavor": "A stone is cheaper than an arrow, and no louder."
     },
     "claws": {
-      "name": "Claws"
+      "name": "Claws",
+      "flavor": "The forest strikes not with a stick but with what grew on the paw."
     },
     "branch": {
-      "name": "Branch"
+      "name": "Branch",
+      "flavor": "What you tear off is what you strike with. The tree is not asked."
     },
     "needle": {
-      "name": "Needle"
+      "name": "Needle",
+      "flavor": "Thin as a nail. Koschei's death sits on the point."
     },
     "mace": {
-      "name": "Mace"
+      "name": "Mace",
+      "flavor": "Spikes go through mail the way a finger goes through dough."
     },
     "pishchal": {
-      "name": "Arquebus"
+      "name": "Arquebus",
+      "flavor": "Thunder in the palm, smoke in the face, silence afterwards."
     },
     "sword_debug": {
-      "name": "Sword (debug)"
+      "name": "Sword (debug)",
+      "flavor": "A lesson sword: it takes without asking, so that you learn."
     },
     "bow_debug": {
-      "name": "Bow (debug)"
+      "name": "Bow (debug)",
+      "flavor": "A practice bow: it never misses and never asks."
     },
     "teeth": {
-      "name": "Teeth"
+      "name": "Teeth",
+      "flavor": "Small, but they hold on to the throat for good."
     },
     "club": {
-      "name": "Club"
+      "name": "Club",
+      "flavor": "A heavier branch — that is all the schooling it takes."
     },
     "spit": {
-      "name": "Spit"
+      "name": "Spit",
+      "flavor": "Wet, caustic and shameful. But it lands."
     }
   },
   "combat": {
@@ -286,49 +304,64 @@
   },
   "skill": {
     "circular_sweep": {
-      "name": "Circular sweep"
+      "name": "Circular sweep",
+      "flavor": "One swing, and no one is left around you but your own."
     },
     "breach": {
-      "name": "Breach"
+      "name": "Breach",
+      "flavor": "The wall holds until it is asked to step aside."
     },
     "shield_bash": {
-      "name": "Shield bash"
+      "name": "Shield bash",
+      "flavor": "The shield strikes not with its rim but with the weight behind it."
     },
     "heal": {
-      "name": "Healing"
+      "name": "Healing",
+      "flavor": "The weeping herb closes the wound before it stops burning."
     },
     "cleanse": {
-      "name": "Cleanse"
+      "name": "Cleanse",
+      "flavor": "Bitter water washes away the glamour, the poison and the bad dream."
     },
     "summon_forest_beast": {
-      "name": "Summon beast"
+      "name": "Summon beast",
+      "flavor": "A whistle in the thicket, and the beast comes — wild, but listening."
     },
     "aimed_eye": {
-      "name": "Keen eye"
+      "name": "Keen eye",
+      "flavor": "A squint, a breath — and half-cover stops mattering."
     },
     "roots": {
-      "name": "Roots"
+      "name": "Roots",
+      "flavor": "Roots wake underfoot and hold tighter than hands."
     },
     "poison_needles": {
-      "name": "Poison needles"
+      "name": "Poison needles",
+      "flavor": "The needle does not wound. What stays in the blood does."
     },
     "raise_skeleton": {
-      "name": "Raise skeleton"
+      "name": "Raise skeleton",
+      "flavor": "The earth sighs and gives back what it took."
     },
     "panic": {
-      "name": "Dread vision"
+      "name": "Dread vision",
+      "flavor": "Fear arrives first — and leads the rest behind it."
     },
     "create_illusion": {
-      "name": "Illusion"
+      "name": "Illusion",
+      "flavor": "A shadow will become a warrior. Not for long — but it will."
     },
     "teleport_ally": {
-      "name": "Teleport ally"
+      "name": "Teleport ally",
+      "flavor": "A step that never happened: here a moment ago, standing there now."
     },
     "evacuate": {
-      "name": "Evacuate"
+      "name": "Evacuate",
+      "flavor": "Leaving alive is not cowardice; it is service you will yet render."
     },
     "whistle": {
-      "name": "Whistle"
+      "name": "Whistle",
+      "flavor": "The robber's whistle: wind in the ears and heels over head."
     }
   },
   "status": {
@@ -762,5 +795,55 @@
         "source": "They came from the barrow-field. The earth there has been swelling since last autumn."
       }
     },
-    "scene": {"revive": "Steady yourself."}}
+    "scene": {
+      "revive": "Steady yourself."
+    }
+  },
+  "action": {
+    "hold": "Hold the button for details",
+    "info": {
+      "aim": "Aim",
+      "apCost": "Action points",
+      "cell": "cells",
+      "close": "Got it",
+      "cooldown": "Cooldown",
+      "crit": "Crit",
+      "damage": "Damage",
+      "defendEffect": "Protection",
+      "defendEffectValue": "−25 enemy aim, −2 damage",
+      "destroyCover": "Breaks cover",
+      "displace": "Moves a fighter",
+      "endsTurn": "Ends the turn",
+      "flee": "Leaves the field",
+      "heal": "Healing",
+      "kind": "Type",
+      "kindMelee": "Melee",
+      "kindRanged": "Ranged",
+      "kindSelf": "Self",
+      "knockback": "Knocks the target back",
+      "no": "no",
+      "overwatchEffect": "Shoots anyone who steps into view",
+      "radius": "Radius",
+      "range": "Range",
+      "removeStatus": "Removes",
+      "reveal": "Breaks stealth",
+      "status": "Applies",
+      "summon": "Summons",
+      "target": "Target",
+      "targetAll": "Any fighter",
+      "targetAllies": "Allies",
+      "targetCover": "Cover",
+      "targetEnemies": "Enemies",
+      "uses": "Uses per battle",
+      "yes": "yes"
+    },
+    "status": {
+      "flying": "Flight",
+      "hidden": "Stealth",
+      "immobile": "Immobile",
+      "panic": "Fear",
+      "poison": "Poison",
+      "timed": "Timer"
+    }
+  }
 }

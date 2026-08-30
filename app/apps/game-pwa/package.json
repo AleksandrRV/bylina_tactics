@@ -1,6 +1,6 @@
 {
   "name": "@bylina/game-pwa",
-  "version": "0.20.45",
+  "version": "0.20.46",
   "private": true,
   "type": "module",
   "scripts": {
