@@ -22,7 +22,7 @@ import type {
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 
-export const CORE_VERSION = "0.20.44";
+export const CORE_VERSION = "0.20.45";
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -63,7 +63,12 @@ export interface TacticsKernel {
   /** Откат к снимку чекпоинта без записи в журнал повтора. */
   restoreMatch(match: MatchState, restoredFog?: FogState): void;
   /** Появление подкрепления/скриптового союзника через публичный канал ядра. */
-  spawnScripted(unitId: string, owner: number, pos: CellPos): EntityState | null;
+  /**
+   * Скриптовое появление существа. `countsForElimination` — признак «в счёт
+   * истребления» (0.20.45): крысы М2 выходят не целью миссии, а угрозой,
+   * и их гибель не должна закрывать бой.
+   */
+  spawnScripted(unitId: string, owner: number, pos: CellPos, options?: { countsForElimination?: boolean }): EntityState | null;
   /**
    * События скриптовых появлений, накопленные с прошлого вызова (0.20.37).
    * Появление происходит внутри `spawnScripted`, а не внутри `apply`, поэтому
@@ -222,6 +227,18 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   let ended = false;
   /** Победа по цели миссии (эвакуация при rescue/recon), фиксируется ядром. */
   let objectiveVictory = false;
+  /**
+   * Стороны, истребление которых означает исход боя (0.20.45).
+   *
+   * Защёлка: однажды появившись, вторая сторона остаётся в счёте и после
+   * гибели своего последнего бойца — иначе победа по истреблению не
+   * наступала бы вовсе. Но в счёт идёт только тот, кого можно истребить:
+   * существо с пометкой `countsForElimination: false` за собой победу не
+   * несёт. Крысы М2 выходят именно с этой пометкой — они не цель миссии,
+   * их истребление ничего не решает, и прежде ядро считало бой
+   * выигранным в момент их выхода: партия «заканчивалась», ход Нави не
+   * начинался, и миссия вставала.
+   */
   const eliminationOwners = new Set(state.entities
     .filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false)
     .map((entity) => entity.owner));
@@ -1190,7 +1207,11 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       revealAdjacent([]);
       emit();
     },
-    spawnScripted: (unitId, owner, pos) => {
+    spawnScripted: (unitId, owner, pos, options) => {
+      // По умолчанию цель истребления — всё, что выходит за Навь: таков
+      // смысл появления противника в обычном бою. Сценарий миссии волен
+      // снять пометку — см. `eliminationOwners` выше (0.20.45).
+      const countsForElimination = options?.countsForElimination ?? owner === ENEMY_OWNER;
       const source: EntityState = {
         id: -1,
         configId: "script",
@@ -1219,9 +1240,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const events: GameEvent[] = [];
       const spawned = spawnAt(source, unitId, pos, "SUMMON", events);
       if (spawned) {
-        spawned.countsForElimination = owner === ENEMY_OWNER;
+        spawned.countsForElimination = countsForElimination;
         spawned.ap = spawned.maxAp;
-        if (spawned.countsForElimination !== false && spawned.owner > 0) {
+        if (countsForElimination && spawned.owner > 0) {
           eliminationOwners.add(spawned.owner);
           eliminationEnabled = eliminationOwners.size >= 2;
         }

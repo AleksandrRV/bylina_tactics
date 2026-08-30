@@ -566,6 +566,13 @@ export const cutsceneConfigSchema = z.object({
    * возвращается. Значение задаёт автор сцены, разумный предел — 4.
    */
   zoom: z.number().min(1).max(4).optional(),
+  /**
+   * Играть сцену один раз за бой (0.20.45). Триггер `onSpawn` срабатывает
+   * на каждое появление записи бестиария; сцена первого выхода — засады
+   * в М2 — не должна повторяться на каждой волне, и после неё играется
+   * следующая подходящая сцена из данных миссии.
+   */
+  once: z.boolean().default(false),
 }).strict();
 
 export type CutsceneConfig = z.infer<typeof cutsceneConfigSchema>;

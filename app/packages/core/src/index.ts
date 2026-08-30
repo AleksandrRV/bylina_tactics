@@ -69,6 +69,8 @@ export {
   createPrologueRunState,
   afterPrologueApply,
   gatePrologueCommand,
+  clampPrologueCommand,
+  revealPrologueExtract,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   prologueHintView,

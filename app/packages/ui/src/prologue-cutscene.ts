@@ -93,13 +93,14 @@ export function spawnedConfigIds(events: readonly GameEvent[]): string[] {
 export function splitSpawnEvents(
   events: readonly GameEvent[],
   cutscenes: readonly CutsceneConfig[] | undefined,
+  fired: readonly string[] = [],
 ): { staged: { configId: string; entityId: number; event: CutsceneEvent }[]; generic: GameEvent[] } {
   const staged: { configId: string; entityId: number; event: CutsceneEvent }[] = [];
   const generic: GameEvent[] = [];
   for (const event of events) {
     if (event.type === "ENTITY_SPAWNED") {
       const configId = event.entity.configId;
-      const config = pickCutscene(cutscenes, { type: "spawn", configId });
+      const config = pickCutscene(cutscenes, { type: "spawn", configId }, fired);
       if (config) {
         staged.push({ configId, entityId: event.entity.id, event: { type: "spawn", configId } });
         continue;
@@ -118,6 +119,7 @@ export function splitSpawnEvents(
 export function stagedEntityIds(
   events: readonly GameEvent[],
   cutscenes: readonly CutsceneConfig[] | undefined,
+  fired: readonly string[] = [],
 ): number[] {
-  return splitSpawnEvents(events, cutscenes).staged.map((entry) => entry.entityId);
+  return splitSpawnEvents(events, cutscenes, fired).staged.map((entry) => entry.entityId);
 }

@@ -59,7 +59,10 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
   }
   const entities: EntityState[] = [...compiled.covers];
   let id = 1;
-  const legend = (options.layout.legend ?? {}) as Record<string, { kind?: string; unitId?: string; side?: string; scripted?: boolean; state?: string; itemId?: string }>;
+  const legend = (options.layout.legend ?? {}) as Record<
+    string,
+    { kind?: string; unitId?: string; side?: string; scripted?: boolean; state?: string; itemId?: string; weapons?: string[] }
+  >;
 
   const spawnAt = (marker: string, unitId: string, owner: number, extra?: (entity: EntityState) => void): void => {
     for (const pos of compiled.markers[marker] ?? []) {
@@ -95,7 +98,14 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
     if (entry.kind === "spawn" && entry.unitId) {
       if (entry.scripted) continue;
       const owner = entry.side === "enemy" ? ENEMY_OWNER : PLAYER_OWNER;
-      spawnAt(ch, entry.unitId, owner);
+      spawnAt(ch, entry.unitId, owner, (entity) => {
+        // Снаряжение из раскладки (0.20.45): М2 продолжает М1, и герой
+        // выходит на ночь уже с дубиной — канон §6.1 и реплика «их будет
+        // больше, чем палки». В М1 того же поля нет: дубину он найдёт.
+        if (!entry.weapons || entry.weapons.length === 0) return;
+        entity.weaponIds = [...entry.weapons];
+        entity.weaponId = entry.weapons[0]!;
+      });
     }
   }
 

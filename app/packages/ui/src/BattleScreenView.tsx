@@ -64,6 +64,8 @@ import {
   buildPrologueContext,
   createPrologueRunState,
   gatePrologueCommand,
+  clampPrologueCommand,
+  revealPrologueExtract,
   initPrologueMatch,
   prologueUnits,
   shouldRestoreCheckpoint,
@@ -376,6 +378,30 @@ export function BattleScreenView() {
   useEffect(() => () => outcomeGate.reset(), [outcomeGate]);
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
   const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
+  /**
+   * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
+   * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
+   * действия закрыты — включая «Конец хода». Единственное принуждение
+   * пролога (campaign.md §1.1), поэтому состояние живёт ровно один ход.
+   */
+  const [prologueStanceLock, setPrologueStanceLock] = useState(false);
+  /**
+   * Сцены, уже сыгранные в этом бою (0.20.45). Сцена с `once` повторно не
+   * выбирается: триггер `onSpawn` срабатывает на каждое появление, и
+   * первая пара крыс М2 играется один раз, а волны — общей сценой стаи.
+   */
+  const firedCutscenesRef = useRef<Set<string>>(new Set());
+  /**
+   * Исход, которым распоряжается сцена (0.20.45).
+   *
+   * В прологе общее правило «противников не осталось» неприменимо: крысы
+   * М2 выходят с пометкой «не для истребления» и по общему правилу бой
+   * считался бы выигранным в ту же секунду, когда они выбежали, — ход
+   * Нави не начинался бы вовсе, и партия вставала. В прологе исход
+   * объявляет контроллер миссии: М2 выигрывается эвакуацией обоих.
+   */
+  const battleOutcome = (): "ongoing" | "victory" | "defeat" =>
+    isPrologue ? (prologueRunRef.current?.outcome ?? "ongoing") : session.getBattleOutcome();
   const prologueTelemetryRef = useRef<TelemetryLog>(createTelemetryLog());
   const [prologueObjectiveKey, setPrologueObjectiveKey] = useState(
     prologueRunRef.current?.objectiveKey ?? "prologue.objective.gather",
@@ -704,7 +730,10 @@ export function BattleScreenView() {
 
   // Ключ подсвечиваемого элемента панели/кнопки (ui-design §4.5):
   // "ap" | "weapon" | "skill" | "defend" | "overwatch" | "end_turn".
-  const hintPanelKey = directiveView?.panelKey ?? null;
+  // Пульсация панели: указание обучения либо принудительная стойка М2
+  // (0.20.45) — единственное место пролога, где интерфейс сам называет
+  // единственно возможное действие.
+  const hintPanelKey = directiveView?.panelKey ?? (prologueStanceLock ? "defend" : null);
 
   const previewPath = useMemo(() => {
     if (!preview || selectedId === null) return [] as CellPos[];
@@ -839,8 +868,12 @@ export function BattleScreenView() {
    */
   const runPrologueCutscene = async (event: CutsceneEvent): Promise<void> => {
     if (!prologueMission?.cutscenes || !kernel) return;
-    const config = pickCutscene(prologueMission.cutscenes, event);
+    const fired = [...firedCutscenesRef.current];
+    const config = pickCutscene(prologueMission.cutscenes, event, fired);
     if (!config) return;
+    // Помечаем до проигрывания: вторая крыса того же пакета уже не
+    // заказывает свою копию сцены (0.20.45).
+    if (config.once) firedCutscenesRef.current.add(config.id);
     const { before, after } = splitAtHandOff(config);
     // Игровой масштаб запоминаем до первой половины: она удерживает
     // приближение (чтобы укус игрался крупным планом), и вторая половина
@@ -883,7 +916,7 @@ export function BattleScreenView() {
    */
   const hideStagedSpawns = (events: readonly GameEvent[]): void => {
     if (!prologueMission) return;
-    const ids = stagedEntityIds(events, prologueMission.cutscenes);
+    const ids = stagedEntityIds(events, prologueMission.cutscenes, [...firedCutscenesRef.current]);
     if (ids.length > 0) rendererRef.current?.setHiddenEntities?.(ids);
   };
 
@@ -895,13 +928,31 @@ export function BattleScreenView() {
    */
   const runPrologueSpawnBeats = async (events: readonly GameEvent[]): Promise<void> => {
     if (!prologueMission || events.length === 0) return;
-    const { staged, generic } = splitSpawnEvents(events, prologueMission.cutscenes);
+    const { staged, generic } = splitSpawnEvents(events, prologueMission.cutscenes, [...firedCutscenesRef.current]);
     if (generic.length > 0) await (rendererRef.current?.play(generic) ?? Promise.resolve());
-    for (const entry of staged) {
-      await runPrologueCutscene(entry.event);
-    }
+    if (staged.length === 0) return;
+    // Стая выбегает разом (0.20.45): одна сцена на пакет появлений, а не
+    // сцена на каждую крысу — иначе шесть выходов игрались бы по очереди.
+    await runPrologueCutscene(staged[0]!.event);
     // Сцена открыла своих героев: больше ничего не скрыто.
-    if (staged.length > 0) rendererRef.current?.setHiddenEntities?.([]);
+    rendererRef.current?.setHiddenEntities?.([]);
+  };
+
+  /**
+   * Открыть зону эвакуации после сцены стаи (0.20.45).
+   *
+   * М2: зона загорается не в момент освобождения Федота, а когда стая уже
+   * выбежала на поле и отыграла своё появление — сначала крысы, потом пан
+   * камеры к точкам выхода. Цель миссии обновляется без пояснительного
+   * текста: свет на западе виден сам.
+   */
+  const revealExtractBeat = async (): Promise<void> => {
+    if (!isPrologue || !kernel || !prologueMission) return;
+    if (!prologueRunRef.current?.extractPending) return;
+    const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
+    prologueRunRef.current = revealPrologueExtract(kernel, prologueRunRef.current, ctx);
+    setPrologueObjectiveKey("prologue.objective.evacuate");
+    await runPrologueCutscene({ type: "flag", flag: "extractRevealed" });
   };
 
   /**
@@ -912,6 +963,9 @@ export function BattleScreenView() {
    */
   const restorePrologueScene = async (): Promise<void> => {
     const renderer = rendererRef.current;
+    // Откат снимает с героя принудительную стойку (0.20.45): сцена
+    // разыгрывается заново, и держать кнопки закрытыми было бы нечем.
+    setPrologueStanceLock(false);
     setBusy(true);
     setLog(t("prologue.scene.revive"));
     try {
@@ -985,11 +1039,18 @@ export function BattleScreenView() {
       trainingDeny(trainingActionKindOfCommand(command));
       return;
     }
-    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, command)) {
+    // Сцена М2 обрывает рывок на полпути (0.20.45): пока засада впереди,
+    // герою оставляют одно ОД на защитную стойку — иначе второе ОД уходило
+    // бы на бег, и стойку стало бы нечем оплатить.
+    let issued = command;
+    if (isPrologue && kernel && prologueRunRef.current) {
+      issued = clampPrologueCommand(kernel, prologueRunRef.current, command, prologueMission?.playerSlots);
+    }
+    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, issued)) {
       setLog(t("prologue.hint.m2.noise"));
       return;
     }
-    const result = session.applyBattleCommand(command);
+    const result = session.applyBattleCommand(issued);
     if (!result.ok) {
       // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
       // ограничены, и без отклика неясно, почему действие не сработало.
@@ -1004,7 +1065,10 @@ export function BattleScreenView() {
     let prologueFinished = false;
     if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
       const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
-      const next = afterPrologueApply(kernel, command, result.events, prologueRunRef.current, ctx);
+      const next = afterPrologueApply(kernel, issued, result.events, prologueRunRef.current, ctx);
+      // Принудительная стойка (0.20.45): пульсация кнопки и закрытые
+      // прочие действия живут ровно до команды «DEFEND».
+      setPrologueStanceLock(next.forceDefend);
       // Контрольная точка миссии: вход в миссию уже ею обеспечен, дальше —
       // ключевые сюжетные вехи, включая выход крысы в М1.
       const armed = next.fedotFreed || next.firstWave || next.vasilisaJoined || next.ratSpawned;
@@ -1029,7 +1093,8 @@ export function BattleScreenView() {
           // вбегания по сцене (0.20.39): иначе она возникает в клетке,
           // пропадает и выбегает заново.
           hideStagedSpawns(taken.events);
-          prologueAfter = () => void runPrologueSpawnBeats(taken.events);
+          // Сначала стая выбегает, потом загорается выход (0.20.45).
+          prologueAfter = () => void runPrologueSpawnBeats(taken.events).then(() => revealExtractBeat());
         }
       }
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
@@ -1184,7 +1249,7 @@ export function BattleScreenView() {
       for (let guard = 0; guard < 96; guard += 1) {
         const snap = session.getBattleSnapshot(PLAYER_OWNER);
         if (snap.activeOwner !== ENEMY_OWNER) break;
-        if (session.getBattleOutcome() !== "ongoing") break;
+        if (battleOutcome() !== "ongoing") break;
         if (!kernel) break;
         let command: Command | null;
         if (isTraining) {
@@ -1236,7 +1301,7 @@ export function BattleScreenView() {
         }
         finishFromEvents(applied.events);
         if (!command) break;
-        if (session.getBattleOutcome() !== "ongoing") break;
+        if (battleOutcome() !== "ongoing") break;
         await sleep(190);
       }
       if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
@@ -1254,7 +1319,7 @@ export function BattleScreenView() {
     const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
     for (let guard = 0; guard < 8; guard += 1) {
       if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== PLAYER_OWNER) break;
-      if (session.getBattleOutcome() !== "ongoing") break;
+      if (battleOutcome() !== "ongoing") break;
       const decision = tickProloguePlayerTurn(kernel, prologueRunRef.current, ctx);
       prologueRunRef.current = decision.state;
       if (!decision.command) break;
@@ -1283,7 +1348,7 @@ export function BattleScreenView() {
   // В поочерёдной игре алгоритм не применяется — ход принадлежит человеку.
   useEffect(() => {
     if (battleKind === "pvp" || battleKind === "pvpNet") return;
-    if (session.getBattleOutcome() !== "ongoing") return;
+    if (battleOutcome() !== "ongoing") return;
     if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== ENEMY_OWNER) return;
     void runEnemyPhase();
     // Только при создании ядра (монтаж экрана, включая восстановление).
@@ -1315,9 +1380,9 @@ export function BattleScreenView() {
       await (rendererRef.current?.play(result.events) ?? Promise.resolve());
       outcomeGate.playbackEnd();
       finishFromEvents(result.events);
-      if (session.getBattleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
+      if (battleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
         await runEnemyPhase();
-      } else if (isPrologue && session.getBattleOutcome() === "ongoing") {
+      } else if (isPrologue && battleOutcome() === "ongoing") {
         await runProloguePlayerScript();
       }
     } finally {
@@ -1389,7 +1454,7 @@ export function BattleScreenView() {
       activeOwner: snapshot.activeOwner,
       viewOwner,
       ownUnits,
-      outcomeOngoing: session.getBattleOutcome() === "ongoing",
+      outcomeOngoing: battleOutcome() === "ongoing",
       isNetGuest: Boolean(isNetGuest),
     })) return;
     endTurn();
@@ -1823,8 +1888,14 @@ export function BattleScreenView() {
     };
   }, [paused, busy, cutscenePlaying, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
 
+  // В дружине — только бойцы (0.20.45). Увязший в трясине Федот выходит
+  // из списка: пока он immobile (maxAp 0), управлять им нельзя, и пустая
+  // карточка с пустой шкалой ОД обещала бы игроку второго бойца, которого
+  // у него нет. На поле он виден, а цель миссии названа в шапке.
   const roster = snapshot.entities.filter((entity) =>
-    (isSpectator ? (entity.owner === 1 || entity.owner === 2) : entity.owner === viewOwner) && entity.coverType === 0,
+    (isSpectator ? (entity.owner === 1 || entity.owner === 2) : entity.owner === viewOwner) &&
+    entity.coverType === 0 &&
+    (entity.dead || entity.maxAp > 0),
   );
   const sideKey = isSpectator
     ? "net.spectator"
@@ -2321,7 +2392,7 @@ export function BattleScreenView() {
                 className={`hud-btn skill-slot${action?.type === "weapon" && action.id === weaponId ? " is-active" : ""}${hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId) ? " hint-pulse" : ""}${accentWeaponId === weaponId ? " action-accent" : ""}`}
                 aria-pressed={action?.type === "weapon" && action.id === weaponId}
                 data-action-state={action?.type === "weapon" && action.id === weaponId ? "active" : "inactive"}
-                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId)}
+                disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId) || prologueStanceLock}
                 onClick={() => {
                   const active = action?.type === "weapon" && action.id === weaponId;
                   setAction(active ? null : { type: "weapon", id: weaponId });
@@ -2350,7 +2421,7 @@ export function BattleScreenView() {
                   aria-pressed={active}
                   data-action-state={exhausted ? "exhausted" : cooldown > 0 ? "cooldown" : active ? "active" : "inactive"}
                   title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId)}
+                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId) || prologueStanceLock}
                   onClick={() => {
                     // Этап-правка: умение «на себя» с областью (круговой взмах)
                     // подтверждается вторым тапом — первый показывает область.
@@ -2409,7 +2480,7 @@ export function BattleScreenView() {
               className={`hud-btn skill-slot${selected?.overwatch ? " is-active" : ""}${hintPanelKey === "overwatch" ? " hint-pulse" : ""}`}
               aria-pressed={Boolean(selected?.overwatch)}
               data-action-state={selected?.overwatch ? "active" : "inactive"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("overwatch")}
+              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("overwatch") || prologueStanceLock}
               title={t("battle.overwatchHint")}
               onClick={() => {
                 if (selectedId === null) return;
@@ -2430,7 +2501,9 @@ export function BattleScreenView() {
           <button
             type="button"
             className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
-            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn")}
+            // Принудительная стойка закрывает и «Конец хода» (0.20.45):
+            // иначе игрок уходил бы от засады ценой пропущенного урока.
+            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn") || prologueStanceLock}
             onClick={() => endTurn()}
           >
             {t("field.endTurn")}

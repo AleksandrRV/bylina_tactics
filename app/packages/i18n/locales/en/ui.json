@@ -715,6 +715,7 @@
       "gather": "Gather brushwood",
       "destroyAll": "Destroy all enemies",
       "rescueFedot": "Find Fedot and lead him to the light",
+      "evacuate": "Lead both of you to the west",
       "clearGlade": "Clear the glade",
       "clearStreet": "Clear the street"
     },

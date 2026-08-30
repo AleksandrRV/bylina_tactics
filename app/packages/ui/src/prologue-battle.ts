@@ -4,6 +4,8 @@ import {
   createPrologueMatch,
   createPrologueRunState,
   gatePrologueCommand,
+  clampPrologueCommand,
+  revealPrologueExtract,
   shouldRestoreCheckpoint,
   takePrologueSpawnEvents,
   tickPrologueEnemyTurn,
@@ -42,8 +44,14 @@ export function buildPrologueContext(
     showHints,
     reinforcements: profile,
     ratMarker: rat,
-    fedotWaveSpawns: layout?.markers.F?.slice(1),
+    // Клетки стаи (0.20.45): отдельный маркер `S`, а не «все `F` кроме
+    // первого» — порядок маркеров в раскладке больше ни на что не влияет.
+    fedotWaveSpawns: layout?.markers.S ?? layout?.markers.F?.slice(1),
     waveCells: layout?.markers.S,
+    // Зона эвакуации открывается по клеткам раскладки, а не всей колонкой:
+    // `E` — служебный символ, в маркеры он не попадает, у раскладки есть
+    // отдельный список extractCells.
+    extractCells: layout?.extractCells,
     allyCell: layout?.markers.A?.[0],
     healerCell: layout?.markers.z?.[0],
   };
@@ -63,6 +71,8 @@ export {
   createPrologueRunState,
   afterPrologueApply,
   gatePrologueCommand,
+  clampPrologueCommand,
+  revealPrologueExtract,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   shouldRestoreCheckpoint,

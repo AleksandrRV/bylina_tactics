@@ -4,8 +4,10 @@ import {
   createPrologueRunState,
   createTacticsKernel,
   afterPrologueApply,
+  clampPrologueCommand,
   compilePrologueLayout,
   gatePrologueCommand,
+  revealPrologueExtract,
   matchOutcome,
   pickScriptedCommand,
   shouldRestoreCheckpoint,
@@ -202,6 +204,227 @@ describe("prologue M2 gate", () => {
     expect(gatePrologueCommand(state, { type: "ATTACK", actorId: mikula.id, targetId: 2, weaponId: "club" })).toBe(false);
     expect(gatePrologueCommand(state, { type: "DEFEND", actorId: mikula.id })).toBe(true);
     expect(gatePrologueCommand(state, { type: "END_TURN", playerId: "1" })).toBe(false);
+  });
+});
+
+// Раскладка М2 «Крик в чаще» (синхронна с prologue_missions.json5, 0.20.45).
+const M2_LAYOUT = {
+  rows: [
+    "Ett..c.StSWS",
+    "E...c..StS.S",
+    "E.M...t.....",
+    "..c..t..t...",
+    "........cF..",
+    ".c....t..t..",
+    "E...c....V..",
+    "E......t...c",
+    "Ett.....ttW.",
+  ],
+  legend: {
+    M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
+    V: { kind: "stranded", unitId: "fedot_stranded", state: "immobile" },
+    F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
+  },
+};
+
+/** Состояние М2: ядро, контроллер пролога и контекст сценария. */
+function m2Setup(options: { adjacent?: boolean } = {}) {
+  const match = createPrologueMatch({ layout: M2_LAYOUT, units: [MIKULA, FEDOT, RAT], seed: 702, hideExtract: true });
+  if (options.adjacent) {
+    // Федот — в соседней клетке: триггер освобождения готов сработать.
+    const mikula = match.entities.find((entity) => entity.configId === "mikula_peasant")!;
+    const fedot = match.entities.find((entity) => entity.configId === "fedot_stranded")!;
+    fedot.x = mikula.x + 1;
+    fedot.y = mikula.y;
+  }
+  const kernel = createTacticsKernel({
+    initial: match,
+    units: [MIKULA, FEDOT, RAT],
+    weapons: { club: CLUB, teeth: TEETH },
+    seed: 702,
+    fogDisabled: true,
+  });
+  const compiled = compilePrologueLayout(M2_LAYOUT);
+  const ctx = {
+    missionId: "prologue_cry",
+    hints: [{ key: "m2.noise", textKey: "prologue.hint.m2.noise", once: true, forced: true, panelKey: "defend" }],
+    showHints: true,
+    ratMarker: compiled.markers.F?.[0],
+    fedotWaveSpawns: compiled.markers.S,
+    extractCells: compiled.extractCells,
+  };
+  return { kernel, ctx, state: createPrologueRunState("prologue_cry") };
+}
+
+const heroOf = (kernel: ReturnType<typeof m2Setup>["kernel"]) =>
+  kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
+
+describe("prologue script waits for its actor (0.20.45)", () => {
+  it("keeps the queued bite until the rat has entered the field", () => {
+    // Крыса М1 выходит только после подбора палки, а герой идёт до неё
+    // несколько ходов: каждый пустой ход Нави пролистывал бы очередь,
+    // и обещанный сценой укус разыгрывался бы обычным алгоритмом — с
+    // обычным шансом промаха.
+    const layout = {
+      rows: [
+        ".M......S.F.",
+        "............",
+      ],
+      legend: {
+        M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
+        S: { kind: "pickup", itemId: "stick", weaponId: "club" },
+        F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
+      },
+    };
+    const match = createPrologueMatch({ layout, units: [MIKULA, RAT], seed: 701 });
+    // Ход Нави: сценарий выбирается именно для активной стороны.
+    match.activeOwner = 2;
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [MIKULA, RAT],
+      weapons: { club: CLUB, teeth: TEETH },
+      seed: 701,
+      fogDisabled: true,
+    });
+    const script = {
+      actions: [
+        { unitId: "forest_rat", side: "enemy" as const, kind: "attack" as const, targetUnitId: "mikula_peasant", weaponId: "teeth", forceOutcome: "min" as const },
+        { kind: "endTurn" as const },
+      ],
+    };
+    let state = { index: 0 };
+    // Пустой ход Нави: крысы на поле нет, очередь обязана остаться на месте.
+    const idle = pickScriptedCommand(kernel, script, state, { activeOwner: 2 });
+    expect(idle.command).toBeNull();
+    expect(idle.state.index).toBe(0);
+
+    // Крыса вышла — обещанный укус на месте, с предписанным исходом.
+    const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
+    // Крыса выходит рядом с героем: укус доступен сразу.
+    kernel.spawnScripted("forest_rat", 2, { x: mikula.x + 1, y: mikula.y, z: 1 });
+    const decision = pickScriptedCommand(kernel, script, idle.state, { activeOwner: 2 });
+    expect(decision.command?.type).toBe("ATTACK");
+    expect(decision.forceOutcome).toBe("min");
+  });
+});
+
+describe("prologue M2 ambush budget (0.20.45)", () => {
+  it("cuts the dash in half: one AP stays for the stance", () => {
+    const { kernel, state } = m2Setup();
+    const mikula = heroOf(kernel);
+    const cells = kernel.getReachable(mikula.id);
+    const dash = cells
+      .filter((cell) => cell.apCost === 2)
+      .sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
+    const command = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
+    const clamped = clampPrologueCommand(kernel, state, command, ["mikula_peasant"]);
+    if (clamped.type !== "MOVE") throw new Error("ожидалась команда перемещения");
+    // Цель не достигнута, но герой не стоит: рывок обрывается на полпути.
+    expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${dash.x},${dash.y}`);
+    expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${mikula.x},${mikula.y}`);
+    expect(kernel.getReachable(mikula.id).find((cell) => cell.x === clamped.to.x && cell.y === clamped.to.y)?.apCost).toBe(1);
+    // Остановка — на маршруте: она ближе к цели, чем клетка старта.
+    const toward = Math.abs(clamped.to.x - dash.x) + Math.abs(clamped.to.y - dash.y);
+    const fromStart = Math.abs(mikula.x - dash.x) + Math.abs(mikula.y - dash.y);
+    expect(toward).toBeLessThan(fromStart);
+    const applied = kernel.apply(clamped);
+    expect(applied.ok).toBe(true);
+    expect(heroOf(kernel).ap).toBe(1);
+  });
+
+  it("leaves an ordinary step, other actors and other missions alone", () => {
+    const { kernel, state } = m2Setup();
+    const mikula = heroOf(kernel);
+    const step = kernel.getReachable(mikula.id).filter((cell) => cell.apCost === 1)[0]!;
+    const command = { type: "MOVE" as const, actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } };
+    // Обычный шаг в бюджете: команда не переписывается.
+    expect(clampPrologueCommand(kernel, state, command, ["mikula_peasant"])).toEqual(command);
+    const dash = kernel.getReachable(mikula.id).filter((cell) => cell.apCost === 2)[0]!;
+    const dashCommand = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
+    // Засада уже позади — бюджет больше не держит.
+    expect(clampPrologueCommand(kernel, { ...state, ambushPending: false }, dashCommand, ["mikula_peasant"])).toEqual(dashCommand);
+    // Чужой боец бюджетом не связан.
+    expect(clampPrologueCommand(kernel, state, dashCommand, ["fedot_stranded"])).toEqual(dashCommand);
+    // Не перемещение — не наша забота.
+    const defend = { type: "DEFEND" as const, actorId: mikula.id };
+    expect(clampPrologueCommand(kernel, state, defend, ["mikula_peasant"])).toEqual(defend);
+  });
+});
+
+describe("prologue M2 wave and exit (0.20.45)", () => {
+  it("lights the evacuation zone only after the swarm has run out", () => {
+    const { kernel, ctx, state } = m2Setup({ adjacent: true });
+    const mikula = heroOf(kernel);
+    const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
+    // Шаг — в клетку рядом с Федотом: триггер освобождения читает позиции.
+    const step = kernel
+      .getReachable(mikula.id)
+      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
+    const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    const next = afterPrologueApply(
+      kernel,
+      { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
+      applied.events,
+      state,
+      ctx,
+    );
+    // Федот освобождён и волен ходить.
+    expect(next.fedotFreed).toBe(true);
+    expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")?.maxAp).toBe(2);
+    // Стая вышла — шесть крыс из чащи, а не ноль, как было бы без маркеров.
+    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length).toBe(6);
+    // Выход ещё тёмен: его покажет сцена, а не само освобождение.
+    expect(next.extractPending).toBe(true);
+    expect(kernel.getSnapshot().grid.tiles.filter((tile) => tile.extract).length).toBe(0);
+    // Экран боя открывает зону после сцены стаи — и только её клетки.
+    const revealed = revealPrologueExtract(kernel, next, ctx);
+    expect(revealed.extractPending).toBe(false);
+    expect(
+      kernel
+        .getSnapshot()
+        .grid.tiles.filter((tile) => tile.extract)
+        .map((tile) => `${tile.x},${tile.y}`)
+        .sort(),
+    ).toEqual(["0,0", "0,1", "0,2", "0,6", "0,7", "0,8"]);
+    expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")?.skillIds).toContain("evacuate");
+  });
+
+  it("opens the exit by itself if the screen missed the beat", () => {
+    const { kernel, ctx, state } = m2Setup({ adjacent: true });
+    const mikula = heroOf(kernel);
+    const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
+    // Шаг — в клетку рядом с Федотом: триггер освобождения читает позиции.
+    const step = kernel
+      .getReachable(mikula.id)
+      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
+    const first = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
+    if (!first.ok) throw new Error("шаг не принят");
+    const pending = afterPrologueApply(
+      kernel,
+      { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
+      first.events,
+      state,
+      ctx,
+    );
+    expect(pending.extractPending).toBe(true);
+    const elsewhere = kernel
+      .getReachable(mikula.id)
+      .filter((cell) => `${cell.x},${cell.y}` !== `${step.x},${step.y}` && cell.apCost === 1)[0]!;
+    const second = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: elsewhere.x, y: elsewhere.y, z: 1 } });
+    if (!second.ok) throw new Error("второй шаг не принят");
+    const recovered = afterPrologueApply(
+      kernel,
+      { type: "MOVE", actorId: mikula.id, to: { x: elsewhere.x, y: elsewhere.y, z: 1 } },
+      second.events,
+      pending,
+      ctx,
+    );
+    // Без этой страховки зона осталась бы тёмной и миссию нельзя было бы
+    // завершить: ядро открывает её на следующем же применении команды.
+    expect(recovered.extractPending).toBe(false);
+    expect(kernel.getSnapshot().grid.tiles.some((tile) => tile.extract)).toBe(true);
   });
 });
 

@@ -3,7 +3,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { parseContent } from "@bylina/content";
-import { createPrologueMatch, findPath, tileAt, type EntityState } from "@bylina/core";
+import { compilePrologueLayout, createPrologueMatch, findPath, tileAt, type EntityState } from "@bylina/core";
 
 function readDataTree(): Record<string, string> {
   const root = join(dirname(fileURLToPath(import.meta.url)), "../../content/data");
@@ -90,5 +90,49 @@ describe("prologue M2 map (0.20.43)", () => {
     expect(mission.map.biome).toBe("swamp");
     // Канон §7.2: трясина — состояние, а не яма.
     expect(grid.tiles.some((tile) => tile.pit)).toBe(false);
+  });
+});
+
+/**
+ * Маркеры раскладки М2 (0.20.45). Сценарий миссии читает их, а не цифры
+ * в коде: `F` — точка засады первой пары крыс, `S` — шесть клеток стаи,
+ * `E` — клетки эвакуации, которые загораются после стаи. До 0.20.45 стая
+ * брала «все `F`, кроме первого» — маркер был один, и шесть крыс не
+ * выходили вовсе.
+ */
+describe("prologue M2 markers (0.20.45)", () => {
+  const parsed = parseContent(readDataTree());
+  if (!parsed.ok) throw new Error("content parse failed");
+  const mission = parsed.data.prologue.missions.find((entry) => entry.id === "prologue_cry")!;
+  const layout = mission.map.layout;
+  if (!layout) throw new Error("нет раскладки у миссии prologue_cry");
+  const compiled = compilePrologueLayout(layout);
+  const { match } = missionMatch("prologue_cry", 702);
+
+  it("marks the ambush pair and six swarm cells in the thicket", () => {
+    expect(compiled.markers.F).toEqual([{ x: 9, y: 4 }]);
+    const swarm = compiled.markers.S ?? [];
+    expect(swarm).toHaveLength(6);
+    // Стая выбегает из чащи на северной кромке — за спиной отряда, который
+    // идёт на запад: крысы догоняют, а не отрезают путь к выходу.
+    for (const cell of swarm) {
+      expect(cell.y, `стая в чаще, а не в поле: ${cell.x},${cell.y}`).toBeLessThanOrEqual(1);
+      const tile = tileAt(match.grid, cell.x, cell.y);
+      expect(tile, `клетка стаи вне поля: ${cell.x},${cell.y}`).toBeTruthy();
+      expect(tile?.pit).toBe(false);
+      expect(tile?.blockLOS).toBe(false);
+      expect(
+        match.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === cell.x && entity.y === cell.y),
+        `клетка стаи занята: ${cell.x},${cell.y}`,
+      ).toBe(false);
+    }
+  });
+
+  it("keeps the exit column a column of six lit cells", () => {
+    // Зона открывается ровно этими клетками, а не всей западной колонкой:
+    // в колонке двенадцать клеток, и половина из них — не выход.
+    expect(compiled.extractCells.map((cell) => `${cell.x},${cell.y}`).sort()).toEqual([
+      "0,0", "0,1", "0,2", "0,6", "0,7", "0,8",
+    ]);
   });
 });
