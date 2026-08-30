@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { readdirSync, readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
 import type { SkillStats, WeaponStats } from "@bylina/core";
 import { actionArt, actionArtFile, knownActionArtIds } from "../src/action-art.js";
@@ -139,5 +142,41 @@ describe("action info content (0.20.46)", () => {
     expect(watch.name).toBe(t("battle.overwatch"));
     expect(rowOf(watch.rows, t("action.info.overwatchEffect"))).toBe(t("action.info.yes"));
     expect(watch.flavor.length).toBeGreaterThan(0);
+  });
+});
+
+/** Размер кадра JPEG: чтение маркера SOF, без сторонних библиотек. */
+function jpegSize(path: string): [number, number] | null {
+  const data = readFileSync(path);
+  let offset = 2;
+  while (offset < data.length - 9) {
+    if (data[offset] !== 0xff) {
+      offset += 1;
+      continue;
+    }
+    const marker = data[offset + 1]!;
+    if (marker === 0xc0 || marker === 0xc1 || marker === 0xc2) {
+      return [data.readUInt16BE(offset + 7), data.readUInt16BE(offset + 5)];
+    }
+    if (marker === 0xd8 || marker === 0xd9 || (marker >= 0xd0 && marker <= 0xd7)) {
+      offset += 2;
+      continue;
+    }
+    offset += 2 + data.readUInt16BE(offset + 2);
+  }
+  return null;
+}
+
+describe("action art files (0.20.46)", () => {
+  it("keeps every shipped icon a 512×512 square named after a known action", () => {
+    const dir = join(dirname(fileURLToPath(import.meta.url)), "../../../apps/game-pwa/public/actions");
+    const files = readdirSync(dir).filter((name) => name.endsWith(".jpg"));
+    expect(files.length, "образы есть").toBeGreaterThan(0);
+    const known = new Set(knownActionArtIds());
+    for (const file of files) {
+      // Файл без записи в карте — потерянный образ: кнопка его не найдёт.
+      expect(known.has(file.replace(/\.jpg$/, "")), `${file} не значится в карте`).toBe(true);
+      expect(jpegSize(join(dir, file)), `${file}: 512×512`).toEqual([512, 512]);
+    }
   });
 });
