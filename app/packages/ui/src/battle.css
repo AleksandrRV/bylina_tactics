@@ -548,6 +548,163 @@
   margin-top: 12px;
 }
 
+/* Окно информации о бойце (0.20.53): тот же слой, что у окна действия —
+   поверх боя с затемнением, но карточка шире: экипировка и умения
+   перечисляются списком, а не строкой параметров. */
+.unit-info-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 96;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(6, 9, 6, 0.74);
+  animation: action-info-in 120ms ease;
+}
+
+.unit-info {
+  width: min(380px, 100%);
+  max-height: min(82vh, 660px);
+  overflow: auto;
+  padding: 12px 14px 14px;
+  border: 1px solid rgba(224, 179, 74, 0.45);
+  border-radius: 12px;
+  background: linear-gradient(180deg, #1b2219, #12170f);
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  color: #e6e0d0;
+}
+
+.unit-info-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.unit-info-face {
+  flex: 0 0 auto;
+  width: 104px;
+  height: 104px;
+  object-fit: cover;
+  border-radius: 10px;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  background: #101410;
+}
+
+.unit-info-title {
+  min-width: 0;
+}
+
+.unit-info-title h3 {
+  margin: 0 0 4px;
+  font-size: 1.05rem;
+  color: #ffe9b0;
+}
+
+.unit-info-fallen {
+  margin: 0 0 4px;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #d08a7a;
+}
+
+.unit-info-flavor {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #969c92;
+  font-style: italic;
+}
+
+.unit-info-label {
+  margin: 12px 0 4px;
+  font-size: 0.68rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #8d937f;
+}
+
+.unit-info-states ul,
+.unit-info-section ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 3px;
+}
+
+/* Состояния — теми же плашками, что и на карточке бойца: читаются
+   перечислением, а не строкой со скобками. */
+.unit-info-state {
+  display: inline-block;
+  margin: 0 4px 4px 0;
+  padding: 2px 8px;
+  border: 1px solid rgba(224, 179, 74, 0.32);
+  border-radius: 999px;
+  background: rgba(224, 179, 74, 0.1);
+  font-size: 0.74rem;
+  color: #f0e9d6;
+}
+
+.unit-info-rows {
+  margin: 12px 0 0;
+  display: grid;
+  gap: 2px;
+}
+
+.unit-info-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.unit-info-row dt {
+  color: #969c92;
+}
+
+.unit-info-row dd {
+  margin: 0;
+  color: #f0e9d6;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit-info-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  font-size: 0.82rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.unit-info-item-name {
+  color: #e6e0d0;
+}
+
+.unit-info-item-mark {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--amber, #e0b34a);
+}
+
+.unit-info-item-note {
+  color: #969c92;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.unit-info-close {
+  width: 100%;
+  margin-top: 12px;
+}
+
 .aim-card {
   margin: 0 8px;
   padding: 6px 10px;
@@ -1916,6 +2073,7 @@
   .apple-hud-icon,
   .cutscene-skip,
   .action-info-backdrop,
+  .unit-info-backdrop,
   .story-note-card,
   .objective-hp i {
     animation: none !important;

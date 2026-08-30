@@ -43,6 +43,8 @@ import {
   type TrainingDirectiveView,
 } from "./training-scenario.js";
 import { ActionInfoDialog, ActionSlot } from "./action-panel.js";
+import { EnemyFace, RosterCard, UnitInfoDialog } from "./unit-card.js";
+import { buildUnitInfo, type UnitInfo } from "./unit-info.js";
 import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./charge-attack.js";
 import { actionArt } from "./action-art.js";
 import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
@@ -387,6 +389,11 @@ export function BattleScreenView() {
    * кнопки или правым кликом и лежит поверх боя.
    */
   const [actionInfo, setActionInfo] = useState<ActionInfo | null>(null);
+  /**
+   * Окно информации о бойце (0.20.53): долгим нажатием портрета в
+   * верхней панели — своего бойца либо видимого противника.
+   */
+  const [unitInfo, setUnitInfo] = useState<UnitInfo | null>(null);
   /**
    * Рывок к цели ближнего боя (0.20.50): показанный план подхода.
    * `chargeArmed` — игрок подтвердил намерение нажатием, следующее
@@ -2295,26 +2302,27 @@ export function BattleScreenView() {
             {enemyStrip.length > 0 ? (
               <div className="enemies-strip" aria-label={t("field.sideEnemy")}>
                 {enemyStrip.map((enemy) => {
-                  const face = unitPortrait(enemy.configId);
                   const name = t(unitNameKey(enemy.configId));
-                  const label = enemy.seen || enemy.dead ? name : `${name} · ${t("field.enemyUnseen")}`;
-                  return face ? (
-                    <button
+                  return (
+                    <EnemyFace
                       key={enemy.id}
-                      type="button"
-                      className={`enemy-face${enemy.dead ? " is-dead" : ""}${enemy.seen ? "" : " is-unseen"}`}
-                      title={label}
-                      aria-label={label}
-                      disabled={!enemy.seen || enemy.dead}
-                      onClick={() => {
+                      configId={enemy.configId}
+                      dead={enemy.dead}
+                      seen={enemy.seen}
+                      label={enemy.seen || enemy.dead ? name : `${name} · ${t("field.enemyUnseen")}`}
+                      onFocus={() => {
                         // Клик ведёт камеру к противнику — но только к тому,
                         // кого видит хоть один боец дружины (0.20.42).
                         rendererRef.current?.focusEntity?.(enemy.id);
                       }}
-                    >
-                      <img src={face} alt="" draggable={false} />
-                    </button>
-                  ) : null;
+                      onInspect={() => {
+                        // Окно информации о противнике: из снимка виден только
+                        // тот, кого дружина наблюдает прямо сейчас.
+                        const live = knownEnemies.find((candidate) => candidate.id === enemy.id);
+                        if (live) setUnitInfo(buildUnitInfo(live, { weapons, skills, side: "enemy" }, t));
+                      }}
+                    />
+                  );
                 })}
               </div>
             ) : null}
@@ -2336,42 +2344,31 @@ export function BattleScreenView() {
             </div>
           ) : null}
           <div className="roster" aria-label={t("field.sidePlayer")}>
-            {roster.map((entity) => {
-              const face = unitPortrait(entity.configId);
-              return (
-                <button
-                  key={entity.id}
-                  type="button"
-                  className={`roster-card${entity.id === selectedId ? " is-on" : ""}${entity.dead ? " is-dead" : ""}`}
-                  onClick={() => {
-                    if (entity.dead) return;
-                    // Обучение: выбор иного бойца запрещён — действует только
-                    // исполнитель текущего указания (строгий сценарий, 0.20.13).
-                    if (isTraining && trainingActorId !== null && entity.id !== trainingActorId) {
-                      setLog(t("training.locked.actor"));
-                      return;
-                    }
-                    setSelectedId(entity.id);
-                    setAction(null);
-                    setSkillTargetPos(null);
-                    setAimId(null);
-                    // Камера плавно приходит к выбранному бойцу (0.20.42):
-                    // поле крупнее окна, и боец мог стоять за кадром.
-                    rendererRef.current?.focusEntity?.(entity.id);
-                  }}
-                >
-                  {face ? <img className="roster-face" src={face} alt="" draggable={false} /> : null}
-                  <span className="roster-meta">
-                    <span className="name">{t(unitNameKey(entity.configId))}</span>
-                    <span className="diamonds" aria-label={t("field.ap", { current: entity.ap, max: entity.maxAp })}>
-                      {Array.from({ length: entity.maxAp }, (_, index) => (
-                        <i key={index} className={index < entity.ap ? "diamond is-on" : "diamond"} />
-                      ))}
-                    </span>
-                  </span>
-                </button>
-              );
-            })}
+            {roster.map((entity) => (
+              <RosterCard
+                key={entity.id}
+                entity={entity}
+                selected={entity.id === selectedId}
+                name={t(unitNameKey(entity.configId))}
+                onSelect={() => {
+                  if (entity.dead) return;
+                  // Обучение: выбор иного бойца запрещён — действует только
+                  // исполнитель текущего указания (строгий сценарий, 0.20.13).
+                  if (isTraining && trainingActorId !== null && entity.id !== trainingActorId) {
+                    setLog(t("training.locked.actor"));
+                    return;
+                  }
+                  setSelectedId(entity.id);
+                  setAction(null);
+                  setSkillTargetPos(null);
+                  setAimId(null);
+                  // Камера плавно приходит к выбранному бойцу (0.20.42):
+                  // поле крупнее окна, и боец мог стоять за кадром.
+                  rendererRef.current?.focusEntity?.(entity.id);
+                }}
+                onInspect={() => setUnitInfo(buildUnitInfo(entity, { weapons, skills, side: "ally" }, t))}
+              />
+            ))}
           </div>
         </header>
 
@@ -2906,6 +2903,8 @@ export function BattleScreenView() {
       ) : null}
       {/* Окно информации о действии: поверх боя, всё остальное затемнено. */}
       {actionInfo ? <ActionInfoDialog info={actionInfo} onClose={() => setActionInfo(null)} /> : null}
+      {/* Окно информации о бойце: портрет, описание, параметры и экипировка. */}
+      {unitInfo ? <UnitInfoDialog info={unitInfo} onClose={() => setUnitInfo(null)} /> : null}
     </div>
   );
 }
