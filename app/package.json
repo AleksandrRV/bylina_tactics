@@ -1,7 +1,7 @@
 {
   "name": "bylina",
   "private": true,
-  "version": "0.20.49",
+  "version": "0.20.50",
   "packageManager": "pnpm@10.34.5",
   "scripts": {
     "dev": "pnpm --filter @bylina/game-pwa dev",

@@ -90,6 +90,12 @@ export interface FieldView {
   /** Цель прицеливания открыта с фланга (этап 2.7): красные уголки-скобки. */
   aimFlanked?: boolean;
   /**
+   * Начало луча прицеливания (0.20.50). По умолчанию луч идёт от самого
+   * бойца; при рывке к цели — от клетки подхода, чтобы игрок видел,
+   * откуда именно будет удар (а не луч через полкарты с текущей клетки).
+   */
+  aimFrom?: CellPos | null;
+  /**
    * Областной прицел выбранного умения (0.20.x, этап 2.6): центр и радиус
    * нужны для оформления, а areaCells — точный результат preview ядра.
    * Renderer не пересчитывает область самостоятельно.
@@ -1127,6 +1133,19 @@ export function createFieldRenderer(): FieldRenderer {
   };
 
   /**
+   * Начало луча прицеливания (0.20.50): обычно центр бойца, при рывке —
+   * центр клетки подхода. Одна точка обслуживает и линию, и маркеры
+   * пересечений, иначе они разъезжались бы при подходе к цели.
+   */
+  const aimOriginOf = (v: FieldView, fallback: EntityState): { cx: number; cy: number } => {
+    if (v.aimFrom) {
+      const tile = tileAt(v.snapshot.grid, v.aimFrom.x, v.aimFrom.y);
+      return centerOf(v.aimFrom.x, v.aimFrom.y, visualLevel(tile ?? ({ pit: false, z: v.aimFrom.z } as Tile)));
+    }
+    return entityPixel(fallback);
+  };
+
+  /**
    * Маркеры пересечения луча прицеливания с укрытиями.
    * Рисует ромб в точке пересечения луча с гранью укрытия.
    */
@@ -1134,7 +1153,7 @@ export function createFieldRenderer(): FieldRenderer {
     const sel = v.snapshot.entities.find((e) => e.id === v.selectedId);
     const aim = v.snapshot.entities.find((e) => e.id === v.aimId);
     if (!sel || !aim || sel.dead || aim.dead) return;
-    const a = centerOf(sel.x, sel.y, sel.z);
+    const a = aimOriginOf(v, sel);
     const b = centerOf(aim.x, aim.y, aim.z);
     const abx = b.cx - a.cx;
     const aby = b.cy - a.cy;
@@ -2144,7 +2163,8 @@ export function createFieldRenderer(): FieldRenderer {
     const selected = view.snapshot.entities.find((entity) => entity.id === view?.selectedId);
     const aimed = view.snapshot.entities.find((entity) => entity.id === view?.aimId);
     if (selected && aimed && !selected.dead && !aimed.dead) {
-      const a = entityPixel(selected);
+      // Рывок (0.20.50): луч начинается в клетке подхода, а не под бойцом.
+      const a = aimOriginOf(view, selected);
       const b = entityPixel(aimed);
       const color = view.aimOk ? 0xe8b64c : 0xc45c5c;
 

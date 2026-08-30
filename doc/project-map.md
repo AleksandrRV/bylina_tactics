@@ -69,6 +69,7 @@
 | `app/packages/ui/src/action-art.ts` | Образы действий и умений, карта файлов `public/actions` (0.20.46) |
 | `app/packages/ui/src/action-info.ts` | Содержимое окна информации: числа из боевых данных, текст из словарей (0.20.46) |
 | `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
+| `app/packages/ui/src/charge-attack.ts` | Рывок к цели ближнего боя: клетка подхода, маршрут, стоимость (0.20.50) |
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
 | `app/scripts/check-version-consistency.mjs` | Единая версия пакетов и констант |
 | `app/scripts/resize-action-art.mjs` | Кадр 512×512 для образов действий (0.20.48) |

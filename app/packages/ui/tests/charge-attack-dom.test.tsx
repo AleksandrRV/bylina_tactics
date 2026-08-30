@@ -1,0 +1,250 @@
+// @vitest-environment jsdom
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import { parseContent } from "@bylina/content";
+import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
+import { createSession } from "@bylina/session";
+import { createSettings } from "@bylina/settings";
+import type { CinematicPlan, FieldRenderer } from "@bylina/render";
+import { ServicesProvider, Shell } from "../src/index.js";
+import type { AppServices } from "../src/context.js";
+import { meleeStrikeOf, planCharge } from "../src/charge-attack.js";
+import { dataTree } from "./training-sim.js";
+
+/**
+ * Рывок к цели ближнего боя в живом экране (0.20.50): нажатие по
+ * далёкому врагу показывает подход, повторное нажание — подходит и бьёт.
+ * Поле боя подменено заглушкой @bylina/render (PixiJS в jsdom не
+ * работает), клики по полю подаются через перехваченный
+ * `setOnActivate`. Раскладка быстрого матча случайна, поэтому пара
+ * «боец — цель» ищется по данным сессии, а не задаётся числами.
+ */
+
+let activate: ((x: number, y: number) => void) | null = null;
+
+const rendererStub: FieldRenderer = {
+  mount: vi.fn(async () => undefined),
+  update: vi.fn(),
+  play: vi.fn(async () => undefined),
+  pan: vi.fn(),
+  destroy: vi.fn(),
+  setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
+    activate = handler;
+  }),
+  setOnHover: vi.fn(),
+  setReducedMotion: vi.fn(),
+  setSpeed: vi.fn(),
+  playCinematic: vi.fn(async (_plan: CinematicPlan) => false),
+  skipCinematic: vi.fn(),
+  isCinematicPlaying: vi.fn(() => false),
+  getCameraScale: vi.fn(() => 1.25),
+  fadeScreen: vi.fn(async () => undefined),
+  setInputLocked: vi.fn(),
+  setHiddenEntities: vi.fn(),
+  focusEntity: vi.fn(),
+};
+
+vi.mock("@bylina/render", () => ({
+  createFieldRenderer: (): FieldRenderer => rendererStub,
+  applyPaletteCssVariables: () => undefined,
+}));
+
+beforeEach(() => {
+  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
+  window.scrollTo = window.scrollTo ?? (() => undefined);
+  window.localStorage.clear();
+});
+
+afterEach(() => {
+  document.body.innerHTML = "";
+  activate = null;
+});
+
+const tick = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function waitFor(condition: () => boolean, timeoutMs = 12000): Promise<void> {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    if (condition()) return;
+    await act(async () => {
+      await tick(40);
+    });
+  }
+  throw new Error("condition was not met in time");
+}
+
+async function mountShell(): Promise<{ root: Root; services: AppServices }> {
+  const parsed = parseContent(dataTree());
+  if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
+  const i18n = createI18n({ manifest, catalogs: loadBundledCatalogs(), initialLanguage: "ru" });
+  const settings = createSettings({ storage: null, allowedLanguages: manifest.languages.map((item) => item.code) });
+  const session = createSession("menu");
+  const services: AppServices = {
+    i18n,
+    settings,
+    session,
+    content: parsed.data,
+    version: "test",
+    install: { canInstall: false, installed: false, prompt: async () => undefined },
+    debug: false,
+  };
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const root = createRoot(host);
+  await act(async () => {
+    root.render(
+      <ServicesProvider value={services}>
+        <Shell />
+      </ServicesProvider>,
+    );
+  });
+  await act(async () => {
+    await tick(20);
+  });
+  return { root, services };
+}
+
+const logText = (): string => document.querySelector(".battle-log")?.textContent ?? "";
+
+function buttonByText(part: string): HTMLButtonElement | undefined {
+  return [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
+    (button.textContent ?? "").includes(part),
+  );
+}
+
+describe("рывок к цели в экране боя (0.20.50)", () => {
+  it(
+    "показывает подход первым нажатием и бьёт вторым",
+    async () => {
+      const { root, services } = await mountShell();
+      const { session, content } = services;
+      await act(async () => {
+        session.selectDifficulty("normal");
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      await act(async () => {
+        await tick(60);
+      });
+
+      const weapons = Object.fromEntries(content.weapons.map((record) => [record.id, record]));
+      const skills = Object.fromEntries(content.skills.map((record) => [record.id, record]));
+
+      /** Пара «наш боец — враг», до которой есть рывок. */
+      const findOpportunity = (): { actorId: number; targetId: number; stepX: number; stepY: number } | null => {
+        const snapshot = session.getBattleSnapshot(1);
+        for (const actor of snapshot.entities) {
+          if (actor.dead || actor.owner !== 1 || actor.coverType !== 0 || actor.maxAp <= 0) continue;
+          const strike = meleeStrikeOf(
+            { type: "weapon", id: actor.weaponId ?? actor.weaponIds?.[0] ?? "" },
+            weapons as never,
+            skills as never,
+          );
+          if (!strike) continue;
+          for (const target of snapshot.entities) {
+            if (target.dead || target.owner === 1 || target.coverType !== 0) continue;
+            const plan = planCharge({
+              snapshot,
+              actor,
+              target,
+              strike,
+              reachable: session.getBattleReachable(actor.id),
+              pathOf: (cell) => session.getBattlePath(actor.id, cell),
+            });
+            if (plan) return { actorId: actor.id, targetId: target.id, stepX: plan.step.x, stepY: plan.step.y };
+          }
+        }
+        return null;
+      };
+
+      // Раскладка случайна: сближаемся, пока рывок не станет возможен.
+      // Противник идёт к дружине сам, поэтому пара находится за 2–3 хода.
+      let found = findOpportunity();
+      for (let attempt = 0; attempt < 5 && !found; attempt += 1) {
+        const endTurn = [...document.querySelectorAll<HTMLButtonElement>(".hud-btn-primary")].find(
+          (button) => !button.disabled,
+        );
+        if (!endTurn) break;
+        const turn = session.getBattleSnapshot(1).turnNumber;
+        await act(async () => {
+          endTurn.click();
+        });
+        await waitFor(() => {
+          const current = session.getBattleSnapshot(1);
+          return current.turnNumber > turn && current.activeOwner === 1;
+        });
+        await act(async () => {
+          await tick(120);
+        });
+        found = findOpportunity();
+      }
+      expect(found, "в раскладке быстрого матча нашлась цель для рывка").not.toBeNull();
+      const { actorId, targetId, stepX, stepY } = found!;
+
+      const before = session.getBattleSnapshot(1);
+      const actor = before.entities.find((entity) => entity.id === actorId)!;
+      const target = before.entities.find((entity) => entity.id === targetId)!;
+      expect(Math.abs(actor.x - target.x) + Math.abs(actor.y - target.y), "цель не рядом").toBeGreaterThan(1);
+
+      // Выбираем бойца и вооружаем его ближним оружием.
+      await act(async () => {
+        activate?.(actor.x, actor.y);
+      });
+      await act(async () => {
+        await tick(60);
+      });
+      const sword = [...document.querySelectorAll<HTMLButtonElement>(".hud-btn.skill-slot")].find(
+        (button) => !button.disabled,
+      );
+      expect(sword, "кнопка оружия доступна").toBeDefined();
+      await act(async () => {
+        sword!.click();
+      });
+      await act(async () => {
+        await tick(60);
+      });
+
+      // Первое нажатие по цели: экран показывает подход.
+      await act(async () => {
+        activate?.(target.x, target.y);
+      });
+      await act(async () => {
+        await tick(80);
+      });
+      expect(logText(), "предложение подхода").toContain("Подойти и ударить");
+
+      // Второе нажатие: подход и удар.
+      await act(async () => {
+        activate?.(target.x, target.y);
+      });
+      await waitFor(() => {
+        const after = session.getBattleSnapshot(1);
+        const moved = after.entities.find((entity) => entity.id === actorId);
+        return Boolean(moved && (moved.x !== actor.x || moved.y !== actor.y));
+      });
+      const after = session.getBattleSnapshot(1);
+      const moved = after.entities.find((entity) => entity.id === actorId)!;
+      expect({ x: moved.x, y: moved.y }, "боец подошёл к названной клетке").toEqual({ x: stepX, y: stepY });
+      const struck = after.entities.find((entity) => entity.id === targetId);
+      const damaged = !struck || struck.hp < target.hp;
+      expect(damaged || /Попадание|Промах|Крит|пал|Погиб/.test(logText()), "удар состоялся").toBe(true);
+      await act(async () => {
+        root.unmount();
+      });
+    },
+    90000,
+  );
+});
