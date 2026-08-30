@@ -179,4 +179,16 @@ describe("action art files (0.20.46)", () => {
       expect(jpegSize(join(dir, file)), `${file}: 512×512`).toEqual([512, 512]);
     }
   });
+
+  it("has a file for every action in the art map", () => {
+    // Обратная сторона предыдущей проверки: действие без файла рисует
+    // пустую рамку, и заметить это можно только глазами.
+    const dir = join(dirname(fileURLToPath(import.meta.url)), "../../../apps/game-pwa/public/actions");
+    const present = new Set(readdirSync(dir));
+    for (const id of knownActionArtIds()) {
+      const file = actionArtFile(id);
+      expect(file, `${id}: нет записи в карте`).toBeDefined();
+      expect(present.has(file!), `${id} → ${file}: файла нет в каталоге`).toBe(true);
+    }
+  });
 });

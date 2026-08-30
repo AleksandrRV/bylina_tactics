@@ -47,7 +47,9 @@
     │   ├── i18n/                словари и t()
     │   └── settings/            язык, громкость, debugMode
     └── scripts/
-        └── check-version-consistency.mjs
+        ├── check-version-consistency.mjs
+        ├── visual-audit.mjs
+        └── resize-action-art.mjs         приведение образов действий к 512×512 (0.20.48)
 ```
 
 | Путь | Назначение |
@@ -69,6 +71,7 @@
 | `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
 | `app/scripts/check-version-consistency.mjs` | Единая версия пакетов и констант |
+| `app/scripts/resize-action-art.mjs` | Кадр 512×512 для образов действий (0.20.48) |
 
 ## 3. Владелец темы
 
