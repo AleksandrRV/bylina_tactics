@@ -67,9 +67,15 @@ export function App() {
   // «На ожидании» лежит только осмысленный прогресс (Тьма, начатая либо
   // пройденная миссия): пустое сохранение свежей установки эквивалентно
   // отсутствию былины.
+  // Начатый пролог — уже былина (0.20.51): сюжет не значится точками
+  // карты, Тьму не копит и миссий не отмечает, поэтому прежний перечень
+  // признаков считал сохранение пустым и скрывал «Продолжить».
   const savedCampaignHasProgress = saved?.campaign
     ? saved.campaign.darkness > 0
       || saved.campaign.activeMissionId !== null
+      || saved.campaign.chapter === "prologue"
+      || saved.session?.battleKind === "prologue"
+      || Boolean(saved.session?.prologueMissionId)
       || saved.campaign.missions.some((mission) => mission.status === "done")
     : false;
   const [campaignRestore, setCampaignRestore] = useState<CampaignState | "pending" | null>(
@@ -130,7 +136,16 @@ export function App() {
       return;
     }
     const entry = saved.session;
-    const inCampaignBattle = entry.screen === "battle" && entry.battleKind === "campaign" && Boolean(saved.match);
+    // Сюжетная миссия (0.20.51): пролог сохраняется своим родом боя. Для
+    // записей прежних версий, где пролог был помечен как бой кампании,
+    // сюжет узнаётся по идентификатору миссии.
+    const storyId =
+      entry.prologueMissionId
+      ?? (entry.activeMissionId?.startsWith("prologue_") ? entry.activeMissionId : null);
+    const inCampaignBattle =
+      entry.screen === "battle"
+      && (entry.battleKind === "campaign" || storyId !== null)
+      && Boolean(saved.match);
     if (inCampaignBattle && saved.match) {
       lastMatchRef.current = { match: saved.match, fog: deserializeFog(saved.fog) };
     }
@@ -141,7 +156,8 @@ export function App() {
         : entry.screen === "deployment" || entry.screen === "missionResult" || entry.screen === "campaign"
           ? entry.screen
           : "campaign",
-      activeMissionId: entry.activeMissionId ?? null,
+      prologueMissionId: inCampaignBattle ? storyId : null,
+      activeMissionId: storyId ? null : entry.activeMissionId ?? null,
       deployment: entry.deployment ?? [],
       matchSeed: entry.matchSeed ?? 0,
       outcome: entry.outcome ?? null,
@@ -180,7 +196,13 @@ export function App() {
 
   useEffect(() => {
     if (!campaign) return;
-    return campaign.subscribe(() => setCampaignTick((value) => value + 1));
+    return campaign.subscribe(() => {
+      setCampaignTick((value) => value + 1);
+      // Правки дружины и запасы (0.20.51): былина пишется не только по
+      // ходам боя, иначе Кузня и Горница оставались бы в памяти до
+      // следующего сражения.
+      schedulePersistRef.current();
+    });
   }, [campaign]);
 
   // Автосохранение: кампания и активная партия пишутся при каждом изменении.
@@ -192,6 +214,12 @@ export function App() {
     fog: saved?.match ? deserializeFog(saved.fog) : undefined,
   });
   const persistRef = useRef<() => void>(() => undefined);
+  /**
+   * Отложенная запись (0.20.51): изменения автомата кампании (экипировка,
+   * лечение, Кузня, исход миссии) пишутся тем же трейлинг-дебаунсом, что
+   * и ходы боя, — пачка правок дружины даёт одну запись, а не десять.
+   */
+  const schedulePersistRef = useRef<() => void>(() => undefined);
   // A later state must not be overwritten by an earlier worker response.
   const saveRequestRef = useRef(0);
   persistRef.current = () => {
@@ -249,7 +277,12 @@ export function App() {
       });
       return;
     }
-    const inCampaignBattle = state.screen === "battle" && state.battleKind === "campaign";
+    // Сюжетная миссия пролога сохраняется так же, как миссия карты
+    // (0.20.51): иначе выход из пролога или перезапуск обозревателя
+    // выбрасывал игрока из былины, начатой сюжетом.
+    const inPrologueBattle = state.screen === "battle" && state.battleKind === "prologue";
+    const inCampaignBattle =
+      (state.screen === "battle" && state.battleKind === "campaign") || inPrologueBattle;
     const inCampaignDeployment = state.screen === "deployment" && state.battleKind === "campaign";
     // Приостановленная миссия кампании (0.20.17–0.20.19): контекст — в слоте,
     // не зависящем от навигации (заход в обучение/быстрый матч/настройки из
@@ -258,6 +291,7 @@ export function App() {
     // как формирование высадки.
     const slot = state.suspendedCampaign ?? null;
     const suspendedCampaign = slot !== null && !inCampaignBattle && !inCampaignDeployment;
+    const suspendedStory = suspendedCampaign && slot!.activeMissionId.startsWith("prologue_");
     if (!inCampaignBattle) lastMatchRef.current = {};
     let match = inCampaignBattle
       ? (session.getBattleFullSnapshot() ?? undefined)
@@ -283,17 +317,23 @@ export function App() {
         : state.screen === "missionResult" || state.screen === "deployment" || state.screen === "campaign"
           ? state.screen
           : "menu";
+    // Сюжетный контекст: из боя пролога либо из приостановленного слота.
+    const prologueMissionId = inPrologueBattle
+      ? state.prologueMissionId
+      : suspendedStory
+        ? slot!.activeMissionId
+        : null;
     // Контекст ветки кампании в записи — из боя либо из слота.
     const campaignSession = inCampaignBattle || inCampaignDeployment
       ? {
-          activeMissionId: state.activeMissionId,
+          activeMissionId: prologueMissionId ? null : state.activeMissionId,
           deployment: state.deployment,
           matchSeed: state.matchSeed,
           outcome: state.outcome,
         }
       : suspendedCampaign
         ? {
-            activeMissionId: slot!.activeMissionId,
+            activeMissionId: suspendedStory ? null : slot!.activeMissionId,
             deployment: slot!.deployment,
             matchSeed: slot!.matchSeed,
             outcome: null,
@@ -317,8 +357,11 @@ export function App() {
         battleKind: inCampaignBattle || inCampaignDeployment
           ? state.battleKind
           : suspendedCampaign
-            ? "campaign"
+            ? suspendedStory
+              ? "prologue"
+              : "campaign"
             : state.battleKind,
+        prologueMissionId,
         activeMissionId: campaignSession.activeMissionId,
         deployment: campaignSession.deployment,
         matchSeed: campaignSession.matchSeed,
@@ -347,6 +390,7 @@ export function App() {
     // но изменение, попавшее в окно, НЕ отбрасывается, а откладывается до его
     // закрытия — последний ход всегда будет сохранён (исправление 0.20.20).
     const debouncedPersist = (): void => {
+      schedulePersistRef.current = debouncedPersist;
       const now = Date.now();
       if (now - lastSave >= 400) {
         if (pendingTimer !== undefined) {
@@ -384,11 +428,18 @@ export function App() {
         retryTimer = undefined;
       }
       subscribeBattle();
+      // Переход сессии — тоже повод записать былину (0.20.51). Прежде
+      // запись шла только от ядра боя и от первого монтирования, поэтому
+      // выход из миссии в меню, старт высадки и итог миссии в сохранение
+      // не попадали: перезапуск возвращал игрока в устаревший кадр, а
+      // былина, начатая сюжетом, и вовсе терялась.
+      debouncedPersist();
     };
     debouncedPersist();
     const unSession = session.subscribe(resub);
     subscribeBattle();
     return () => {
+      schedulePersistRef.current = () => undefined;
       unSession();
       unBattle?.();
       if (retryTimer !== undefined) window.clearTimeout(retryTimer);
@@ -433,10 +484,14 @@ export function App() {
     if (!campaign) return false;
     if (campaignRestore === "pending") return true;
     const snapshot = campaign.getState();
+    // Пролог (0.20.51): былина начата сюжетом — «Продолжить» обязана
+    // вернуть игрока в недойденный бой, а не предлагать начать заново.
     return (
       snapshot.darkness > 0
       || snapshot.activeMissionId !== null
+      || snapshot.chapter === "prologue"
       || snapshot.missions.some((mission) => mission.status === "done")
+      || Boolean(session.get().suspendedCampaign)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign, campaignRestore, campaignTick]);
