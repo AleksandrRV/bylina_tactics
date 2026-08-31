@@ -39,18 +39,27 @@ function paths(value, prefix = "") {
   return Object.entries(value).flatMap(([key, child]) => paths(child, prefix ? `${prefix}.${key}` : key));
 }
 
-const [paletteSource, stylesSource, battleSource, campaignSource, rendererSource, ruSource, enSource, docsSource, packageJsonSource] =
-  await Promise.all([
-    read("packages/render/src/palette.ts"),
-    read("apps/game-pwa/src/styles.css"),
-    read("packages/ui/src/battle.css"),
-    read("packages/ui/src/campaign.css"),
-    read("packages/render/src/field-renderer.ts"),
-    read("packages/i18n/locales/ru/ui.json"),
-    read("packages/i18n/locales/en/ui.json"),
-    read("../doc/README.md"),
-    read("package.json"),
-  ]);
+const [
+  paletteSource,
+  stylesSource,
+  battleSource,
+  campaignSource,
+  rendererSource,
+  ruSource,
+  enSource,
+  docsSource,
+  packageJsonSource,
+] = await Promise.all([
+  read("packages/render/src/palette.ts"),
+  read("apps/game-pwa/src/styles.css"),
+  read("packages/ui/src/battle.css"),
+  read("packages/ui/src/campaign.css"),
+  read("packages/render/src/field-renderer.ts"),
+  read("packages/i18n/locales/ru/ui.json"),
+  read("packages/i18n/locales/en/ui.json"),
+  read("../doc/README.md"),
+  read("package.json"),
+]);
 const packageJson = JSON.parse(packageJsonSource);
 
 // Контраст семантических цветов: текст 4.5:1, крупный/акцентный 3:1.
@@ -86,7 +95,10 @@ const rendererMarkers = [
 for (const [label, needle] of rendererMarkers) {
   if (!rendererSource.includes(needle)) failures.push(`отрисовка потеряла ${label} (${needle})`);
 }
-for (const [surface, source] of [["battle", battleSource], ["campaign", campaignSource]]) {
+for (const [surface, source] of [
+  ["battle", battleSource],
+  ["campaign", campaignSource],
+]) {
   if (!source.includes("prefers-reduced-motion")) failures.push(`${surface}: нет блока prefers-reduced-motion`);
 }
 if (!campaignSource.includes(".road-seg-glow") || !campaignSource.includes(".ship-flight-trail")) {
@@ -115,5 +127,7 @@ if (failures.length > 0) {
   for (const failure of failures) console.error(`- ${failure}`);
   process.exitCode = 1;
 } else {
-  console.log(`Визуальный аудит пройден: контраст, семантика цвета, motion, reduced-motion, ${ruPaths.length} ключей локалей.`);
+  console.log(
+    `Визуальный аудит пройден: контраст, семантика цвета, motion, reduced-motion, ${ruPaths.length} ключей локалей.`,
+  );
 }

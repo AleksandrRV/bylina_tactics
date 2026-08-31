@@ -94,7 +94,9 @@ async function capture() {
 async function compare() {
   // Тот же единый источник: каталог снимков называется версией приложения.
   const currentDir = path.join(outRoot, JSON.parse(await readFile(path.join(root, "package.json"), "utf8")).version);
-  const baselineDir = process.env.BASELINE_DIR ? path.resolve(process.env.BASELINE_DIR) : await latestOtherVersion(currentDir);
+  const baselineDir = process.env.BASELINE_DIR
+    ? path.resolve(process.env.BASELINE_DIR)
+    : await latestOtherVersion(currentDir);
   if (!baselineDir) {
     console.warn("Нет эталонного набора снимков — сравнивать не с чем (первый запуск?).");
     return;
@@ -121,7 +123,9 @@ async function compare() {
     }
     const current = PNG.sync.read(await readFile(path.join(currentDir, file)));
     const diff = new PNG({ width: current.width, height: current.height });
-    const mismatch = pixelmatch(current.data, baseline.data, diff.data, current.width, current.height, { threshold: 0.1 });
+    const mismatch = pixelmatch(current.data, baseline.data, diff.data, current.width, current.height, {
+      threshold: 0.1,
+    });
     const ratio = mismatch / (current.width * current.height);
     if (ratio > threshold) {
       failures += 1;

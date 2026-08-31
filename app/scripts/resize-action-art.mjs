@@ -65,15 +65,7 @@ async function main() {
     const size = jpegSize(await readFile(target));
     if (size && size[0] === SIZE && size[1] === SIZE) continue;
     const temporary = path.join("/tmp", `action-${file}`);
-    await run("convert", [
-      target,
-      "-resize",
-      `${SIZE}x${SIZE}!`,
-      "-quality",
-      QUALITY,
-      "-strip",
-      temporary,
-    ]);
+    await run("convert", [target, "-resize", `${SIZE}x${SIZE}!`, "-quality", QUALITY, "-strip", temporary]);
     await writeFile(target, await readFile(temporary));
     await rename(temporary, target);
     changed += 1;
