@@ -168,7 +168,8 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
   const unitIds = checkUnique("units", units);
   const weaponIds = checkUnique("weapons", weapons);
   const skillIds = checkUnique("skills", skills);
-  const itemIds = checkUnique("items", items);
+  // Проверка уникальности: побочный эффект — запись замечаний (0.20.55).
+  checkUnique("items", items);
 
   const prologueUnits = prologueBestiary.value?.units ?? [];
   const prologueWeapons = prologueBestiary.value?.weapons ?? [];

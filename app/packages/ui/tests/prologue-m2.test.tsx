@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererJournal, createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
 import { createRoot, type Root } from "react-dom/client";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
@@ -23,87 +24,38 @@ import { dataTree } from "./training-sim.js";
  */
 
 /** Журнал обращений к средству отображения. */
-const calls: { name: string; args: unknown[] }[] = [];
-const record =
-  (name: string) =>
-  (...args: unknown[]): void => {
-    calls.push({ name, args });
-  };
+const journal = createRendererJournal();
 
 let activate: ((x: number, y: number) => void) | null = null;
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
-  update: vi.fn(),
-  play: vi.fn(async () => undefined),
-  pan: vi.fn(),
-  destroy: vi.fn(),
-  setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
-    activate = handler;
-  }),
-  setOnHover: vi.fn(),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
-  playCinematic: vi.fn(async (plan: CinematicPlan) => {
-    // План целиком (0.20.52): тесту нужны не только имя сцены, но и
-    // сущности, которых она выводит на поле.
-    calls.push({ name: "playCinematic", args: [plan] });
-    return false;
-  }),
-  skipCinematic: vi.fn(),
-  isCinematicPlaying: vi.fn(() => false),
-  getCameraScale: vi.fn(() => 1.25),
-  fadeScreen: vi.fn(async () => undefined),
-  setInputLocked: vi.fn(),
-  setHiddenEntities: vi.fn(record("setHiddenEntities")),
-  focusEntity: vi.fn(),
-};
+const rendererStub = createRendererStub(
+  {
+    setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
+      activate = handler;
+    }),
+    playCinematic: vi.fn(async (plan: CinematicPlan) => {
+      // План целиком (0.20.52): тесту нужны не только имя сцены, но и
+      // сущности, которых она выводит на поле.
+      journal.record("playCinematic", plan);
+      return false;
+    }),
+    setHiddenEntities: vi.fn((...args: unknown[]) => journal.record("setHiddenEntities", ...args)),
+  },
+  journal,
+);
 
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
   window.localStorage.clear();
 });
 
 afterEach(() => {
   document.body.innerHTML = "";
   activate = null;
-  calls.length = 0;
+  journal.reset();
 });
-
-const tick = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-async function waitFor(condition: () => boolean, timeoutMs = 10000): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (condition()) return;
-    await act(async () => {
-      await tick(40);
-    });
-  }
-  throw new Error("condition was not met in time");
-}
 
 async function mountShell(): Promise<{ root: Root; services: AppServices }> {
   const parsed = parseContent(dataTree());
@@ -139,14 +91,15 @@ async function mountShell(): Promise<{ root: Root; services: AppServices }> {
 
 /** Сыгранные сцены в порядке вызова. */
 const playedScenes = (): string[] =>
-  calls
+  journal.calls
     .filter((entry) => entry.name === "playCinematic")
     .map((entry) => String((entry.args[0] as CinematicPlan | undefined)?.id));
 
 /** План сыгранной сцены по её имени. */
 const scenePlan = (id: string): CinematicPlan | undefined =>
-  calls.find((entry) => entry.name === "playCinematic" && (entry.args[0] as CinematicPlan | undefined)?.id === id)
-    ?.args[0] as CinematicPlan | undefined;
+  journal.calls.find(
+    (entry) => entry.name === "playCinematic" && (entry.args[0] as CinematicPlan | undefined)?.id === id,
+  )?.args[0] as CinematicPlan | undefined;
 
 /** Начать М2: экран боя, вступительная карточка закрыта. */
 async function startM2(root: Root, session: AppServices["session"]): Promise<void> {
@@ -272,7 +225,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       );
       expect(playedScenes(), "сцена засады").toContain("m2_ambush");
       // Крысы появляются скрытыми: на поле их выводит сцена.
-      expect(calls.some((entry) => entry.name === "setHiddenEntities")).toBe(true);
+      expect(journal.calls.some((entry) => entry.name === "setHiddenEntities")).toBe(true);
 
       await act(async () => {
         root.unmount();

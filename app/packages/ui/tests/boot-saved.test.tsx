@@ -1,24 +1,14 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererStub, installDomTestEnv, renderMock } from "./harness.js";
 import { createRoot, type Root } from "react-dom/client";
 
 // Рендер поля подменён заглушкой (PixiJS не работает в jsdom): тестам
 // продолжения нужны смонтированные экраны боя кампании (0.20.17).
-vi.mock("@bylina/render", () => {
-  const stub = {
-    mount: async () => undefined,
-    update: () => undefined,
-    play: async () => undefined,
-    pan: () => undefined,
-    destroy: () => undefined,
-    setOnActivate: () => undefined,
-    setOnHover: () => undefined,
-    setReducedMotion: () => undefined,
-    setSpeed: () => undefined,
-  };
-  return { createFieldRenderer: () => stub, applyPaletteCssVariables: () => undefined };
-});
+const rendererStub = createRendererStub();
+
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 /**
  * Продолжение былины через главное меню (0.20.15). Прежнее поведение:
@@ -81,7 +71,11 @@ async function mountInteractiveApp(): Promise<{ root: Root; host: HTMLElement; e
 }
 
 /** Ждать условия (монтаж экранов боя асинхронен: ядро + эффекты). */
-async function waitFor(predicate: () => boolean, timeoutMs = 2500): Promise<boolean> {
+/**
+ * Ожидание с признаком успеха: этот тест проверяет и отсутствие, поэтому
+ * вместо броска исключения возвращается `false` по истечении времени.
+ */
+async function waitUntil(predicate: () => boolean, timeoutMs = 2500): Promise<boolean> {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
     if (predicate()) return true;
@@ -257,11 +251,11 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Начать новую").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(document.body.textContent).toContain("Хворост");
       expect(
-        await waitFor(() => {
+        await waitUntil(() => {
           const raw = window.localStorage.getItem("bylina.save.v1");
           if (!raw) return false;
           const save = JSON.parse(raw) as { campaign: { darkness: number; chapter?: string } };
@@ -290,7 +284,7 @@ describe("app boot with a player save (0.20.15)", () => {
       });
       // Пролог включён (0.20.31): без сохранения «Новая былина» открывает
       // кампанию сразу с боя М1, без карты корабля и без предупреждения.
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(document.body.textContent).toContain("Хворост");
       expect(app.errors).toEqual([]);
@@ -389,7 +383,7 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       // Пауза → «Выйти в меню»: миссия приостанавливается, не покидается.
       await act(async () => {
         buttonByText("Пауза").click();
@@ -397,12 +391,12 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Выйти в меню").click();
       });
-      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       expect(hasButton("Продолжить")).toBe(true);
       // Автосохранение в меню хранит бой: и после перезапуска «Продолжить»
       // вернёт в миссию (пишется с троттлом — дождаться записи).
       expect(
-        await waitFor(() => {
+        await waitUntil(() => {
           const raw = window.localStorage.getItem("bylina.save.v1");
           if (!raw) return false;
           const save = JSON.parse(raw) as { session: { screen: string }; match?: unknown };
@@ -413,7 +407,7 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       // Второй цикл «выход в меню -> Продолжить» — по-прежнему бой: миссия
       // не теряется сколько бы раз её ни покидали (0.20.17).
@@ -423,11 +417,11 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Выйти в меню").click();
       });
-      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(app.errors).toEqual([]);
     } finally {
@@ -445,7 +439,7 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       // Пауза -> «К карте корабля»: миссия приостановлена, карта корабля.
       await act(async () => {
         buttonByText("Пауза").click();
@@ -453,7 +447,7 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("К карте корабля").click();
       });
-      expect(await waitFor(() => document.querySelector(".campaign-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".campaign-screen") !== null)).toBe(true);
       // Выбрать начатую точку на карте: миссия предлагает вернуться;
       // покинуть — только явно.
       await act(async () => {
@@ -469,11 +463,11 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         (document.querySelector(".campaign-exit-btn") as HTMLButtonElement).click();
       });
-      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(app.errors).toEqual([]);
     } finally {
@@ -491,29 +485,29 @@ describe("app boot with a player save (0.20.15)", () => {
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       await act(async () => {
         buttonByText("Пауза").click();
       });
       await act(async () => {
         buttonByText("Выйти в меню").click();
       });
-      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       // Прогулка по меню: обучение и обратно.
       await act(async () => {
         buttonByText("Обучение").click();
       });
-      expect(await waitFor(() => document.querySelector(".training-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".training-screen") !== null)).toBe(true);
       await act(async () => {
         buttonByText("Назад").click();
       });
-      expect(await waitFor(() => document.querySelector(".menu-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".menu-screen") !== null)).toBe(true);
       // «Продолжить» всё равно возвращает в бой миссии (регрессия 0.20.19:
       // прежде заход в другой раздел стирал контекст приостановленной миссии).
       await act(async () => {
         buttonByText("Продолжить").click();
       });
-      expect(await waitFor(() => document.querySelector(".battle-screen") !== null)).toBe(true);
+      expect(await waitUntil(() => document.querySelector(".battle-screen") !== null)).toBe(true);
       expect(document.querySelector(".campaign-screen")).toBeNull();
       expect(app.errors).toEqual([]);
     } finally {

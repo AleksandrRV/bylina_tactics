@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererJournal, createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
 import { createRoot, type Root } from "react-dom/client";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
@@ -26,95 +27,38 @@ import { dataTree } from "./training-sim.js";
  */
 
 /** Журнал обращений к средству отображения: порядок и аргументы. */
-const calls: { name: string; args: unknown[] }[] = [];
-
-const record =
-  (name: string) =>
-  (...args: unknown[]): void => {
-    calls.push({ name, args });
-  };
+const journal = createRendererJournal();
 
 let activate: ((x: number, y: number) => void) | null = null;
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
-  update: vi.fn(),
-  play: vi.fn(async () => {
-    calls.push({ name: "play", args: [] });
-  }),
-  pan: vi.fn(),
-  destroy: vi.fn(),
-  setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
-    activate = handler;
-  }),
-  setOnHover: vi.fn(),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
-  playCinematic: vi.fn(async (plan) => {
-    calls.push({ name: "playCinematic", args: [plan] });
-    return false;
-  }),
-  skipCinematic: vi.fn(),
-  isCinematicPlaying: vi.fn(() => false),
-  // Игровой масштаб камеры: его сцена запоминает перед первой половиной,
-  // чтобы вторая вернулась к игровому кадру (0.20.41).
-  getCameraScale: vi.fn(() => 1.25),
-  fadeScreen: vi.fn(async () => undefined),
-  setInputLocked: vi.fn(),
-  setHiddenEntities: vi.fn(record("setHiddenEntities")),
-  // Ведение камеры кликом по портрету в верхней панели (0.20.42).
-  focusEntity: vi.fn(record("focusEntity")),
-};
+const rendererStub = createRendererStub(
+  {
+    setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
+      activate = handler;
+    }),
+    playCinematic: vi.fn(async (plan) => {
+      journal.record("playCinematic", plan);
+      return false;
+    }),
+    setHiddenEntities: vi.fn((...args: unknown[]) => journal.record("setHiddenEntities", ...args)),
+    // Ведение камеры кликом по портрету в верхней панели (0.20.42).
+    focusEntity: vi.fn((...args: unknown[]) => journal.record("focusEntity", ...args)),
+  },
+  journal,
+);
 
-/** Порядок имён в журнале. */
-const order = (): string[] => calls.map((entry) => entry.name);
-
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
   window.localStorage.clear();
 });
 
 afterEach(() => {
   document.body.innerHTML = "";
   activate = null;
-  calls.length = 0;
+  journal.reset();
 });
-
-const tick = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-/** Дождаться условия (ленивая загрузка экрана, анимации хода). */
-async function waitFor(condition: () => boolean, timeoutMs = 8000): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (condition()) return;
-    await act(async () => {
-      await tick(40);
-    });
-  }
-  throw new Error("condition was not met in time");
-}
 
 /**
  * Поход Микулы к палке (М1). Клетка с предметом занята, поэтому маршрут
@@ -347,15 +291,18 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       });
       // Вступление: сцена уходит в средство отображения с приближением —
       // при подгонке «поле целиком» камера не смогла бы ехать.
-      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
-      const plan = calls.find((entry) => entry.name === "playCinematic")?.args[0] as { id: string; zoom?: number };
+      await waitFor(() => journal.calls.some((entry) => entry.name === "playCinematic"));
+      const plan = journal.calls.find((entry) => entry.name === "playCinematic")?.args[0] as {
+        id: string;
+        zoom?: number;
+      };
       expect(plan.id).toBe("m1_intro");
       expect(plan.zoom ?? 0, "camera zooms in for the scene").toBeGreaterThan(1);
 
       // Поход к палке: крыса выходит по триггеру подбора.
-      calls.length = 0;
+      journal.reset();
       await walkToStick(session);
-      await waitFor(() => calls.some((entry) => entry.name === "setHiddenEntities"), 8000);
+      await waitFor(() => journal.calls.some((entry) => entry.name === "setHiddenEntities"), 8000);
 
       // Крыса рождается ядром сразу, но на поле её не показывают: скрытие
       // приходит ДО проигрывания событий хода, иначе она мелькнула бы
@@ -364,18 +311,18 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
         .getBattleSnapshot(1)
         .entities.find((entity) => entity.configId === "forest_rat" && !entity.dead);
       expect(rat, "rat has spawned in the kernel").toBeDefined();
-      const at = calls.findIndex((entry) => entry.name === "setHiddenEntities");
+      const at = journal.calls.findIndex((entry) => entry.name === "setHiddenEntities");
       expect(at, "the rat is hidden").toBeGreaterThanOrEqual(0);
-      expect(calls[at]?.args[0], "exactly the rat is hidden").toEqual([rat!.id]);
+      expect(journal.calls[at]?.args[0], "exactly the rat is hidden").toEqual([rat!.id]);
       // Скрытие приходит ДО проигрывания событий того же хода: иначе крыса
       // мелькнула бы в клетке появления, а потом выбегала заново.
-      expect(order()[at + 1], "events play after the hide").toBe("play");
+      expect(journal.order()[at + 1], "events play after the hide").toBe("play");
 
       // После вбегания сцена возвращает видимость.
-      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"), 8000);
+      await waitFor(() => journal.calls.some((entry) => entry.name === "playCinematic"), 8000);
       await waitFor(
         () =>
-          calls.some(
+          journal.calls.some(
             (entry) => entry.name === "setHiddenEntities" && Array.isArray(entry.args[0]) && entry.args[0].length === 0,
           ),
         8000,
@@ -403,9 +350,9 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       await act(async () => {
         dismiss!.click();
       });
-      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
+      await waitFor(() => journal.calls.some((entry) => entry.name === "playCinematic"));
       // Палка подсвечена акцентом: кадр называет цель светом (0.20.40).
-      const intro = calls.find((entry) => entry.name === "playCinematic")?.args[0] as {
+      const intro = journal.calls.find((entry) => entry.name === "playCinematic")?.args[0] as {
         steps: { kind: string; accent?: boolean }[];
       };
       expect(
@@ -413,7 +360,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
         "the stick is accented",
       ).toBe(true);
 
-      calls.length = 0;
+      journal.reset();
       const hero = () =>
         session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
       await walkToStick(session);
@@ -429,8 +376,8 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
 
       // Сцена выхода крысы: кадр на опушке, вбегание с трекингом, передача
       // хода Нави и возврат камеры к герою.
-      await waitFor(() => calls.filter((entry) => entry.name === "playCinematic").length >= 2, 12000);
-      const plans = calls
+      await waitFor(() => journal.calls.filter((entry) => entry.name === "playCinematic").length >= 2, 12000);
+      const plans = journal.calls
         .filter((entry) => entry.name === "playCinematic")
         .map(
           (entry) =>
@@ -535,7 +482,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       await act(async () => {
         dismiss!.click();
       });
-      await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
+      await waitFor(() => journal.calls.some((entry) => entry.name === "playCinematic"));
 
       // Свой боец: клик по портрету в верхней панели ведёт камеру к нему.
       const hero = session
@@ -543,12 +490,12 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
         .entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
       const cards = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".roster .roster-card"));
       await waitFor(() => cards().length > 0);
-      calls.length = 0;
+      journal.reset();
       await act(async () => {
         cards()[0]!.click();
       });
       expect(
-        calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
+        journal.calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
         "camera is sent to the clicked fighter",
       ).toEqual([hero!.id]);
 
@@ -564,12 +511,12 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       // Крыса в поле зрения дружины: портрет кликабелен и ведёт камеру.
       expect(face()!.className, "a visible enemy is not dimmed").not.toContain("is-unseen");
       expect(face()!.disabled, "a visible enemy is clickable").toBe(false);
-      calls.length = 0;
+      journal.reset();
       await act(async () => {
         face()!.click();
       });
       expect(
-        calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
+        journal.calls.filter((entry) => entry.name === "focusEntity").map((entry) => entry.args[0]),
         "camera is sent to the visible enemy",
       ).toEqual([rat!.id]);
 

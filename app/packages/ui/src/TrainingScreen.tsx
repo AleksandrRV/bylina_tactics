@@ -2,10 +2,6 @@ import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
 
-function unitName(unitId: string): string {
-  return `unit.${unitId}.name`;
-}
-
 function BackIcon() {
   return (
     <svg

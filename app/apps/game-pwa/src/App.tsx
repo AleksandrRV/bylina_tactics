@@ -10,7 +10,7 @@ import {
   deserializeFog,
   SAVE_FORMAT_VERSION,
 } from "@bylina/storage";
-import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
+import { createReplayRecorder, isReplayJournal } from "@bylina/replay";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
@@ -126,7 +126,6 @@ export function App() {
     // «Новая былина») остаётся синхронным — пустых экранов не возникает.
     session.bindCampaign(created);
     return created;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [content, campaignRestore, session]);
 
   /** «Продолжить»: несчитанное сохранение — загрузить былину и вернуться к

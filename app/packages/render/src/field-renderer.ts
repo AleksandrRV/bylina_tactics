@@ -1,6 +1,5 @@
 import {
   effectiveCoverTier,
-  terrainCoverTier,
   tileAt,
   type CellPos,
   type EntityState,
@@ -21,8 +20,6 @@ import {
 } from "pixi.js";
 import { FRINGE_CELLS, fringeDecor } from "./fringe.js";
 import {
-  CAMERA_CELLS_IN_VIEW,
-  CINEMATIC_OVERSCROLL,
   cinematicGlideOffset,
   clampCameraOffset,
   fitScale,
@@ -50,10 +47,7 @@ import {
   MOVE_STEP_TINT,
   NAV_LOOK,
   ROUTE_MARK,
-  TERRAIN_FACE,
-  TERRAIN_RISER,
   biomeLookOf,
-  type BiomeLook,
   type FactionLook,
 } from "./palette.js";
 
@@ -244,10 +238,6 @@ function shakeNoise(): number {
 }
 
 /* ---------- рельеф ---------- */
-
-/** Верхние грани и откосы ярусов — из единого справочника (palette.ts). */
-const Z_FACE = TERRAIN_FACE;
-const Z_RISER = TERRAIN_RISER;
 
 function visualLevel(tile: Tile): number {
   return tile.pit ? 0 : tile.z;
@@ -598,14 +588,6 @@ function hexPoints(cx: number, cy: number, r: number): number[] {
   return pts;
 }
 
-/** Деревянная завала-укрытие: полубрус (1) или высокий сруб (2). */
-/** Смещение для граневых укрытий: N=0, E=1, S=2, W=3. */
-const EDGE_OFFSET: [number, number][] = [
-  [0, -14],
-  [14, 0],
-  [0, 14],
-  [-14, 0],
-];
 const C = CELL_SIZE;
 const HALF = C / 2;
 
@@ -3837,7 +3819,6 @@ export function createFieldRenderer(): FieldRenderer {
     while (jobs.length > 0) {
       const job = jobs.shift();
       if (!job) break;
-      // eslint-disable-next-line no-await-in-loop
       for (const event of job.events) {
         // eslint-disable-next-line no-await-in-loop
         await playOne(event);

@@ -379,7 +379,7 @@ function NetworkSetup({
   const t = useT();
   const [role, setRole] = useState<"host" | "guest">("host");
   const [objective, setObjective] = useState<Objective>("elimination");
-  const [peerRole, setPeerRole] = useState<"guest" | "spectator">("guest");
+  const [peerRole] = useState<"guest" | "spectator">("guest");
   const [joinRole, setJoinRole] = useState<"guest" | "spectator">("guest");
   const [omniscient, setOmniscient] = useState(false);
   const [code, setCode] = useState<string>("");

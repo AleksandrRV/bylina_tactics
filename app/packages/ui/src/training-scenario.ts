@@ -369,7 +369,7 @@ export function resolveTrainingDirective(
       const reachable = deps.reachable(actor.id);
       if (reachable.length === 0) return null;
       let cell: ReachableCell | null = null;
-      let reason: "move" | "dash" | "approach" =
+      const reason: "move" | "dash" | "approach" =
         hint.until === "move" ? "move" : hint.until === "dash" ? "dash" : "approach";
       if (hint.until === "approach") {
         const target = hint.targetUnitId ? livingByUnitId(snapshot, hint.targetUnitId) : undefined;

@@ -86,7 +86,9 @@ export default tseslint.config(
   {
     files: nodeFiles,
     languageOptions: { globals: globals.node },
-    rules: { "no-console": "off" },
+    // Сценарий обходит файлы по очереди — это его естественный порядок,
+    // а консоль для него — рабочий инструмент.
+    rules: { "no-console": "off", "no-await-in-loop": "off" },
   },
   { files: browserFiles, languageOptions: { globals: globals.browser } },
   {

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
 import { createRoot, type Root } from "react-dom/client";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
@@ -23,49 +24,17 @@ import { dataTree } from "./training-sim.js";
 
 let activate: ((x: number, y: number) => void) | null = null;
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
-  update: vi.fn(),
-  play: vi.fn(async () => undefined),
-  pan: vi.fn(),
-  destroy: vi.fn(),
+const rendererStub = createRendererStub({
   setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
     activate = handler;
   }),
-  setOnHover: vi.fn(),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
   playCinematic: vi.fn(async (_plan: CinematicPlan) => false),
-  skipCinematic: vi.fn(),
-  isCinematicPlaying: vi.fn(() => false),
-  getCameraScale: vi.fn(() => 1.25),
-  fadeScreen: vi.fn(async () => undefined),
-  setInputLocked: vi.fn(),
-  setHiddenEntities: vi.fn(),
-  focusEntity: vi.fn(),
-};
+});
 
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
   window.localStorage.clear();
 });
 
@@ -73,19 +42,6 @@ afterEach(() => {
   document.body.innerHTML = "";
   activate = null;
 });
-
-const tick = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
-
-async function waitFor(condition: () => boolean, timeoutMs = 12000): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (condition()) return;
-    await act(async () => {
-      await tick(40);
-    });
-  }
-  throw new Error("condition was not met in time");
-}
 
 /** Тот же опрос, но без исключения: вызывающий решает, что делать дальше. */
 async function waitUntil(condition: () => boolean, timeoutMs = 8000): Promise<boolean> {
