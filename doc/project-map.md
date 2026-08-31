@@ -46,6 +46,8 @@
     │   ├── ui/                  React-экраны
     │   ├── i18n/                словари и t()
     │   └── settings/            язык, громкость, debugMode
+    ├── eslint.config.mjs                правила проверки кода (0.20.55)
+    ├── .prettierrc.json                настройки форматтера: ширина строки 120 (0.20.55)
     └── scripts/
         ├── check-version-consistency.mjs
         ├── set-version.mjs                  единственная точка правки номера версии (0.20.54)
@@ -74,6 +76,8 @@
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
 | `app/scripts/check-version-consistency.mjs` | Единый источник версии: манифест, константы, документация, отсутствие литералов в исходниках (0.20.54) |
 | `app/scripts/set-version.mjs` | Установка версии приложения одной командой `pnpm version:set` (0.20.54) |
+| `app/eslint.config.mjs` | Правила ESLint: базовый набор, typescript-eslint, react-hooks; форматирование отдано Prettier (0.20.55) |
+| `app/.prettierrc.json` | Единое форматирование исходников (0.20.55) |
 | `app/scripts/resize-action-art.mjs` | Кадр 512×512 для образов действий (0.20.48) |
 
 ## 3. Владелец темы
