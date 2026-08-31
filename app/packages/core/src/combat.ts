@@ -29,7 +29,7 @@ export interface AttackOptions {
   forceOutcome?: ForceOutcome;
 }
 
-export interface HitBreakdown {
+interface HitBreakdown {
   baseAim: number;
   weaponMod: number;
   heightAim: number;

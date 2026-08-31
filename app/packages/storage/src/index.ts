@@ -10,7 +10,7 @@ import type { FogState, MatchState } from "@bylina/core";
  * целиком; туман войны — множествами строк по владельцам.
  */
 
-export interface SessionSaveState {
+interface SessionSaveState {
   screen: string;
   battleKind: "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue" | null;
   /**
@@ -31,7 +31,7 @@ export interface SessionSaveState {
   campaignHintsDone?: string[];
 }
 
-export interface FogSave {
+interface FogSave {
   [owner: number]: { explored: string[]; visible: string[] };
 }
 
@@ -51,7 +51,7 @@ export interface SaveData {
   fog?: FogSave;
 }
 
-export interface SaveStorage {
+interface SaveStorage {
   save(data: SaveData): boolean;
   /** Writes JSON produced by SaveSerializer without repeating JSON.stringify on the UI thread. */
   saveSerialized(serialized: string): boolean;
@@ -59,19 +59,19 @@ export interface SaveStorage {
   clear(): void;
 }
 
-export interface SaveStorageOptions {
+interface SaveStorageOptions {
   /** Called when browser storage is full; autosave remains non-fatal. */
   onQuotaExceeded?: (error: unknown) => void;
 }
 
-export interface StorageBackend {
+interface StorageBackend {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
   removeItem(key: string): void;
 }
 
 /** Safari uses code 22, Firefox may use 1014; modern engines use the name. */
-export function isQuotaExceededError(error: unknown): boolean {
+function isQuotaExceededError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   const candidate = error as { name?: unknown; code?: unknown };
   return candidate.name === "QuotaExceededError" || candidate.code === 22 || candidate.code === 1014;
@@ -142,7 +142,7 @@ export function migrateSave(value: unknown): SaveData | null {
 }
 
 /** Ключ списка повторов партий (0.17.0). */
-export const DEFAULT_REPLAYS_KEY = "bylina.replays.v1";
+const DEFAULT_REPLAYS_KEY = "bylina.replays.v1";
 
 export interface ReplayStorage {
   listReplays(): unknown[];
@@ -201,7 +201,7 @@ export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?:
   };
 }
 
-export const DEFAULT_SAVE_KEY = "bylina.save.v1";
+const DEFAULT_SAVE_KEY = "bylina.save.v1";
 
 export function createSaveStorage(
   key: string = DEFAULT_SAVE_KEY,
@@ -269,7 +269,7 @@ export function serializeSaveDraft(data: SaveDraft): string {
   return JSON.stringify({ ...save, fog: fog ? serializeFog(fog) : undefined });
 }
 
-export interface SaveSerializer {
+interface SaveSerializer {
   /** Serializes MatchState and fog off the UI thread where Workers are available. */
   serialize(data: SaveDraft): Promise<string>;
   dispose(): void;

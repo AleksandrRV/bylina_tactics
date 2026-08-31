@@ -13,7 +13,7 @@ export interface WebRtcChannelOptions {
 }
 
 /** Описание сессии, передаваемое изображением быстрого считывания либо короткой строкой. */
-export interface WebRtcSignal {
+interface WebRtcSignal {
   type: "offer" | "answer";
   sdp: string;
 }

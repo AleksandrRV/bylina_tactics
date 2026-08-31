@@ -63,7 +63,7 @@ export interface SkillPreview {
   areaCells?: CellPos[];
 }
 
-export type SpawnEffect = Extract<SkillEffect, { type: "spawn" }>;
+type SpawnEffect = Extract<SkillEffect, { type: "spawn" }>;
 
 export type SpawnCause = "SUMMON" | "ILLUSION" | "RESURRECTION";
 

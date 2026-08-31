@@ -88,7 +88,7 @@ class MinHeap {
   }
 }
 
-export interface PathResult {
+interface PathResult {
   path: CellPos[];
   mpCost: number;
 }

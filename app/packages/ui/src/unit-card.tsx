@@ -19,7 +19,7 @@ import type { UnitInfo } from "./unit-info.js";
 import { useLongPress } from "./use-long-press.js";
 
 /** Карточка бойца дружины в верхней панели. */
-export interface RosterCardProps {
+interface RosterCardProps {
   entity: EntityState;
   selected: boolean;
   /** Имя из словаря: экран знает язык, карточка — нет. */
@@ -59,7 +59,7 @@ export function RosterCard({ entity, selected, name, onSelect, onInspect }: Rost
 }
 
 /** Портрет противника в полосе верхней панели. */
-export interface EnemyFaceProps {
+interface EnemyFaceProps {
   configId: string;
   dead: boolean;
   /** Противник в поле зрения дружины прямо сейчас. */

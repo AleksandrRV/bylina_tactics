@@ -3,7 +3,7 @@ import { effectiveCoverTier, terrainCoverTier } from "./los.js";
 import { isCover } from "./occupancy.js";
 import type { EntityState, Grid } from "./types.js";
 
-export interface CoverEval {
+interface CoverEval {
   penalty: number;
   coverType: 0 | 1 | 2;
   flanked: boolean;
@@ -25,7 +25,7 @@ function sgn(value: number): number {
   return value > 0 ? 1 : value < 0 ? -1 : 0;
 }
 
-export function wholeCellCoverOnFireLine(sx: number, sy: number, dx: number, dy: number): boolean {
+function wholeCellCoverOnFireLine(sx: number, sy: number, dx: number, dy: number): boolean {
   if (sx !== 0 && sy !== 0) {
     return (dx === sx && dy === 0) || (dx === 0 && dy === sy) || (dx === sx && dy === sy);
   }
@@ -45,7 +45,7 @@ const EDGE_VECTOR: ReadonlyArray<readonly [number, number]> = [
  * Граневое укрытие защищает цель, только если луч входит в её клетку через
  * указанную границу. Укрытие может храниться с любой из двух сторон границы.
  */
-export function edgeCoverOnFireLine(attacker: EntityState, target: EntityState, cover: EntityState): boolean {
+function edgeCoverOnFireLine(attacker: EntityState, target: EntityState, cover: EntityState): boolean {
   if (cover.edge === undefined) return false;
   const vector = EDGE_VECTOR[cover.edge];
   if (!vector) return false;

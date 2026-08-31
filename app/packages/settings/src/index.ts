@@ -23,7 +23,7 @@ export interface SettingsState {
   debugMode: boolean;
 }
 
-export const defaultSettings: SettingsState = {
+const defaultSettings: SettingsState = {
   language: "ru",
   masterVolume: 80,
   musicVolume: 70,
@@ -35,7 +35,7 @@ export const defaultSettings: SettingsState = {
   debugMode: false,
 };
 
-export interface SettingsStorage {
+interface SettingsStorage {
   getItem(key: string): string | null;
   setItem(key: string, value: string): void;
 }

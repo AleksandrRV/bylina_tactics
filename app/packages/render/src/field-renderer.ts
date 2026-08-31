@@ -36,6 +36,8 @@ import {
   AIM_IMPOSSIBLE,
   AIM_PRESELECT,
   AIM_READY,
+  AP_OFF,
+  AP_ON,
   DRUZHINA_LOOK,
   EXTRACT_GLOW,
   EXTRACT_SPARK,
@@ -43,6 +45,9 @@ import {
   FALLBACK_TOKEN_ART,
   HOME_AMBER,
   HOME_BLUE,
+  HP_BACK,
+  HP_LOW,
+  HP_OK,
   MOVE_DASH_TINT,
   MOVE_STEP_TINT,
   NAV_LOOK,
@@ -1914,16 +1919,16 @@ export function createFieldRenderer(): FieldRenderer {
     const hp = shown?.hp ?? entity.hp;
     const maxHp = shown?.maxHp ?? entity.maxHp;
     const ratio = Math.max(0, hp / Math.max(1, maxHp));
-    g.roundRect(cx - 15, cy - 27, 30, 4.4, 2).fill({ color: 0x0a0a0a, alpha: 0.62 });
+    g.roundRect(cx - 15, cy - 27, 30, 4.4, 2).fill({ color: HP_BACK, alpha: 0.62 });
     if (ratio > 0) {
-      g.roundRect(cx - 14, cy - 26, 28 * ratio, 2.6, 1.3).fill(ratio > 0.4 ? 0x6fbf4a : 0xd84a3a);
+      g.roundRect(cx - 14, cy - 26, 28 * ratio, 2.6, 1.3).fill(ratio > 0.4 ? HP_OK : HP_LOW);
     }
 
     const pips = Math.max(0, entity.ap);
     for (let i = 0; i < entity.maxAp; i += 1) {
       const px0 = cx - ((entity.maxAp - 1) * 8) / 2 + i * 8;
       g.poly([px0, cy + 21.5, px0 + 2.9, cy + 24.4, px0, cy + 27.3, px0 - 2.9, cy + 24.4]).fill(
-        i < pips ? 0xe8b64c : 0x3a382e,
+        i < pips ? AP_ON : AP_OFF,
       );
     }
 

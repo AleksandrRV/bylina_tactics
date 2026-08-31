@@ -12,7 +12,7 @@ import type { EntityState } from "@bylina/core";
  * Логика вынесена из компонента: её можно покрыть тестом без jsdom.
  */
 
-export interface EnemyStripEntry {
+interface EnemyStripEntry {
   id: number;
   configId: string;
   /** Противник погиб (портрет остаётся в полосе зачёркнутым). */

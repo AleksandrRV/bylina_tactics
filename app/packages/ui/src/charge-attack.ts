@@ -112,7 +112,7 @@ function strikeAvailable(
   return hasLineOfSight(snapshot.grid, ghost.x, ghost.y, ghost.z, target.x, target.y, target.z);
 }
 
-export interface ChargeOptions {
+interface ChargeOptions {
   snapshot: MatchState;
   actor: EntityState;
   target: EntityState;

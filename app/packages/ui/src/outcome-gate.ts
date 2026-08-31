@@ -18,7 +18,7 @@
 /** Пауза после последней анимации: игрок успевает осознать исход. */
 export const OUTCOME_SETTLE_MS = 1000;
 
-export interface OutcomeGateOptions {
+interface OutcomeGateOptions {
   /** Пауза после проигрывания событий (мс). */
   delayMs?: number;
   /**

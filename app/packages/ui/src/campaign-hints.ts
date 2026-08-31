@@ -21,7 +21,7 @@ export type CampaignHintId =
   | "first_leshy" // первый леший — волхв (дистанция, корни)
   | "first_kikimora"; // первая кикимора — знахарка (яд, воскрешение)
 
-export type PersonaId = "znaharka" | "kuznets" | "volkhv" | "chronicler";
+type PersonaId = "znaharka" | "kuznets" | "volkhv" | "chronicler";
 
 /** Кто подаёт каждый туториал (game-design §3.1: знахарка — лечение и ранения,
  *  кузнец — снаряжение, волхв — умения, летописец — Тьму и миссию «Игла»). */

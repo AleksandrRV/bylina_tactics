@@ -48,7 +48,7 @@ export function hintCompletedByEvents(hint: TrainingHintConfig, events: readonly
   });
 }
 
-export interface AutoEndTurnConditions {
+interface AutoEndTurnConditions {
   paused: boolean;
   busy: boolean;
   enemyPhase: boolean;

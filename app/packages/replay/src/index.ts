@@ -28,7 +28,7 @@ export interface ReplayJournal {
   title: string;
 }
 
-export interface ReplayRecorder {
+interface ReplayRecorder {
   record(command: Command): void;
   finish(winner: 1 | 2 | null, title: string): ReplayJournal;
   getJournal(): ReplayJournal | null;

@@ -1,7 +1,7 @@
 import { inBounds, tileAt } from "./grid.js";
 import type { EntityState, Grid } from "./types.js";
 
-export function livingAt(entities: readonly EntityState[], x: number, y: number): EntityState[] {
+function livingAt(entities: readonly EntityState[], x: number, y: number): EntityState[] {
   return entities.filter((entity) => !entity.dead && entity.x === x && entity.y === y);
 }
 
@@ -9,12 +9,8 @@ export function isCover(entity: EntityState): boolean {
   return entity.coverType > 0;
 }
 
-export function isFoe(walker: EntityState, other: EntityState): boolean {
+function isFoe(walker: EntityState, other: EntityState): boolean {
   return other.obstacle && !other.dead && !isCover(other) && other.owner !== 0 && other.owner !== walker.owner;
-}
-
-export function isAlly(walker: EntityState, other: EntityState): boolean {
-  return other.id !== walker.id && other.obstacle && !other.dead && !isCover(other) && other.owner === walker.owner;
 }
 
 /**
