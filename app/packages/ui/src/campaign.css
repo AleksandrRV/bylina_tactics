@@ -3001,6 +3001,29 @@
 .replay-title {
   color: #e8e2d4;
   font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Пометка совместимости повтора (0.21.5): другие правила — янтарным,
+   неподдерживаемый формат — приглушённо-красным. */
+.replay-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.replay-badge-warn {
+  color: var(--amber, #e0b34a);
+}
+
+.replay-badge-off {
+  color: #c9807a;
 }
 
 .replay-actions {
