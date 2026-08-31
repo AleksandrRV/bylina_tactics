@@ -1,5 +1,5 @@
 /**
- * Правила проверки кода (0.20.55, фаза 0 рефакторинга).
+ * Правила проверки кода.
  *
  * Прежде в проекте не было ни линтера, ни форматтера: стиль держался на
  * внимании, а мёртвый код и случайные ошибки находил только просмотр.
@@ -8,6 +8,20 @@
  * правил форматирования, отданных Prettier.
  *
  * Форматирование — не дело линтера: за него отвечает `pnpm format`.
+ *
+ * Фазы рефакторинга:
+ *   - фаза 0 (0.20.55): появился базовый набор, предупреждения не роняют
+ *     сборку, а правятся по мере касания файлов;
+ *   - фаза 1 (0.21.7, день 8): добавлен типизированный набор
+ *     `recommendedTypeChecked` на `projectService`. Типизированные правила
+ *     требуют загрузки программы TypeScript (заметно медленнее), поэтому
+ *     они применяются только к типизированным файлам в `src`/`tests` —
+ *     каталогах, покрытых package-tsconfig; конфиги (`*.config.ts`) на
+ *     базовом наборе. Все находки типизированного набора в фазе 1 —
+ *     предупреждения: `no-floating-promises` и `no-misused-promises`, как и
+ *     остальные, видны и попадают в зафиксированный список, но сборку не
+ *     роняют. Часть находок (require-await, небезопасные any и пр.)
+ *     разбирается в следующей фазе — здесь только зафиксировать.
  */
 
 import js from "@eslint/js";
@@ -25,6 +39,21 @@ const browserFiles = [
   "packages/*/tests/**/*.{ts,tsx}",
   "apps/game-pwa/src/**/*.{ts,tsx}",
 ];
+/**
+ * Типизированные файлы для фазы 1: только каталоги, покрытые package
+ * tsconfig (`src`/`tests`). Конфиги сборки (`*.config.ts` в корне пакета) в
+ * tsconfig не входят — для них типизированный набор не поднимается.
+ */
+const typedFiles = ["packages/*/src/**/*.ts", "packages/*/tests/**/*.ts", "apps/*/src/**/*.ts", "**/*.tsx"];
+
+/**
+ * Фаза 1: правила типизированного набора приводятся к `warn` — сборку не
+ * роняют, но предупреждения видны в выводе и попадают в зафиксированный
+ * список. Ужесточение до `error` — следующая фаза, по мере разбора.
+ */
+const typeCheckedWarn = tseslint.configs.recommendedTypeChecked.flatMap((block) =>
+  Object.entries(block.rules ?? {}).map(([ruleId]) => [ruleId, "warn"]),
+);
 
 export default tseslint.config(
   {
@@ -40,10 +69,35 @@ export default tseslint.config(
   { files: sources, ...js.configs.recommended },
   // Набор typescript-eslint — только для типизированных файлов.
   ...tseslint.configs.recommended.map((config) => ({ ...config, files: ["**/*.{ts,tsx}"] })),
+  // Фаза 1 (0.21.7): типизированный набор на projectService. projectService
+  // сам находит ближайший tsconfig по файлу; tsconfigRootDir заякорен на app/.
+  ...tseslint.configs.recommendedTypeChecked.map((config) => ({
+    ...config,
+    files: typedFiles,
+    languageOptions: {
+      ...config.languageOptions,
+      parserOptions: {
+        ...config.languageOptions?.parserOptions,
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  })),
+  {
+    // Правила типизированного набора в фазе 1 — предупреждения: видны в
+    // выводе и попадают в зафиксированный список, но сборку не роняют
+    // (no-floating-promises и no-misused-promises в том числе). Список —
+    // ровно правила recommendedTypeChecked; применяется к тем же
+    // типизированным файлам, где поднят projectService.
+    files: typedFiles,
+    rules: Object.fromEntries(typeCheckedWarn),
+  },
   {
     files: sources,
     // Плагин обязан быть объявлен в том же объекте, что и его правила:
-    // иначе ESLint не знает, откуда брать @typescript-eslint/*.
+    // иначе ESLint не знает, откуда брать @typescript-eslint/* и
+    // react-hooks/* (фаза 0). Правила типизированного набора в фазе 1 —
+    // предупреждения: видны, но сборку не роняют.
     plugins: { "@typescript-eslint": tseslint.plugin, "react-hooks": reactHooks },
     languageOptions: {
       ecmaVersion: 2022,
@@ -77,10 +131,19 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-empty-object-type": "off",
       "@typescript-eslint/no-unsafe-function-type": "off",
-      // Правила реакт-хуков: в коде уже есть директивы под ними, и без
+      // Правила реакт-хуков: в коде уже есть директивы под них, и без
       // плагина они были бы мёртвыми комментариями.
       "react-hooks/rules-of-hooks": "error",
       "react-hooks/exhaustive-deps": "warn",
+    },
+  },
+  {
+    // Видимость переменных в TS-файлах проверяет сам TypeScript: no-undef
+    // даёт ложные срабатывания (React при jsx-runtime, DOM/сервис-типы) и
+    // официально отключается вместе с typescript-eslint.
+    files: ["**/*.{ts,tsx}"],
+    rules: {
+      "no-undef": "off",
     },
   },
   {
