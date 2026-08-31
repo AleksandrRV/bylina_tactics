@@ -30,6 +30,7 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
 import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
+import { firstFighterId } from "./battle-selection.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
 import {
@@ -49,7 +50,7 @@ import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./
 import { actionArt } from "./action-art.js";
 import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
+import { useI18nTick, useLatest, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "./enemy-strip.js";
@@ -681,13 +682,10 @@ export function BattleScreenView() {
     [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot],
   );
 
-  const isOwn = (entity: EntityState): boolean =>
-    !isSpectator &&
-    !isReplay &&
-    !entity.dead &&
-    entity.coverType === 0 &&
-    entity.owner === viewOwner &&
-    entity.maxAp > 0;
+  // Сторона экрана: по ней модуль battle-selection отбирает своих бойцов
+  // (0.20.60). Память нужна, чтобы ссылка на неё не менялась каждый кадр —
+  // иначе эффекты, читающие сторону, пересчитывались бы без нужды.
+  const side = useMemo(() => ({ viewOwner, isSpectator, isReplay }), [viewOwner, isSpectator, isReplay]);
 
   /**
    * Показать сюжетное сообщение окном (0.20.52): строка журнала гасится,
@@ -794,17 +792,18 @@ export function BattleScreenView() {
     return () => window.clearTimeout(timer);
   }, [snapshot.turnNumber, battleKind]);
 
+  // Состав поля читается из ссылки (0.20.60): сущности меняются после каждой
+  // команды, а выбор по их смене отбирал бы у игрока бойца, которым он только
+  // что походил. Повод выбрать заново — смена хода, стороны или указания
+  // обучения; состав берётся на этот момент.
+  const entitiesRef = useLatest(snapshot.entities);
   useEffect(() => {
-    // Обучение: выбран всегда исполнитель текущего указания — произвольный
-    // выбор бойца в обучении запрещён (строгий сценарий, 0.20.13).
-    const first =
-      (isTraining && trainingActorId !== null
-        ? snapshot.entities.find((entity) => entity.id === trainingActorId)
-        : undefined) ?? snapshot.entities.find(isOwn);
-    setSelectedId(first?.id ?? null);
+    // Кого выбрать — решает battle-selection: в обучении исполнитель
+    // указания (строгий сценарий, 0.20.13), иначе первый свой боец.
+    setSelectedId(firstFighterId(entitiesRef.current, { ...side, isTraining, trainingActorId }));
     setAction(null);
     clearAim();
-  }, [snapshot.turnNumber, viewOwner, trainingActorId]);
+  }, [snapshot.turnNumber, side, isTraining, trainingActorId, entitiesRef]);
 
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
@@ -2128,70 +2127,67 @@ export function BattleScreenView() {
   // каждый рендер; будь они в зависимостях, окно переподписывалось бы на
   // каждом кадре, а без них в обработчике осталась бы устаревшая команда.
   // Ссылка даёт свежие замыкания при одной подписке на время экрана.
-  const keyboardRef = useRef<{ ctx: BattleKeyContext; actions: BattleKeyActions } | null>(null);
-  useEffect(() => {
-    keyboardRef.current = {
-      ctx: {
-        paused,
-        busy,
-        outcomePending,
-        cutscenePlaying,
-        isTraining,
-        trainingActorId,
-        trainingDirective,
-        trainingAllows,
-        selectedId,
-        selected: selected ?? null,
-        action,
-        skills,
-        snapshot,
-        viewOwner,
-        isOwn,
+  const keyboard = useLatest<{ ctx: BattleKeyContext; actions: BattleKeyActions }>({
+    ctx: {
+      paused,
+      busy,
+      outcomePending,
+      cutscenePlaying,
+      isTraining,
+      trainingActorId,
+      trainingDirective,
+      trainingAllows,
+      selectedId,
+      selected: selected ?? null,
+      action,
+      skills,
+      snapshot,
+      viewOwner,
+      side,
+    },
+    actions: {
+      skipCutscene,
+      togglePause: () => session.setPaused(!paused),
+      select: (id) => {
+        setSelectedId(id);
+        // Обзор клетки не снимаем: перебор бойцов клавишей не отменяет
+        // подсветку уже осмотренной клетки.
+        setAction(null);
+        setSkillTargetPos(null);
+        setAimId(null);
       },
-      actions: {
-        skipCutscene,
-        togglePause: () => session.setPaused(!paused),
-        select: (id) => {
-          setSelectedId(id);
-          // Обзор клетки не снимаем: перебор бойцов клавишей не отменяет
-          // подсветку уже осмотренной клетки.
-          setAction(null);
-          setSkillTargetPos(null);
-          setAimId(null);
-        },
-        defend: () => {
-          if (selectedId === null) return;
-          applyCommand({ type: "DEFEND", actorId: selectedId });
-          cancelKeyboardAim();
-        },
-        overwatch: () => {
-          if (selectedId === null) return;
-          applyCommand({ type: "OVERWATCH", actorId: selectedId });
-          cancelKeyboardAim();
-        },
-        applySelfSkill,
-        armSkill: (entry) => {
-          setAction(entry);
-          cancelKeyboardAim();
-        },
-        toggleAction: (entry) => {
-          const active = action?.type === entry.type && action.id === entry.id;
-          setAction(active ? null : entry);
-          cancelKeyboardAim();
-        },
-        cancel: cancelKeyboardAim,
-        pan: (dx, dy) => rendererRef.current?.pan(dx, dy),
+      defend: () => {
+        if (selectedId === null) return;
+        applyCommand({ type: "DEFEND", actorId: selectedId });
+        cancelKeyboardAim();
       },
-    };
+      overwatch: () => {
+        if (selectedId === null) return;
+        applyCommand({ type: "OVERWATCH", actorId: selectedId });
+        cancelKeyboardAim();
+      },
+      applySelfSkill,
+      armSkill: (entry) => {
+        setAction(entry);
+        cancelKeyboardAim();
+      },
+      toggleAction: (entry) => {
+        const active = action?.type === entry.type && action.id === entry.id;
+        setAction(active ? null : entry);
+        cancelKeyboardAim();
+      },
+      cancel: cancelKeyboardAim,
+      pan: (dx, dy) => rendererRef.current?.pan(dx, dy),
+    },
   });
+  // Подписка одна на время экрана: состояние читается из ссылки.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      const runtime = keyboardRef.current;
-      if (runtime) handleBattleKey(event, runtime.ctx, runtime.actions);
+      handleBattleKey(event, keyboard.current.ctx, keyboard.current.actions);
     };
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
-      keyboardRef.current?.actions.cancel();
+      keyboard.current.actions.cancel();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("contextmenu", onContext);
@@ -2199,7 +2195,8 @@ export function BattleScreenView() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, []);
+    // Ссылка неизменна, поэтому подписка одна на время экрана.
+  }, [keyboard]);
 
   // В дружине — только бойцы (0.20.45). Увязший в трясине Федот выходит
   // из списка: пока он immobile (maxAp 0), управлять им нельзя, и пустая

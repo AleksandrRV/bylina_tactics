@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServices } from "./context.js";
 
 export function useI18nTick(): void {
@@ -19,4 +19,20 @@ export function useSettingsState() {
   const [state, setState] = useState(settings.get());
   useEffect(() => settings.subscribe(setState), [settings]);
   return state;
+}
+
+/**
+ * Ссылка на последнее значение (0.20.60): обновляется после каждого кадра.
+ *
+ * Обработчик, который должен срабатывать редко, но читать свежие данные,
+ * иначе обречён на выбор из двух зол: зависимости либо тянут переподписку
+ * на каждом кадре, либо держат устаревшее замыкание. Ссылка снимает сам
+ * выбор — значение читается в момент события, а не в момент подписки.
+ */
+export function useLatest<T>(value: T): { readonly current: T } {
+  const ref = useRef(value);
+  useEffect(() => {
+    ref.current = value;
+  });
+  return ref;
 }

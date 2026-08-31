@@ -26,6 +26,7 @@ function makeEntity(id: number, overrides: Record<string, unknown> = {}): Entity
     hp: 10,
     maxHp: 10,
     dead: false,
+    coverType: 0,
     weaponIds: ["sword"],
     skillIds: [],
     skillCooldowns: {},
@@ -55,7 +56,7 @@ function makeContext(overrides: Partial<BattleKeyContext> = {}): BattleKeyContex
     skills: {},
     snapshot: makeSnapshot([actor]),
     viewOwner: 1,
-    isOwn: (entity) => entity.owner === 1 && !entity.dead,
+    side: { viewOwner: 1, isSpectator: false, isReplay: false },
     ...overrides,
   };
 }
