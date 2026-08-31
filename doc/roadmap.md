@@ -57,10 +57,15 @@
   2.1 → 3.2 (критическая находка в dev-сервере Vitest UI), vite 5.4 →
   6.4 (high, обход `server.fs.deny`), esbuild 0.21 → 0.25 (moderate,
   dev-сервер ретранслятора). Локально аудит чист полностью.
-- [ ] **День 2 — ретранслятор (P0-1).** `maxPayload` в `WebSocketServer`,
-  `MAX_ROOMS`/`MAX_SOCKETS` через переменные окружения, отказ
-  `1013 OVERLOADED`, `peerId()` на `crypto.randomUUID()`; тесты и
-  `doc/operations.md`.
+- [x] **День 2 — ретранслятор (P0-1).** `maxPayload` в `WebSocketServer`
+  (65 KiB; кадр крупнее закрывается транспортом кодом `1009` до
+  буферизации), пределы комнат и соединений (`RELAY_MAX_ROOMS`=200,
+  `RELAY_MAX_SOCKETS`=400 — переменные окружения и опции `createRelayServer`),
+  отказ `CAPACITY` и `1013 OVERLOADED`, `peerId()` на
+  `crypto.randomUUID()`; три новых теста в
+  `apps/signaling-server/tests/relay-server.test.ts` (падали бы до правки);
+  документация — `doc/network-protocol.md` §8.1 (владелец сетевого
+  формата) и `apps/signaling-server/README.md`.
 - [ ] **День 3 — граница команд (P0-4) и мелкие правки сети.** Предел
   длины `path` (256), `isCommandPayload` как type-guard без `as Command`,
   пределы `match.entities`/`grid.tiles` в `isSyncPayload`, запись команды

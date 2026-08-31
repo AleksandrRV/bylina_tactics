@@ -99,4 +99,71 @@ describe("signaling relay server", () => {
     const response = await fetch(`http://127.0.0.1:${relay!.port}/rooms`);
     expect(response.headers.get("access-control-allow-origin")).toBe("https://game.example");
   });
+
+  it("tears down a frame larger than the transport payload limit (close 1009)", async () => {
+    // Кадр крупнее лимита отвергается транспортом до обработчика сообщения:
+    // ws сам закрывает сокет кодом 1009. Лимит = 64 KiB + 1 KiB конверта.
+    relay = await createRelayServer({ port: 0, heartbeatMs: 10_000 });
+    const socket = await connect();
+    const closed = new Promise<{ code: number }>((resolve) => socket.on("close", (code) => resolve({ code })));
+    const oversized = JSON.stringify({
+      type: "JOIN",
+      roomId: "room-big",
+      name: "huge",
+      role: "guest",
+      signal: "x".repeat(70 * 1024),
+    });
+    socket.send(oversized);
+    const { code } = await closed;
+    expect(code).toBe(1009);
+  });
+
+  it("refuses a new room beyond the room capacity with CAPACITY", async () => {
+    relay = await createRelayServer({ port: 0, heartbeatMs: 10_000, maxRooms: 2 });
+    const first = await connect();
+    const second = await connect();
+    const firstJoined = nextMessage(first, "JOINED");
+    first.send(JSON.stringify({ type: "JOIN", roomId: "room-1", name: "a", role: "host" }));
+    await firstJoined;
+    const secondJoined = nextMessage(second, "JOINED");
+    second.send(JSON.stringify({ type: "JOIN", roomId: "room-2", name: "b", role: "host" }));
+    await secondJoined;
+
+    // Две комнаты заняты: третья комната не создаётся, клиент получает
+    // CAPACITY и соединение закрывается.
+    const third = await connect();
+    const capacityError = nextMessage(third, "ERROR");
+    const closed = new Promise<void>((resolve) => third.on("close", () => resolve()));
+    third.send(JSON.stringify({ type: "JOIN", roomId: "room-3", name: "c", role: "guest" }));
+    expect((await capacityError).message).toBe("CAPACITY");
+    await closed;
+
+    // Вход в существующую комнату в пределах её ёмкости не запрещён.
+    const extra = await connect();
+    const extraJoined = nextMessage(extra, "JOINED");
+    extra.send(JSON.stringify({ type: "JOIN", roomId: "room-1", name: "d", role: "guest" }));
+    expect((await extraJoined).roomId).toBe("room-1");
+
+    first.close();
+    second.close();
+    extra.close();
+  });
+
+  it("closes connections beyond the socket limit with 1013 OVERLOADED", async () => {
+    relay = await createRelayServer({ port: 0, heartbeatMs: 10_000, maxSockets: 2 });
+    // Два сокета — ровно предел: соединения живы.
+    const first = await connect();
+    const second = await connect();
+    expect(first.readyState).toBe(WebSocket.OPEN);
+    expect(second.readyState).toBe(WebSocket.OPEN);
+
+    // Третье подключение превышает предел: обработчики не навешиваются,
+    // сокет закрывается кодом 1013 (Try Again Later).
+    const third = await connect();
+    const closed = new Promise<number>((resolve) => third.on("close", (code) => resolve(code)));
+    await expect(closed).resolves.toBe(1013);
+
+    first.close();
+    second.close();
+  });
 });

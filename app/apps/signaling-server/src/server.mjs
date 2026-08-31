@@ -3,14 +3,35 @@
  * SIGNAL is addressed: a signal may only be delivered to its named peer.
  */
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 import { WebSocketServer, WebSocket } from "ws";
 
 const MAX_PEERS = 4;
 const MAX_ROOM_ID = 64;
 const MAX_NAME = 48;
 const MAX_SIGNAL_BYTES = 64 * 1024;
+/**
+ * Верхний предел кадра транспорта. Проверка размера внутри обработчика
+ * сообщения стоит уже ПОСЛЕ полной буферизации кадра, поэтому защиту от
+ * исчерпания памяти задаёт `maxPayload` у WebSocketServer: кадр крупнее
+ * отвергается транспортом (close 1009) до буферизации.
+ */
+const MAX_FRAME_BYTES = MAX_SIGNAL_BYTES + 1024;
 const HEARTBEAT_MS = 30_000;
+/**
+ * Пределы числа комнат и одновременных соединений. Без них карта комнат и
+ * набор сокетов росли бы неограниченно. Настраиваются при развёртывании
+ * через переменные окружения рядом с RELAY_ALLOW_ORIGIN.
+ */
+const DEFAULT_MAX_ROOMS = 200;
+const DEFAULT_MAX_SOCKETS = 400;
 const ROOM_ID = new RegExp(`^[A-Za-z0-9_-]{1,${MAX_ROOM_ID}}$`);
+
+/** Положительное целое из переменной окружения; мусорное значение игнорируется. */
+function positiveEnvInt(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
 /**
  * Значение `Access-Control-Allow-Origin` для HTTP-эндпоинтов (`/rooms`,
  * `/health`): клиент комнаты лежит на другом источнике (порт/домен),
@@ -24,6 +45,8 @@ export function createRelayServer(options = {}) {
   const rooms = new Map();
   const heartbeatMs = options.heartbeatMs ?? HEARTBEAT_MS;
   const corsOrigin = options.corsOrigin ?? process.env.RELAY_ALLOW_ORIGIN ?? DEFAULT_CORS_ORIGIN;
+  const maxRooms = options.maxRooms ?? positiveEnvInt(process.env.RELAY_MAX_ROOMS, DEFAULT_MAX_ROOMS);
+  const maxSockets = options.maxSockets ?? positiveEnvInt(process.env.RELAY_MAX_SOCKETS, DEFAULT_MAX_SOCKETS);
   const server = http.createServer((req, res) => {
     const url = req.url ?? "/";
     res.setHeader("Access-Control-Allow-Origin", corsOrigin);
@@ -40,7 +63,9 @@ export function createRelayServer(options = {}) {
     res.writeHead(404);
     res.end(JSON.stringify({ error: "NOT_FOUND" }));
   });
-  const wss = new WebSocketServer({ server });
+  // maxPayload: кадр крупнее предела отвергается транспортом (close 1009)
+  // до того, как он будет буферизован и попадёт в обработчик сообщения.
+  const wss = new WebSocketServer({ server, maxPayload: MAX_FRAME_BYTES });
   const heartbeat = setInterval(() => {
     for (const socket of wss.clients) {
       if (socket.isAlive === false) {
@@ -53,6 +78,12 @@ export function createRelayServer(options = {}) {
   }, heartbeatMs);
 
   wss.on("connection", (socket) => {
+    // Предел соединений проверяется до любой обработки: лишний сокет не
+    // получает обработчиков и сразу закрывается (1013 Try Again Later).
+    if (wss.clients.size > maxSockets) {
+      socket.close(1013, "OVERLOADED");
+      return;
+    }
     socket.isAlive = true;
     socket.on("pong", () => {
       socket.isAlive = true;
@@ -60,7 +91,9 @@ export function createRelayServer(options = {}) {
     const peer = { id: peerId(), role: "guest", name: "player", socket };
     let joinedRoomId = null;
     socket.on("message", (raw) => {
-      if (raw.length > MAX_SIGNAL_BYTES + 1024) return send(socket, { type: "ERROR", message: "MESSAGE_TOO_LARGE" });
+      // Основная защита — maxPayload транспорта (close 1009 до буферизации);
+      // эта проверка остаётся вторым рубежом для согласованного ERROR.
+      if (raw.length > MAX_FRAME_BYTES) return send(socket, { type: "ERROR", message: "MESSAGE_TOO_LARGE" });
       let message;
       try {
         message = JSON.parse(String(raw));
@@ -76,7 +109,7 @@ export function createRelayServer(options = {}) {
         peer.name = message.name.trim();
         peer.role = message.role;
         joinedRoomId = message.roomId;
-        joinRoom(rooms, joinedRoomId, peer, MAX_PEERS);
+        joinRoom(rooms, joinedRoomId, peer, MAX_PEERS, maxRooms);
       } else if (message.type === "SIGNAL") {
         if (!validRoomId(message.roomId) || !joinedRoomId || message.roomId !== joinedRoomId)
           return send(socket, { type: "ERROR", message: "NOT_IN_ROOM" });
@@ -113,7 +146,9 @@ export function createRelayServer(options = {}) {
 }
 
 function peerId() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  // crypto.randomUUID вместо Date.now()+Math.random: предсказуемый
+  // генератор давал бы воспроизводимые идентификаторы пиров.
+  return randomUUID();
 }
 function validRoomId(value) {
   return typeof value === "string" && ROOM_ID.test(value);
@@ -146,9 +181,16 @@ function roomInfo(room) {
     peers: room.peers.map(peerInfo),
   };
 }
-function joinRoom(rooms, roomId, peer, maxPeers) {
+function joinRoom(rooms, roomId, peer, maxPeers, maxRooms) {
   let room = rooms.get(roomId);
   if (!room) {
+    // Предел числа комнат проверяется до создания: новая комната не должна
+    // рождаться, когда ретранслятор заполнен. Соединение закрывается.
+    if (rooms.size >= maxRooms) {
+      send(peer.socket, { type: "ERROR", message: "CAPACITY" });
+      peer.socket.close();
+      return;
+    }
     room = { id: roomId, peers: [], createdAt: Date.now() };
     rooms.set(roomId, room);
   }
