@@ -28,11 +28,11 @@ import {
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
+import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
 import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
 import { firstFighterId } from "./battle-selection.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
-import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
+import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
 import {
   directiveAllowsAction,
   resolveTrainingDirective,
@@ -397,7 +397,7 @@ export function BattleScreenView() {
       session.subscribeBattle(() => {
         setTick((value) => value + 1);
       }),
-    [kernel],
+    [kernel, session],
   );
 
   // Режим обучения (0.19.0): активный шаг подсказки; отслеживание событий
@@ -623,16 +623,16 @@ export function BattleScreenView() {
   const trainingDone = isTraining && trainingHints.length > 0 && hintStep >= trainingHints.length;
   useEffect(() => {
     if (!isTraining || busy || trainingOver) return;
-    const outcome = session.getBattleOutcome();
-    const missionHasEnemies = (trainingMission?.enemies.length ?? 0) > 0;
-    const complete = missionHasEnemies ? outcome === "victory" : trainingDone;
-    if (complete) {
-      if (trainingMission) session.completeTrainingMission(trainingMission.id);
-      // Итог обучения — так же после анимаций и паузы (0.20.39).
-      outcomeGate.report(() => setTrainingOver("victory"));
-      return;
-    }
-    if (outcome === "defeat") outcomeGate.report(() => setTrainingOver("defeat"));
+    // Путь к победе (шаги подсказки или исход ядра) выбирает training-progress.
+    const outcome = trainingOutcome({
+      outcome: session.getBattleOutcome(),
+      missionHasEnemies: (trainingMission?.enemies.length ?? 0) > 0,
+      trainingDone,
+    });
+    if (outcome === null) return;
+    if (outcome === "victory" && trainingMission) session.completeTrainingMission(trainingMission.id);
+    // Итог обучения — так же после анимаций и паузы (0.20.39).
+    outcomeGate.report(() => setTrainingOver(outcome));
   }, [
     snapshot.turnNumber,
     snapshot.entities,
@@ -643,6 +643,8 @@ export function BattleScreenView() {
     hintStep,
     trainingOver,
     trainingMission,
+    outcomeGate,
+    session,
   ]);
 
   // Ограничение действий в обучении (строгий сценарий, 0.20.13): игрок может
@@ -675,11 +677,17 @@ export function BattleScreenView() {
 
   const visibleCells = useMemo(
     () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot],
+    // Ядро и части снимка — признак устаревания (0.20.61): память обязана
+    // пересчитываться на каждое изменение поля, хотя тело читает только
+    // сервис. У соседних памятей правило то же.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot, session],
   );
   const exploredCells = useMemo(
     () => (usesNetSnapshot ? session.getNetExplored() : session.getBattleExplored(viewOwner)),
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot],
+    // Тот же признак устаревания, что у видимости поля (0.20.61).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot, session],
   );
 
   // Сторона экрана: по ней модуль battle-selection отбирает своих бойцов
@@ -815,6 +823,8 @@ export function BattleScreenView() {
     if (isNetGuest) return session.requestNetReachable(selectedId);
     if (usesNetSnapshot || isReplay) return [] as ReachableCell[];
     return session.getBattleReachable(selectedId);
+    // Ядро, номер хода и положение бойца — признак устаревания (0.20.61).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     kernel,
     selectedId,
@@ -828,6 +838,7 @@ export function BattleScreenView() {
     isNetGuest,
     usesNetSnapshot,
     isReplay,
+    session,
   ]);
 
   const byReach = useMemo(() => {
@@ -857,7 +868,9 @@ export function BattleScreenView() {
     const [xs, ys] = preview.split(",");
     const path = session.getBattlePath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
     return path?.path ?? [];
-  }, [preview, selectedId, kernel, snapshot.turnNumber, usesNetSnapshot]);
+    // Ядро и номер хода — признак устаревания маршрута (0.20.61).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview, selectedId, kernel, snapshot.turnNumber, usesNetSnapshot, session]);
 
   const hit: HitPreview | null = useMemo(() => {
     if (selectedId === null || !action) return null;
@@ -887,6 +900,8 @@ export function BattleScreenView() {
       flanked: result.flanked,
       areaCells: result.areaCells,
     };
+    // Ядро и состояние цели — признак устаревания предпросмотра (0.20.61).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     kernel,
     selectedId,
@@ -899,6 +914,10 @@ export function BattleScreenView() {
     aimed?.x,
     aimed?.y,
     aimed?.hp,
+    isNetGuest,
+    usesNetSnapshot,
+    isReplay,
+    session,
   ]);
 
   const announce = (events: GameEvent[]): void => {
@@ -1905,7 +1924,9 @@ export function BattleScreenView() {
       rendererRef.current = null;
       renderer.destroy();
     };
-  }, []);
+    // Ссылка ввода неизменна: подписка одна на время экрана, а обратные
+    // вызовы средство отображения берёт из неё при каждом событии.
+  }, [inputRef]);
 
   const aimBreakCell = useMemo(() => {
     if (!hit || !selected || !aimed) return null;
@@ -1936,7 +1957,17 @@ export function BattleScreenView() {
     }
     if (battleKind === "replay") return replayJournal?.options.map.biome;
     return content.quickMatch.map.biome;
-  }, [isTraining, trainingMission, battleKind, activeMissionId, session, content, replayJournal]);
+  }, [
+    isTraining,
+    trainingMission,
+    isPrologue,
+    prologueMission,
+    battleKind,
+    activeMissionId,
+    session,
+    content,
+    replayJournal,
+  ]);
 
   // Этап 3.6: доля счётчика Тьмы кампании — холодный слой поверх сцены.
   const darknessRatio = useMemo(() => {
@@ -1982,6 +2013,8 @@ export function BattleScreenView() {
       // допускает friendly fire; лечение/призыв с filter="all" не опасны.
       warnFriendly: skill.resolution === "attack" && (skill.filter === "all" || skill.filter === "allies"),
     };
+    // Ядро и номер хода — признак устаревания, как у видимости поля (0.20.61).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     action,
     selectedId,
@@ -2079,6 +2112,7 @@ export function BattleScreenView() {
     darknessRatio,
     areaPreview,
     charge,
+    viewOwner,
   ]);
 
   // Жесты холста закрыты, пока исход боя ещё не показан (0.20.40): пауза
