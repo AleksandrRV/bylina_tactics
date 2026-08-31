@@ -14,7 +14,7 @@ import { actionArt } from "./action-art.js";
 export type Translate = (key: string, vars?: Record<string, string | number>) => string;
 
 /** Строка параметров: подпись и значение. */
-export interface ActionInfoRow {
+interface ActionInfoRow {
   label: string;
   value: string;
 }

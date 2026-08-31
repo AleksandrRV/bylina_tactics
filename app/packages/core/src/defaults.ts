@@ -119,7 +119,7 @@ export const MACE: WeaponStats = {
   envDmg: 1,
 };
 
-export const PISHCHAL: WeaponStats = {
+const PISHCHAL: WeaponStats = {
   id: "pishchal",
   category: "ranged",
   apCost: 2,

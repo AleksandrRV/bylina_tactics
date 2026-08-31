@@ -5,7 +5,7 @@ import { spawnUnitState } from "./match.js";
 import { compilePrologueLayout, type PrologueLayout } from "./prologue-layout.js";
 import type { EntityState, MatchState } from "./types.js";
 
-export interface PrologueMatchOptions {
+interface PrologueMatchOptions {
   layout: PrologueLayout;
   units: SpawnUnitConfig[];
   seed?: number;

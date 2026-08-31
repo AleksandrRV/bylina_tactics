@@ -4,20 +4,14 @@ import { livingOf } from "./outcome.js";
 import { pickEnemyCommand } from "./ai.js";
 import type { TacticsKernel } from "./kernel.js";
 import type { CellPos, Command, EntityState } from "./types.js";
-import type {
-  TrainingEnemyAction,
-  TrainingEnemyCondition,
-  TrainingEnemyScript,
-  TrainingEnemyScriptState,
-} from "./training-ai.js";
-import { pickScriptedEnemyCommand } from "./training-ai.js";
+import type { TrainingEnemyAction, TrainingEnemyCondition } from "./training-ai.js";
 
 /**
  * Скрипт пролога (0.20.32): обобщение строгого сценария обучения на
  * исполнителей стороны игрока и канал forceHit/forceMiss.
  */
 
-export type PrologueScriptSide = "player" | "enemy";
+type PrologueScriptSide = "player" | "enemy";
 
 export interface PrologueScriptAction {
   unitId?: string;
@@ -261,22 +255,6 @@ export function pickScriptedCommand(
     return { command: pickEnemyCommand(kernel), state: { index } };
   }
   return { command: null, state: { index } };
-}
-
-/** Совместимость: сценарий обучения по-прежнему выбирается тем же контрактом. */
-export function asTrainingScript(script: PrologueScript): TrainingEnemyScript {
-  return {
-    priority: script.priority as TrainingEnemyAction[] | undefined,
-    actions: script.actions as TrainingEnemyAction[] | undefined,
-  };
-}
-
-export function pickTrainingViaPrologue(
-  kernel: TacticsKernel,
-  script: TrainingEnemyScript | undefined,
-  state: TrainingEnemyScriptState,
-): ReturnType<typeof pickScriptedEnemyCommand> {
-  return pickScriptedEnemyCommand(kernel, script, state);
 }
 
 export type { TrainingEnemyCondition };

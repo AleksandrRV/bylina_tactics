@@ -14,13 +14,13 @@ import type { Translate } from "./action-info.js";
 import { unitPortrait } from "./portraits.js";
 
 /** Строка параметров: подпись и значение. */
-export interface UnitInfoRow {
+interface UnitInfoRow {
   label: string;
   value: string;
 }
 
 /** Запись экипировки или умения: название и краткая сводка. */
-export interface UnitInfoItem {
+interface UnitInfoItem {
   id: string;
   name: string;
   /** Краткая сводка: урон и дальность для оружия, цена и ресурсы для умения. */
@@ -29,7 +29,7 @@ export interface UnitInfoItem {
   current?: boolean;
 }
 
-export interface UnitInfoSection {
+interface UnitInfoSection {
   id: "equipment" | "skills";
   title: string;
   items: UnitInfoItem[];
@@ -56,7 +56,7 @@ export interface UnitInfo {
   sections: UnitInfoSection[];
 }
 
-export interface UnitInfoSource {
+interface UnitInfoSource {
   weapons: Record<string, WeaponStats>;
   skills: Record<string, SkillStats>;
   /** Свой боец или противник: от этого зависит подпись стороны. */

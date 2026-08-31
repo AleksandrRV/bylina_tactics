@@ -3,8 +3,8 @@ import { PLAYER_OWNER, ENEMY_OWNER } from "./debug-map.js";
 import type { CellPos, EntityState, MatchState } from "./types.js";
 import type { FogState } from "./fog.js";
 
-export type ReinforcementMode = "threshold" | "onKill";
-export type SpawnEdge = "north" | "south" | "east" | "west";
+type ReinforcementMode = "threshold" | "onKill";
+type SpawnEdge = "north" | "south" | "east" | "west";
 
 export interface ReinforcementsConfig {
   enabled?: boolean;
@@ -27,7 +27,7 @@ export interface ReinforcementsState {
   killsThisNavTurn: number;
 }
 
-export interface ReinforcementTick {
+interface ReinforcementTick {
   state: ReinforcementsState;
   telegraph: CellPos[];
   spawns: { unitId: string; at: CellPos }[];

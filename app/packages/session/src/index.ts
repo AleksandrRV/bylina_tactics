@@ -47,18 +47,18 @@ export type AppScreen =
   | "training"
   | "trainingBattle";
 
-export type GameMode = "quickMatch" | "campaign" | "pvp";
+type GameMode = "quickMatch" | "campaign" | "pvp";
 
-export type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue";
+type BattleKind = "quick" | "campaign" | "pvp" | "pvpNet" | "replay" | "training" | "prologue";
 
 /** Сторона в поочерёдной игре на одном устройстве (0.14.0). */
-export type PvpSide = 1 | 2;
+type PvpSide = 1 | 2;
 
 export type DifficultyId = "easy" | "normal" | "hard";
 
 export type MatchOutcome = "victory" | "defeat";
 
-export interface CampaignFinishInfo {
+interface CampaignFinishInfo {
   darknessGained: number;
   campaignLost: boolean;
   fallen: string[];
@@ -339,7 +339,7 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" |
  * игра была сохранена. Прикладывается при нажатии «Продолжить» в главном
  * меню — до этого сессия стартует в меню, состояние кампании не загружено.
  */
-export interface CampaignContinuation {
+interface CampaignContinuation {
   /** Сохранённый экран ветки кампании. */
   screen: "campaign" | "deployment" | "missionResult" | "battle";
   /**

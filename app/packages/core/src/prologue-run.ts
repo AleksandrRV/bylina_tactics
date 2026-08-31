@@ -1,5 +1,5 @@
 import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
-import { distH, tileAt } from "./grid.js";
+import { tileAt } from "./grid.js";
 import {
   allowedPanel,
   createHintsManagerState,
@@ -26,7 +26,7 @@ import {
 } from "./reinforcements.js";
 import type { CellPos, Command, GameEvent, MatchState } from "./types.js";
 
-export type PrologueMissionId = "prologue_brushwood" | "prologue_cry" | string;
+type PrologueMissionId = "prologue_brushwood" | "prologue_cry" | string;
 
 export interface PrologueRunContext {
   missionId: PrologueMissionId;
@@ -634,8 +634,4 @@ export function shouldRestoreCheckpoint(
       !state.extracted.includes(entity.configId),
   );
   return fallen.length > 0;
-}
-
-export function adjacentTo(a: { x: number; y: number }, b: { x: number; y: number }): boolean {
-  return distH(a.x, a.y, b.x, b.y) <= 1;
 }

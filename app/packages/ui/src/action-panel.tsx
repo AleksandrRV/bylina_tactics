@@ -19,7 +19,7 @@ import type { ActionInfo } from "./action-info.js";
 // портретам бойцов в верхней панели.
 import { useLongPress } from "./use-long-press.js";
 
-export interface ActionSlotProps {
+interface ActionSlotProps {
   /** Идентификатор оружия, умения или служебного действия. */
   id: string;
   name: string;

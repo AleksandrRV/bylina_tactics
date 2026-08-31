@@ -2,7 +2,7 @@ import type { CellPos, EntityState, GameEvent, MatchState } from "./types.js";
 import { distH } from "./grid.js";
 
 /** Триггеры миссии пролога (doc/campaign.md §13.1). Только наблюдают события ядра. */
-export type MissionTriggerKind =
+type MissionTriggerKind =
   | "OnZoneEnter"
   | "OnUnitAdjacent"
   | "OnObjectDestroyed"
@@ -41,7 +41,7 @@ export interface MissionScriptState {
   flags: Record<string, boolean>;
 }
 
-export interface MissionTriggerFire {
+interface MissionTriggerFire {
   triggerId: string;
   flag?: string;
 }

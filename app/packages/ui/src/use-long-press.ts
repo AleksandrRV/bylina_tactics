@@ -16,11 +16,11 @@
 import { useCallback, useEffect, useRef } from "react";
 
 /** Длительность долгого нажатия: длиннее обычного клика, короче ожидания. */
-export const LONG_PRESS_MS = 420;
+const LONG_PRESS_MS = 420;
 /** Допустимый сдвиг пальца: больше — нажатие считают прокруткой ленты. */
 const MOVE_TOLERANCE_PX = 10;
 
-export interface LongPressOptions {
+interface LongPressOptions {
   /** Открыть окно информации; без обработчика жест не отслеживается. */
   onLongPress?: (() => void) | undefined;
   /** Обычный клик: исполняется, только если удержание не сработало. */
@@ -30,7 +30,7 @@ export interface LongPressOptions {
 }
 
 /** Обработчики указателя: навешиваются на кнопку целиком. */
-export interface LongPressHandlers {
+interface LongPressHandlers {
   onPointerDown: React.PointerEventHandler<HTMLElement>;
   onPointerUp: React.PointerEventHandler<HTMLElement>;
   onPointerLeave: React.PointerEventHandler<HTMLElement>;
@@ -39,7 +39,7 @@ export interface LongPressHandlers {
   onContextMenu: React.MouseEventHandler<HTMLElement>;
 }
 
-export interface LongPress {
+interface LongPress {
   handlers: LongPressHandlers;
   /** Клик с подавлением: после удержания действие не исполняется. */
   onClick: () => void;

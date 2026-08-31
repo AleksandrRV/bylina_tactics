@@ -1,6 +1,6 @@
 import type { Grid, Tile } from "./types.js";
 
-export function tileIndex(grid: Grid, x: number, y: number): number {
+function tileIndex(grid: Grid, x: number, y: number): number {
   return y * grid.width + x;
 }
 
@@ -18,13 +18,6 @@ export function distH(ax: number, ay: number, bx: number, by: number): number {
   const dy = by - ay;
   return Math.floor(Math.sqrt(dx * dx + dy * dy));
 }
-
-export const ORTHO: ReadonlyArray<readonly [number, number]> = [
-  [1, 0],
-  [-1, 0],
-  [0, 1],
-  [0, -1],
-];
 
 export const NEIGHBORS: ReadonlyArray<readonly [number, number]> = [
   [1, 0],

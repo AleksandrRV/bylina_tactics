@@ -77,6 +77,7 @@
 | `app/scripts/check-version-consistency.mjs` | Единый источник версии: манифест, константы, документация, отсутствие литералов в исходниках (0.20.54) |
 | `app/scripts/set-version.mjs` | Установка версии приложения одной командой `pnpm version:set` (0.20.54) |
 | `app/packages/ui/tests/harness.tsx` | Общая обвязка DOM-тестов: заглушка поля боя, журнал обращений, монтирование экрана, жесты (0.20.56) |
+| `app/packages/content/src/schemas/` | Проверки содержимого по областям: `combat`, `world`, `campaign`, `modes`, `training`, `scripting`, `prologue`; точка входа — `schemas.ts` (0.20.57) |
 | `app/eslint.config.mjs` | Правила ESLint: базовый набор, typescript-eslint, react-hooks; форматирование отдано Prettier (0.20.55) |
 | `app/.prettierrc.json` | Единое форматирование исходников (0.20.55) |
 | `app/scripts/resize-action-art.mjs` | Кадр 512×512 для образов действий (0.20.48) |

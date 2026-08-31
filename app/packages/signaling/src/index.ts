@@ -1,9 +1,9 @@
 import { createWebRtcChannel, type Envelope, type Transport } from "@bylina/net";
 
-export type PeerRole = "host" | "guest" | "spectator";
-export type SignalingState = "connecting" | "reconnecting" | "signaling-connected" | "rtc-connected" | "closed";
+type PeerRole = "host" | "guest" | "spectator";
+type SignalingState = "connecting" | "reconnecting" | "signaling-connected" | "rtc-connected" | "closed";
 
-export interface SignalingPeer {
+interface SignalingPeer {
   id: string;
   role: PeerRole;
   name: string;
@@ -19,7 +19,7 @@ export interface DataChannel extends Transport {
   close?(): void;
 }
 
-export interface SignalingSession {
+interface SignalingSession {
   transport: Transport;
   onOpen(listener: () => void): void;
   /** Fired only when explicitly closed, not during an automatic reconnect. */

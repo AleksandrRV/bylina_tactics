@@ -15,23 +15,23 @@ import { migratePrologueFighters } from "./prologue-migration.js";
  */
 
 export type MissionOutcome = "victory" | "defeat";
-export type CampaignPhase = "active" | "lost";
-export type CampaignChapter = "prologue" | "open";
+type CampaignPhase = "active" | "lost";
+type CampaignChapter = "prologue" | "open";
 
-export type MissionPointStatus = "open" | "done" | "locked";
+type MissionPointStatus = "open" | "done" | "locked";
 
-export interface Resources {
+interface Resources {
   gold: number;
   herbs: number;
   artifacts: number;
 }
 
-export interface MissionPointState {
+interface MissionPointState {
   id: string;
   status: MissionPointStatus;
 }
 
-export interface FighterState {
+interface FighterState {
   id: number;
   name: string;
   /** Запись юнита (класс либо `recruitUnitId` для рекрута). */
@@ -53,7 +53,7 @@ export interface MissionParticipant {
   hp: number;
 }
 
-export interface MissionFinishResult {
+interface MissionFinishResult {
   /** Прирост Тьмы, применённый после миссии. */
   darknessGained: number;
   /** Награда миссии (при успехе; при поражении — нули). */
@@ -72,7 +72,7 @@ export interface MissionFinishResult {
   newRecruit: string | null;
 }
 
-export interface ScanResult {
+interface ScanResult {
   /** Затраченные на сканирование запасы. */
   cost: Resources;
   /** Открытые сканированием точки. */
@@ -171,7 +171,7 @@ const RECRUIT_NAMES: readonly string[] = [
 
 const ZERO_RESOURCES: Resources = { gold: 0, herbs: 0, artifacts: 0 };
 
-export interface CampaignOptions {
+interface CampaignOptions {
   /** Запас здоровья записей юнитов дружины (из модуля содержания). */
   unitStats?: Record<string, { maxHealth: number }>;
   /** Записи предметов Кузни (из модуля содержания). */

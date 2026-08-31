@@ -45,7 +45,7 @@ export interface BiomeLook {
 }
 
 /** Луг — прежний облик поля; отсутствие биома трактуется как луг. */
-export const BIOME_MEADOW: BiomeLook = {
+const BIOME_MEADOW: BiomeLook = {
   face: [0x2c3a2c, 0x43603f, 0x74925f],
   riser: [0x171a12, 0x23291a, 0x38432a],
   coverStyle: "wood",
@@ -53,7 +53,7 @@ export const BIOME_MEADOW: BiomeLook = {
 };
 
 /** Болото кикиморы: холодная зелень, кусты и камыш. */
-export const BIOME_SWAMP: BiomeLook = {
+const BIOME_SWAMP: BiomeLook = {
   face: [0x243226, 0x39513a, 0x5d7350],
   riser: [0x12160f, 0x1c2114, 0x2c3320],
   coverStyle: "bush",
@@ -61,7 +61,7 @@ export const BIOME_SWAMP: BiomeLook = {
 };
 
 /** Чаща лешего: густая тёмная зелень, брёвна и грибы. */
-export const BIOME_THICKET: BiomeLook = {
+const BIOME_THICKET: BiomeLook = {
   face: [0x1e2c1e, 0x31482e, 0x54684a],
   riser: [0x101409, 0x181d10, 0x26301c],
   coverStyle: "wood",
@@ -69,7 +69,7 @@ export const BIOME_THICKET: BiomeLook = {
 };
 
 /** Выжженная земля: пепельные тона, каменные глыбы и кости. */
-export const BIOME_SCORCHED: BiomeLook = {
+const BIOME_SCORCHED: BiomeLook = {
   face: [0x33302a, 0x4a4438, 0x6b5f4c],
   riser: [0x14120e, 0x1e1a14, 0x2c261c],
   coverStyle: "stone",
@@ -83,7 +83,7 @@ export const BIOMES: Record<BiomeId, BiomeLook> = {
   scorched: BIOME_SCORCHED,
 };
 
-export const DEFAULT_BIOME: BiomeId = "meadow";
+const DEFAULT_BIOME: BiomeId = "meadow";
 
 export function biomeLookOf(biome: string | undefined): BiomeLook {
   return BIOMES[(biome as BiomeId) ?? DEFAULT_BIOME] ?? BIOMES[DEFAULT_BIOME];
