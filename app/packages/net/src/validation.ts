@@ -1,3 +1,4 @@
+import type { Command } from "@bylina/core";
 import type { Envelope } from "./envelope.js";
 
 const object = (value: unknown): value is Record<string, unknown> =>
@@ -5,15 +6,29 @@ const object = (value: unknown): value is Record<string, unknown> =>
 const number = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 const position = (value: unknown): boolean => object(value) && number(value.x) && number(value.y) && number(value.z);
 
-/** Runtime contract for untrusted tactical commands. */
-export function isCommandPayload(value: unknown): boolean {
+/**
+ * Максимальная длина маршрута в MOVE. Тот же порядок пределов, что и у
+ * пакета событий (512): недоверенный ведомый не должен задавать длину
+ * работы ведущего (проверка каждого шага пути поиском и запись в журнал).
+ */
+const MAX_PATH_LENGTH = 256;
+
+/**
+ * Runtime contract for untrusted tactical commands. Отбрасывает только
+ * заведомо непригодные кадры: семантическую законность (право хода,
+ * достижимость, очки действий) проверяет ядро. Сужение до Command убирает
+ * приведение типа на принимающей стороне (session).
+ */
+export function isCommandPayload(value: unknown): value is Command {
   if (!object(value) || typeof value.type !== "string") return false;
   if (value.type === "END_TURN") return typeof value.playerId === "string" && value.playerId.length <= 32;
   if (!number(value.actorId) || !Number.isInteger(value.actorId)) return false;
   switch (value.type) {
     case "MOVE":
       return (
-        position(value.to) && (value.path === undefined || (Array.isArray(value.path) && value.path.every(position)))
+        position(value.to) &&
+        (value.path === undefined ||
+          (Array.isArray(value.path) && value.path.length <= MAX_PATH_LENGTH && value.path.every(position)))
       );
     case "ATTACK":
       return number(value.targetId) && typeof value.weaponId === "string" && value.weaponId.length <= 128;
@@ -41,19 +56,34 @@ export function isEventBatchPayload(value: unknown): boolean {
   );
 }
 
+/**
+ * Размеры снимка синхронизации ограничены так же, как остальная граница
+ * доверия (network-protocol.md §3): недоверенный ведущий не должен присылать
+ * раздуваемые CPU/память массивы. Сетки контента — 12×10..14×10, отряды —
+ * единицы–десятки сущностей; потолки взяты с большим запасом.
+ */
+const MAX_SYNC_ENTITIES = 256;
+const MAX_SYNC_TILES = 10_000;
+const MAX_CELL_KEY_LENGTH = 16;
+
 /** The single network-protocol.md SyncPayload format: { match, visible, explored }. */
 export function isSyncPayload(value: unknown): boolean {
   if (!object(value) || !object(value.match) || !Array.isArray(value.visible) || !Array.isArray(value.explored))
     return false;
+  if (value.visible.length > MAX_SYNC_TILES || value.explored.length > MAX_SYNC_TILES) return false;
+  if (!value.visible.every((cell) => typeof cell === "string" && cell.length <= MAX_CELL_KEY_LENGTH)) return false;
+  if (!value.explored.every((cell) => typeof cell === "string" && cell.length <= MAX_CELL_KEY_LENGTH)) return false;
   const match = value.match;
+  const grid = object(match.grid) ? match.grid : null;
   return (
     number(match.turnNumber) &&
     number(match.activeOwner) &&
-    object(match.grid) &&
+    grid !== null &&
     Array.isArray(match.entities) &&
-    Array.isArray((match.grid as Record<string, unknown>).tiles) &&
-    value.visible.every((cell) => typeof cell === "string") &&
-    value.explored.every((cell) => typeof cell === "string")
+    match.entities.length <= MAX_SYNC_ENTITIES &&
+    Array.isArray(grid.tiles) &&
+    grid.tiles.length <= MAX_SYNC_TILES &&
+    grid.tiles.every(position)
   );
 }
 

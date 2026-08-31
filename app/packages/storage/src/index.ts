@@ -70,6 +70,24 @@ interface StorageBackend {
   removeItem(key: string): void;
 }
 
+/**
+ * Браузерный localStorage как StorageBackend. Вынесен в одно место: одинаковое
+ * замыкание использовалось и в хранилище сохранений, и в хранилище повторов.
+ * В среде без обозревателя (SSR, тесты без адаптера) чтение даёт null, а
+ * запись молча не выполняется — вызывающий трактует это как «не сохранено».
+ */
+export function createLocalStorageBackend(): StorageBackend {
+  return {
+    getItem: (key) => (typeof localStorage === "undefined" ? null : localStorage.getItem(key)),
+    setItem: (key, value) => {
+      if (typeof localStorage !== "undefined") localStorage.setItem(key, value);
+    },
+    removeItem: (key) => {
+      if (typeof localStorage !== "undefined") localStorage.removeItem(key);
+    },
+  };
+}
+
 /** Safari uses code 22, Firefox may use 1014; modern engines use the name. */
 function isQuotaExceededError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
@@ -147,24 +165,19 @@ const DEFAULT_REPLAYS_KEY = "bylina.replays.v1";
 export interface ReplayStorage {
   listReplays(): unknown[];
   saveReplay(journal: unknown): boolean;
-  deleteReplay(createdAt: number): void;
-  clearReplays(): void;
+  /** Удаляет повтор; false, если запись не удалась (переполнение/недоступность). */
+  deleteReplay(createdAt: number): boolean;
+  /** Очищает все повторы; false, если запись не удалась. */
+  clearReplays(): boolean;
 }
 
 /** Хранилище повторов: массив журналов в том же backend (0.17.0). */
-export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?: StorageBackend): ReplayStorage {
-  const storage = backend ?? {
-    getItem: (storageKey) => {
-      if (typeof localStorage === "undefined") return null;
-      return localStorage.getItem(storageKey);
-    },
-    setItem: (storageKey, value) => {
-      if (typeof localStorage !== "undefined") localStorage.setItem(storageKey, value);
-    },
-    removeItem: (storageKey) => {
-      if (typeof localStorage !== "undefined") localStorage.removeItem(storageKey);
-    },
-  };
+export function createReplayStorage(
+  key: string = DEFAULT_REPLAYS_KEY,
+  backend?: StorageBackend,
+  options: SaveStorageOptions = {},
+): ReplayStorage {
+  const storage = backend ?? createLocalStorageBackend();
   const read = (): unknown[] => {
     try {
       const raw = storage.getItem(key);
@@ -179,7 +192,10 @@ export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?:
     try {
       storage.setItem(key, JSON.stringify(replays));
       return true;
-    } catch {
+    } catch (error) {
+      // Переполнение при записи повторов так же не должно ломать ход
+      // (0.21.2): подписчик сообщает об этом интерфейсу, как и для сохранений.
+      if (isQuotaExceededError(error)) options.onQuotaExceeded?.(error);
       return false;
     }
   };
@@ -192,12 +208,9 @@ export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?:
       if (replays.length > 20) replays.length = 20;
       return write(replays);
     },
-    deleteReplay: (createdAt) => {
-      write(read().filter((entry) => (entry as { createdAt?: number }).createdAt !== createdAt));
-    },
-    clearReplays: () => {
-      write([]);
-    },
+    deleteReplay: (createdAt) =>
+      write(read().filter((entry) => (entry as { createdAt?: number }).createdAt !== createdAt)),
+    clearReplays: () => write([]),
   };
 }
 
@@ -208,18 +221,7 @@ export function createSaveStorage(
   backend?: StorageBackend,
   options: SaveStorageOptions = {},
 ): SaveStorage {
-  const storage = backend ?? {
-    getItem: (storageKey) => {
-      if (typeof localStorage === "undefined") return null;
-      return localStorage.getItem(storageKey);
-    },
-    setItem: (storageKey, value) => {
-      if (typeof localStorage !== "undefined") localStorage.setItem(storageKey, value);
-    },
-    removeItem: (storageKey) => {
-      if (typeof localStorage !== "undefined") localStorage.removeItem(storageKey);
-    },
-  };
+  const storage = backend ?? createLocalStorageBackend();
 
   const write = (serialized: string): boolean => {
     try {

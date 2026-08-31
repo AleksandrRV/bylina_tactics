@@ -129,8 +129,30 @@ describe("createReplayStorage (0.17.0)", () => {
     replays.saveReplay({ createdAt: 1, title: "Бой 1" });
     replays.saveReplay({ createdAt: 2, title: "Бой 2" });
     expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 2", "Бой 1"]);
-    replays.deleteReplay(2);
+    expect(replays.deleteReplay(2)).toBe(true);
     expect(replays.listReplays().map((entry) => (entry as { title: string }).title)).toEqual(["Бой 1"]);
+  });
+
+  it("reports failed writes (0.21.2): clearReplays and deleteReplay return false", () => {
+    const quotaError = Object.assign(new Error("full"), { name: "QuotaExceededError" });
+    let haveData = false;
+    const backend = {
+      // После первой успешной записи следующие операции записи падают.
+      getItem: () => (haveData ? "[]" : null),
+      setItem: () => {
+        haveData = true;
+        throw quotaError;
+      },
+      removeItem: () => undefined,
+    };
+    const onQuotaExceeded = vi.fn();
+    const replays = createReplayStorage("bylina.replays.quota", backend, { onQuotaExceeded });
+    // Запись повтора при переполнении возвращает false и сообщает подписчику.
+    expect(replays.saveReplay({ createdAt: 1 })).toBe(false);
+    expect(onQuotaExceeded).toHaveBeenCalledWith(quotaError);
+    // Удаление и очистка тоже возвращают false, а не молча проглатывают сбой.
+    expect(replays.deleteReplay(1)).toBe(false);
+    expect(replays.clearReplays()).toBe(false);
   });
 });
 

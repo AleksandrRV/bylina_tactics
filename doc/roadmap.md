@@ -66,12 +66,20 @@
   `apps/signaling-server/tests/relay-server.test.ts` (падали бы до правки);
   документация — `doc/network-protocol.md` §8.1 (владелец сетевого
   формата) и `apps/signaling-server/README.md`.
-- [ ] **День 3 — граница команд (P0-4) и мелкие правки сети.** Предел
-  длины `path` (256), `isCommandPayload` как type-guard без `as Command`,
-  пределы `match.entities`/`grid.tiles` в `isSyncPayload`, запись команды
-  в `replayDraft` после `applied.ok`; из пакета P2 — осиротевший
-  комментарий в `content/src/schemas/modes.ts`, дедупликация
-  localStorage-замыкания и `onQuotaExceeded` для повторов в `storage`.
+- [x] **День 3 — граница команд (P0-4) и мелкие правки сети.** Предел
+  длины `path` (256), `isCommandPayload` как type-guard (`value is Command`,
+  net зависит от core — слой 3→2) без `as Command` в сессии; пределы
+  `match.entities` (256) / `grid.tiles` и `visible`/`explored` (10 000) в
+  `isSyncPayload`; команда пишется в `replayDraft` только после
+  `applied.ok` во всех трёх путях (локальный поочерёдный, команды
+  ведомого у ведущего, собственные команды ведущего). Попутно
+  исправлен скрытый дефект: черновик журнала затирался открытием боя
+  (`openBattle({...idle})`) и до первой записи не доживал — теперь он
+  несётся боевым стейтом. Из пакета P2: удалён осиротевший комментарий в
+  `content/src/schemas/modes.ts`; общее localStorage-замыкание вынесено в
+  `createLocalStorageBackend()`; повторам добавлены `onQuotaExceeded`,
+  а `deleteReplay`/`clearReplays` возвращают результат записи.
+  Тесты: net (+2), session (+2), storage (+1).
 - [ ] **День 4 — живучесть автосохранения (P0-3).** Флаг `workerAlive`,
   откат на синхронную сериализацию, таймаут 4 с, `console.warn`; тесты на
   мёртвый Worker и на молчащий Worker.

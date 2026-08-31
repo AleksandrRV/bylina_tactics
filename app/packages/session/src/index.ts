@@ -787,15 +787,14 @@ export function createSession(
     },
     getCampaign: () => requireCampaign(),
     startPvpBattle: (side1, side2, seed, options?: { objective?: "elimination" | "apple" }) => {
-      state = {
-        ...state,
-        replayDraft: {
-          seed,
-          sides: { side1: [...side1], side2: [...side2] },
-          objective: options?.objective ?? null,
-          commands: [],
-        },
-        netDisconnected: null,
+      // Черновик журнала несёт сам боевой стейт ниже: открытие боя идёт
+      // через openBattle({ ...idle, ... }), поэтому запись черновика в
+      // `state` заранее была бы затёрта idling'ом (0.21.2).
+      const replayDraft: NonNullable<SessionState["replayDraft"]> = {
+        seed,
+        sides: { side1: [...side1], side2: [...side2] },
+        objective: options?.objective ?? null,
+        commands: [],
       };
       // Локальный транспорт: обе стороны на одном устройстве, правила
       // исполняет ведущий (этот же процесс). Команда стороны применяется
@@ -804,16 +803,18 @@ export function createSession(
       pvpTransport = transport;
       transport.subscribe((message: Envelope) => {
         if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
-        const command = message.payload as Command;
-        state = {
-          ...state,
-          replayDraft: state.replayDraft
-            ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
-            : state.replayDraft,
-        };
+        const command = message.payload;
         const applied = tacticsHost?.apply(command);
         if (!applied) return;
         if (applied.ok) {
+          // Журнал повтора пополняется только принятыми командами:
+          // отклонённая команда никогда не применялась и в журнал не попадает.
+          state = {
+            ...state,
+            replayDraft: state.replayDraft
+              ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
+              : state.replayDraft,
+          };
           transport.send({
             type: "EVENT_BATCH",
             senderId: "host",
@@ -825,7 +826,7 @@ export function createSession(
             type: "REJECT",
             senderId: "host",
             timestamp: Date.now(),
-            payload: { commandType: (message.payload as Command).type, reason: applied.reason },
+            payload: { commandType: command.type, reason: applied.reason },
           });
         }
       });
@@ -837,6 +838,8 @@ export function createSession(
         pvp: { side1: [...side1], side2: [...side2] },
         pvpWinner: null,
         pvpObjective: options?.objective ?? null,
+        replayDraft,
+        netDisconnected: null,
       });
     },
     getPvpSides: () => (state.pvp ? { side1: [...state.pvp.side1], side2: [...state.pvp.side2] } : null),
@@ -876,15 +879,13 @@ export function createSession(
       transport,
       options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean },
     ) => {
-      state = {
-        ...state,
-        replayDraft: {
-          seed,
-          sides: { side1: [...sides.side1], side2: [...sides.side2] },
-          objective: options?.objective ?? null,
-          commands: [],
-        },
-        netDisconnected: null,
+      // Черновик журнала несёт сам боевой стейт ниже (openBattle с ...idle);
+      // запись в `state` заранее затёрлась бы idling'ом (0.21.2).
+      const replayDraft: NonNullable<SessionState["replayDraft"]> = {
+        seed,
+        sides: { side1: [...sides.side1], side2: [...sides.side2] },
+        objective: options?.objective ?? null,
+        commands: [],
       };
       netHostTransport = transport;
       // Ведущий исполняет правила: команды ведомого применяются ядром,
@@ -905,13 +906,7 @@ export function createSession(
           return;
         }
         if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
-        const command = message.payload as Command;
-        state = {
-          ...state,
-          replayDraft: state.replayDraft
-            ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
-            : state.replayDraft,
-        };
+        const command = message.payload;
         // Ведомый управляет только своей стороной (номер 2): чужие ходы
         // отклоняются, даже если команда формально допустима.
         const guestOwner = 2;
@@ -922,6 +917,8 @@ export function createSession(
         const ownerOk =
           command.type === "END_TURN" ? command.playerId === String(guestOwner) : actor?.owner === guestOwner;
         if (!ownerOk) {
+          // Отклонённая команда не применялась и в журнал повтора не пишется
+          // (иначе ведомый мог бы неограниченно раздувать журнал).
           transport.send({
             type: "REJECT",
             senderId: "host",
@@ -933,6 +930,13 @@ export function createSession(
         const applied = tacticsHost?.apply(command);
         if (!applied) return;
         if (applied.ok) {
+          // Журнал пополняется только принятой командой — после применения.
+          state = {
+            ...state,
+            replayDraft: state.replayDraft
+              ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
+              : state.replayDraft,
+          };
           // Сокращение пакетов по зрению (network-protocol.md §5):
           // ведомому — только события, видимые его стороне.
           const guestEvents = tacticsHost
@@ -945,7 +949,7 @@ export function createSession(
             type: "REJECT",
             senderId: "host",
             timestamp: Date.now(),
-            payload: { commandType: (message.payload as Command).type, reason: applied.reason },
+            payload: { commandType: command.type, reason: applied.reason },
           });
         }
       });
@@ -961,6 +965,8 @@ export function createSession(
         pvpObjective: options?.objective ?? null,
         netOmniscient: options?.omniscient ?? false,
         netPeerRole: options?.peerRole ?? "guest",
+        replayDraft,
+        netDisconnected: null,
       });
     },
     bindGuestNetPvp: (owner, transport) => {
@@ -1214,7 +1220,11 @@ export function createSession(
       // Работает и в обучении (экран trainingBattle): иначе команды игрока
       // в миссиях обучения отклонялись бы и подсказки не продвигались (0.20.1).
       if (!tacticsHost || !isBattleScreen(state.screen)) return { ok: false, reason: "ILLEGAL" };
-      if (state.battleKind === "pvp" || state.battleKind === "pvpNet") {
+      const result = tacticsHost.apply(command);
+      // Журнал пополняется только принятой командой (как и команды ведомого):
+      // отклонённая команда не применялась и в повторе воспроизводиться не
+      // должна.
+      if (result.ok && (state.battleKind === "pvp" || state.battleKind === "pvpNet")) {
         state = {
           ...state,
           replayDraft: state.replayDraft
@@ -1222,7 +1232,6 @@ export function createSession(
             : state.replayDraft,
         };
       }
-      const result = tacticsHost.apply(command);
       // Сетевой ведущий: любое изменение состояния (своё или гостя) уходит
       // ведомому — события, сокращённые по зрению, и свежий снимок стороны.
       if (result.ok && netHostTransport && state.battleKind === "pvpNet") {

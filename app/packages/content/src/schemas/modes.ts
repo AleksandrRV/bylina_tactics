@@ -52,11 +52,5 @@ export const pvpConfigSchema = z
   })
   .strict();
 
-/**
- * Запись хода Нави в сценарии обучения (0.20.13). Структурно совместима с
- * типом TrainingEnemyAction ядра (@bylina/core): конфигурация передаётся
- * исполнителю сценария без преобразования.
- */
-
 export type QuickMatchConfig = z.infer<typeof quickMatchConfigSchema>;
 export type PvpConfig = z.infer<typeof pvpConfigSchema>;

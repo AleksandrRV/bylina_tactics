@@ -72,4 +72,70 @@ describe("runtime tactical payload validation", () => {
     ).toBe(true);
     expect(isSyncPayload({ match: {}, visible: [1], explored: [] })).toBe(false);
   });
+
+  it("rejects a MOVE path longer than 256 steps (0.21.2, Major-2)", async () => {
+    const { isCommandPayload } = await import("../src/index.js");
+    const cell = (index: number) => ({ x: index, y: 0, z: 1 });
+    // Маршрут в 256 шагов — на границе предела — принимается.
+    expect(
+      isCommandPayload({
+        type: "MOVE",
+        actorId: 1,
+        to: cell(256),
+        path: Array.from({ length: 256 }, (_, i) => cell(i)),
+      }),
+    ).toBe(true);
+    // Маршрут в 257 шагов (а тем более на миллион, тот, что раньше
+    // нагружал ведомого) отвергается.
+    const longPath = Array.from({ length: 257 }, (_, i) => cell(i));
+    expect(isCommandPayload({ type: "MOVE", actorId: 1, to: cell(257), path: longPath })).toBe(false);
+    // Не-массив и путь с битой клеткой также отвергаются.
+    expect(isCommandPayload({ type: "MOVE", actorId: 1, to: cell(0), path: "nope" })).toBe(false);
+    expect(isCommandPayload({ type: "MOVE", actorId: 1, to: cell(0), path: [{ x: 1 }] })).toBe(false);
+  });
+
+  it("bounds the synchronization snapshot size (0.21.2, Minor-6)", async () => {
+    const { isSyncPayload } = await import("../src/index.js");
+    const cell = { x: 1, y: 1, z: 1 };
+    const baseSync = (overrides: Record<string, unknown>) => ({
+      match: { turnNumber: 1, activeOwner: 1, grid: { tiles: [cell] }, entities: [] },
+      visible: [],
+      explored: [],
+      ...overrides,
+    });
+    // Слишком много сущностей.
+    expect(
+      isSyncPayload(
+        baseSync({
+          match: {
+            turnNumber: 1,
+            activeOwner: 1,
+            grid: { tiles: [cell] },
+            entities: Array.from({ length: 257 }, () => ({ id: 1 })),
+          },
+        }),
+      ),
+    ).toBe(false);
+    // Слишком много клеток сетки.
+    expect(
+      isSyncPayload(
+        baseSync({
+          match: {
+            turnNumber: 1,
+            activeOwner: 1,
+            grid: { tiles: Array.from({ length: 10_001 }, () => cell) },
+            entities: [],
+          },
+        }),
+      ),
+    ).toBe(false);
+    // Слишком длинные списки видимых клеток.
+    expect(isSyncPayload(baseSync({ visible: Array.from({ length: 10_001 }, (_, i) => `${i},0`) }))).toBe(false);
+    // Видимые клетки обязаны быть строками.
+    expect(isSyncPayload(baseSync({ visible: [1, 2] }))).toBe(false);
+    // Битая клетка сетки.
+    expect(
+      isSyncPayload(baseSync({ match: { turnNumber: 1, activeOwner: 1, grid: { tiles: [{ x: 0 }] }, entities: [] } })),
+    ).toBe(false);
+  });
 });

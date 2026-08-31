@@ -416,6 +416,101 @@ describe("createSession pvp (0.14.0)", () => {
     expect(session.get().pvpWinner).toBe(2);
     expect(session.get().outcome).toBe("defeat");
   });
+
+  it("survives battle start with an empty draft and records only applied commands", async () => {
+    const session = pvpSession();
+    const host = createTacticsKernel({
+      initial: {
+        turnNumber: 1,
+        activeOwner: 1,
+        grid: {
+          width: 8,
+          height: 6,
+          tiles: Array.from({ length: 48 }, (_, i) => ({
+            x: i % 8,
+            y: Math.floor(i / 8),
+            z: 1,
+            pit: false,
+            blockLOS: false,
+          })),
+        },
+        entities: [
+          {
+            id: 1,
+            configId: "bogatyr",
+            owner: 1,
+            x: 1,
+            y: 2,
+            z: 1,
+            dir: 1,
+            ap: 2,
+            maxAp: 2,
+            mobility: 5,
+            hp: 12,
+            maxHp: 12,
+            aim: 70,
+            defense: 10,
+            will: 40,
+            vision: 12,
+            weaponId: "sword",
+            weaponIds: ["sword"],
+            skillIds: [],
+            obstacle: true,
+            dead: false,
+            flying: false,
+            coverType: 0,
+            overwatch: false,
+            defending: false,
+            movementSpent: 0,
+          },
+          {
+            id: 11,
+            configId: "bogatyr",
+            owner: 2,
+            x: 6,
+            y: 2,
+            z: 1,
+            dir: 3,
+            ap: 2,
+            maxAp: 2,
+            mobility: 5,
+            hp: 12,
+            maxHp: 12,
+            aim: 70,
+            defense: 10,
+            will: 40,
+            vision: 12,
+            weaponId: "sword",
+            weaponIds: ["sword"],
+            skillIds: [],
+            obstacle: true,
+            dead: false,
+            flying: false,
+            coverType: 0,
+            overwatch: false,
+            defending: false,
+            movementSpent: 0,
+          },
+        ],
+      },
+    });
+    session.bindTacticsHost(host);
+
+    // Черновик журнала переживает открытие боя и стартует пустым.
+    expect(session.getReplayDraft()?.commands).toEqual([]);
+
+    // Легитимный ход (завершение хода стороны 1) — применяется и пишется.
+    session.sendPvpCommand({ type: "END_TURN", playerId: "1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.getReplayDraft()?.commands).toHaveLength(1);
+
+    // Отклонённая команда (бойцу нечем атаковать цель вне дистанции)
+    // отклоняется ядром и в журнал не попадает.
+    const before = session.getReplayDraft()?.commands.length;
+    session.sendPvpCommand({ type: "ATTACK", actorId: 11, targetId: 1, weaponId: "sword" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(session.getReplayDraft()?.commands.length).toBe(before);
+  });
 });
 
 describe("createSession training (0.19.0)", () => {
