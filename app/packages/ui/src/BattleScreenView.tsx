@@ -32,6 +32,7 @@ import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
 import { resolveBattleKey, type BattleKeyContext, type BattleKeyIntent } from "./battle-keyboard.js";
 import { resolveCellClick } from "./battle-cell-click.js";
 import { prologueAftermath, routeCommand } from "./battle-command.js";
+import { enemyPhaseActive, enemyPhaseContinues, type EnemyPhaseState } from "./battle-enemy-phase.js";
 import { firstFighterId } from "./battle-selection.js";
 import { cellKey } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
@@ -77,7 +78,6 @@ import {
   revealPrologueExtract,
   initPrologueMatch,
   prologueUnits,
-  shouldRestoreCheckpoint,
   takePrologueSpawnEvents,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
@@ -1506,11 +1506,19 @@ export function BattleScreenView() {
         return;
       }
       await sleep(430);
+      // Свежий снимок на каждом круге: сцена идёт асинхронно, состояние
+      // рендера могло устареть.
+      const phase = (): EnemyPhaseState => ({
+        activeOwner: session.getBattleSnapshot(PLAYER_OWNER).activeOwner,
+        enemyOwner: ENEMY_OWNER,
+        outcome: battleOutcome(),
+        hasKernel: Boolean(kernel),
+      });
       for (let guard = 0; guard < 96; guard += 1) {
-        const snap = session.getBattleSnapshot(PLAYER_OWNER);
-        if (snap.activeOwner !== ENEMY_OWNER) break;
-        if (battleOutcome() !== "ongoing") break;
+        // Ядро нужно не только правилу хода (оно в предикате), но и типам:
+        // ниже по телу цикла оно уже не пусто.
         if (!kernel) break;
+        if (!enemyPhaseActive(phase())) break;
         let command: Command | null;
         if (isTraining) {
           const decision = pickScriptedEnemyCommand(kernel, trainingMission?.enemyScript, enemyScriptRef.current);
@@ -1537,34 +1545,45 @@ export function BattleScreenView() {
         if (isPrologue && prologueMission && prologueRunRef.current && command) {
           const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
           const next = afterPrologueApply(kernel, command, applied.events, prologueRunRef.current, ctx);
-          if (shouldRestoreCheckpoint(next, applied.events, kernel.getSnapshot())) {
-            prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
-              type: "death_by",
-              cause: "checkpoint",
-            });
-            if (session.hasBattleCheckpoint()) {
-              prologueRunRef.current = next;
+          // Тот же разбор итога, что и в канале команд: откат к контрольной
+          // точке, честное поражение или выход стаи сценой.
+          const aftermath = prologueAftermath({
+            next,
+            events: applied.events,
+            snapshot: kernel.getSnapshot(),
+            hasCheckpoint: session.hasBattleCheckpoint(),
+          });
+          prologueRunRef.current = aftermath.state;
+          switch (aftermath.kind) {
+            case "restore":
+              prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+                type: "death_by",
+                cause: "checkpoint",
+              });
               // Затемнение и откат — после того, как ход Нави доигран.
               enemyAfter = () => void restorePrologueScene();
-            } else {
-              prologueRunRef.current = { ...next, outcome: "defeat" };
+              break;
+            case "defeat":
+              prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+                type: "death_by",
+                cause: "checkpoint",
+              });
               outcomeGate.report(() => setPrologueCard("outro"));
-            }
-          } else {
-            const taken = takePrologueSpawnEvents(next);
-            prologueRunRef.current = taken.state;
-            if (taken.events.length > 0) {
+              break;
+            case "spawnBeats":
               // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
-              hideStagedSpawns(taken.events);
-              enemyAfter = () => void runPrologueSpawnBeats(taken.events);
-            }
+              hideStagedSpawns(aftermath.events);
+              enemyAfter = () => void runPrologueSpawnBeats(aftermath.events);
+              break;
+            case "none":
+              break;
           }
           setPrologueObjectiveKey(next.objectiveKey);
           if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
         }
         finishFromEvents(applied.events);
-        if (!command) break;
-        if (battleOutcome() !== "ongoing") break;
+        // Пустая команда — сценарий противника исчерпан: круг завершён.
+        if (!enemyPhaseContinues({ ...phase(), commandIssued: command !== null })) break;
         await sleep(190);
       }
       if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
