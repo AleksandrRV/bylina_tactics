@@ -16,7 +16,10 @@
  *   2. ни один другой манифест не объявляет версию;
  *   3. ни один исходник не содержит литерала версии;
  *   4. `packages/core/src/version.ts` читает номер из корневого манифеста;
- *   5. `doc/README.md` называет текущий номер.
+ *   5. `doc/README.md` называет текущий номер;
+ *   6. версии формата и правил повторов объявлены в единственном месте
+ *      (`packages/replay/src/index.ts`), а reminder-напоминание о ручном
+ *      подъёме RULES_VERSION — на месте.
  */
 
 import { readFile, readdir } from "node:fs/promises";
@@ -110,6 +113,44 @@ const readme = path.join(root, "../doc/README.md");
 const readmeText = await readFile(readme, "utf8").catch(() => "");
 if (!readmeText.includes(`Текущая версия комплекта: ${rootVersion}`)) {
   failures.push(`doc/README.md: не называет текущую версию ${rootVersion}`);
+}
+
+/**
+ * 6. Версии формата и правил повторов (0.21.4–0.21.5) объявлены ровно один
+ *    раз — в `packages/replay/src/index.ts`. Они не следуют за версией
+ *    приложения: REPLAY_FORMAT_VERSION поднимается при изменении полей
+ *    журнала, RULES_VERSION — при изменении боевых алгоритмов/контента.
+ *    Проверка фиксирует единое место объявления и наличие напоминания о
+ *    ручном подъёме; сам подъём скрипт выполнить не может — это решение
+ *    автора изменения.
+ */
+const replayModule = path.join(root, "packages/replay/src/index.ts");
+const replaySource = await readFile(replayModule, "utf8").catch(() => "");
+for (const [name, marker] of [
+  ["REPLAY_FORMAT_VERSION", "export const REPLAY_FORMAT_VERSION ="],
+  ["RULES_VERSION", "export const RULES_VERSION ="],
+]) {
+  const declarations = replaySource.match(new RegExp(marker, "g")) ?? [];
+  if (declarations.length === 0) {
+    failures.push(`packages/replay/src/index.ts: не объявлена ${name} — единое место версии повторов утрачено`);
+  } else if (declarations.length > 1) {
+    failures.push(
+      `packages/replay/src/index.ts: ${name} объявлена более одного раза — допустимо ровно одно объявление`,
+    );
+  }
+}
+for (const [file, needle] of [
+  // Напоминание в документации модуля повторов.
+  [replayModule, "инкрементируется при любом изменении боевых алгоритм"],
+  // Напоминание в документации формата повторов для автора релиза.
+  [path.join(root, "../doc/operations.md"), "RULES_VERSION"],
+]) {
+  const text = await readFile(file, "utf8").catch(() => "");
+  if (!text.includes(needle)) {
+    failures.push(
+      `${relative(file)}: нет напоминания о подъёме RULES_VERSION («${needle}…») — изменение правил без подъёма версии рассинхронизирует повторы`,
+    );
+  }
 }
 
 if (failures.length > 0) {

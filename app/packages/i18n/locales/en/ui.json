@@ -696,7 +696,12 @@
     "watching": "Replay",
     "done": "Replay finished",
     "winner": "Side {side} wins",
-    "aborted": "Aborted"
+    "aborted": "Aborted",
+    "otherRules": "Other rules",
+    "otherRulesNote": "This replay was recorded under a different rules version. The outcome may differ from the actual battle.",
+    "otherRulesWatch": "Watch anyway",
+    "unsupported": "Unavailable",
+    "unsupportedNote": "This replay was recorded in an unsupported format and cannot be played."
   },
   "training": {
     "title": "Training",
