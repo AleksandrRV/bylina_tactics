@@ -135,10 +135,27 @@
   вверх по слоям из content/net/session, `campaign → storage`) роняют
   проверку с ненулевым кодом — критерий «импорт `@bylina/ui` в `core/src`
   роняет CI» выполнен.
-- [ ] **День 8 — типизированный линтинг (P1-5, часть 2).**
-  `recommendedTypeChecked` + `projectService`, `no-floating-promises` и
-  `no-misused-promises` в режиме warn (фаза 1); список предупреждений
-  зафиксирован, сборка не падает.
+- [x] **День 8 — типизированный линтинг (P1-5, часть 2).**
+  `eslint.config.mjs` поднимает набор `recommendedTypeChecked` на
+  `projectService` (фаза 1, по принятой логике предупреждений): правила
+  применяются только к типизированным файлам в `src`/`tests` — каталогам,
+  покрытым package-tsconfig; `projectService` сам находит ближайший
+  tsconfig, а корневые `*.config.ts` (вне tsconfig) остаются на базовом
+  наборе. Все находки типизированного набора — `warn`, сборку не роняют:
+  `no-floating-promises` и `no-misused-promises` в их числе (проверено
+  искусственным плавающим промисом — срабатывает как warn). Дополнительно
+  `no-undef` отключён для TS-файлов (видимость проверяет сам TypeScript).
+  Типизированный проход заметно медленнее (~28 с против ~1,5 с), поэтому
+  линт остаётся отдельной задачей CI; правила подключены внутри одного
+  `pnpm lint` (eslint && check:boundaries). Список зафиксирован: 0
+  ошибок, 333 предупреждения (289 в тестах, 44 в исходниках). По
+  правилам: `require-await` 116 (почти всё в тестах),
+  `no-unnecessary-type-assertion` 67, `unbound-method` 13,
+  `no-await-in-loop` 12 (осознанный проигрыватель событий),
+  `no-unsafe-assignment` 5, единичные `no-redundant-type-constituents`,
+  `await-thenable`, `no-base-to-string`. `no-floating-promises` и
+  `no-misused-promises` на текущем коде срабатываний не дали — правила
+  активны и готовы ловить регрессии.
 - [ ] **День 9 — тест исчерпывающности `cloneState` (P1-4, часть 1).**
   Партия со всеми необязательными полями; сверка со `structuredClone`;
   отсутствие общих ссылок на каждом уровне; глушение любой строки
