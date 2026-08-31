@@ -11,21 +11,63 @@ import type { EntityState, MatchState } from "../src/types.js";
 import type { WeaponStats } from "../src/weapons.js";
 
 const NO_WEAPON: WeaponStats = {
-  id: "none", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 1, maxDmg: 1, crit: 0, critBonus: 0, envDmg: 0,
+  id: "none",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 1,
+  maxDmg: 1,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 const EVACUATE: SkillStats = {
-  id: "evacuate", apCost: 1, endsTurn: true, range: 0, requiresLOS: false, category: "self",
-  resolution: "auto", envDmg: 0, extract: true, cooldownTurns: 1, effects: [],
+  id: "evacuate",
+  apCost: 1,
+  endsTurn: true,
+  range: 0,
+  requiresLOS: false,
+  category: "self",
+  resolution: "auto",
+  envDmg: 0,
+  extract: true,
+  cooldownTurns: 1,
+  effects: [],
 };
 
 function fighter(partial: Partial<EntityState>): EntityState {
   return {
-    id: 1, configId: "fighter", owner: 1, x: 0, y: 3, z: 1, dir: 1,
-    ap: 2, maxAp: 2, mobility: 5, hp: 10, maxHp: 10, aim: 100, defense: 0, will: 20, vision: 10,
-    weaponId: NO_WEAPON.id, weaponIds: [NO_WEAPON.id], skillIds: [EVACUATE.id], obstacle: true,
-    dead: false, flying: false, hidden: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+    id: 1,
+    configId: "fighter",
+    owner: 1,
+    x: 0,
+    y: 3,
+    z: 1,
+    dir: 1,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 10,
+    maxHp: 10,
+    aim: 100,
+    defense: 0,
+    will: 20,
+    vision: 10,
+    weaponId: NO_WEAPON.id,
+    weaponIds: [NO_WEAPON.id],
+    skillIds: [EVACUATE.id],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType: 0,
+    overwatch: false,
+    defending: false,
+    movementSpent: 0,
     ...partial,
   };
 }
@@ -63,7 +105,11 @@ describe("extraction (§6 game-rules, §3.2 game-design)", () => {
     const result = kernel.apply({ type: "USE_SKILL", actorId: inside.id, skillId: EVACUATE.id });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED" && event.entityId === inside.id)).toBe(true);
+    expect(
+      result.events.some(
+        (event) => event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED" && event.entityId === inside.id,
+      ),
+    ).toBe(true);
     expect(kernel.getSnapshot().entities.some((entity) => entity.id === inside.id)).toBe(false);
   });
 
@@ -128,27 +174,73 @@ const MAP = {
 };
 
 const SWORD: WeaponStats = {
-  id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 5, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 0,
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 5,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 const IDOL: SpawnUnitConfig = {
-  id: "idol", maxHealth: 10, maxAP: 1, mobility: 1, aim: 0, defense: 0, will: 0,
-  vision: 0, weapons: [], skills: [], tags: [],
+  id: "idol",
+  maxHealth: 10,
+  maxAP: 1,
+  mobility: 1,
+  aim: 0,
+  defense: 0,
+  will: 0,
+  vision: 0,
+  weapons: [],
+  skills: [],
+  tags: [],
 };
 const CAPTIVE: SpawnUnitConfig = {
-  id: "captive", maxHealth: 5, maxAP: 2, mobility: 4, aim: 0, defense: 0, will: 10,
-  vision: 8, weapons: [], skills: [EVACUATE.id], tags: [],
+  id: "captive",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 4,
+  aim: 0,
+  defense: 0,
+  will: 10,
+  vision: 8,
+  weapons: [],
+  skills: [EVACUATE.id],
+  tags: [],
 };
 
 describe("mission objectives (0.13.0)", () => {
   const BOGATYR: SpawnUnitConfig = {
-    id: "bogatyr", maxHealth: 12, maxAP: 2, mobility: 5, aim: 70, defense: 10, will: 40,
-    vision: 12, weapons: ["sword"], skills: [], tags: [],
+    id: "bogatyr",
+    maxHealth: 12,
+    maxAP: 2,
+    mobility: 5,
+    aim: 70,
+    defense: 10,
+    will: 40,
+    vision: 12,
+    weapons: ["sword"],
+    skills: [],
+    tags: [],
   };
   const UPYR: SpawnUnitConfig = {
-    id: "upyr", maxHealth: 8, maxAP: 2, mobility: 5, aim: 60, defense: 0, will: 20,
-    vision: 10, weapons: ["claws"], skills: [], tags: [],
+    id: "upyr",
+    maxHealth: 8,
+    maxAP: 2,
+    mobility: 5,
+    aim: 60,
+    defense: 0,
+    will: 20,
+    vision: 10,
+    weapons: ["claws"],
+    skills: [],
+    tags: [],
   };
 
   function objectiveMatch(objective: NonNullable<MatchState["objective"]>, enemyCount = 1): MatchState {
@@ -195,25 +287,100 @@ describe("mission objectives (0.13.0)", () => {
     // Контролируемая карта: богатырь (1,1), идол (5,1) с запасом 5, цель — уничтожение.
     const grid = makeGrid(12, 8, 1);
     const bogatyr: EntityState = {
-      id: 1, configId: "bogatyr", owner: PLAYER_OWNER, x: 1, y: 1, z: 1, dir: 1,
-      ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 100, defense: 10, will: 40, vision: 12,
-      weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false,
-      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+      id: 1,
+      configId: "bogatyr",
+      owner: PLAYER_OWNER,
+      x: 1,
+      y: 1,
+      z: 1,
+      dir: 1,
+      ap: 2,
+      maxAp: 2,
+      mobility: 5,
+      hp: 12,
+      maxHp: 12,
+      aim: 100,
+      defense: 10,
+      will: 40,
+      vision: 12,
+      weaponId: "sword",
+      weaponIds: ["sword"],
+      skillIds: [],
+      obstacle: true,
+      dead: false,
+      flying: false,
+      coverType: 0,
+      overwatch: false,
+      defending: false,
+      movementSpent: 0,
     };
     const idol: EntityState = {
-      id: 1000, configId: "idol", owner: 0, x: 5, y: 1, z: 1, dir: 0,
-      ap: 0, maxAp: 0, mobility: 1, hp: 5, maxHp: 5, aim: 0, defense: 0, will: 0, vision: 0,
-      weaponId: "", weaponIds: [], skillIds: [], obstacle: true, dead: false, flying: false,
-      coverType: 0, overwatch: false, defending: false, movementSpent: 0, countsForElimination: false,
+      id: 1000,
+      configId: "idol",
+      owner: 0,
+      x: 5,
+      y: 1,
+      z: 1,
+      dir: 0,
+      ap: 0,
+      maxAp: 0,
+      mobility: 1,
+      hp: 5,
+      maxHp: 5,
+      aim: 0,
+      defense: 0,
+      will: 0,
+      vision: 0,
+      weaponId: "",
+      weaponIds: [],
+      skillIds: [],
+      obstacle: true,
+      dead: false,
+      flying: false,
+      coverType: 0,
+      overwatch: false,
+      defending: false,
+      movementSpent: 0,
+      countsForElimination: false,
     };
     const upyr: EntityState = {
-      id: 2, configId: "upyr", owner: ENEMY_OWNER, x: 10, y: 6, z: 1, dir: 3,
-      ap: 2, maxAp: 2, mobility: 5, hp: 8, maxHp: 8, aim: 60, defense: 0, will: 20, vision: 10,
-      weaponId: "claws", weaponIds: ["claws"], skillIds: [], obstacle: true, dead: false, flying: false,
-      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+      id: 2,
+      configId: "upyr",
+      owner: ENEMY_OWNER,
+      x: 10,
+      y: 6,
+      z: 1,
+      dir: 3,
+      ap: 2,
+      maxAp: 2,
+      mobility: 5,
+      hp: 8,
+      maxHp: 8,
+      aim: 60,
+      defense: 0,
+      will: 20,
+      vision: 10,
+      weaponId: "claws",
+      weaponIds: ["claws"],
+      skillIds: [],
+      obstacle: true,
+      dead: false,
+      flying: false,
+      coverType: 0,
+      overwatch: false,
+      defending: false,
+      movementSpent: 0,
     };
     const kernel = createTacticsKernel({
-      initial: { turnNumber: 1, activeOwner: PLAYER_OWNER, grid, entities: [bogatyr, idol, upyr], objective: { kind: "destroy", unitId: "idol" }, rngSeed: "61", rngState: "61" },
+      initial: {
+        turnNumber: 1,
+        activeOwner: PLAYER_OWNER,
+        grid,
+        entities: [bogatyr, idol, upyr],
+        objective: { kind: "destroy", unitId: "idol" },
+        rngSeed: "61",
+        rngState: "61",
+      },
       weapons: { sword: SWORD },
       skills: {},
       seed: 61,
@@ -264,7 +431,23 @@ describe("mission objectives (0.13.0)", () => {
     bogatyr.y = 1;
     const kernel = createTacticsKernel({
       initial: match,
-      weapons: { sword: SWORD, claws: { id: "claws", category: "melee", apCost: 1, endsTurn: true, range: 1, requiresLOS: false, aimMod: 0, minDmg: 3, maxDmg: 4, crit: 0, critBonus: 0, envDmg: 0 } },
+      weapons: {
+        sword: SWORD,
+        claws: {
+          id: "claws",
+          category: "melee",
+          apCost: 1,
+          endsTurn: true,
+          range: 1,
+          requiresLOS: false,
+          aimMod: 0,
+          minDmg: 3,
+          maxDmg: 4,
+          crit: 0,
+          critBonus: 0,
+          envDmg: 0,
+        },
+      },
       skills: { [EVACUATE.id]: EVACUATE },
       seed: 62,
     });
@@ -310,12 +493,30 @@ describe("mission objectives (0.13.0)", () => {
 
 describe("extraction accounting and debug auto win (QA 0.13.0)", () => {
   const BOGATYR: SpawnUnitConfig = {
-    id: "bogatyr", maxHealth: 12, maxAP: 2, mobility: 5, aim: 70, defense: 10, will: 40,
-    vision: 12, weapons: ["sword"], skills: [], tags: [],
+    id: "bogatyr",
+    maxHealth: 12,
+    maxAP: 2,
+    mobility: 5,
+    aim: 70,
+    defense: 10,
+    will: 40,
+    vision: 12,
+    weapons: ["sword"],
+    skills: [],
+    tags: [],
   };
   const UPYR: SpawnUnitConfig = {
-    id: "upyr", maxHealth: 8, maxAP: 2, mobility: 5, aim: 60, defense: 0, will: 20,
-    vision: 10, weapons: ["claws"], skills: [], tags: [],
+    id: "upyr",
+    maxHealth: 8,
+    maxAP: 2,
+    mobility: 5,
+    aim: 60,
+    defense: 0,
+    will: 20,
+    vision: 10,
+    weapons: ["claws"],
+    skills: [],
+    tags: [],
   };
 
   function matchWith(objective: NonNullable<MatchState["objective"]>): MatchState {
@@ -360,7 +561,11 @@ describe("extraction accounting and debug auto win (QA 0.13.0)", () => {
     const result = kernel.debugAutoWin();
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(result.events).toContainEqual({
+      type: "MATCH_ENDED",
+      winnerPlayerId: String(PLAYER_OWNER),
+      reason: "OBJECTIVE",
+    });
   });
 
   it("debug auto win completes rescue by extracting the escortee", () => {
@@ -373,7 +578,11 @@ describe("extraction accounting and debug auto win (QA 0.13.0)", () => {
     const result = kernel.debugAutoWin();
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(result.events).toContainEqual({
+      type: "MATCH_ENDED",
+      winnerPlayerId: String(PLAYER_OWNER),
+      reason: "OBJECTIVE",
+    });
     expect(result.events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED")).toBe(true);
   });
 
@@ -387,7 +596,11 @@ describe("extraction accounting and debug auto win (QA 0.13.0)", () => {
     const result = kernel.debugAutoWin();
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(result.events).toContainEqual({
+      type: "MATCH_ENDED",
+      winnerPlayerId: String(PLAYER_OWNER),
+      reason: "OBJECTIVE",
+    });
     expect(kernel.getSnapshot().extracted?.[0]?.rosterIndex).toBe(0);
   });
 });

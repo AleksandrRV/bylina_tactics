@@ -20,13 +20,16 @@ describe("createQuickMatch", () => {
     expect(livingOf(easy, PLAYER_OWNER)).toHaveLength(3);
     expect(livingOf(easy, ENEMY_OWNER)).toHaveLength(3);
     expect(livingOf(hard, ENEMY_OWNER)).toHaveLength(8);
-    expect(easy.entities.filter((entity) => entity.coverType === 0 && !entity.dead).every((entity) => entity.maxAp > 0)).toBe(
-      true,
-    );
+    expect(
+      easy.entities.filter((entity) => entity.coverType === 0 && !entity.dead).every((entity) => entity.maxAp > 0),
+    ).toBe(true);
   });
 
   it("uses configured player slots and unit tags", () => {
-    const units = Object.values(DEFAULT_TRAINING_UNITS).map((unit) => ({ ...unit, tags: unit.id === "upyr" ? ["flying" as const] : [] }));
+    const units = Object.values(DEFAULT_TRAINING_UNITS).map((unit) => ({
+      ...unit,
+      tags: unit.id === "upyr" ? ["flying" as const] : [],
+    }));
     const match = createQuickMatch({
       enemyCount: 3,
       seed: 17,
@@ -95,7 +98,9 @@ describe("enemy AI", () => {
     kernel.apply({ type: "END_TURN", playerId: "1" });
     expect(kernel.getSnapshot().activeOwner).toBe(ENEMY_OWNER);
     const command = pickEnemyCommand(kernel);
-    expect(command === null || command.type === "MOVE" || command.type === "ATTACK" || command.type === "OVERWATCH").toBe(true);
+    expect(
+      command === null || command.type === "MOVE" || command.type === "ATTACK" || command.type === "OVERWATCH",
+    ).toBe(true);
     const events = runEnemyTurn(kernel);
     expect(events.length).toBeGreaterThan(0);
     expect(kernel.getSnapshot().activeOwner).toBe(PLAYER_OWNER);
@@ -115,7 +120,9 @@ describe("debug auto win", () => {
     expect(result.events.some((event) => event.type === "ENTITY_DIED")).toBe(true);
     expect(result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
     const snapshot = kernel.getSnapshot();
-    expect(snapshot.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.dead)).toHaveLength(0);
+    expect(
+      snapshot.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.dead),
+    ).toHaveLength(0);
   });
 
   it("rejects a second auto win after the match has ended", () => {
@@ -138,6 +145,8 @@ describe("debug auto win", () => {
     expect(kernel.getSnapshot().activeOwner).toBe(ENEMY_OWNER);
     const result = kernel.debugAutoWin();
     expect(result.ok).toBe(true);
-    expect(result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+    expect(
+      result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1"),
+    ).toBe(true);
   });
 });

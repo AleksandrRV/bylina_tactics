@@ -11,14 +11,10 @@ export function interactiveEntityAt(
   y: number,
   reachable: boolean,
 ): EntityState | undefined {
-  const unit = entities.find(
-    (entity) => !entity.dead && entity.coverType === 0 && entity.x === x && entity.y === y,
-  );
+  const unit = entities.find((entity) => !entity.dead && entity.coverType === 0 && entity.x === x && entity.y === y);
   if (unit) return unit;
   if (reachable) return undefined;
-  return entities.find(
-    (entity) => !entity.dead && entity.coverType > 0 && entity.x === x && entity.y === y,
-  );
+  return entities.find((entity) => !entity.dead && entity.coverType > 0 && entity.x === x && entity.y === y);
 }
 
 /**
@@ -39,7 +35,8 @@ export function primaryAttackForEnemy(
     target.dead ||
     target.coverType > 0 ||
     target.owner === playerOwner
-  ) return null;
+  )
+    return null;
   // Владелец 0 — нейтральный объект миссии (идол): клик по нему включает
   // основное оружие, как по противнику.
   const weaponId = selected.weaponId || selected.weaponIds?.[0];

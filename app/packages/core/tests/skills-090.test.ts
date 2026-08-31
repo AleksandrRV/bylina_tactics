@@ -8,16 +8,49 @@ import type { EntityState, MatchState } from "../src/types.js";
 import type { WeaponStats } from "../src/weapons.js";
 
 const TEST_WEAPON: WeaponStats = {
-  id: "test_weapon", category: "ranged", apCost: 1, endsTurn: true, range: 8,
-  requiresLOS: true, aimMod: 0, minDmg: 2, maxDmg: 2, crit: 0, critBonus: 0, envDmg: 0,
+  id: "test_weapon",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 2,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 function fighter(partial: Partial<EntityState>): EntityState {
   return {
-    id: 1, configId: "fighter", owner: 1, x: 1, y: 2, z: 1, dir: 1,
-    ap: 2, maxAp: 2, mobility: 5, hp: 10, maxHp: 10, aim: 100, defense: 0, will: 20, vision: 10,
-    weaponId: TEST_WEAPON.id, weaponIds: [TEST_WEAPON.id], skillIds: [], obstacle: true,
-    dead: false, flying: false, hidden: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+    id: 1,
+    configId: "fighter",
+    owner: 1,
+    x: 1,
+    y: 2,
+    z: 1,
+    dir: 1,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 10,
+    maxHp: 10,
+    aim: 100,
+    defense: 0,
+    will: 20,
+    vision: 10,
+    weaponId: TEST_WEAPON.id,
+    weaponIds: [TEST_WEAPON.id],
+    skillIds: [],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType: 0,
+    overwatch: false,
+    defending: false,
+    movementSpent: 0,
     ...partial,
   };
 }
@@ -27,55 +60,169 @@ function state(...entities: EntityState[]): MatchState {
 }
 
 const HEAL: SkillStats = {
-  id: "heal", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 2, effects: [{ type: "heal", amount: 4 }],
+  id: "heal",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "allies",
+  cooldownTurns: 2,
+  effects: [{ type: "heal", amount: 4 }],
 };
 const CLEANSE: SkillStats = {
-  id: "cleanse", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 3, effects: [
-    { type: "removeStatus", status: "poison" }, { type: "removeStatus", status: "panic" }, { type: "removeStatus", status: "immobile" },
+  id: "cleanse",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "allies",
+  cooldownTurns: 3,
+  effects: [
+    { type: "removeStatus", status: "poison" },
+    { type: "removeStatus", status: "panic" },
+    { type: "removeStatus", status: "immobile" },
   ],
 };
 const POISON: SkillStats = {
-  id: "poison_needles", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "enemies", cooldownTurns: 3, effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
+  id: "poison_needles",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 3,
+  effects: [{ type: "applyStatus", status: "poison", duration: 3, magnitude: 2 }],
 };
 const ROOTS: SkillStats = {
-  id: "roots", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "enemies", cooldownTurns: 2, effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
+  id: "roots",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 2,
+  effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
 };
 const PANIC: SkillStats = {
-  id: "panic", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "will", willPower: 100, envDmg: 0, filter: "enemies", cooldownTurns: 4, effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
+  id: "panic",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "will",
+  willPower: 100,
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 4,
+  effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
 };
 const SUMMON: SkillStats = {
-  id: "summon_forest_beast", apCost: 1, endsTurn: true, range: 4, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "forest_beast" }],
+  id: "summon_forest_beast",
+  apCost: 1,
+  endsTurn: true,
+  range: 4,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "all",
+  maxUsesPerBattle: 1,
+  effects: [{ type: "spawn", unitId: "forest_beast" }],
 };
 const TELEPORT: SkillStats = {
-  id: "teleport_ally", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "allies", cooldownTurns: 5, effects: [{ type: "displace" }],
+  id: "teleport_ally",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "allies",
+  cooldownTurns: 5,
+  effects: [{ type: "displace" }],
 };
 const ILLUSION: SkillStats = {
-  id: "create_illusion", apCost: 1, endsTurn: true, range: 5, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "illusion" }],
+  id: "create_illusion",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "all",
+  maxUsesPerBattle: 1,
+  effects: [{ type: "spawn", unitId: "illusion" }],
 };
 const RAISE: SkillStats = {
-  id: "raise_skeleton", apCost: 1, endsTurn: true, range: 5, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "all", maxUsesPerBattle: 1, effects: [{ type: "spawn", unitId: "upyr" }],
+  id: "raise_skeleton",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "all",
+  maxUsesPerBattle: 1,
+  effects: [{ type: "spawn", unitId: "upyr" }],
 };
 
 const BEAST: SpawnUnitConfig = {
-  id: "forest_beast", maxHealth: 5, maxAP: 2, mobility: 7, aim: 70, defense: 5, will: 20,
-  vision: 8, weapons: [TEST_WEAPON.id], skills: [], tags: [], timedLife: 2,
+  id: "forest_beast",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 7,
+  aim: 70,
+  defense: 5,
+  will: 20,
+  vision: 8,
+  weapons: [TEST_WEAPON.id],
+  skills: [],
+  tags: [],
+  timedLife: 2,
 };
 const ILLUSION_UNIT: SpawnUnitConfig = {
-  id: "illusion", maxHealth: 1, maxAP: 1, mobility: 4, aim: 0, defense: 0, will: 0,
-  vision: 0, weapons: [], skills: [], tags: [], timedLife: 2, decoy: true,
+  id: "illusion",
+  maxHealth: 1,
+  maxAP: 1,
+  mobility: 4,
+  aim: 0,
+  defense: 0,
+  will: 0,
+  vision: 0,
+  weapons: [],
+  skills: [],
+  tags: [],
+  timedLife: 2,
+  decoy: true,
 };
 const UPYR: SpawnUnitConfig = {
-  id: "upyr", maxHealth: 8, maxAP: 2, mobility: 5, aim: 60, defense: 0, will: 20,
-  vision: 8, weapons: [TEST_WEAPON.id], skills: [], tags: [],
+  id: "upyr",
+  maxHealth: 8,
+  maxAP: 2,
+  mobility: 5,
+  aim: 60,
+  defense: 0,
+  will: 20,
+  vision: 8,
+  weapons: [TEST_WEAPON.id],
+  skills: [],
+  tags: [],
 };
 
 function kernel(initial: MatchState, skills: SkillStats[], units: SpawnUnitConfig[] = []) {
@@ -110,7 +257,15 @@ describe("0.9 automatic skills", () => {
 
   it("heals up to max HP and removes all configured negative statuses", () => {
     const healer = fighter({ id: 1, owner: 1, skillIds: [HEAL.id, CLEANSE.id] });
-    const ally = fighter({ id: 2, owner: 1, x: 2, hp: 5, poison: { damagePerTurn: 2, turnsLeft: 2 }, panic: { sourceId: 9, turnsLeft: 1 }, immobileTurns: 1 });
+    const ally = fighter({
+      id: 2,
+      owner: 1,
+      x: 2,
+      hp: 5,
+      poison: { damagePerTurn: 2, turnsLeft: 2 },
+      panic: { sourceId: 9, turnsLeft: 1 },
+      immobileTurns: 1,
+    });
     const enemy = fighter({ id: 9, owner: 2, x: 6 });
     const game = kernel(state(healer, ally, enemy), [HEAL, CLEANSE]);
     expect(game.apply({ type: "USE_SKILL", actorId: 1, skillId: HEAL.id, targetId: 2 }).ok).toBe(true);
@@ -146,7 +301,10 @@ describe("0.9 automatic skills", () => {
     expect(game.getReachable(2)).toEqual([]);
     expect(game.apply({ type: "MOVE", actorId: 2, to: { x: 4, y: 2, z: 1 } }).ok).toBe(false);
     const ended = game.apply({ type: "END_TURN", playerId: "2" });
-    expect(ended.ok && ended.events.some((event) => event.type === "STATUS_CHANGED" && event.status === "IMMOBILE" && !event.applied)).toBe(true);
+    expect(
+      ended.ok &&
+        ended.events.some((event) => event.type === "STATUS_CHANGED" && event.status === "IMMOBILE" && !event.applied),
+    ).toBe(true);
   });
 });
 
@@ -170,10 +328,15 @@ describe("skill cooldowns and per-battle limits", () => {
     const source = fighter({ id: 1, owner: 1, skillIds: [SUMMON.id] });
     const enemy = fighter({ id: 2, owner: 2, x: 6 });
     const game = kernel(state(source, enemy), [SUMMON], [BEAST]);
-    expect(game.apply({ type: "USE_SKILL", actorId: 1, skillId: SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } }).ok).toBe(true);
+    expect(game.apply({ type: "USE_SKILL", actorId: 1, skillId: SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } }).ok).toBe(
+      true,
+    );
     game.apply({ type: "END_TURN", playerId: "1" });
     game.apply({ type: "END_TURN", playerId: "2" });
-    expect(game.getSkillPreview(1, SUMMON.id, undefined, { x: 3, y: 3, z: 1 })).toMatchObject({ available: false, reason: "NO_USES" });
+    expect(game.getSkillPreview(1, SUMMON.id, undefined, { x: 3, y: 3, z: 1 })).toMatchObject({
+      available: false,
+      reason: "NO_USES",
+    });
     expect(game.getSnapshot().entities.find((entity) => entity.id === 1)?.skillUses?.[SUMMON.id]).toBe(1);
   });
 });
@@ -197,7 +360,9 @@ describe("0.9 will, panic, summons and displacement", () => {
     const enemy = fighter({ id: 2, owner: 2, x: 6 });
     const game = kernel(state(source, enemy), [SUMMON], [BEAST]);
     const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } });
-    expect(result.ok && result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON")).toBe(true);
+    expect(
+      result.ok && result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON"),
+    ).toBe(true);
     const summonedId = game.getSnapshot().entities.find((entity) => entity.configId === "forest_beast")!.id;
     game.apply({ type: "END_TURN", playerId: "1" });
     game.apply({ type: "END_TURN", playerId: "2" });
@@ -212,13 +377,26 @@ describe("0.9 will, panic, summons and displacement", () => {
     const ally = fighter({ id: 2, owner: 1, x: 2, y: 3 });
     const enemy = fighter({ id: 3, owner: 2, x: 7, y: 4 });
     let game = kernel(state(caster, ally, enemy), [ILLUSION], [ILLUSION_UNIT]);
-    const illusion = game.apply({ type: "USE_SKILL", actorId: 1, skillId: ILLUSION.id, targetPos: { x: 3, y: 2, z: 1 } });
-    expect(illusion.ok && illusion.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "ILLUSION")).toBe(true);
+    const illusion = game.apply({
+      type: "USE_SKILL",
+      actorId: 1,
+      skillId: ILLUSION.id,
+      targetPos: { x: 3, y: 2, z: 1 },
+    });
+    expect(
+      illusion.ok && illusion.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "ILLUSION"),
+    ).toBe(true);
     expect(game.getSnapshot().entities.find((entity) => entity.configId === "illusion")?.decoy).toBe(true);
 
     caster.ap = 2;
     game = kernel(state(caster, ally, enemy), [TELEPORT]);
-    const teleport = game.apply({ type: "USE_SKILL", actorId: 1, skillId: TELEPORT.id, targetId: 2, targetPos: { x: 4, y: 3, z: 1 } });
+    const teleport = game.apply({
+      type: "USE_SKILL",
+      actorId: 1,
+      skillId: TELEPORT.id,
+      targetId: 2,
+      targetPos: { x: 4, y: 3, z: 1 },
+    });
     expect(teleport.ok).toBe(true);
     expect(game.getSnapshot().entities.find((entity) => entity.id === 2)?.x).toBe(4);
 
@@ -226,7 +404,12 @@ describe("0.9 will, panic, summons and displacement", () => {
     const corpse = fighter({ id: 4, owner: 1, configId: "upyr", x: 3, y: 2, dead: true, obstacle: false, hp: 0 });
     game = kernel(state(kikimora, corpse, enemy), [RAISE], [UPYR]);
     const raised = game.apply({ type: "USE_SKILL", actorId: 1, skillId: RAISE.id, targetPos: { x: 3, y: 2, z: 1 } });
-    expect(raised.ok && raised.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1)).toBe(true);
+    expect(
+      raised.ok &&
+        raised.events.some(
+          (event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1,
+        ),
+    ).toBe(true);
     const livingSkeletons = game.getSnapshot().entities.filter((entity) => entity.configId === "upyr" && !entity.dead);
     expect(livingSkeletons).toHaveLength(1);
     expect(livingSkeletons[0]?.hp).toBe(1);
@@ -235,20 +418,52 @@ describe("0.9 will, panic, summons and displacement", () => {
 
 describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
   const SWORD: WeaponStats = {
-    id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-    requiresLOS: false, aimMod: 0, minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0, envDmg: 0,
+    id: "sword",
+    category: "melee",
+    apCost: 1,
+    endsTurn: true,
+    range: 1,
+    requiresLOS: false,
+    aimMod: 0,
+    minDmg: 3,
+    maxDmg: 3,
+    crit: 0,
+    critBonus: 0,
+    envDmg: 0,
   };
   const SWEEP: SkillStats = {
-    id: "circular_sweep", apCost: 1, endsTurn: true, range: 0, requiresLOS: false, category: "self",
-    resolution: "attack", envDmg: 0, radius: 1, filter: "enemies", cooldownTurns: 3,
+    id: "circular_sweep",
+    apCost: 1,
+    endsTurn: true,
+    range: 0,
+    requiresLOS: false,
+    category: "self",
+    resolution: "attack",
+    envDmg: 0,
+    radius: 1,
+    filter: "enemies",
+    cooldownTurns: 3,
     effects: [{ type: "damage", minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0 }],
   };
   const SWEEP_ALL: SkillStats = { ...SWEEP, filter: "all" };
 
   const coverEntity = (id: number, coverType: 1 | 2, edge: 0 | 1 | 2 | 3): EntityState => ({
     ...fighter({ id, owner: 0, x: 3, y: 3 }),
-    configId: "cover", obstacle: false, coverType, edge, hp: 2, maxHp: 2,
-    aim: 0, defense: 0, vision: 0, weaponId: "", weaponIds: [], skillIds: [], ap: 0, maxAp: 0, mobility: 0,
+    configId: "cover",
+    obstacle: false,
+    coverType,
+    edge,
+    hp: 2,
+    maxHp: 2,
+    aim: 0,
+    defense: 0,
+    vision: 0,
+    weaponId: "",
+    weaponIds: [],
+    skillIds: [],
+    ap: 0,
+    maxAp: 0,
+    mobility: 0,
   });
 
   const sweepKernel = (initial: MatchState) =>
@@ -262,7 +477,14 @@ describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
     });
 
   it("previews all eight neighbours and may resolve the configured friendly-fire hit", () => {
-    const sweeper = fighter({ id: 1, configId: "bogatyr", x: 3, y: 3, weaponIds: [SWORD.id], skillIds: [SWEEP_ALL.id] });
+    const sweeper = fighter({
+      id: 1,
+      configId: "bogatyr",
+      x: 3,
+      y: 3,
+      weaponIds: [SWORD.id],
+      skillIds: [SWEEP_ALL.id],
+    });
     const ally = fighter({ id: 2, owner: 1, x: 4, y: 4, hp: 10 });
     const enemy = fighter({ id: 3, owner: 2, x: 2, y: 3, hp: 10 });
     const game = createTacticsKernel({
@@ -274,16 +496,20 @@ describe("area melee attacks respect edge covers (§9.5, §12.1)", () => {
 
     const preview = game.getSkillPreview(1, SWEEP_ALL.id);
     expect(preview.areaCells).toHaveLength(9); // центр + все восемь соседей
-    expect(preview.areaCells).toEqual(expect.arrayContaining([
-      { x: 2, y: 2, z: 1 },
-      { x: 4, y: 4, z: 1 },
-      { x: 2, y: 4, z: 1 },
-      { x: 4, y: 2, z: 1 },
-    ]));
+    expect(preview.areaCells).toEqual(
+      expect.arrayContaining([
+        { x: 2, y: 2, z: 1 },
+        { x: 4, y: 4, z: 1 },
+        { x: 2, y: 4, z: 1 },
+        { x: 4, y: 2, z: 1 },
+      ]),
+    );
 
     const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: SWEEP_ALL.id });
     expect(result.ok).toBe(true);
-    expect(result.ok && result.events.some((event) => event.type === "COMBAT_RESOLVED" && event.targetId === ally.id)).toBe(true);
+    expect(
+      result.ok && result.events.some((event) => event.type === "COMBAT_RESOLVED" && event.targetId === ally.id),
+    ).toBe(true);
     expect(game.getSnapshot().entities.find((entity) => entity.id === ally.id)?.hp).toBe(7);
     expect(game.getSnapshot().entities.find((entity) => entity.id === sweeper.id)?.hp).toBe(sweeper.hp);
   });
@@ -337,7 +563,12 @@ describe("spawnKind controls the spawn cause (§2.9 review)", () => {
     const source = fighter({ id: 1, owner: 1, skillIds: [RAISE_NAMED_SUMMON.id] });
     const enemy = fighter({ id: 2, owner: 2, x: 6 });
     const game = kernel(state(source, enemy), [RAISE_NAMED_SUMMON], [UPYR]);
-    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: RAISE_NAMED_SUMMON.id, targetPos: { x: 2, y: 3, z: 1 } });
+    const result = game.apply({
+      type: "USE_SKILL",
+      actorId: 1,
+      skillId: RAISE_NAMED_SUMMON.id,
+      targetPos: { x: 2, y: 3, z: 1 },
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "SUMMON")).toBe(true);
@@ -353,9 +584,18 @@ describe("spawnKind controls the spawn cause (§2.9 review)", () => {
     const corpse = fighter({ id: 4, owner: 1, configId: "upyr", x: 3, y: 2, dead: true, obstacle: false, hp: 0 });
     const enemy = fighter({ id: 2, owner: 2, x: 7, y: 4 });
     const game = kernel(state(caster, corpse, enemy), [CUSTOM_RAISE], [UPYR]);
-    const result = game.apply({ type: "USE_SKILL", actorId: 1, skillId: CUSTOM_RAISE.id, targetPos: { x: 3, y: 2, z: 1 } });
+    const result = game.apply({
+      type: "USE_SKILL",
+      actorId: 1,
+      skillId: CUSTOM_RAISE.id,
+      targetPos: { x: 3, y: 2, z: 1 },
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events.some((event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1)).toBe(true);
+    expect(
+      result.events.some(
+        (event) => event.type === "ENTITY_SPAWNED" && event.cause === "RESURRECTION" && event.entity.hp === 1,
+      ),
+    ).toBe(true);
   });
 });

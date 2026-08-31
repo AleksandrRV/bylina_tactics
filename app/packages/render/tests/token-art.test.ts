@@ -97,9 +97,7 @@ describe("M1 token art (0.20.37)", () => {
     // Дубина добавляет примитивы: рука-хват, древко, набалдашник, сучья.
     expect(armed.length).toBeGreaterThan(bare.length);
     // И выходит вправо за корпус — оружие должно читаться в силуэте.
-    expect(Math.max(...armed.map((point) => point.x))).toBeGreaterThan(
-      Math.max(...bare.map((point) => point.x)),
-    );
+    expect(Math.max(...armed.map((point) => point.x))).toBeGreaterThan(Math.max(...bare.map((point) => point.x)));
   });
 
   it("draws the rat lower and flatter than the standing hero", () => {

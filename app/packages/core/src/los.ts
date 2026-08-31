@@ -46,10 +46,12 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
   while ((ix !== ixe || iy !== iye) && guard < 512) {
     guard += 1;
     if (tmaxX < tmaxY - 1e-12) {
-      ix += stepX; tmaxX += tdx;
+      ix += stepX;
+      tmaxX += tdx;
       push(ix, iy, "full");
     } else if (tmaxY < tmaxX - 1e-12) {
-      iy += stepY; tmaxY += tdy;
+      iy += stepY;
+      tmaxY += tdy;
       push(ix, iy, "full");
     } else {
       // Пересечение вершины: обе касающиеся клетки принадлежат одной вершине (§7.4).
@@ -59,8 +61,10 @@ export function traceRay(ax: number, ay: number, bx: number, by: number): Traced
       };
       push(ix + stepX, iy, "glancing", corner);
       push(ix, iy + stepY, "glancing", corner);
-      ix += stepX; iy += stepY;
-      tmaxX += tdx; tmaxY += tdy;
+      ix += stepX;
+      iy += stepY;
+      tmaxX += tdx;
+      tmaxY += tdy;
       push(ix, iy, "full");
     }
   }
@@ -93,7 +97,6 @@ function sgnDir(value: number): number {
   return 0;
 }
 
-
 export interface ObstacleResult {
   blocked: boolean;
   obstaclePenalty: number;
@@ -103,14 +106,22 @@ export interface ObstacleResult {
 export function evaluateObstacles(
   grid: Grid,
   entities: readonly EntityState[],
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
 ): ObstacleResult {
   if (ax === bx && ay === by) return { blocked: false, obstaclePenalty: 0, breakCell: null };
 
   const traced = traceRay(ax, ay, bx, by);
-  const x0 = ax + 0.5, y0 = ay + 0.5, z0 = az + 0.5;
-  const x1 = bx + 0.5, y1 = by + 0.5, z1 = bz + 0.5;
+  const x0 = ax + 0.5,
+    y0 = ay + 0.5,
+    z0 = az + 0.5;
+  const x1 = bx + 0.5,
+    y1 = by + 0.5,
+    z1 = bz + 0.5;
 
   let blocked = false;
   let maxPenalty = 0;
@@ -124,13 +135,19 @@ export function evaluateObstacles(
     if ((cell.x === ax && cell.y === ay) || (cell.x === bx && cell.y === by)) continue;
 
     const tile = tileAt(grid, cell.x, cell.y);
-    if (!tile) { blocked = true; breakCell = { x: cell.x, y: cell.y, z: 0 }; break; }
+    if (!tile) {
+      blocked = true;
+      breakCell = { x: cell.x, y: cell.y, z: 0 };
+      break;
+    }
 
     const rz = rayZ(x0, y0, z0, x1, y1, z1, cell.x, cell.y);
     if (rz < tile.z) {
       const heightDiff = tile.z - rz;
       if (heightDiff > 1.01) {
-        blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break;
+        blocked = true;
+        breakCell = { x: cell.x, y: cell.y, z: tile.z };
+        break;
       } else {
         let tier = tile.z - az >= 2 ? 2 : tile.z - az >= 1 ? 1 : 0;
         if (cell.type === "glancing") tier = Math.max(0, tier - 1);
@@ -139,7 +156,11 @@ export function evaluateObstacles(
     }
 
     if (tile.blockLOS) {
-      if (cell.type === "full") { blocked = true; breakCell = { x: cell.x, y: cell.y, z: tile.z }; break; }
+      if (cell.type === "full") {
+        blocked = true;
+        breakCell = { x: cell.x, y: cell.y, z: tile.z };
+        break;
+      }
       glancingCount += 1;
       const corner = cell.corner;
       if (corner) {
@@ -149,7 +170,6 @@ export function evaluateObstacles(
         else glancingByCorner.set(key, { x: corner.x, y: corner.y, count: 1 });
       }
     }
-
   }
 
   if (!blocked) {
@@ -168,16 +188,23 @@ export function evaluateObstacles(
   return { blocked, obstaclePenalty: maxPenalty, breakCell };
 }
 
-
 export function hasLineOfSight(
   grid: Grid,
-  ax: number, ay: number, az: number,
-  bx: number, by: number, bz: number,
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
 ): boolean {
   if (ax === bx && ay === by) return true;
   const traced = traceRay(ax, ay, bx, by);
-  const x0 = ax + 0.5, y0 = ay + 0.5, z0 = az + 0.5;
-  const x1 = bx + 0.5, y1 = by + 0.5, z1 = bz + 0.5;
+  const x0 = ax + 0.5,
+    y0 = ay + 0.5,
+    z0 = az + 0.5;
+  const x1 = bx + 0.5,
+    y1 = by + 0.5,
+    z1 = bz + 0.5;
 
   // §7.4: линию прерывает только пара glancing-касаний в одной вершине.
   const glancingByCorner = new Map<string, number>();

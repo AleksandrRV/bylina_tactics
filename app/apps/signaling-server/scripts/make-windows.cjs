@@ -19,10 +19,13 @@ if (!existsSync(bundle)) {
 
 try {
   execSync("npx --no-install pkg --version", { stdio: "ignore" });
-  execSync(`npx --no-install pkg ${JSON.stringify(bundle)} --targets node18-win-x64 --output ${JSON.stringify(join(dist, "bylina-relay.exe"))}`, { stdio: "inherit" });
+  execSync(
+    `npx --no-install pkg ${JSON.stringify(bundle)} --targets node18-win-x64 --output ${JSON.stringify(join(dist, "bylina-relay.exe"))}`,
+    { stdio: "inherit" },
+  );
   console.log("bylina-relay.exe built");
 } catch {
   const cmd = join(dist, "bylina-relay.cmd");
-  writeFileSync(cmd, "@echo off\r\nnode \"%~dp0signaling-server.cjs\" %*\r\n");
+  writeFileSync(cmd, '@echo off\r\nnode "%~dp0signaling-server.cjs" %*\r\n');
   console.log(`pkg unavailable; created launcher ${cmd}`);
 }

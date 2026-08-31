@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { createQrDataUrl, createWebRtcChannel, decodeQrImage, decodeSessionCode, encodeSessionCode, type Transport } from "@bylina/net";
+import {
+  createQrDataUrl,
+  createWebRtcChannel,
+  decodeQrImage,
+  decodeSessionCode,
+  encodeSessionCode,
+  type Transport,
+} from "@bylina/net";
 import { createSignalingSession, listRooms, type RoomSummary } from "@bylina/signaling";
 import { useServices, useT } from "./context.js";
 import { useI18nTick } from "./hooks.js";
@@ -11,7 +18,17 @@ function unitName(unitId: string): string {
 
 function SwordsIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
       <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
     </svg>
@@ -20,7 +37,17 @@ function SwordsIcon() {
 
 function BackIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12.5 4 6.5 10l6 6" />
     </svg>
   );
@@ -51,13 +78,31 @@ export function PvpRoomScreen() {
       </header>
 
       <div className="pvp-tabs" role="tablist" aria-label={t("pvp.roomHint")}>
-        <button type="button" role="tab" aria-selected={tab === "local"} className={`pvp-tab${tab === "local" ? " is-active" : ""}`} onClick={() => setTab("local")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "local"}
+          className={`pvp-tab${tab === "local" ? " is-active" : ""}`}
+          onClick={() => setTab("local")}
+        >
           {t("pvp.tabLocal")}
         </button>
-        <button type="button" role="tab" aria-selected={tab === "network"} className={`pvp-tab${tab === "network" ? " is-active" : ""}`} onClick={() => setTab("network")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "network"}
+          className={`pvp-tab${tab === "network" ? " is-active" : ""}`}
+          onClick={() => setTab("network")}
+        >
           {t("pvp.tabNetwork")}
         </button>
-        <button type="button" role="tab" aria-selected={tab === "public"} className={`pvp-tab${tab === "public" ? " is-active" : ""}`} onClick={() => setTab("public")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "public"}
+          className={`pvp-tab${tab === "public" ? " is-active" : ""}`}
+          onClick={() => setTab("public")}
+        >
           {t("pvp.tabPublic")}
         </button>
       </div>
@@ -80,7 +125,11 @@ export function PvpRoomScreen() {
         <NetworkSetup
           pool={pool}
           onHostStart={(side1, side2, objective, peerRole, omniscient, transport) =>
-            session.startNetPvpBattle({ side1, side2 }, Date.now() >>> 0, transport, { objective, peerRole, omniscient })
+            session.startNetPvpBattle({ side1, side2 }, Date.now() >>> 0, transport, {
+              objective,
+              peerRole,
+              omniscient,
+            })
           }
           onGuestJoin={(owner, transport) => session.bindGuestNetPvp(owner, transport)}
           onSpectatorJoin={(transport) => session.bindNetSpectator(transport)}
@@ -121,11 +170,17 @@ function Draft({
   return (
     <div className="draft">
       <div className="draft-status">
-        <span className={`draft-side is-side1${current === 1 ? " is-current" : ""}${picks[1].length === n ? " is-full" : ""}`}>
+        <span
+          className={`draft-side is-side1${current === 1 ? " is-current" : ""}${picks[1].length === n ? " is-full" : ""}`}
+        >
           {t("pvp.side1")} · {picks[1].length}/{n}
         </span>
-        <span className="draft-vs" aria-hidden="true">⇄</span>
-        <span className={`draft-side is-side2${current === 2 ? " is-current" : ""}${picks[2].length === n ? " is-full" : ""}`}>
+        <span className="draft-vs" aria-hidden="true">
+          ⇄
+        </span>
+        <span
+          className={`draft-side is-side2${current === 2 ? " is-current" : ""}${picks[2].length === n ? " is-full" : ""}`}
+        >
           {t("pvp.side2")} · {picks[2].length}/{n}
         </span>
       </div>
@@ -143,9 +198,17 @@ function Draft({
               disabled={taken || current === null}
               onClick={() => onPick(unitId)}
             >
-              {face ? <img className="draft-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+              {face ? (
+                <img className="draft-face" src={face} alt="" draggable={false} />
+              ) : (
+                <span className="deploy-face-empty" aria-hidden="true" />
+              )}
               <span className="draft-name">{t(unitName(unitId))}</span>
-              {taken ? <span className="draft-taken-mark" aria-hidden="true">✓</span> : null}
+              {taken ? (
+                <span className="draft-taken-mark" aria-hidden="true">
+                  ✓
+                </span>
+              ) : null}
             </button>
           );
         })}
@@ -200,10 +263,22 @@ function LocalSetup({
       <div className="pvp-options">
         <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
           <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
-          <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={objective === "elimination"}
+            className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`}
+            onClick={() => setObjective("elimination")}
+          >
             {t("pvp.objectiveElimination")}
           </button>
-          <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+          <button
+            type="button"
+            role="radio"
+            aria-checked={objective === "apple"}
+            className={`pvp-radio${objective === "apple" ? " is-on" : ""}`}
+            onClick={() => setObjective("apple")}
+          >
             {t("pvp.objectiveApple")}
           </button>
         </div>
@@ -211,7 +286,15 @@ function LocalSetup({
           <span className="pvp-option-title">{t("pvp.nLabel")}</span>
           <div className="pvp-n-select">
             {Array.from({ length: maxN - minN + 1 }, (_, i) => i + minN).map((value) => (
-              <button key={value} type="button" className={`pvp-n-btn${n === value ? " is-on" : ""}`} onClick={() => { setN(value); reset(); }}>
+              <button
+                key={value}
+                type="button"
+                className={`pvp-n-btn${n === value ? " is-on" : ""}`}
+                onClick={() => {
+                  setN(value);
+                  reset();
+                }}
+              >
                 {value}
               </button>
             ))}
@@ -234,7 +317,12 @@ function LocalSetup({
         <button type="button" className="btn btn-ghost" onClick={reset}>
           {t("pvp.reset")}
         </button>
-        <button type="button" className="btn btn-primary" disabled={!ready} onClick={() => ready && onStart(picks[1], picks[2], objective)}>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!ready}
+          onClick={() => ready && onStart(picks[1], picks[2], objective)}
+        >
           <span>{t("pvp.start")}</span>
           <span aria-hidden="true">→</span>
         </button>
@@ -254,7 +342,11 @@ function SideCard({ side, pool }: { side: 1 | 2; pool: string[] }) {
           const face = unitPortrait(unitId);
           return (
             <div key={unitId} className="pvp-slot">
-              {face ? <img className="pvp-slot-face" src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+              {face ? (
+                <img className="pvp-slot-face" src={face} alt="" draggable={false} />
+              ) : (
+                <span className="deploy-face-empty" aria-hidden="true" />
+              )}
               <span className="pvp-slot-name">{t(unitName(unitId))}</span>
             </div>
           );
@@ -272,7 +364,14 @@ function NetworkSetup({
   onOmniscientChange,
 }: {
   pool: string[];
-  onHostStart: (side1: string[], side2: string[], objective: Objective, peerRole: "guest" | "spectator", omniscient: boolean, transport: Transport) => void;
+  onHostStart: (
+    side1: string[],
+    side2: string[],
+    objective: Objective,
+    peerRole: "guest" | "spectator",
+    omniscient: boolean,
+    transport: Transport,
+  ) => void;
   onGuestJoin: (owner: number, transport: Transport) => void;
   onSpectatorJoin: (transport: Transport) => void;
   onOmniscientChange: (value: boolean) => void;
@@ -288,7 +387,10 @@ function NetworkSetup({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
-  const transportRef = useMemo(() => ({ current: null as (Transport & { receiveSignal(data: unknown): void; close?(): void }) | null }), []);
+  const transportRef = useMemo(
+    () => ({ current: null as (Transport & { receiveSignal(data: unknown): void; close?(): void }) | null }),
+    [],
+  );
   const qrInputRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
 
   /** Смена роли рвёт начатое соединение: канал и коды принадлежат паре. */
@@ -312,7 +414,9 @@ function NetworkSetup({
         onSignal: (signal) => {
           const next = encodeSessionCode(signal);
           setCode(next);
-          void createQrDataUrl(next).then(setQr).catch(() => setQr(null));
+          void createQrDataUrl(next)
+            .then(setQr)
+            .catch(() => setQr(null));
         },
         receiveSignal: () => undefined,
         onConnect: () => setConnected(true),
@@ -361,10 +465,22 @@ function NetworkSetup({
   return (
     <div className="net-setup">
       <div className="net-role-switch" role="tablist" aria-label={t("pvp.tabNetwork")}>
-        <button type="button" role="tab" aria-selected={role === "host"} className={`pvp-tab${role === "host" ? " is-active" : ""}`} onClick={() => switchRole("host")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={role === "host"}
+          className={`pvp-tab${role === "host" ? " is-active" : ""}`}
+          onClick={() => switchRole("host")}
+        >
           {t("net.host")}
         </button>
-        <button type="button" role="tab" aria-selected={role === "guest"} className={`pvp-tab${role === "guest" ? " is-active" : ""}`} onClick={() => switchRole("guest")}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={role === "guest"}
+          className={`pvp-tab${role === "guest" ? " is-active" : ""}`}
+          onClick={() => switchRole("guest")}
+        >
           {t("net.guest")}
         </button>
       </div>
@@ -374,19 +490,45 @@ function NetworkSetup({
           <p className="muted">{t("net.hostHint")}</p>
           <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
             <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
-            <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={objective === "elimination"}
+              className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`}
+              onClick={() => setObjective("elimination")}
+            >
               {t("pvp.objectiveElimination")}
             </button>
-            <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={objective === "apple"}
+              className={`pvp-radio${objective === "apple" ? " is-on" : ""}`}
+              onClick={() => setObjective("apple")}
+            >
               {t("pvp.objectiveApple")}
             </button>
           </div>
           <label className="pvp-check">
-            <input type="checkbox" checked={omniscient} onChange={(event) => { setOmniscient(event.target.checked); onOmniscientChange(event.target.checked); }} />
+            <input
+              type="checkbox"
+              checked={omniscient}
+              onChange={(event) => {
+                setOmniscient(event.target.checked);
+                onOmniscientChange(event.target.checked);
+              }}
+            />
             {t("net.omniscient")}
           </label>
           {!code ? (
-            <button type="button" className="btn btn-primary" onClick={() => { setError(null); createChannel(true); }}>
+            <button
+              type="button"
+              className="btn btn-primary"
+              onClick={() => {
+                setError(null);
+                createChannel(true);
+              }}
+            >
               {t("net.create")}
             </button>
           ) : null}
@@ -402,16 +544,36 @@ function NetworkSetup({
               для показа ввода было бы взаимной блокировкой рукопожатия. */}
           {code && !connected ? (
             <>
-              <label className="net-input-label" htmlFor="net-peer-code">{t("net.peerCode")}</label>
-              <input id="net-peer-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.peerCodePlaceholder")} />
-              <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>{t("net.apply")}</button>
+              <label className="net-input-label" htmlFor="net-peer-code">
+                {t("net.peerCode")}
+              </label>
+              <input
+                id="net-peer-code"
+                className="net-input"
+                value={peerCode}
+                onChange={(event) => setPeerCode(event.target.value)}
+                placeholder={t("net.peerCodePlaceholder")}
+              />
+              <button type="button" className="btn btn-ghost" onClick={applyPeerCode}>
+                {t("net.apply")}
+              </button>
             </>
           ) : null}
           {connected ? (
             <button
               type="button"
               className="btn btn-primary"
-              onClick={() => transportRef.current && onHostStart([...pool].slice(0, 5), [...pool].slice(0, 5), objective, peerRole, omniscient, transportRef.current)}
+              onClick={() =>
+                transportRef.current &&
+                onHostStart(
+                  [...pool].slice(0, 5),
+                  [...pool].slice(0, 5),
+                  objective,
+                  peerRole,
+                  omniscient,
+                  transportRef.current,
+                )
+              }
               disabled={pool.length === 0}
             >
               {t("net.startBattle")}
@@ -421,8 +583,16 @@ function NetworkSetup({
       ) : (
         <div className="net-panel">
           <p className="muted">{t("net.guestHint")}</p>
-          <label className="net-input-label" htmlFor="net-guest-code">{t("net.enterCode")}</label>
-          <input id="net-guest-code" className="net-input" value={peerCode} onChange={(event) => setPeerCode(event.target.value)} placeholder={t("net.enterCodePlaceholder")} />
+          <label className="net-input-label" htmlFor="net-guest-code">
+            {t("net.enterCode")}
+          </label>
+          <input
+            id="net-guest-code"
+            className="net-input"
+            value={peerCode}
+            onChange={(event) => setPeerCode(event.target.value)}
+            placeholder={t("net.enterCodePlaceholder")}
+          />
           <button
             type="button"
             className="btn btn-ghost"
@@ -434,7 +604,9 @@ function NetworkSetup({
             {t("net.scanQr")}
           </button>
           <input
-            ref={(node) => { qrInputRef.current = node; }}
+            ref={(node) => {
+              qrInputRef.current = node;
+            }}
             type="file"
             accept="image/*"
             className="net-file-input"
@@ -483,10 +655,18 @@ function NetworkSetup({
           {connected ? <p className="net-connected">{t("net.connected")}</p> : null}
           <div className="pvp-option-group">
             <span className="pvp-option-title">{t("net.peerRole")}</span>
-            <button type="button" className={`pvp-radio${joinRole === "guest" ? " is-on" : ""}`} onClick={() => setJoinRole("guest")}>
+            <button
+              type="button"
+              className={`pvp-radio${joinRole === "guest" ? " is-on" : ""}`}
+              onClick={() => setJoinRole("guest")}
+            >
               {t("net.peerGuest")}
             </button>
-            <button type="button" className={`pvp-radio${joinRole === "spectator" ? " is-on" : ""}`} onClick={() => setJoinRole("spectator")}>
+            <button
+              type="button"
+              className={`pvp-radio${joinRole === "spectator" ? " is-on" : ""}`}
+              onClick={() => setJoinRole("spectator")}
+            >
               {t("net.peerSpectator")}
             </button>
           </div>
@@ -494,11 +674,14 @@ function NetworkSetup({
         </div>
       )}
 
-      {error ? <p className="net-error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="net-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
-
 
 /** Сеть общего пользования (0.17.0): подключение через ретранслятор. */
 function PublicSetup({
@@ -562,8 +745,16 @@ function PublicSetup({
   return (
     <div className="net-setup">
       <div className="net-panel">
-        <label className="net-input-label" htmlFor="relay-url">{t("net.relayUrl")}</label>
-        <input id="relay-url" className="net-input" value={relayUrl} onChange={(event) => setRelayUrl(event.target.value)} placeholder="http://localhost:8080" />
+        <label className="net-input-label" htmlFor="relay-url">
+          {t("net.relayUrl")}
+        </label>
+        <input
+          id="relay-url"
+          className="net-input"
+          value={relayUrl}
+          onChange={(event) => setRelayUrl(event.target.value)}
+          placeholder="http://localhost:8080"
+        />
         <div className="pvp-start-row">
           <button type="button" className="btn btn-ghost" onClick={() => void refreshRooms()}>
             {t("net.refreshRooms")}
@@ -575,8 +766,17 @@ function PublicSetup({
             {rooms.map((room) => (
               <div key={room.id} className="room-row">
                 <span className="room-id">{room.id}</span>
-                <span className="muted">{room.peers.length}/4 · {t("net.host")}: {room.host ?? "—"}</span>
-                <button type="button" className="btn btn-ghost" onClick={() => { setRoomId(room.id); connect(room.id, "guest"); }}>
+                <span className="muted">
+                  {room.peers.length}/4 · {t("net.host")}: {room.host ?? "—"}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  onClick={() => {
+                    setRoomId(room.id);
+                    connect(room.id, "guest");
+                  }}
+                >
                   {t("net.join")}
                 </button>
               </div>
@@ -586,10 +786,22 @@ function PublicSetup({
         {objectiveFixed === null ? (
           <div className="pvp-option-group" role="radiogroup" aria-label={t("pvp.objectiveLabel")}>
             <span className="pvp-option-title">{t("pvp.objectiveLabel")}</span>
-            <button type="button" role="radio" aria-checked={objective === "elimination"} className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`} onClick={() => setObjective("elimination")}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={objective === "elimination"}
+              className={`pvp-radio${objective === "elimination" ? " is-on" : ""}`}
+              onClick={() => setObjective("elimination")}
+            >
               {t("pvp.objectiveElimination")}
             </button>
-            <button type="button" role="radio" aria-checked={objective === "apple"} className={`pvp-radio${objective === "apple" ? " is-on" : ""}`} onClick={() => setObjective("apple")}>
+            <button
+              type="button"
+              role="radio"
+              aria-checked={objective === "apple"}
+              className={`pvp-radio${objective === "apple" ? " is-on" : ""}`}
+              onClick={() => setObjective("apple")}
+            >
               {t("pvp.objectiveApple")}
             </button>
           </div>
@@ -607,14 +819,31 @@ function PublicSetup({
             {t("net.createRoom")}
           </button>
         </div>
-        <label className="net-input-label" htmlFor="room-id">{t("net.roomId")}</label>
-        <input id="room-id" className="net-input" value={roomId} onChange={(event) => setRoomId(event.target.value)} placeholder="room-xxxxxx" />
-        <button type="button" className="btn btn-primary" disabled={!roomId.trim()} onClick={() => connect(roomId.trim(), "guest")}>
+        <label className="net-input-label" htmlFor="room-id">
+          {t("net.roomId")}
+        </label>
+        <input
+          id="room-id"
+          className="net-input"
+          value={roomId}
+          onChange={(event) => setRoomId(event.target.value)}
+          placeholder="room-xxxxxx"
+        />
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!roomId.trim()}
+          onClick={() => connect(roomId.trim(), "guest")}
+        >
           {t("net.connect")}
         </button>
         {status ? <p className="net-connected">{status}</p> : null}
       </div>
-      {error ? <p className="net-error" role="alert">{error}</p> : null}
+      {error ? (
+        <p className="net-error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

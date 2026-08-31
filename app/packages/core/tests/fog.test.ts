@@ -25,20 +25,47 @@ describe("fog of war", () => {
     // раскладки карты и позиций высадки. Юнит в углу (0,0), дальность 10.
     const grid = makeGrid(20, 20, 1);
     const unit: EntityState = {
-      id: 1, configId: "u", owner: 1, x: 0, y: 0, z: 1, dir: 0,
-      ap: 2, maxAp: 2, mobility: 5, hp: 10, maxHp: 10, aim: 70, defense: 0, vision: 10,
-      weaponId: "", weaponIds: [], skillIds: [], obstacle: true, dead: false, flying: false,
-      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+      id: 1,
+      configId: "u",
+      owner: 1,
+      x: 0,
+      y: 0,
+      z: 1,
+      dir: 0,
+      ap: 2,
+      maxAp: 2,
+      mobility: 5,
+      hp: 10,
+      maxHp: 10,
+      aim: 70,
+      defense: 0,
+      vision: 10,
+      weaponId: "",
+      weaponIds: [],
+      skillIds: [],
+      obstacle: true,
+      dead: false,
+      flying: false,
+      coverType: 0,
+      overwatch: false,
+      defending: false,
+      movementSpent: 0,
     };
     const own = tileAt(grid, 0, 0)!;
 
     // С высоты z=2 (поправка +1): клетка на расстоянии vision+1 = 11 видна.
     own.z = 2;
-    const visibleHigh = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 2 }] }, PLAYER_OWNER);
+    const visibleHigh = computeVisibleCells(
+      { turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 2 }] },
+      PLAYER_OWNER,
+    );
 
     // Снизу z=0 (поправка −1): та же клетка вне дальности (эффективная 9).
     own.z = 0;
-    const visibleLow = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 0 }] }, PLAYER_OWNER);
+    const visibleLow = computeVisibleCells(
+      { turnNumber: 1, activeOwner: 1, grid, entities: [{ ...unit, z: 0 }] },
+      PLAYER_OWNER,
+    );
 
     expect(visibleHigh.has("11,0")).toBe(true);
     expect(visibleLow.has("11,0")).toBe(false);
@@ -48,10 +75,31 @@ describe("fog of war", () => {
   it("observes the own cell even with zero vision (§8.1)", () => {
     const grid = makeGrid(5, 5, 1);
     const unit: EntityState = {
-      id: 1, configId: "u", owner: 1, x: 2, y: 2, z: 1, dir: 0,
-      ap: 1, maxAp: 1, mobility: 4, hp: 1, maxHp: 1, aim: 0, defense: 0, vision: 0,
-      weaponId: "", weaponIds: [], skillIds: [], obstacle: true, dead: false, flying: false,
-      coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+      id: 1,
+      configId: "u",
+      owner: 1,
+      x: 2,
+      y: 2,
+      z: 1,
+      dir: 0,
+      ap: 1,
+      maxAp: 1,
+      mobility: 4,
+      hp: 1,
+      maxHp: 1,
+      aim: 0,
+      defense: 0,
+      vision: 0,
+      weaponId: "",
+      weaponIds: [],
+      skillIds: [],
+      obstacle: true,
+      dead: false,
+      flying: false,
+      coverType: 0,
+      overwatch: false,
+      defending: false,
+      movementSpent: 0,
     };
     const visible = computeVisibleCells({ turnNumber: 1, activeOwner: 1, grid, entities: [unit] }, PLAYER_OWNER);
     expect(visible.has("2,2")).toBe(true);
@@ -73,10 +121,13 @@ describe("fog of war", () => {
     const behindWall = match.grid.tiles.find((t) => t.x === wallX + 1 && t.y === player.y);
     if (behindWall) {
       // Проверяем, что конкретный боец не видит клетку за стеной.
-      const cellVisibleByThisUnit = computeVisibleCells({
-        ...match,
-        entities: match.entities.filter((e) => e.id === player.id || e.owner !== PLAYER_OWNER),
-      }, PLAYER_OWNER);
+      const cellVisibleByThisUnit = computeVisibleCells(
+        {
+          ...match,
+          entities: match.entities.filter((e) => e.id === player.id || e.owner !== PLAYER_OWNER),
+        },
+        PLAYER_OWNER,
+      );
       expect(cellVisibleByThisUnit.has(`${behindWall.x},${behindWall.y}`)).toBe(false);
     }
   });

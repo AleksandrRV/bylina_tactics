@@ -61,13 +61,29 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
   let id = 1;
   const legend = (options.layout.legend ?? {}) as Record<
     string,
-    { kind?: string; unitId?: string; side?: string; scripted?: boolean; state?: string; itemId?: string; weapons?: string[] }
+    {
+      kind?: string;
+      unitId?: string;
+      side?: string;
+      scripted?: boolean;
+      state?: string;
+      itemId?: string;
+      weapons?: string[];
+    }
   >;
 
   const spawnAt = (marker: string, unitId: string, owner: number, extra?: (entity: EntityState) => void): void => {
     for (const pos of compiled.markers[marker] ?? []) {
       const tile = tileAt(compiled.grid, pos.x, pos.y);
-      const spawned = spawnUnitState(id++, pickUnit(options.units, unitId), owner, pos.x, pos.y, tile?.z ?? 1, owner === PLAYER_OWNER ? 1 : 3);
+      const spawned = spawnUnitState(
+        id++,
+        pickUnit(options.units, unitId),
+        owner,
+        pos.x,
+        pos.y,
+        tile?.z ?? 1,
+        owner === PLAYER_OWNER ? 1 : 3,
+      );
       if (spawned.configId === "strelets") {
         spawned.skillIds = (spawned.skillIds ?? []).filter((skillId) => skillId !== "aimed_eye");
       }

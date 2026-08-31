@@ -8,7 +8,17 @@ function unitName(unitId: string): string {
 
 function BackIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12.5 4 6.5 10l6 6" />
     </svg>
   );
@@ -16,7 +26,17 @@ function BackIcon() {
 
 function BookIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 3.5h8a2 2 0 0 1 2 2v11H6a2 2 0 0 1-2-2v-11Z" />
       <path d="M14 5.5h2v11h-2" />
       <path d="M6.5 7h4M6.5 9.5h4" />
@@ -26,7 +46,17 @@ function BookIcon() {
 
 function StepsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 6h12M4 10h12M4 14h7" />
       <circle cx="16" cy="14" r="2" />
     </svg>
@@ -35,7 +65,17 @@ function StepsIcon() {
 
 function SwordIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
       <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
     </svg>
@@ -95,7 +135,11 @@ export function TrainingScreen() {
               <span className="training-card-title">{t(mission.titleKey)}</span>
               <span className="training-card-desc">{t(mission.descriptionKey)}</span>
               <span className="training-card-footer">
-                {completed ? <span className="training-done-mark">{t("training.completed")}</span> : <span className="training-start">{t("training.start")} →</span>}
+                {completed ? (
+                  <span className="training-done-mark">{t("training.completed")}</span>
+                ) : (
+                  <span className="training-start">{t("training.start")} →</span>
+                )}
               </span>
             </button>
           );

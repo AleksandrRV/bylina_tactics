@@ -4,7 +4,12 @@ import { livingOf } from "./outcome.js";
 import { pickEnemyCommand } from "./ai.js";
 import type { TacticsKernel } from "./kernel.js";
 import type { CellPos, Command, EntityState } from "./types.js";
-import type { TrainingEnemyAction, TrainingEnemyCondition, TrainingEnemyScript, TrainingEnemyScriptState } from "./training-ai.js";
+import type {
+  TrainingEnemyAction,
+  TrainingEnemyCondition,
+  TrainingEnemyScript,
+  TrainingEnemyScriptState,
+} from "./training-ai.js";
 import { pickScriptedEnemyCommand } from "./training-ai.js";
 
 /**
@@ -44,11 +49,17 @@ export interface ScriptedDecision {
 }
 
 function livingByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, configId: string): EntityState | undefined {
-  return snap.entities.find((entity) => entity.configId === configId && !entity.dead && entity.ap > 0)
-    ?? snap.entities.find((entity) => entity.configId === configId && !entity.dead);
+  return (
+    snap.entities.find((entity) => entity.configId === configId && !entity.dead && entity.ap > 0) ??
+    snap.entities.find((entity) => entity.configId === configId && !entity.dead)
+  );
 }
 
-function deadByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, configId: string, owner: number): EntityState | undefined {
+function deadByConfigId(
+  snap: ReturnType<TacticsKernel["getSnapshot"]>,
+  configId: string,
+  owner: number,
+): EntityState | undefined {
   return snap.entities.find((entity) => entity.configId === configId && entity.dead && entity.owner === owner);
 }
 
@@ -95,7 +106,12 @@ function approachStep(
   return best ? { type: "MOVE", actorId: actor.id, to: best } : null;
 }
 
-type ActionResolution = { command: Command | null; done: boolean; forceOutcome?: "hit" | "miss" | "min"; spawn?: ScriptedDecision["spawn"] };
+type ActionResolution = {
+  command: Command | null;
+  done: boolean;
+  forceOutcome?: "hit" | "miss" | "min";
+  spawn?: ScriptedDecision["spawn"];
+};
 
 function resolveAction(kernel: TacticsKernel, action: PrologueScriptAction): ActionResolution {
   const snap = kernel.getSnapshot();
@@ -116,10 +132,14 @@ function resolveAction(kernel: TacticsKernel, action: PrologueScriptAction): Act
   if (!conditionHolds(kernel, action, actor)) return { command: null, done: true };
 
   if (action.kind === "defend") {
-    return actor.defending ? { command: null, done: true } : { command: { type: "DEFEND", actorId: actor.id }, done: true };
+    return actor.defending
+      ? { command: null, done: true }
+      : { command: { type: "DEFEND", actorId: actor.id }, done: true };
   }
   if (action.kind === "overwatch") {
-    return actor.overwatch ? { command: null, done: true } : { command: { type: "OVERWATCH", actorId: actor.id }, done: true };
+    return actor.overwatch
+      ? { command: null, done: true }
+      : { command: { type: "OVERWATCH", actorId: actor.id }, done: true };
   }
 
   if (action.kind === "resurrect") {
@@ -141,7 +161,11 @@ function resolveAction(kernel: TacticsKernel, action: PrologueScriptAction): Act
     const skillId = action.skillId;
     if (!skillId) return { command: null, done: true };
     if (kernel.getSkillPreview(actor.id, skillId, target.id).available) {
-      return { command: { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id }, done: true, forceOutcome: action.forceOutcome };
+      return {
+        command: { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id },
+        done: true,
+        forceOutcome: action.forceOutcome,
+      };
     }
     return { command: approachStep(kernel, actor, target, true), done: false };
   }

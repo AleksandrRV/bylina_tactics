@@ -204,9 +204,15 @@ describe("directiveAllowsAction and denial keys (0.20.13)", () => {
 
   it("denial keys cover the lock cases", () => {
     const rig = makeRig("movement");
-    const moveView = resolveTrainingDirective(rig.hints.find((h) => h.until === "move")!, refreshDeps(rig))!;
+    const moveView = resolveTrainingDirective(
+      rig.hints.find((h) => h.until === "move")!,
+      refreshDeps(rig),
+    )!;
     expect(trainingDenialKey(moveView, "move")).toBe("training.locked.cell");
-    const endView = resolveTrainingDirective(rig.hints.find((h) => h.until === "end_turn")!, refreshDeps(rig))!;
+    const endView = resolveTrainingDirective(
+      rig.hints.find((h) => h.until === "end_turn")!,
+      refreshDeps(rig),
+    )!;
     expect(trainingDenialKey(endView, "attack")).toBe("training.locked.endTurn");
     expect(trainingDenialKey(null, "attack")).toBe("training.locked.generic");
   });
@@ -243,7 +249,8 @@ describe("content references are consistent (0.20.13)", () => {
         if (hint.actorUnitId) expect(unitIds.has(hint.actorUnitId), `${mission.id} step ${hint.step} actor`).toBe(true);
         if (hint.weaponId) expect(weaponIds.has(hint.weaponId), `${mission.id} step ${hint.step} weapon`).toBe(true);
         if (hint.skillId) expect(skillIds.has(hint.skillId), `${mission.id} step ${hint.step} skill`).toBe(true);
-        if (hint.targetUnitId) expect(unitIds.has(hint.targetUnitId), `${mission.id} step ${hint.step} target`).toBe(true);
+        if (hint.targetUnitId)
+          expect(unitIds.has(hint.targetUnitId), `${mission.id} step ${hint.step} target`).toBe(true);
       }
       const missionEnemies = new Set(mission.enemies.map((e) => e.unitId));
       for (const action of [...(mission.enemyScript?.priority ?? []), ...(mission.enemyScript?.actions ?? [])]) {
@@ -264,7 +271,10 @@ describe("content references are consistent (0.20.13)", () => {
     for (const mission of parsed.data.training.missions) {
       if (mission.enemies.length === 0) continue;
       expect(mission.enemyScript, `${mission.id} enemyScript`).toBeDefined();
-      expect(mission.enemyScript!.actions.some((a) => a.kind === "endTurn"), `${mission.id} endTurn marker`).toBe(true);
+      expect(
+        mission.enemyScript!.actions.some((a) => a.kind === "endTurn"),
+        `${mission.id} endTurn marker`,
+      ).toBe(true);
     }
   });
 

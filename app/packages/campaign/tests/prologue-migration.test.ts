@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { migratePrologueFighters, PROLOGUE_TO_CANONICAL_UNIT, type MigratableFighter } from "../src/prologue-migration.js";
+import {
+  migratePrologueFighters,
+  PROLOGUE_TO_CANONICAL_UNIT,
+  type MigratableFighter,
+} from "../src/prologue-migration.js";
 
 function fighter(unitId: string, overrides?: Partial<MigratableFighter>): MigratableFighter {
   return {
@@ -27,9 +31,7 @@ describe("migratePrologueFighters (0.20.35)", () => {
   });
 
   it("keeps level, hp and wound", () => {
-    const migrated = migratePrologueFighters([
-      fighter("mikula_peasant", { level: 3, hp: 8, wounded: true }),
-    ]);
+    const migrated = migratePrologueFighters([fighter("mikula_peasant", { level: 3, hp: 8, wounded: true })]);
     expect(migrated[0]).toMatchObject({ unitId: "bogatyr", level: 3, hp: 8, wounded: true });
   });
 

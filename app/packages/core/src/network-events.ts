@@ -7,7 +7,12 @@ import type { EntityState, GameEvent, MatchState } from "./types.js";
  * не наблюдает, за исключением случаев, когда результат изменяет уже
  * известную местность (разрушение ранее наблюдавшегося укрытия).
  */
-export function eventsVisibleTo(events: readonly GameEvent[], state: MatchState, fog: FogState, owner: number): GameEvent[] {
+export function eventsVisibleTo(
+  events: readonly GameEvent[],
+  state: MatchState,
+  fog: FogState,
+  owner: number,
+): GameEvent[] {
   const entry = fog[owner];
   if (!entry) return [...events];
 
@@ -18,7 +23,8 @@ export function eventsVisibleTo(events: readonly GameEvent[], state: MatchState,
     return !entity.hidden;
   };
 
-  const cellKnown = (x: number, y: number): boolean => entry.explored.has(`${x},${y}`) || entry.visible.has(`${x},${y}`);
+  const cellKnown = (x: number, y: number): boolean =>
+    entry.explored.has(`${x},${y}`) || entry.visible.has(`${x},${y}`);
 
   const affectedEntities = (event: GameEvent): number[] => {
     switch (event.type) {

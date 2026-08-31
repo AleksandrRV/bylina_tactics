@@ -46,10 +46,7 @@ const SHIELD_BASH: SkillStats = {
   envDmg: 0,
   filter: "enemies",
   cooldownTurns: 1,
-  effects: [
-    { type: "damage", minDmg: 1, maxDmg: 2 },
-    { type: "knockback" },
-  ],
+  effects: [{ type: "damage", minDmg: 1, maxDmg: 2 }, { type: "knockback" }],
 };
 
 function rowOf(rows: { label: string; value: string }[], label: string): string | undefined {

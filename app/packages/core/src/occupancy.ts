@@ -10,23 +10,11 @@ export function isCover(entity: EntityState): boolean {
 }
 
 export function isFoe(walker: EntityState, other: EntityState): boolean {
-  return (
-    other.obstacle &&
-    !other.dead &&
-    !isCover(other) &&
-    other.owner !== 0 &&
-    other.owner !== walker.owner
-  );
+  return other.obstacle && !other.dead && !isCover(other) && other.owner !== 0 && other.owner !== walker.owner;
 }
 
 export function isAlly(walker: EntityState, other: EntityState): boolean {
-  return (
-    other.id !== walker.id &&
-    other.obstacle &&
-    !other.dead &&
-    !isCover(other) &&
-    other.owner === walker.owner
-  );
+  return other.id !== walker.id && other.obstacle && !other.dead && !isCover(other) && other.owner === walker.owner;
 }
 
 /**
@@ -47,10 +35,22 @@ export function edgeCoverBetween(
   // Грань клетки (fx,fy) в направлении движения.
   let fromEdge: number;
   let toEdge: number;
-  if (dx === 1) { fromEdge = 1; toEdge = 3; } // east
-  else if (dx === -1) { fromEdge = 3; toEdge = 1; } // west
-  else if (dy === 1) { fromEdge = 2; toEdge = 0; } // south
-  else if (dy === -1) { fromEdge = 0; toEdge = 2; } // north
+  if (dx === 1) {
+    fromEdge = 1;
+    toEdge = 3;
+  } // east
+  else if (dx === -1) {
+    fromEdge = 3;
+    toEdge = 1;
+  } // west
+  else if (dy === 1) {
+    fromEdge = 2;
+    toEdge = 0;
+  } // south
+  else if (dy === -1) {
+    fromEdge = 0;
+    toEdge = 2;
+  } // north
   else return null;
 
   // Ищем укрытие на грани fromEdge клетки (fx,fy).
@@ -127,13 +127,7 @@ export const DIAGONAL_SURCHARGE = 0.5;
  * Цена пересечения одной грани: 0 — грани нет, 1 — полуукрытие,
  * {@link Number.POSITIVE_INFINITY} — полное укрытие, прохода нет.
  */
-function edgeCoverStepCost(
-  entities: readonly EntityState[],
-  fx: number,
-  fy: number,
-  tx: number,
-  ty: number,
-): number {
+function edgeCoverStepCost(entities: readonly EntityState[], fx: number, fy: number, tx: number, ty: number): number {
   const edgeCover = edgeCoverBetween(entities, fx, fy, tx, ty);
   if (!edgeCover) return 0;
   if (edgeCover.coverType === 2) return Number.POSITIVE_INFINITY;

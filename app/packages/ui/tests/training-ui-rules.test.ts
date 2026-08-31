@@ -1,10 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ENEMY_OWNER, PLAYER_OWNER, matchOutcome, pickScriptedEnemyCommand } from "@bylina/core";
 import { commandFromDirective, makeRig, refreshDeps, runMission, reachableOf } from "./training-sim.js";
-import {
-  resolveTrainingDirective,
-  trainingCommandAllowed,
-} from "../src/training-scenario.js";
+import { resolveTrainingDirective, trainingCommandAllowed } from "../src/training-scenario.js";
 import { shouldAutoEndTurn } from "../src/training-progress.js";
 
 /**
@@ -32,9 +29,7 @@ describe("the scenario gate rejects every non-prescribed action (0.20.13)", () =
         }
         if (d.kind === "attack") {
           // Атака булавой вместо лука/меча по другой цели.
-          const wrongTarget = snap.entities.find(
-            (e) => !e.dead && e.owner === ENEMY_OWNER && e.id !== d.targetId,
-          );
+          const wrongTarget = snap.entities.find((e) => !e.dead && e.owner === ENEMY_OWNER && e.id !== d.targetId);
           return wrongTarget
             ? { type: "ATTACK", actorId: d.actorId, targetId: wrongTarget.id, weaponId: "mace" }
             : null;

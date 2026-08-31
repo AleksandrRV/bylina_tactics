@@ -109,7 +109,14 @@ export {
   orthogonalEdgeCost,
 } from "./occupancy.js";
 export { apCostFor, findPath, listReachable } from "./pathfinding.js";
-export { effectiveCoverTier, evaluateObstacles, hasLineOfSight, supercover, terrainCoverTier, traceRay } from "./los.js";
+export {
+  effectiveCoverTier,
+  evaluateObstacles,
+  hasLineOfSight,
+  supercover,
+  terrainCoverTier,
+  traceRay,
+} from "./los.js";
 export type { IntersectionType, ObstacleResult, TracedCell } from "./los.js";
 export { effectiveRange, heightRangeMod, inMeleeReach, inRangedReach } from "./range.js";
 export { evaluateCover } from "./cover.js";
@@ -119,12 +126,7 @@ export { DEBUG_BOW, DEBUG_SWORD, defaultWeapons } from "./weapons.js";
 export type { WeaponStats } from "./weapons.js";
 export type { SkillEffect, SkillPreview, SkillStats, StatusId } from "./skills.js";
 export { clampChance, createMulberry32 } from "./rng.js";
-export {
-  cellVisibility,
-  computeVisibleCells,
-  createFogState,
-  refreshFog,
-} from "./fog.js";
+export { cellVisibility, computeVisibleCells, createFogState, refreshFog } from "./fog.js";
 export type { CellVisibility, FogOfOwner, FogState } from "./fog.js";
 export type {
   ApplyResult,

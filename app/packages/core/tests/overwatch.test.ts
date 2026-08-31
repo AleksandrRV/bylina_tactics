@@ -6,11 +6,31 @@ import type { EntityState, MatchState } from "../src/types.js";
 
 function unit(id: number, owner: number, x: number, y: number, dir: number): EntityState {
   return {
-    id, configId: `u${id}`, owner, x, y, z: 1, dir, ap: 2, maxAp: 2, mobility: 5,
-    hp: 20, maxHp: 20, aim: 100, defense: 0, vision: 10,
-    weaponId: DEBUG_BOW.id, weaponIds: [DEBUG_BOW.id], skillIds: [],
-    obstacle: true, dead: false, flying: false, hidden: false, coverType: 0,
-    overwatch: false, movementSpent: 0,
+    id,
+    configId: `u${id}`,
+    owner,
+    x,
+    y,
+    z: 1,
+    dir,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 20,
+    maxHp: 20,
+    aim: 100,
+    defense: 0,
+    vision: 10,
+    weaponId: DEBUG_BOW.id,
+    weaponIds: [DEBUG_BOW.id],
+    skillIds: [],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType: 0,
+    overwatch: false,
+    movementSpent: 0,
   };
 }
 
@@ -32,7 +52,13 @@ describe("overwatch (§14)", () => {
     const set = kernel.apply({ type: "OVERWATCH", actorId: watcher.id });
     expect(set.ok).toBe(true);
     if (!set.ok) return;
-    expect(set.events).toContainEqual({ type: "STAT_CHANGED", entityId: watcher.id, stat: "AP", newValue: 0, delta: -1 });
+    expect(set.events).toContainEqual({
+      type: "STAT_CHANGED",
+      entityId: watcher.id,
+      stat: "AP",
+      newValue: 0,
+      delta: -1,
+    });
 
     expect(kernel.apply({ type: "END_TURN", playerId: "1" }).ok).toBe(true);
     const move = kernel.apply({ type: "MOVE", actorId: mover.id, to: { x: 2, y: 1, z: 1 } });
@@ -76,8 +102,19 @@ describe("overwatch (§14)", () => {
     const defended = kernel.apply({ type: "DEFEND", actorId: watcher.id });
     expect(defended.ok).toBe(true);
     if (!defended.ok) return;
-    expect(defended.events).toContainEqual({ type: "STAT_CHANGED", entityId: watcher.id, stat: "AP", newValue: 0, delta: -1 });
-    expect(defended.events).toContainEqual({ type: "STATUS_CHANGED", entityId: watcher.id, status: "DEFENDING", applied: true });
+    expect(defended.events).toContainEqual({
+      type: "STAT_CHANGED",
+      entityId: watcher.id,
+      stat: "AP",
+      newValue: 0,
+      delta: -1,
+    });
+    expect(defended.events).toContainEqual({
+      type: "STATUS_CHANGED",
+      entityId: watcher.id,
+      status: "DEFENDING",
+      applied: true,
+    });
     kernel.apply({ type: "END_TURN", playerId: "1" });
     expect(kernel.getSnapshot().entities.find((entity) => entity.id === watcher.id)?.defending).toBe(true);
     kernel.apply({ type: "END_TURN", playerId: "2" });

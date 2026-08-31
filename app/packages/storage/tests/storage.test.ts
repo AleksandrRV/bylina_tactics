@@ -1,5 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
-import { createReplayStorage, createSaveStorage, deserializeFog, isSaveData, migrateSave, serializeFog, type SaveData } from "../src/index.js";
+import {
+  createReplayStorage,
+  createSaveStorage,
+  deserializeFog,
+  isSaveData,
+  migrateSave,
+  serializeFog,
+  type SaveData,
+} from "../src/index.js";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
 
@@ -31,7 +39,17 @@ function sampleSave(): SaveData {
       shipPosition: { x: 13, y: 64 },
       missions: [{ id: "clearing_1", status: "done" }],
       fighters: [
-        { id: 1, name: "Ратибор", unitId: "bogatyr", level: 3, hp: 10, maxHp: 12, wounded: false, alive: true, equippedItemId: null },
+        {
+          id: 1,
+          name: "Ратибор",
+          unitId: "bogatyr",
+          level: 3,
+          hp: 10,
+          maxHp: 12,
+          wounded: false,
+          alive: true,
+          equippedItemId: null,
+        },
       ],
       deadGenerals: [],
       activeMissionId: null,
@@ -135,7 +153,9 @@ describe("storage quota handling", () => {
     const quotaError = Object.assign(new Error("full"), { name: "QuotaExceededError" });
     const backend = {
       getItem: () => null,
-      setItem: () => { throw quotaError; },
+      setItem: () => {
+        throw quotaError;
+      },
       removeItem: () => undefined,
     };
     const onQuotaExceeded = vi.fn();
@@ -144,7 +164,6 @@ describe("storage quota handling", () => {
     expect(onQuotaExceeded).toHaveBeenCalledWith(quotaError);
   });
 });
-
 
 describe("save format migrations", () => {
   it("upgrades a legacy v1 save without a formatVersion", () => {

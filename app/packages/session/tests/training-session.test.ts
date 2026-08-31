@@ -3,7 +3,18 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseContent } from "@bylina/content";
-import { createMissionMatch, createTacticsKernel, defaultTrainingWeapons, weaponStatsFromRecord, pickEnemyCommand, PLAYER_OWNER, ENEMY_OWNER, livingOf, distH, type WeaponStats } from "@bylina/core";
+import {
+  createMissionMatch,
+  createTacticsKernel,
+  defaultTrainingWeapons,
+  weaponStatsFromRecord,
+  pickEnemyCommand,
+  PLAYER_OWNER,
+  ENEMY_OWNER,
+  livingOf,
+  distH,
+  type WeaponStats,
+} from "@bylina/core";
 import { createSession } from "../src/index.js";
 
 /**
@@ -42,7 +53,13 @@ function startTrainingSession(missionId: string, seed: number) {
   expect(session.get().battleKind).toBe("training");
 
   const kernel = createTacticsKernel({
-    initial: createMissionMatch({ units: parsed.data.units, map: mission.map, playerSlots: mission.playerSlots, enemies: mission.enemies, seed }),
+    initial: createMissionMatch({
+      units: parsed.data.units,
+      map: mission.map,
+      playerSlots: mission.playerSlots,
+      enemies: mission.enemies,
+      seed,
+    }),
     weapons,
     skills: skills as never,
     units: parsed.data.units,
@@ -60,13 +77,20 @@ function playerAct(session: ReturnType<typeof createSession>): void {
     if (fighter.ap <= 0) continue;
     const foes = livingOf(snap, ENEMY_OWNER).filter((e) => !e.hidden);
     if (foes.length > 0) {
-      const target = [...foes].sort((a, b) =>
-        (a.configId === "kikimora" ? 1000 : 0) + distH(fighter.x, fighter.y, a.x, a.y)
-        - ((b.configId === "kikimora" ? 1000 : 0) + distH(fighter.x, fighter.y, b.x, b.y)),
+      const target = [...foes].sort(
+        (a, b) =>
+          (a.configId === "kikimora" ? 1000 : 0) +
+          distH(fighter.x, fighter.y, a.x, a.y) -
+          ((b.configId === "kikimora" ? 1000 : 0) + distH(fighter.x, fighter.y, b.x, b.y)),
       )[0]!;
       const preview = session.getBattleHitPreview(fighter.id, target.id);
       if (preview.available) {
-        const applied = session.applyBattleCommand({ type: "ATTACK", actorId: fighter.id, targetId: target.id, weaponId: fighter.weaponId });
+        const applied = session.applyBattleCommand({
+          type: "ATTACK",
+          actorId: fighter.id,
+          targetId: target.id,
+          weaponId: fighter.weaponId,
+        });
         expect(applied.ok).toBe(true);
         acted = true;
         continue;
@@ -75,7 +99,9 @@ function playerAct(session: ReturnType<typeof createSession>): void {
     const reach = session.getBattleReachable(fighter.id);
     if (reach.length > 0 && foes.length > 0) {
       const foe = foes[0]!;
-      const best = [...reach].sort((a, b) => distH(a.x, a.y, foe.x, foe.y) - distH(b.x, b.y, foe.x, foe.y) || a.mpCost - b.mpCost)[0]!;
+      const best = [...reach].sort(
+        (a, b) => distH(a.x, a.y, foe.x, foe.y) - distH(b.x, b.y, foe.x, foe.y) || a.mpCost - b.mpCost,
+      )[0]!;
       const applied = session.applyBattleCommand({ type: "MOVE", actorId: fighter.id, to: best });
       expect(applied.ok).toBe(true);
       acted = true;

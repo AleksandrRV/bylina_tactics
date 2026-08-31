@@ -26,7 +26,22 @@ function buildWorld() {
   const { units, weapons, pvp } = parsed.data;
   const wStats: Record<string, WeaponStats> = {};
   for (const w of weapons) {
-    wStats[w.id] = { id: w.id, category: w.category, apCost: w.apCost, endsTurn: w.endsTurn, range: w.range, requiresLOS: w.requiresLOS, aimMod: w.aimMod, minDmg: w.minDmg, maxDmg: w.maxDmg, crit: w.crit, critBonus: w.critBonus, envDmg: w.envDmg, ignoreHalfCover: w.ignoreHalfCover, closeRangePenalty: w.closeRangePenalty };
+    wStats[w.id] = {
+      id: w.id,
+      category: w.category,
+      apCost: w.apCost,
+      endsTurn: w.endsTurn,
+      range: w.range,
+      requiresLOS: w.requiresLOS,
+      aimMod: w.aimMod,
+      minDmg: w.minDmg,
+      maxDmg: w.maxDmg,
+      crit: w.crit,
+      critBonus: w.critBonus,
+      envDmg: w.envDmg,
+      ignoreHalfCover: w.ignoreHalfCover,
+      closeRangePenalty: w.closeRangePenalty,
+    };
   }
   return { units, weapons: wStats, pvp };
 }
@@ -95,11 +110,23 @@ describe("QA pvp full match (0.14.0)", () => {
     }
 
     // Ход 1: каждый боец стороны 1 атакует своего визави — вся сторона 2 гибнет.
-    const live1 = host.getSnapshot().entities.filter((e) => e.owner === 1 && e.coverType === 0 && !e.dead).sort((a, b) => a.id - b.id);
-    const live2 = host.getSnapshot().entities.filter((e) => e.owner === 2 && e.coverType === 0 && !e.dead).sort((a, b) => a.id - b.id);
+    const live1 = host
+      .getSnapshot()
+      .entities.filter((e) => e.owner === 1 && e.coverType === 0 && !e.dead)
+      .sort((a, b) => a.id - b.id);
+    const live2 = host
+      .getSnapshot()
+      .entities.filter((e) => e.owner === 2 && e.coverType === 0 && !e.dead)
+      .sort((a, b) => a.id - b.id);
     live1.forEach((attacker, index) => {
       const target = live2[index];
-      if (target) session.sendPvpCommand({ type: "ATTACK", actorId: attacker.id, targetId: target.id, weaponId: attacker.weaponId });
+      if (target)
+        session.sendPvpCommand({
+          type: "ATTACK",
+          actorId: attacker.id,
+          targetId: target.id,
+          weaponId: attacker.weaponId,
+        });
     });
     await new Promise((r) => setTimeout(r, 0));
     expect(host.getSnapshot().entities.filter((e) => e.owner === 2 && e.coverType === 0 && !e.dead)).toHaveLength(0);

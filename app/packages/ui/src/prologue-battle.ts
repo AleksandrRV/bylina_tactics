@@ -35,7 +35,7 @@ export function buildPrologueContext(
   const rat = layout?.markers.F?.[0];
   const profileName = mission.reinforcements;
   const profile = profileName
-    ? content.reinforcements.profiles?.[profileName] ?? content.reinforcements.default
+    ? (content.reinforcements.profiles?.[profileName] ?? content.reinforcements.default)
     : undefined;
   return {
     missionId: mission.id,

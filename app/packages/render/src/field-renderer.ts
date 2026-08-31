@@ -9,7 +9,16 @@ import {
   type ReachableCell,
   type Tile,
 } from "@bylina/core";
-import { Application, Container, Graphics, Rectangle, Text, TilingSprite, Texture, type FederatedPointerEvent } from "pixi.js";
+import {
+  Application,
+  Container,
+  Graphics,
+  Rectangle,
+  Text,
+  TilingSprite,
+  Texture,
+  type FederatedPointerEvent,
+} from "pixi.js";
 import { FRINGE_CELLS, fringeDecor } from "./fringe.js";
 import {
   CAMERA_CELLS_IN_VIEW,
@@ -227,7 +236,7 @@ function easeInOut(t: number): number {
  * но не использует стандартный генератор среды (§1 math: источник случайности
  * тактического слоя — только Mulberry32; средство отображения состояния не меняет).
  */
-let shakeSeed = (Date.now() >>> 0) || 0x9e3779b9;
+let shakeSeed = Date.now() >>> 0 || 0x9e3779b9;
 
 function shakeNoise(): number {
   shakeSeed = (Math.imul(shakeSeed, 1664525) + 1013904223) >>> 0;
@@ -252,11 +261,8 @@ function neighborLevel(tiles: readonly Tile[], x: number, y: number): number | n
 
 /* ---------- токены ---------- */
 
-
 const DRUZHINA: FactionLook = DRUZHINA_LOOK;
 const NAV: FactionLook = NAV_LOOK;
-
-
 
 /** Богатырь: стальной шлем с наносником, алые плечи, щит с коловратом.
  *  Этап 5.3: плечи шире — силуэт различим без увеличения. */
@@ -335,16 +341,26 @@ function drawZnaharka({ g, cx, cy }: TokenCtx): void {
 /** Упырь: чёрный плащ-крыло с алым подбоем, бледное лицо, угольные глаза. */
 function drawUpyr({ g, cx, cy }: TokenCtx): void {
   g.poly([
-    cx - 13, cy + 4,
-    cx - 8, cy + 11,
-    cx - 3, cy + 6.5,
-    cx + 2, cy + 11.5,
-    cx + 8, cy + 6,
-    cx + 13, cy + 10.5,
-    cx + 12, cy - 4,
-    cx + 6, cy - 8,
-    cx - 6, cy - 8,
-    cx - 12, cy - 4,
+    cx - 13,
+    cy + 4,
+    cx - 8,
+    cy + 11,
+    cx - 3,
+    cy + 6.5,
+    cx + 2,
+    cy + 11.5,
+    cx + 8,
+    cy + 6,
+    cx + 13,
+    cy + 10.5,
+    cx + 12,
+    cy - 4,
+    cx + 6,
+    cy - 8,
+    cx - 6,
+    cy - 8,
+    cx - 12,
+    cy - 4,
   ]).fill(0x1c1a20);
   g.poly([cx - 7, cy - 4, cx, cy - 1, cx + 7, cy - 4, cx + 5, cy + 1.5, cx - 5, cy + 1.5]).fill(0x8e2f26);
   g.ellipse(cx, cy - 3.5, 5.4, 6.4).fill(0xd8cfc0);
@@ -412,11 +428,15 @@ function drawVolkhv({ g, cx, cy }: TokenCtx): void {
   g.ellipse(cx, cy + 6, 11, 7).fill(0x264f57);
   g.poly([cx - 9, cy + 5, cx, cy - 12, cx + 9, cy + 5]).fill(0x357681);
   // Этап 5.3: подол и опушка — детализация доведена до уровня остальных.
-  g.moveTo(cx - 9, cy + 5).lineTo(cx + 9, cy + 5).stroke({ width: 1.2, color: 0x1d3a40 });
+  g.moveTo(cx - 9, cy + 5)
+    .lineTo(cx + 9, cy + 5)
+    .stroke({ width: 1.2, color: 0x1d3a40 });
   g.circle(cx, cy - 2, 5).fill(0xd9c9a5);
   g.circle(cx - 2, cy - 2, 1.05).fill(0x9ff3ff);
   g.circle(cx + 2, cy - 2, 1.05).fill(0x9ff3ff);
-  g.moveTo(cx + 8, cy - 7).lineTo(cx + 12, cy + 11).stroke({ width: 2, color: 0x8b6a42 });
+  g.moveTo(cx + 8, cy - 7)
+    .lineTo(cx + 12, cy + 11)
+    .stroke({ width: 2, color: 0x8b6a42 });
   g.circle(cx + 8, cy - 8, 3).stroke({ width: 1.5, color: 0x75e0eb });
   // Орбита посоха: две искры по кругу.
   for (const offset of [0, Math.PI]) {
@@ -435,7 +455,8 @@ function drawForestBeast({ g, cx, cy }: TokenCtx): void {
   g.circle(cx + 6.5, cy - 5, 1.1).fill(0xe9f5a1);
   g.circle(cx - 2, cy + 2, 2.2).fill({ color: 0x526d32, alpha: 0.85 });
   g.circle(cx - 6, cy + 4, 1.8).fill({ color: 0x526d32, alpha: 0.85 });
-  g.moveTo(cx - 10, cy + 1).quadraticCurveTo(cx - 18, cy - 7, cx - 13, cy - 12)
+  g.moveTo(cx - 10, cy + 1)
+    .quadraticCurveTo(cx - 18, cy - 7, cx - 13, cy - 12)
     .stroke({ width: 2.5, color: 0x759a49 });
 }
 
@@ -444,8 +465,12 @@ function drawIllusion({ g, cx, cy }: TokenCtx): void {
   g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).fill({ color: 0x72dce8, alpha: 0.32 });
   g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).stroke(outline);
   // Этап 5.3: внутренние грани и ядро — детализация до уровня остальных.
-  g.moveTo(cx, cy - 13).lineTo(cx, cy + 13).stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
-  g.moveTo(cx - 10, cy + 7).lineTo(cx + 10, cy + 7).stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
+  g.moveTo(cx, cy - 13)
+    .lineTo(cx, cy + 13)
+    .stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
+  g.moveTo(cx - 10, cy + 7)
+    .lineTo(cx + 10, cy + 7)
+    .stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
   g.circle(cx, cy - 2, 4).fill({ color: 0xe8ffff, alpha: 0.6 });
   g.circle(cx - 3.4, cy + 4, 1.1).fill({ color: 0xe8ffff, alpha: 0.5 });
   g.circle(cx + 3.4, cy + 4, 1.1).fill({ color: 0xe8ffff, alpha: 0.5 });
@@ -454,9 +479,13 @@ function drawIllusion({ g, cx, cy }: TokenCtx): void {
 /** Идол Нави: каменная стела с ликом; цель уничтожения (0.13.0). */
 function drawIdol({ g, cx, cy }: TokenCtx): void {
   // Постамент.
-  g.roundRect(cx - 14, cy + 6, 28, 7, 2).fill({ color: 0x4a4a52, alpha: 1 }).stroke({ width: 1, color: 0x2e2e34 });
+  g.roundRect(cx - 14, cy + 6, 28, 7, 2)
+    .fill({ color: 0x4a4a52, alpha: 1 })
+    .stroke({ width: 1, color: 0x2e2e34 });
   // Стела.
-  g.roundRect(cx - 11, cy - 14, 22, 21, 3).fill(0x5d5d66).stroke({ width: 1.2, color: 0x34343b });
+  g.roundRect(cx - 11, cy - 14, 22, 21, 3)
+    .fill(0x5d5d66)
+    .stroke({ width: 1.2, color: 0x34343b });
   // Лик.
   g.circle(cx, cy - 6, 4.5).fill(0x3f3f47);
   g.circle(cx - 1.6, cy - 7, 1.2).fill(0xb8b8c4);
@@ -471,10 +500,14 @@ function drawIdol({ g, cx, cy }: TokenCtx): void {
 /** Княжна: спасаемое лицо; белая фигурка с кокошником и алой накидкой (0.13.0). */
 function drawCaptive({ g, cx, cy }: TokenCtx): void {
   // Кокошник.
-  g.poly([cx - 7, cy - 10, cx + 7, cy - 10, cx + 5, cy - 4, cx - 5, cy - 4]).fill(0xd9b64a).stroke({ width: 0.8, color: 0x8a6f2a });
+  g.poly([cx - 7, cy - 10, cx + 7, cy - 10, cx + 5, cy - 4, cx - 5, cy - 4])
+    .fill(0xd9b64a)
+    .stroke({ width: 0.8, color: 0x8a6f2a });
   g.circle(cx, cy - 11, 3).fill(0xe8d9b0);
   // Платье-колокол.
-  g.poly([cx - 8, cy - 2, cx + 8, cy - 2, cx + 11, cy + 12, cx - 11, cy + 12]).fill(0xb83a3a).stroke({ width: 0.8, color: 0x6e2222 });
+  g.poly([cx - 8, cy - 2, cx + 8, cy - 2, cx + 11, cy + 12, cx - 11, cy + 12])
+    .fill(0xb83a3a)
+    .stroke({ width: 0.8, color: 0x6e2222 });
   // Пояс.
   g.poly([cx - 8, cy - 2, cx + 8, cy - 2, cx + 8, cy + 1, cx - 8, cy + 1]).fill(0xd9b64a);
   // Руки.
@@ -485,13 +518,17 @@ function drawCaptive({ g, cx, cy }: TokenCtx): void {
 /** Баба Яга: ведьма в ступе; полёт, контроль, пороговый уход (0.18.0). */
 function drawBabaYaga({ g, cx, cy }: TokenCtx): void {
   // Ступа (тёмное дерево) с парящим ореолом.
-  g.ellipse(cx, cy + 9, 11, 5).fill(0x3a2a1a).stroke({ width: 1, color: 0x241a10 });
+  g.ellipse(cx, cy + 9, 11, 5)
+    .fill(0x3a2a1a)
+    .stroke({ width: 1, color: 0x241a10 });
   g.ellipse(cx, cy + 6, 7.5, 4).fill(0x241a10);
   // Пламя под ступой.
   g.ellipse(cx, cy + 12, 5, 2.5).fill({ color: 0x7a4a2a, alpha: 0.9 });
   g.ellipse(cx, cy + 13, 3, 1.6).fill({ color: 0xc97a3a, alpha: 0.95 });
   // Ведьма: платок и серый плащ.
-  g.circle(cx, cy - 3, 6).fill(0x8a8f98).stroke({ width: 0.8, color: 0x4a4e55 });
+  g.circle(cx, cy - 3, 6)
+    .fill(0x8a8f98)
+    .stroke({ width: 0.8, color: 0x4a4e55 });
   g.circle(cx, cy - 3.4, 4.4).fill(0xd8cfc0);
   g.poly([cx - 6.5, cy - 2, cx + 6.5, cy - 2, cx + 4.5, cy + 6, cx - 4.5, cy + 6]).fill(0x5a5f68);
   // Платок-узел.
@@ -499,7 +536,9 @@ function drawBabaYaga({ g, cx, cy }: TokenCtx): void {
   // Крючковатый нос.
   g.poly([cx + 3.4, cy - 4.6, cx + 6, cy - 3.2, cx + 3.4, cy - 2.4]).fill(0xd8cfc0);
   // Метла за спиной.
-  g.moveTo(cx + 7, cy + 4).lineTo(cx + 13, cy - 2).stroke({ width: 1.4, color: 0x6b4f2a });
+  g.moveTo(cx + 7, cy + 4)
+    .lineTo(cx + 13, cy - 2)
+    .stroke({ width: 1.4, color: 0x6b4f2a });
   g.poly([cx + 11, cy - 1, cx + 16, cy - 4, cx + 13, cy + 1]).fill(0xa08050);
   // Изумрудное свечение зелья.
   g.circle(cx - 4, cy + 2.4, 1.8).fill({ color: 0x5fd6a8, alpha: 0.9 });
@@ -508,17 +547,25 @@ function drawBabaYaga({ g, cx, cy }: TokenCtx): void {
 /** Соловей-Разбойник: разбойник с луком и свитком (0.18.0). */
 function drawSolovey({ g, cx, cy }: TokenCtx): void {
   // Плащ разбойника.
-  g.poly([cx - 9, cy - 4, cx + 9, cy - 4, cx + 7, cy + 11, cx - 7, cy + 11]).fill(0x4a4a3a).stroke({ width: 0.8, color: 0x2c2c22 });
+  g.poly([cx - 9, cy - 4, cx + 9, cy - 4, cx + 7, cy + 11, cx - 7, cy + 11])
+    .fill(0x4a4a3a)
+    .stroke({ width: 0.8, color: 0x2c2c22 });
   // Голова с шапкой.
   g.circle(cx, cy - 6, 5.5).fill(0xd8c9a8);
   g.poly([cx - 6, cy - 9, cx + 6, cy - 9, cx + 4, cy - 4, cx - 4, cy - 4]).fill(0x8a2a2a);
   // Борода.
   g.poly([cx - 3.4, cy - 3, cx + 3.4, cy - 3, cx, cy + 2.4]).fill(0x6b5b48);
   // Лук в руке.
-  g.moveTo(cx + 8, cy - 2).quadraticCurveTo(cx + 14, cy + 2, cx + 8, cy + 7).stroke({ width: 1.4, color: 0x8a6a3a });
-  g.moveTo(cx + 8, cy - 2).lineTo(cx + 8, cy + 7).stroke({ width: 0.6, color: 0xd8cfc0 });
+  g.moveTo(cx + 8, cy - 2)
+    .quadraticCurveTo(cx + 14, cy + 2, cx + 8, cy + 7)
+    .stroke({ width: 1.4, color: 0x8a6a3a });
+  g.moveTo(cx + 8, cy - 2)
+    .lineTo(cx + 8, cy + 7)
+    .stroke({ width: 0.6, color: 0xd8cfc0 });
   // Свисток у пояса (золотой).
-  g.circle(cx - 2, cy + 7, 2).fill(0xd9b64a).stroke({ width: 0.6, color: 0x8a6f2a });
+  g.circle(cx - 2, cy + 7, 2)
+    .fill(0xd9b64a)
+    .stroke({ width: 0.6, color: 0x8a6f2a });
 }
 
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
@@ -553,7 +600,12 @@ function hexPoints(cx: number, cy: number, r: number): number[] {
 
 /** Деревянная завала-укрытие: полубрус (1) или высокий сруб (2). */
 /** Смещение для граневых укрытий: N=0, E=1, S=2, W=3. */
-const EDGE_OFFSET: [number, number][] = [[0, -14], [14, 0], [0, 14], [-14, 0]];
+const EDGE_OFFSET: [number, number][] = [
+  [0, -14],
+  [14, 0],
+  [0, 14],
+  [-14, 0],
+];
 const C = CELL_SIZE;
 const HALF = C / 2;
 
@@ -575,10 +627,27 @@ function drawEdgeCover(
 
   // Позиция: на грани клетки.
   let bx: number, by: number, bw: number, bh: number;
-  if (edge === 0) { bx = cx - HALF + 2; by = cy - HALF - thick / 2; bw = length; bh = thick; }
-  else if (edge === 2) { bx = cx - HALF + 2; by = cy + HALF - thick / 2; bw = length; bh = thick; }
-  else if (edge === 1) { bx = cx + HALF - thick / 2; by = cy - HALF + 2; bw = thick; bh = length; }
-  else { bx = cx - HALF - thick / 2; by = cy - HALF + 2; bw = thick; bh = length; }
+  if (edge === 0) {
+    bx = cx - HALF + 2;
+    by = cy - HALF - thick / 2;
+    bw = length;
+    bh = thick;
+  } else if (edge === 2) {
+    bx = cx - HALF + 2;
+    by = cy + HALF - thick / 2;
+    bw = length;
+    bh = thick;
+  } else if (edge === 1) {
+    bx = cx + HALF - thick / 2;
+    by = cy - HALF + 2;
+    bw = thick;
+    bh = length;
+  } else {
+    bx = cx - HALF - thick / 2;
+    by = cy - HALF + 2;
+    bw = thick;
+    bh = length;
+  }
 
   if (style === "stone") {
     // Низкая каменная кладка вдоль грани.
@@ -591,10 +660,14 @@ function drawEdgeCover(
     for (let i = 1; i <= seams; i += 1) {
       if (isHorizontal) {
         const sx = bx + (bw * i) / (seams + 1);
-        g.moveTo(sx, by + 1).lineTo(sx, by + bh - 1).stroke({ width: 0.7, color: stoneStroke, alpha: 0.7 });
+        g.moveTo(sx, by + 1)
+          .lineTo(sx, by + bh - 1)
+          .stroke({ width: 0.7, color: stoneStroke, alpha: 0.7 });
       } else {
         const sy = by + (bh * i) / (seams + 1);
-        g.moveTo(bx + 1, sy).lineTo(bx + bw - 1, sy).stroke({ width: 0.7, color: stoneStroke, alpha: 0.7 });
+        g.moveTo(bx + 1, sy)
+          .lineTo(bx + bw - 1, sy)
+          .stroke({ width: 0.7, color: stoneStroke, alpha: 0.7 });
       }
     }
     if (coverType === 1) drawCoverDamage(g, bx + bw / 2, by + bh / 2, bw * 0.8, bh + 2);
@@ -623,12 +696,24 @@ function drawEdgeCover(
   const logStroke = 0x3a2a18;
   for (let i = 0; i < stakeCount; i += 1) {
     let sx: number, sy: number, sw: number, sh: number;
-    if (isHorizontal) { sw = stakeW - 1; sh = thick + 1; sx = bx + i * stakeW + 0.5; sy = by + (edge === 0 ? 0 : -1); }
-    else { sw = thick + 1; sh = stakeW - 1; sx = bx + (edge === 3 ? 0 : -1); sy = by + i * stakeW + 0.5; }
+    if (isHorizontal) {
+      sw = stakeW - 1;
+      sh = thick + 1;
+      sx = bx + i * stakeW + 0.5;
+      sy = by + (edge === 0 ? 0 : -1);
+    } else {
+      sw = thick + 1;
+      sh = stakeW - 1;
+      sx = bx + (edge === 3 ? 0 : -1);
+      sy = by + i * stakeW + 0.5;
+    }
     if (isHorizontal) {
       // Столбик с заострённым верхом (остриё к северу).
       g.poly([sx, sy + sh, sx, sy + 2, sx + sw / 2, sy, sx + sw, sy + 2, sx + sw, sy + sh]).fill(logColor);
-      g.poly([sx, sy + sh, sx, sy + 2, sx + sw / 2, sy, sx + sw, sy + 2, sx + sw, sy + sh]).stroke({ width: 0.7, color: logStroke });
+      g.poly([sx, sy + sh, sx, sy + 2, sx + sw / 2, sy, sx + sw, sy + 2, sx + sw, sy + sh]).stroke({
+        width: 0.7,
+        color: logStroke,
+      });
     } else {
       // Вертикальный столбик: остриё наружу грани (к востоку либо западу).
       const tipRight = edge === 1;
@@ -661,8 +746,10 @@ function drawCoverDamage(g: Graphics, cx: number, cy: number, w: number, h: numb
   }
   // Сколотый угол: тёмный клин в верхнем правом углу.
   const notch = 3 + hashCell(seedX, seedY, 51) * 3;
-  g.poly([cx + w / 2 - notch, cy - h / 2, cx + w / 2, cy - h / 2, cx + w / 2, cy - h / 2 + notch])
-    .fill({ color: 0x241a10, alpha: 0.9 });
+  g.poly([cx + w / 2 - notch, cy - h / 2, cx + w / 2, cy - h / 2, cx + w / 2, cy - h / 2 + notch]).fill({
+    color: 0x241a10,
+    alpha: 0.9,
+  });
 }
 
 function drawCover(
@@ -686,10 +773,42 @@ function drawCover(
     // Каменная глыба: серые грани независимо от яруса защиты.
     const body = coverType === 2 ? 0x6f6a5e : 0x8a857a;
     const stroke = 0x3a3630;
-    g.poly([px - 13, py + 8, px - 11, py - 6, px - 1, py - 11, px + 11, py - 7, px + 13, py + 8, px + 4, py + 10, px - 5, py + 9]).fill(body);
+    g.poly([
+      px - 13,
+      py + 8,
+      px - 11,
+      py - 6,
+      px - 1,
+      py - 11,
+      px + 11,
+      py - 7,
+      px + 13,
+      py + 8,
+      px + 4,
+      py + 10,
+      px - 5,
+      py + 9,
+    ]).fill(body);
     g.poly([px - 11, py - 6, px - 1, py - 11, px + 11, py - 7, px + 3, py - 1]).fill(shade(body, 16));
-    g.poly([px - 13, py + 8, px - 5, py + 9, px + 4, py + 10, px + 13, py + 8, px + 6, py + 2, px - 6, py + 3]).fill(shade(body, -14));
-    g.poly([px - 13, py + 8, px - 11, py - 6, px - 1, py - 11, px + 11, py - 7, px + 13, py + 8, px + 4, py + 10, px - 5, py + 9]).stroke({ width: 1, color: stroke, alpha: 0.85 });
+    g.poly([px - 13, py + 8, px - 5, py + 9, px + 4, py + 10, px + 13, py + 8, px + 6, py + 2, px - 6, py + 3]).fill(
+      shade(body, -14),
+    );
+    g.poly([
+      px - 13,
+      py + 8,
+      px - 11,
+      py - 6,
+      px - 1,
+      py - 11,
+      px + 11,
+      py - 7,
+      px + 13,
+      py + 8,
+      px + 4,
+      py + 10,
+      px - 5,
+      py + 9,
+    ]).stroke({ width: 1, color: stroke, alpha: 0.85 });
     if (coverType === 1) drawCoverDamage(g, px, py, 24, 18);
     return;
   }
@@ -754,10 +873,19 @@ function drawShieldIcon(
   // Позиция: на грани клетки, смещена к центру.
   const inset = 4;
   let sx: number, sy: number;
-  if (edge === 0) { sx = cx; sy = cy - HALF + inset + shieldH / 2; }
-  else if (edge === 2) { sx = cx; sy = cy + HALF - inset - shieldH / 2; }
-  else if (edge === 1) { sx = cx + HALF - inset - shieldW / 2; sy = cy; }
-  else { sx = cx - HALF + inset + shieldW / 2; sy = cy; }
+  if (edge === 0) {
+    sx = cx;
+    sy = cy - HALF + inset + shieldH / 2;
+  } else if (edge === 2) {
+    sx = cx;
+    sy = cy + HALF - inset - shieldH / 2;
+  } else if (edge === 1) {
+    sx = cx + HALF - inset - shieldW / 2;
+    sy = cy;
+  } else {
+    sx = cx - HALF + inset + shieldW / 2;
+    sy = cy;
+  }
 
   const hw = shieldW / 2;
   const hh = shieldH / 2;
@@ -800,8 +928,12 @@ function drawShieldIcon(
   }
 
   // Крест на щите.
-  g.moveTo(sx, top + 2).lineTo(sx, bot - 2).stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
-  g.moveTo(sx - hw + 2, sy - 1).lineTo(sx + hw - 2, sy - 1).stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
+  g.moveTo(sx, top + 2)
+    .lineTo(sx, bot - 2)
+    .stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
+  g.moveTo(sx - hw + 2, sy - 1)
+    .lineTo(sx + hw - 2, sy - 1)
+    .stroke({ width: 0.8, color: 0xffffff, alpha: alpha * 0.5 });
 }
 
 /** Могильная отметина павшего: камешки и череп. */
@@ -826,7 +958,17 @@ type Fx =
   | { kind: "bolt"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; warm: boolean }
   | { kind: "poof"; x: number; y: number; start: number }
   | { kind: "extract"; x: number; y: number; start: number }
-  | { kind: "skill"; x0: number; y0: number; x1: number; y1: number; start: number; dur: number; style: string; success: boolean }
+  | {
+      kind: "skill";
+      x0: number;
+      y0: number;
+      x1: number;
+      y1: number;
+      start: number;
+      dur: number;
+      style: string;
+      success: boolean;
+    }
   | { kind: "status"; x: number; y: number; start: number; status: string; applied: boolean }
   /** Гибель вне ямы (этап 2.4): детерминированные тёмные осколки с псевдогравитацией. */
   | { kind: "shards"; x: number; y: number; start: number; seed: number; palette: "dark" | "wood" }
@@ -978,7 +1120,17 @@ export function createFieldRenderer(): FieldRenderer {
   const fringeLayer = new Graphics();
   // Акцент сцены (0.20.40): пульсирующая подсветка цели кадра.
   const accentLayer = new Graphics();
-  world.addChild(fringeLayer, terrain, fogBaseLayer, fogDriftLayer, fxLayer, accentLayer, glowLayer, labelsLayer, debugLayer);
+  world.addChild(
+    fringeLayer,
+    terrain,
+    fogBaseLayer,
+    fogDriftLayer,
+    fxLayer,
+    accentLayer,
+    glowLayer,
+    labelsLayer,
+    debugLayer,
+  );
   // Атмосфера экрана (0.20.25, этапы 3.6/3.7): живёт в экранных координатах
   // поверх мира — холодный слой Тьмы, виньетка и статичное зерно.
   const atmosphere = new Container();
@@ -1083,9 +1235,9 @@ export function createFieldRenderer(): FieldRenderer {
     // Проверить все 4 грани клетки entity на наличие укрытий.
     const edges: { dx: number; dy: number; edge: 0 | 1 | 2 | 3 }[] = [
       { dx: 0, dy: -1, edge: 0 }, // north
-      { dx: 1, dy: 0, edge: 1 },   // east
-      { dx: 0, dy: 1, edge: 2 },   // south
-      { dx: -1, dy: 0, edge: 3 },  // west
+      { dx: 1, dy: 0, edge: 1 }, // east
+      { dx: 0, dy: 1, edge: 2 }, // south
+      { dx: -1, dy: 0, edge: 3 }, // west
     ];
     for (const { dx, dy, edge } of edges) {
       const nx = entity.x + dx;
@@ -1310,7 +1462,11 @@ export function createFieldRenderer(): FieldRenderer {
     // Этап 3.2: два-три оттенка базовой плитки на ярус — выбор детерминированным
     // хешем координат, поле не «пестрит», но и не выглядит монолитным.
     const shadeVariant = [-11, 0, 11][Math.floor(hashCell(tile.x, tile.y, 2) * 3)] ?? 0;
-    const base = tile.pit ? shade(look.face[0] ?? 0x141a12, -14) : tile.blockLOS ? 0x3c332a : shade(look.face[z] ?? look.face[1], shadeVariant);
+    const base = tile.pit
+      ? shade(look.face[0] ?? 0x141a12, -14)
+      : tile.blockLOS
+        ? 0x3c332a
+        : shade(look.face[z] ?? look.face[1], shadeVariant);
     const fill = tile.pit || tile.blockLOS ? base : shade(base, jitter);
     g.rect(0, 0, C, C).fill(fill);
     if (!tile.pit && !tile.blockLOS) {
@@ -1486,14 +1642,20 @@ export function createFieldRenderer(): FieldRenderer {
       const r = item.size * CELL_SIZE;
       if (item.kind === "canopy") {
         fringeLayer.ellipse(x, y, r * 0.62, r * 0.5).fill({ color: canopy, alpha: item.alpha });
-        fringeLayer.ellipse(x - r * 0.14, y - r * 0.18, r * 0.4, r * 0.3).fill({ color: leaf, alpha: item.alpha * 0.7 });
+        fringeLayer
+          .ellipse(x - r * 0.14, y - r * 0.18, r * 0.4, r * 0.3)
+          .fill({ color: leaf, alpha: item.alpha * 0.7 });
         // Ствол виден только у самой кромки: в глубине лес сливается в тень.
         if (item.alpha > 0.45) {
-          fringeLayer.rect(x - r * 0.05, y + r * 0.24, r * 0.1, r * 0.52).fill({ color: canopy, alpha: item.alpha * 0.8 });
+          fringeLayer
+            .rect(x - r * 0.05, y + r * 0.24, r * 0.1, r * 0.52)
+            .fill({ color: canopy, alpha: item.alpha * 0.8 });
         }
       } else if (item.kind === "bush") {
         fringeLayer.ellipse(x, y, r * 0.58, r * 0.44).fill({ color: canopy, alpha: item.alpha });
-        fringeLayer.ellipse(x + r * 0.24, y + r * 0.08, r * 0.34, r * 0.26).fill({ color: leaf, alpha: item.alpha * 0.8 });
+        fringeLayer
+          .ellipse(x + r * 0.24, y + r * 0.08, r * 0.34, r * 0.26)
+          .fill({ color: leaf, alpha: item.alpha * 0.8 });
       } else {
         // Трава: три штриха — кромка поля не кончается обрывом.
         for (let i = -1; i <= 1; i += 1) {
@@ -1646,11 +1808,21 @@ export function createFieldRenderer(): FieldRenderer {
     // индикаторы не наслаиваются в кашу: показываются не более трёх — по
     // приоритету (боевые помехи важнее пассивных маскировок), каждому отведён
     // свой фиксированный радиус орбиты.
-    const camouflaged = Boolean(entity.camouflageMinCover && view?.snapshot.entities.some((other) =>
-      !other.dead && other.owner === entity.owner && other.id !== entity.id && other.providesCamouflage &&
-      Math.max(Math.abs(other.x - entity.x), Math.abs(other.y - entity.y)) <= 1
-    ));
-    const statusStack: Array<{ key: "panic" | "poison" | "immobile" | "timed" | "hidden" | "camouflage"; priority: number }> = [];
+    const camouflaged = Boolean(
+      entity.camouflageMinCover &&
+      view?.snapshot.entities.some(
+        (other) =>
+          !other.dead &&
+          other.owner === entity.owner &&
+          other.id !== entity.id &&
+          other.providesCamouflage &&
+          Math.max(Math.abs(other.x - entity.x), Math.abs(other.y - entity.y)) <= 1,
+      ),
+    );
+    const statusStack: Array<{
+      key: "panic" | "poison" | "immobile" | "timed" | "hidden" | "camouflage";
+      priority: number;
+    }> = [];
     if (entity.panic) statusStack.push({ key: "panic", priority: 0 });
     if (entity.poison) statusStack.push({ key: "poison", priority: 1 });
     if (entity.immobileTurns) statusStack.push({ key: "immobile", priority: 2 });
@@ -1673,10 +1845,14 @@ export function createFieldRenderer(): FieldRenderer {
         for (let i = 0; i < 4; i += 1) {
           const angle = statusTime + (i * Math.PI * 2) / 4;
           const radius = orbit + Math.sin(statusTime * 1.7 + i) * 2;
-          g.circle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius - 2, 2.2 + (i % 2) * 0.7)
-            .fill({ color: 0x78d83d, alpha: 0.8 });
-          g.circle(cx + Math.cos(angle) * radius - 0.6, cy + Math.sin(angle) * radius - 2.8, 0.8)
-            .fill({ color: 0xd7ff8a, alpha: 0.9 });
+          g.circle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius - 2, 2.2 + (i % 2) * 0.7).fill({
+            color: 0x78d83d,
+            alpha: 0.8,
+          });
+          g.circle(cx + Math.cos(angle) * radius - 0.6, cy + Math.sin(angle) * radius - 2.8, 0.8).fill({
+            color: 0xd7ff8a,
+            alpha: 0.9,
+          });
         }
       } else if (entry.key === "immobile") {
         const reach = orbit / 24;
@@ -1685,7 +1861,12 @@ export function createFieldRenderer(): FieldRenderer {
           const x0 = cx + Math.cos(angle) * 10;
           const y0 = cy + Math.sin(angle) * 8 + 9;
           g.moveTo(x0, y0)
-            .quadraticCurveTo(cx + Math.cos(angle + 0.5) * 19 * reach, cy + 14, cx + Math.cos(angle) * 24 * reach, cy + 12)
+            .quadraticCurveTo(
+              cx + Math.cos(angle + 0.5) * 19 * reach,
+              cy + 14,
+              cx + Math.cos(angle) * 24 * reach,
+              cy + 12,
+            )
             .stroke({ width: 2, color: 0x6f8f3d, alpha: 0.9 });
         }
       } else if (entry.key === "timed") {
@@ -1699,16 +1880,20 @@ export function createFieldRenderer(): FieldRenderer {
       } else {
         for (let i = 0; i < 3; i += 1) {
           const angle = statusTime * 0.5 + (i * Math.PI * 2) / 3;
-          g.ellipse(cx + Math.cos(angle) * orbit * 0.85, cy + Math.sin(angle) * orbit * 0.55, 3.6, 1.9)
-            .fill({ color: 0x7fb84d, alpha: 0.75 });
+          g.ellipse(cx + Math.cos(angle) * orbit * 0.85, cy + Math.sin(angle) * orbit * 0.55, 3.6, 1.9).fill({
+            color: 0x7fb84d,
+            alpha: 0.75,
+          });
         }
       }
     }
     if (entity.flying) {
       const wing = 7 + Math.sin(statusTime * 2) * 3;
-      g.moveTo(cx - 13, cy - 2).quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2)
+      g.moveTo(cx - 13, cy - 2)
+        .quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2)
         .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
-      g.moveTo(cx + 13, cy - 2).quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2)
+      g.moveTo(cx + 13, cy - 2)
+        .quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2)
         .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
     }
 
@@ -1736,8 +1921,7 @@ export function createFieldRenderer(): FieldRenderer {
       // Кольцо цели прицеливания (этап 1.4): светло-зелёное прежде сливалось
       // с зелёными кольцами Нави. Теперь цвет дублирует состояние атаки.
       const aimState = view.aimState ?? (view.aimOk ? "ready" : "blocked");
-      const aimRing =
-        aimState === "ready" ? AIM_READY : aimState === "blocked" ? AIM_IMPOSSIBLE : AIM_PRESELECT;
+      const aimRing = aimState === "ready" ? AIM_READY : aimState === "blocked" ? AIM_IMPOSSIBLE : AIM_PRESELECT;
       g.circle(cx, cy, 22).stroke({ width: 2.4, color: aimRing });
     }
 
@@ -1767,8 +1951,12 @@ export function createFieldRenderer(): FieldRenderer {
       const sy = cy - 18;
       g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
       g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
-      g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
-      g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
+      g.moveTo(sx, sy - 3)
+        .lineTo(sx, sy + 3)
+        .stroke({ width: 1.4, color: 0xf3ecdc });
+      g.moveTo(sx - 2.5, sy)
+        .lineTo(sx + 2.5, sy)
+        .stroke({ width: 1.4, color: 0xf3ecdc });
     }
 
     // Дозор: глаз-индикатор.
@@ -1822,9 +2010,12 @@ export function createFieldRenderer(): FieldRenderer {
         const nlen = Math.max(1, Math.hypot(nx, ny));
         const width = 5.2 * (1 - t * 0.55);
         g.poly([
-          bx, by,
-          tailX + (nx / nlen) * width, tailY + (ny / nlen) * width,
-          tailX - (nx / nlen) * width, tailY - (ny / nlen) * width,
+          bx,
+          by,
+          tailX + (nx / nlen) * width,
+          tailY + (ny / nlen) * width,
+          tailX - (nx / nlen) * width,
+          tailY - (ny / nlen) * width,
         ]).fill({ color, alpha: 0.28 * (1 - t * 0.4) });
         for (let trail = 1; trail <= 3; trail += 1) {
           const tt = Math.max(0, e - trail * 0.03);
@@ -1894,7 +2085,8 @@ export function createFieldRenderer(): FieldRenderer {
             g.rect(sx - 1, sy - 4, 2, 8).fill({ color: secondary, alpha: 1 - t });
             g.rect(sx - 4, sy - 1, 8, 2).fill({ color: secondary, alpha: 1 - t });
           } else if (fx.style === "roots") {
-            g.moveTo(fx.x1, fx.y1 + 8).quadraticCurveTo(sx, sy, fx.x1 + Math.cos(angle) * 24, fx.y1 + 14)
+            g.moveTo(fx.x1, fx.y1 + 8)
+              .quadraticCurveTo(sx, sy, fx.x1 + Math.cos(angle) * 24, fx.y1 + 14)
               .stroke({ width: 2, color: p % 2 ? primary : secondary, alpha: 1 - t * 0.7 });
           } else {
             g.circle(sx, sy, 1.5 + (p % 3) * 0.6).fill({ color: p % 2 ? primary : secondary, alpha: 1 - t });
@@ -1902,8 +2094,12 @@ export function createFieldRenderer(): FieldRenderer {
         }
         if (fx.style === "aimed_eye") {
           g.circle(fx.x1, fx.y1, 14 + t * 5).stroke({ width: 1.5, color: secondary, alpha: 1 - t });
-          g.moveTo(fx.x1 - 21, fx.y1).lineTo(fx.x1 + 21, fx.y1).stroke({ width: 1, color: primary, alpha: 1 - t });
-          g.moveTo(fx.x1, fx.y1 - 21).lineTo(fx.x1, fx.y1 + 21).stroke({ width: 1, color: primary, alpha: 1 - t });
+          g.moveTo(fx.x1 - 21, fx.y1)
+            .lineTo(fx.x1 + 21, fx.y1)
+            .stroke({ width: 1, color: primary, alpha: 1 - t });
+          g.moveTo(fx.x1, fx.y1 - 21)
+            .lineTo(fx.x1, fx.y1 + 21)
+            .stroke({ width: 1, color: primary, alpha: 1 - t });
         }
         if (fx.style === "whistle") {
           // «Свист» Соловья: расходящиеся звуковые кольца от источника к цели.
@@ -1915,8 +2111,10 @@ export function createFieldRenderer(): FieldRenderer {
           for (let p = 0; p < 4; p += 1) {
             const noteAngle = (p / 4) * Math.PI * 2 + t * 5;
             const noteR = 6 + t * 20;
-            g.circle(px + Math.cos(noteAngle) * noteR, py + Math.sin(noteAngle) * noteR * 0.7, 1.6)
-              .fill({ color: 0xffe0b0, alpha: 1 - t });
+            g.circle(px + Math.cos(noteAngle) * noteR, py + Math.sin(noteAngle) * noteR * 0.7, 1.6).fill({
+              color: 0xffe0b0,
+              alpha: 1 - t,
+            });
           }
         }
       } else if (fx.kind === "status") {
@@ -1926,8 +2124,14 @@ export function createFieldRenderer(): FieldRenderer {
           continue;
         }
         const colors: Record<string, number> = {
-          POISON: 0x78d83d, PANIC: 0xb94cff, IMMOBILE: 0x709343, HIDDEN: 0x78c9b2,
-          FLYING: 0x9edfff, TIMED: 0x5fd6e8, DEFENDING: 0x68aee8, OVERWATCH: 0xe8b64c,
+          POISON: 0x78d83d,
+          PANIC: 0xb94cff,
+          IMMOBILE: 0x709343,
+          HIDDEN: 0x78c9b2,
+          FLYING: 0x9edfff,
+          TIMED: 0x5fd6e8,
+          DEFENDING: 0x68aee8,
+          OVERWATCH: 0xe8b64c,
         };
         const color = colors[fx.status] ?? 0xf3ecdc;
         const radius = 12 + t * 20;
@@ -1935,8 +2139,10 @@ export function createFieldRenderer(): FieldRenderer {
         for (let p = 0; p < 8; p += 1) {
           const angle = (p / 8) * Math.PI * 2;
           const direction = fx.applied ? 1 : -1;
-          g.circle(fx.x + Math.cos(angle) * radius, fx.y + Math.sin(angle) * radius, 2)
-            .fill({ color, alpha: (1 - t) * 0.8 * direction * direction });
+          g.circle(fx.x + Math.cos(angle) * radius, fx.y + Math.sin(angle) * radius, 2).fill({
+            color,
+            alpha: (1 - t) * 0.8 * direction * direction,
+          });
         }
       } else if (fx.kind === "poof") {
         const t = (now - fx.start) / 430;
@@ -1958,10 +2164,16 @@ export function createFieldRenderer(): FieldRenderer {
         for (let p = 0; p < 5; p += 1) {
           const phase = (p / 5 + t * 0.7) % 1;
           const sway = Math.sin(phase * Math.PI * 4 + p * 2.1) * 4;
-          g.circle(fx.x + sway, fx.y - 8 - phase * 34, 1.8 * (1 - phase) + 0.6)
-            .fill({ color: 0xf2dd9a, alpha: 0.9 * (1 - phase) });
+          g.circle(fx.x + sway, fx.y - 8 - phase * 34, 1.8 * (1 - phase) + 0.6).fill({
+            color: 0xf2dd9a,
+            alpha: 0.9 * (1 - phase),
+          });
         }
-        g.circle(fx.x, fx.y - rise * 0.4, 9 * (1 - t * 0.6)).stroke({ width: 1.6, color: 0xe8c96a, alpha: 0.8 * (1 - t) });
+        g.circle(fx.x, fx.y - rise * 0.4, 9 * (1 - t * 0.6)).stroke({
+          width: 1.6,
+          color: 0xe8c96a,
+          alpha: 0.8 * (1 - t),
+        });
       } else if (fx.kind === "shards") {
         // Этап 2.4: разлёт детерминированных осколков (треугольники и квадратики)
         // с псевдогравитацией, затуханием; палитра «wood» — щепки укрытий (2.9).
@@ -1981,14 +2193,7 @@ export function createFieldRenderer(): FieldRenderer {
           const py = fx.y + Math.sin(angle) * speed * t * 0.6 - (16 + hC * 14) * t + 44 * t * t;
           const size = 2.2 + hC * 2.6;
           const alpha = Math.max(0, 1 - t);
-          const color =
-            fx.palette === "wood"
-              ? hB > 0.5
-                ? 0xa08050
-                : 0x6b4f2a
-              : hB > 0.5
-                ? 0x2c2c28
-                : 0x3f3f38;
+          const color = fx.palette === "wood" ? (hB > 0.5 ? 0xa08050 : 0x6b4f2a) : hB > 0.5 ? 0x2c2c28 : 0x3f3f38;
           if (hB > 0.33) {
             g.roundRect(px - size / 2, py - size / 2, size, size, size * 0.3).fill({ color, alpha });
           } else {
@@ -2044,34 +2249,46 @@ export function createFieldRenderer(): FieldRenderer {
 
         // Двойной контур и мягкая пульсация отделяют область умения от
         // синей достижимости и жёлтого маршрута перемещения.
-        g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4)
-          .fill({ color: areaColor, alpha: 0.12 + pulse * 0.06 });
-        g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6)
-          .stroke({ width: 2.2, color: areaColor, alpha: 0.72 + pulse * 0.18 });
-        g.rect(fx + 7, fy + 7, CELL_SIZE - 14, CELL_SIZE - 14)
-          .stroke({ width: 0.9, color: 0xffd18a, alpha: 0.3 + pulse * 0.18 });
+        g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: areaColor, alpha: 0.12 + pulse * 0.06 });
+        g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6).stroke({
+          width: 2.2,
+          color: areaColor,
+          alpha: 0.72 + pulse * 0.18,
+        });
+        g.rect(fx + 7, fy + 7, CELL_SIZE - 14, CELL_SIZE - 14).stroke({
+          width: 0.9,
+          color: 0xffd18a,
+          alpha: 0.3 + pulse * 0.18,
+        });
 
-        const ally = caster && view.snapshot.entities.find(
-          (candidate) =>
-            !candidate.dead &&
-            candidate.coverType === 0 &&
-            candidate.id !== caster.id &&
-            candidate.owner === caster.owner &&
-            candidate.x === cell.x &&
-            candidate.y === cell.y,
-        );
+        const ally =
+          caster &&
+          view.snapshot.entities.find(
+            (candidate) =>
+              !candidate.dead &&
+              candidate.coverType === 0 &&
+              candidate.id !== caster.id &&
+              candidate.owner === caster.owner &&
+              candidate.x === cell.x &&
+              candidate.y === cell.y,
+          );
         if (warnFriendly && ally) {
           // Союзник действительно входит в область all: алый щит и крест
           // заметно предупреждают игрока, не меняя список целей ядра.
           g.rect(fx + 4, fy + 4, CELL_SIZE - 8, CELL_SIZE - 8)
             .fill({ color: AIM_IMPOSSIBLE, alpha: 0.1 + pulse * 0.06 })
             .stroke({ width: 2.8, color: AIM_IMPOSSIBLE, alpha: 0.86 + pulse * 0.12 });
-          g.moveTo(fx + 8, fy + 8).lineTo(fx + CELL_SIZE - 8, fy + CELL_SIZE - 8)
+          g.moveTo(fx + 8, fy + 8)
+            .lineTo(fx + CELL_SIZE - 8, fy + CELL_SIZE - 8)
             .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
-          g.moveTo(fx + CELL_SIZE - 8, fy + 8).lineTo(fx + 8, fy + CELL_SIZE - 8)
+          g.moveTo(fx + CELL_SIZE - 8, fy + 8)
+            .lineTo(fx + 8, fy + CELL_SIZE - 8)
             .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
-          g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 8)
-            .stroke({ width: 1.2, color: 0xffb3a8, alpha: 0.65 + pulse * 0.2 });
+          g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 8).stroke({
+            width: 1.2,
+            color: 0xffb3a8,
+            alpha: 0.65 + pulse * 0.2,
+          });
         }
       }
     }
@@ -2100,20 +2317,29 @@ export function createFieldRenderer(): FieldRenderer {
       if (!tile.extract) continue;
       const z = visualLevel(tile);
       const { fx, fy } = faceOf(tile.x, tile.y, z);
-      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: EXTRACT_GLOW, alpha: 0.08 + extractPulse * 0.07 });
-      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({ width: 1.4, color: EXTRACT_GLOW, alpha: 0.3 + extractPulse * 0.35 });
+      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({
+        color: EXTRACT_GLOW,
+        alpha: 0.08 + extractPulse * 0.07,
+      });
+      g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({
+        width: 1.4,
+        color: EXTRACT_GLOW,
+        alpha: 0.3 + extractPulse * 0.35,
+      });
       // Стрелка выхода по центру клетки.
-      g.poly([
-        fx + CELL_SIZE / 2, fy + 5,
-        fx + CELL_SIZE / 2 + 4, fy + 11,
-        fx + CELL_SIZE / 2 - 4, fy + 11,
-      ]).fill({ color: EXTRACT_SPARK, alpha: 0.5 + extractPulse * 0.3 });
+      g.poly([fx + CELL_SIZE / 2, fy + 5, fx + CELL_SIZE / 2 + 4, fy + 11, fx + CELL_SIZE / 2 - 4, fy + 11]).fill({
+        color: EXTRACT_SPARK,
+        alpha: 0.5 + extractPulse * 0.3,
+      });
       // Этап 3.8: «портальный» контур — арка над клеткой зоны; назначение
       // зоны считывается мгновенно даже новичком.
       const postH = 15;
       const archTop = fy - 13;
       g.roundRect(fx + 4, fy - postH + 8, 3, postH, 1.5).fill({ color: EXTRACT_GLOW, alpha: 0.5 + extractPulse * 0.3 });
-      g.roundRect(fx + CELL_SIZE - 7, fy - postH + 8, 3, postH, 1.5).fill({ color: EXTRACT_GLOW, alpha: 0.5 + extractPulse * 0.3 });
+      g.roundRect(fx + CELL_SIZE - 7, fy - postH + 8, 3, postH, 1.5).fill({
+        color: EXTRACT_GLOW,
+        alpha: 0.5 + extractPulse * 0.3,
+      });
       g.moveTo(fx + 5.5, archTop + 12)
         .quadraticCurveTo(fx + CELL_SIZE / 2, archTop - 5, fx + CELL_SIZE - 5.5, archTop + 12)
         .stroke({ width: 2.2, color: EXTRACT_SPARK, alpha: 0.45 + extractPulse * 0.35 });
@@ -2142,7 +2368,9 @@ export function createFieldRenderer(): FieldRenderer {
     // Молодильное яблоко (0.16.0): пульсирующая фишка в клетке предмета.
     const apple = view.snapshot.apple;
     if (apple) {
-      const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === apple.pos.x && candidate.y === apple.pos.y);
+      const tile = view.snapshot.grid.tiles.find(
+        (candidate) => candidate.x === apple.pos.x && candidate.y === apple.pos.y,
+      );
       if (tile) {
         const z = visualLevel(tile);
         const { fx, fy } = faceOf(tile.x, tile.y, z);
@@ -2154,12 +2382,18 @@ export function createFieldRenderer(): FieldRenderer {
         // Тень.
         g.ellipse(cx, cy + 7, 5, 2).fill({ color: 0x000000, alpha: 0.35 });
         // Яблоко.
-        g.circle(cx, cy, 5.5 + pulse * 0.5).fill(0xd94a3a).stroke({ width: 1, color: 0x8a2a1e });
+        g.circle(cx, cy, 5.5 + pulse * 0.5)
+          .fill(0xd94a3a)
+          .stroke({ width: 1, color: 0x8a2a1e });
         // Блик.
         g.circle(cx - 1.6, cy - 1.8, 1.6).fill({ color: 0xffe8c9, alpha: 0.85 });
         // Листик и веточка.
-        g.moveTo(cx, cy - 5.5).lineTo(cx + 0.6, cy - 8).stroke({ width: 1, color: 0x6b4f2a });
-        g.ellipse(cx + 3.4, cy - 8, 2.6, 1.4).fill(0x7fb84d).stroke({ width: 0.6, color: 0x4a7a2e });
+        g.moveTo(cx, cy - 5.5)
+          .lineTo(cx + 0.6, cy - 8)
+          .stroke({ width: 1, color: 0x6b4f2a });
+        g.ellipse(cx + 3.4, cy - 8, 2.6, 1.4)
+          .fill(0x7fb84d)
+          .stroke({ width: 0.6, color: 0x4a7a2e });
       }
     }
 
@@ -2180,7 +2414,9 @@ export function createFieldRenderer(): FieldRenderer {
       let breakRatio = 1; // 1 = нет разрыва
       if (view.aimBreakCell) {
         // Точка препятствия: центр клетки breakCell, спроецированный на прямую A→Ц.
-        const breakTile = view.snapshot.grid.tiles.find((t) => t.x === view!.aimBreakCell!.x && t.y === view!.aimBreakCell!.y);
+        const breakTile = view.snapshot.grid.tiles.find(
+          (t) => t.x === view!.aimBreakCell!.x && t.y === view!.aimBreakCell!.y,
+        );
         const breakZ = visualLevel(breakTile ?? ({ pit: false, z: 0 } as Tile));
         const bc = centerOf(view.aimBreakCell.x, view.aimBreakCell.y, breakZ);
         // Проекция breakCell центра на прямую A→Ц.
@@ -2286,7 +2522,9 @@ export function createFieldRenderer(): FieldRenderer {
       const hx = view.hoverCell.x;
       const hy = view.hoverCell.y;
       const hoverEntity: EntityState = {
-        x: hx, y: hy, z: view.hoverCell.z,
+        x: hx,
+        y: hy,
+        z: view.hoverCell.z,
       } as EntityState;
       drawProtectionHighlights(g, hoverEntity, view, 0.35);
     }
@@ -2321,11 +2559,17 @@ export function createFieldRenderer(): FieldRenderer {
         alpha: number,
       ): void => {
         if (inside.x0 >= inside.x1 || inside.y0 >= inside.y1) {
-          g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, outside.y1 - outside.y0).fill({ color: dimColor, alpha });
+          g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, outside.y1 - outside.y0).fill({
+            color: dimColor,
+            alpha,
+          });
           return;
         }
         // Верхняя и нижняя полосы, затем левая и правая.
-        g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, inside.y0 - outside.y0).fill({ color: dimColor, alpha });
+        g.rect(outside.x0, outside.y0, outside.x1 - outside.x0, inside.y0 - outside.y0).fill({
+          color: dimColor,
+          alpha,
+        });
         g.rect(outside.x0, inside.y1, outside.x1 - outside.x0, outside.y1 - inside.y1).fill({ color: dimColor, alpha });
         g.rect(outside.x0, inside.y0, inside.x0 - outside.x0, inside.y1 - inside.y0).fill({ color: dimColor, alpha });
         g.rect(inside.x1, inside.y0, outside.x1 - inside.x1, inside.y1 - inside.y0).fill({ color: dimColor, alpha });
@@ -2344,14 +2588,33 @@ export function createFieldRenderer(): FieldRenderer {
           });
           const m2 = 16;
           const m1 = 8;
-          const hole2 = clamp({ x0: cellRect.fx - m2, y0: cellRect.fy - m2, x1: cellRect.fx + CELL_SIZE + m2, y1: cellRect.fy + CELL_SIZE + m2 });
-          const hole1 = clamp({ x0: cellRect.fx - m1, y0: cellRect.fy - m1, x1: cellRect.fx + CELL_SIZE + m1, y1: cellRect.fy + CELL_SIZE + m1 });
-          const hole = clamp({ x0: cellRect.fx - 2, y0: cellRect.fy - 2, x1: cellRect.fx + CELL_SIZE + 2, y1: cellRect.fy + CELL_SIZE + 2 });
+          const hole2 = clamp({
+            x0: cellRect.fx - m2,
+            y0: cellRect.fy - m2,
+            x1: cellRect.fx + CELL_SIZE + m2,
+            y1: cellRect.fy + CELL_SIZE + m2,
+          });
+          const hole1 = clamp({
+            x0: cellRect.fx - m1,
+            y0: cellRect.fy - m1,
+            x1: cellRect.fx + CELL_SIZE + m1,
+            y1: cellRect.fy + CELL_SIZE + m1,
+          });
+          const hole = clamp({
+            x0: cellRect.fx - 2,
+            y0: cellRect.fy - 2,
+            x1: cellRect.fx + CELL_SIZE + 2,
+            y1: cellRect.fy + CELL_SIZE + 2,
+          });
           frameRects(outer, hole2, (0.5 * pulseDim + 0.14) * dimScale);
           frameRects(hole2, hole1, (0.28 * pulseDim + 0.06) * dimScale);
           frameRects(hole1, hole, 0.12 * pulseDim * dimScale);
         } else {
-          frameRects(outer, { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 }, (0.38 * pulseDim + 0.06) * dimScale);
+          frameRects(
+            outer,
+            { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 },
+            (0.38 * pulseDim + 0.06) * dimScale,
+          );
         }
       }
 
@@ -2373,7 +2636,10 @@ export function createFieldRenderer(): FieldRenderer {
         const arm = 9;
         const cw = 2.6;
         const corner = (cx: number, cy: number, dx: number, dy: number): void => {
-          g.moveTo(cx + dx * arm, cy).lineTo(cx, cy).lineTo(cx, cy + dy * arm).stroke({ width: cw, color: 0xf4feff, alpha: 0.85 });
+          g.moveTo(cx + dx * arm, cy)
+            .lineTo(cx, cy)
+            .lineTo(cx, cy + dy * arm)
+            .stroke({ width: cw, color: 0xf4feff, alpha: 0.85 });
         };
         corner(fx + inset, fy + inset, 1, 1);
         corner(fx + C - inset, fy + inset, -1, 1);
@@ -2411,7 +2677,9 @@ export function createFieldRenderer(): FieldRenderer {
         const r = 24 + pulse * 3;
         const arm = 8;
         const bracket = (qx: number, qy: number, sx: number, sy: number): void => {
-          g.moveTo(qx - sx * arm, qy).lineTo(qx, qy).lineTo(qx, qy - sy * arm)
+          g.moveTo(qx - sx * arm, qy)
+            .lineTo(qx, qy)
+            .lineTo(qx, qy - sy * arm)
             .stroke({ width: 2.6, color: 0xd84a3a, alpha: 0.65 + pulse * 0.35 });
         };
         bracket(cx - r, cy - r, -1, -1);
@@ -2419,11 +2687,12 @@ export function createFieldRenderer(): FieldRenderer {
         bracket(cx - r, cy + r, -1, 1);
         bracket(cx + r, cy + r, 1, 1);
         const bob = Math.sin(motionNow * 0.009) * 2;
-        g.poly([cx, cy - r - 10 + bob, cx - 5, cy - r - 19 + bob, cx + 5, cy - r - 19 + bob])
-          .fill({ color: 0xd84a3a, alpha: 0.7 + pulse * 0.3 });
+        g.poly([cx, cy - r - 10 + bob, cx - 5, cy - r - 19 + bob, cx + 5, cy - r - 19 + bob]).fill({
+          color: 0xd84a3a,
+          alpha: 0.7 + pulse * 0.3,
+        });
       }
     }
-
   };
 
   /* ---------- всплывающие числа (0.20.21, этап 2.1) ---------- */
@@ -2515,7 +2784,11 @@ export function createFieldRenderer(): FieldRenderer {
     const maxInset = Math.min(w, h) * 0.22;
     for (let i = steps; i >= 1; i -= 1) {
       const inset = ((i - 1) / steps) * maxInset;
-      g.rect(inset, inset, w - inset * 2, h - inset * 2).stroke({ width: maxInset / steps + 1, color: 0x000000, alpha: 0.028 });
+      g.rect(inset, inset, w - inset * 2, h - inset * 2).stroke({
+        width: maxInset / steps + 1,
+        color: 0x000000,
+        alpha: 0.028,
+      });
     }
     vignetteG.addChild(g);
     // Матовое зерно 3–5% прозрачности, полностью статичное.
@@ -2554,9 +2827,7 @@ export function createFieldRenderer(): FieldRenderer {
     accentLayer
       .circle(point.x, point.y, C * (0.4 + pulse * 0.09))
       .stroke({ width: 1.6 + pulse * 1.8, color: CINEMATIC_ACCENT, alpha: 0.3 + pulse * 0.5 });
-    accentLayer
-      .circle(point.x, point.y, C * 0.3)
-      .stroke({ width: 1.2, color: 0xf3ecdc, alpha: 0.16 + pulse * 0.22 });
+    accentLayer.circle(point.x, point.y, C * 0.3).stroke({ width: 1.2, color: 0xf3ecdc, alpha: 0.16 + pulse * 0.22 });
     // Четыре засечки по сторонам света: взгляд сходится к центру.
     for (let i = 0; i < 4; i += 1) {
       const angle = (Math.PI / 2) * i + Math.PI / 4;
@@ -2604,9 +2875,9 @@ export function createFieldRenderer(): FieldRenderer {
     const tip = pt(13, 0);
     const left = pt(-7, 8);
     const right = pt(-7, -8);
-    edgeArrowG.poly([tip[0], tip[1], left[0], left[1], right[0], right[1]])
-      .fill({ color: 0xe0b34a, alpha: pulse });
-    edgeArrowG.poly([tip[0], tip[1], left[0], left[1], right[0], right[1]])
+    edgeArrowG.poly([tip[0], tip[1], left[0], left[1], right[0], right[1]]).fill({ color: 0xe0b34a, alpha: pulse });
+    edgeArrowG
+      .poly([tip[0], tip[1], left[0], left[1], right[0], right[1]])
       .stroke({ width: 1.5, color: 0xf3ecdc, alpha: 0.7 * pulse + 0.2 });
   };
 
@@ -2624,11 +2895,11 @@ export function createFieldRenderer(): FieldRenderer {
     if (!v.visibleCells) return "off";
     let h = 0x811c9dc5;
     for (const key of v.visibleCells) {
-      for (let i = 0; i < key.length; i += 1) h = (Math.imul(h ^ key.charCodeAt(i), 16777619)) >>> 0;
+      for (let i = 0; i < key.length; i += 1) h = Math.imul(h ^ key.charCodeAt(i), 16777619) >>> 0;
       h = (h + v.visibleCells.size) >>> 0;
     }
     for (const key of v.exploredCells ?? []) {
-      for (let i = 0; i < key.length; i += 1) h = (Math.imul(h ^ (key.charCodeAt(i) * 3), 16777619)) >>> 0;
+      for (let i = 0; i < key.length; i += 1) h = Math.imul(h ^ (key.charCodeAt(i) * 3), 16777619) >>> 0;
     }
     return `${h}`;
   };
@@ -2663,7 +2934,10 @@ export function createFieldRenderer(): FieldRenderer {
         // Полоса перехода: неразведанная клетка рядом с известной территорией
         // светлеет, граница мира не выглядит рваным чёрным зубцом.
         const nearKnown =
-          isKnown(tile.x - 1, tile.y) || isKnown(tile.x + 1, tile.y) || isKnown(tile.x, tile.y - 1) || isKnown(tile.x, tile.y + 1);
+          isKnown(tile.x - 1, tile.y) ||
+          isKnown(tile.x + 1, tile.y) ||
+          isKnown(tile.x, tile.y - 1) ||
+          isKnown(tile.x, tile.y + 1);
         g.rect(fx, fy, C, C).fill({ color: 0x080a0c, alpha: nearKnown ? 0.55 : 0.96 });
       } else {
         g.rect(fx, fy, C, C).fill({ color: 0x0c1218, alpha: 0.6 });
@@ -2809,7 +3083,9 @@ export function createFieldRenderer(): FieldRenderer {
   /** Мировая точка центра клетки-цели указания (клетка либо сущность). */
   const trainingHighlightPoint = (highlight: NonNullable<FieldView["trainingHighlight"]>): Point | null => {
     if (!view) return null;
-    const tile = view.snapshot.grid.tiles.find((candidate) => candidate.x === highlight.x && candidate.y === highlight.y);
+    const tile = view.snapshot.grid.tiles.find(
+      (candidate) => candidate.x === highlight.x && candidate.y === highlight.y,
+    );
     if (!tile) return null;
     const { cx, cy } = centerOf(tile.x, tile.y, visualLevel(tile));
     return { x: cx, y: cy };
@@ -3138,7 +3414,9 @@ export function createFieldRenderer(): FieldRenderer {
       return { point: { x: at.cx, y: at.cy }, entityId: entity.id };
     }
     if (target.cell) {
-      const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === target.cell!.x && candidate.y === target.cell!.y);
+      const tile = view?.snapshot.grid.tiles.find(
+        (candidate) => candidate.x === target.cell!.x && candidate.y === target.cell!.y,
+      );
       const at = centerOf(target.cell.x, target.cell.y, tile ? visualLevel(tile) : 1);
       return { point: { x: at.cx, y: at.cy } };
     }
@@ -3230,9 +3508,7 @@ export function createFieldRenderer(): FieldRenderer {
           // одним шагом, камера ведёт только первого.
           const pack = plan.revealIds?.length ? [...plan.revealIds] : [runner.id];
           const lead = pack.indexOf(runner.id);
-          await Promise.all(
-            pack.map((id, index) => runInEntity(id, step.runInMs!, index === lead && follow)),
-          );
+          await Promise.all(pack.map((id, index) => runInEntity(id, step.runInMs!, index === lead && follow)));
         }
         if (step.holdMs) await waitCinematic(step.holdMs);
         cinematicAccent = null;
@@ -3321,13 +3597,7 @@ export function createFieldRenderer(): FieldRenderer {
       // лёгкое дрожание. Формула ограничена сверху.
       const shakeStrength = miss
         ? 0.8
-        : Math.min(
-            7,
-            1 +
-              event.damageDealt * 0.65 +
-              (crit ? 1.5 : 0) +
-              (event.actionType === "MELEE" ? 1 : 0),
-          );
+        : Math.min(7, 1 + event.damageDealt * 0.65 + (crit ? 1.5 : 0) + (event.actionType === "MELEE" ? 1 : 0));
       if (miss) {
         fxs.push({ kind: "flash", x: to.cx, y: to.cy, start: performance.now(), crit: false, miss: true, angle });
         bumps.set(event.targetId, { dx: Math.cos(angle + Math.PI / 2) * 6, dy: Math.sin(angle + Math.PI / 2) * 6 });
@@ -3363,9 +3633,19 @@ export function createFieldRenderer(): FieldRenderer {
     if (!from) return;
     const target = event.targetId !== undefined ? displayPixel(event.targetId) : null;
     const targetPos = event.targetPos;
-    const to = targetPos ? centerOf(targetPos.x, targetPos.y, targetPos.z) : target ?? from;
+    const to = targetPos ? centerOf(targetPos.x, targetPos.y, targetPos.z) : (target ?? from);
     await focusOn((from.cx + to.cx) / 2, (from.cy + to.cy) / 2);
-    fxs.push({ kind: "skill", x0: from.cx, y0: from.cy, x1: to.cx, y1: to.cy, start: performance.now(), dur: 560, style: event.skillId, success: event.success });
+    fxs.push({
+      kind: "skill",
+      x0: from.cx,
+      y0: from.cy,
+      x1: to.cx,
+      y1: to.cy,
+      start: performance.now(),
+      dur: 560,
+      style: event.skillId,
+      success: event.success,
+    });
     await wait(280);
   };
 
@@ -3377,7 +3657,14 @@ export function createFieldRenderer(): FieldRenderer {
     if (event.type === "STATUS_CHANGED") {
       const at = displayPixel(event.entityId);
       if (at) {
-        fxs.push({ kind: "status", x: at.cx, y: at.cy, start: performance.now(), status: event.status, applied: event.applied });
+        fxs.push({
+          kind: "status",
+          x: at.cx,
+          y: at.cy,
+          start: performance.now(),
+          status: event.status,
+          applied: event.applied,
+        });
         await wait(140);
       }
       return;
@@ -3395,15 +3682,40 @@ export function createFieldRenderer(): FieldRenderer {
     if (event.type === "COVER_DESTROYED") {
       // Этап 2.9: при разрушении укрытия летят деревянные щепки и поле
       // коротко встряхивается.
-      const z = visualLevel(tileAt(view?.snapshot.grid ?? { width: 0, height: 0, tiles: [] }, event.gridPos.x, event.gridPos.y) ?? ({ pit: false, z: 0 } as Tile));
+      const z = visualLevel(
+        tileAt(view?.snapshot.grid ?? { width: 0, height: 0, tiles: [] }, event.gridPos.x, event.gridPos.y) ??
+          ({ pit: false, z: 0 } as Tile),
+      );
       const { cx, cy } = centerOf(event.gridPos.x, event.gridPos.y, z);
-      fxs.push({ kind: "shards", x: cx, y: cy - 4, start: performance.now(), seed: event.gridPos.x * 131 + event.gridPos.y * 7, palette: "wood" });
+      fxs.push({
+        kind: "shards",
+        x: cx,
+        y: cy - 4,
+        start: performance.now(),
+        seed: event.gridPos.x * 131 + event.gridPos.y * 7,
+        palette: "wood",
+      });
       void shake(2.4);
       return;
     }
     if (event.type === "ENTITY_SPAWNED") {
       const at = centerOf(event.entity.x, event.entity.y, event.entity.z);
-      fxs.push({ kind: "skill", x0: at.cx, y0: at.cy, x1: at.cx, y1: at.cy, start: performance.now(), dur: 520, style: event.cause === "ILLUSION" ? "create_illusion" : event.cause === "RESURRECTION" ? "raise_skeleton" : "summon_forest_beast", success: true });
+      fxs.push({
+        kind: "skill",
+        x0: at.cx,
+        y0: at.cy,
+        x1: at.cx,
+        y1: at.cy,
+        start: performance.now(),
+        dur: 520,
+        style:
+          event.cause === "ILLUSION"
+            ? "create_illusion"
+            : event.cause === "RESURRECTION"
+              ? "raise_skeleton"
+              : "summon_forest_beast",
+        success: true,
+      });
       await wait(260);
       return;
     }
@@ -3486,12 +3798,21 @@ export function createFieldRenderer(): FieldRenderer {
         const { cx, cy } = entityPixel(entity);
         // Этапы 2.4/2.5: выразительная гибель — оседание с осколками; в яме —
         // засасывание без осколков. Угасание продлено до ~0.7 секунды.
-        const tile = view?.snapshot.grid.tiles.find((candidate) => candidate.x === entity.x && candidate.y === entity.y);
+        const tile = view?.snapshot.grid.tiles.find(
+          (candidate) => candidate.x === entity.x && candidate.y === entity.y,
+        );
         dying.set(event.entityId, performance.now());
         if (event.causeOfDeath === "FALL_INTO_PIT" || tile?.pit === true) {
           fxs.push({ kind: "pitfall", x: cx, y: cy, start: performance.now() });
         } else {
-          fxs.push({ kind: "shards", x: cx, y: cy, start: performance.now(), seed: event.entityId * 17 + 3, palette: "dark" });
+          fxs.push({
+            kind: "shards",
+            x: cx,
+            y: cy,
+            start: performance.now(),
+            seed: event.entityId * 17 + 3,
+            palette: "dark",
+          });
           void shake(1.8);
         }
         await wait(700);
@@ -3529,7 +3850,14 @@ export function createFieldRenderer(): FieldRenderer {
     // Восстановить истинное состояние после постановки.
     if (view) {
       for (const entity of view.snapshot.entities) {
-        display.set(entity.id, { x: entity.x, y: entity.y, z: entity.z, hp: entity.hp, maxHp: entity.maxHp, dead: entity.dead });
+        display.set(entity.id, {
+          x: entity.x,
+          y: entity.y,
+          z: entity.z,
+          hp: entity.hp,
+          maxHp: entity.maxHp,
+          dead: entity.dead,
+        });
       }
     }
     lunges.clear();
@@ -3625,7 +3953,8 @@ export function createFieldRenderer(): FieldRenderer {
     if (tapKey && tapKey === lastTapKey && tapTime - lastTapTime < 350) {
       lastTapKey = null;
       const occupant = view?.snapshot.entities.find(
-        (candidate) => !candidate.dead && candidate.coverType === 0 && candidate.x === cell!.x && candidate.y === cell!.y,
+        (candidate) =>
+          !candidate.dead && candidate.coverType === 0 && candidate.x === cell!.x && candidate.y === cell!.y,
       );
       if (occupant) {
         centerOnEntityCell(cell!.x, cell!.y);

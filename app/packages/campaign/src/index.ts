@@ -197,13 +197,13 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   const hpOf = (unitId: string): number => options.unitStats?.[unitId]?.maxHealth ?? 6;
   const items = options.items ?? [];
   const missions = config.missions;
-  const initialRoster = config.initialRoster.length > 0
-    ? config.initialRoster
-    : ["bogatyr", "strelets", "znaharka"];
+  const initialRoster = config.initialRoster.length > 0 ? config.initialRoster : ["bogatyr", "strelets", "znaharka"];
   // Восстановление сохранённой кампании (0.13.0): счётчики идентификаторов
   // и имён переносятся из состояния, чтобы новые бойцы не конфликтовали
   // с уже существующими.
-  let nextFighterId = options.initialState ? Math.max(0, ...options.initialState.fighters.map((fighter) => fighter.id)) + 1 : 1;
+  let nextFighterId = options.initialState
+    ? Math.max(0, ...options.initialState.fighters.map((fighter) => fighter.id)) + 1
+    : 1;
   let nameCursor = options.initialState?.fighters.length ?? 0;
   // Имена, занятые живыми бойцами: при восстановлении курсор имён может
   // отстать от уже выданных имён (состав записи меняется от боя к бою),
@@ -301,9 +301,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
   const livingCount = (): number => state.fighters.filter((fighter) => fighter.alive).length;
 
   const canPay = (cost: Resources): boolean =>
-    state.resources.gold >= cost.gold
-    && state.resources.herbs >= cost.herbs
-    && state.resources.artifacts >= cost.artifacts;
+    state.resources.gold >= cost.gold &&
+    state.resources.herbs >= cost.herbs &&
+    state.resources.artifacts >= cost.artifacts;
 
   const pay = (cost: Resources): void => {
     state.resources.gold -= cost.gold;
@@ -338,8 +338,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       const level = unitId === "bogatyr" ? Math.max(2, config.classUnlockLevel) : 1;
       state.fighters.push(makeFighter(unitId, level));
     }
-    const empty =
-      state.resources.gold === 0 && state.resources.herbs === 0 && state.resources.artifacts === 0;
+    const empty = state.resources.gold === 0 && state.resources.herbs === 0 && state.resources.artifacts === 0;
     if (empty) gain(config.startingResources);
     const first = state.missions[0];
     if (first && first.status === "locked") first.status = "open";
@@ -382,7 +381,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       const isPrologue = state.chapter === "prologue";
       const sandbox = !isPrologue;
       const darknessGained = sandbox
-        ? (outcome === "victory" ? mission.darknessOnVictory : mission.darknessOnDefeat)
+        ? outcome === "victory"
+          ? mission.darknessOnVictory
+          : mission.darknessOnDefeat
         : 0;
       if (sandbox) {
         state.darkness = Math.min(state.darknessMax, state.darkness + darknessGained);
@@ -437,11 +438,11 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
       const campaignLost = sandbox && (state.darkness >= state.darknessMax || livingCount() === 0);
       const lostReason = sandbox
-        ? (state.darkness >= state.darknessMax
+        ? state.darkness >= state.darknessMax
           ? "darkness"
           : livingCount() === 0
             ? "roster"
-            : undefined)
+            : undefined
         : undefined;
       state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit };
       if (campaignLost) {

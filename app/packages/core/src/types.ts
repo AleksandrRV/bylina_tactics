@@ -124,9 +124,7 @@ export interface MatchState {
  * Задаётся сценарием миссии в конфигурации кампании и проверяется ядром.
  */
 export type MissionObjective =
-  | { kind: "destroy"; unitId: string }
-  | { kind: "rescue"; unitId: string }
-  | { kind: "recon" };
+  { kind: "destroy"; unitId: string } | { kind: "rescue"; unitId: string } | { kind: "recon" };
 
 export interface ReachableCell extends CellPos {
   mpCost: number;
@@ -162,12 +160,27 @@ export type GameEvent =
       isFlanked: boolean;
       heightMod: -1 | 0 | 1;
     }
-  | { type: "SKILL_RESOLVED"; sourceId: number; skillId: string; targetId?: number; targetPos?: CellPos; success: boolean }
-  | { type: "SKILL_RESOURCE_CHANGED"; entityId: number; skillId: string; cooldown: number; uses: number; usesLeft?: number }
+  | {
+      type: "SKILL_RESOLVED";
+      sourceId: number;
+      skillId: string;
+      targetId?: number;
+      targetPos?: CellPos;
+      success: boolean;
+    }
+  | {
+      type: "SKILL_RESOURCE_CHANGED";
+      entityId: number;
+      skillId: string;
+      cooldown: number;
+      uses: number;
+      usesLeft?: number;
+    }
   | {
       type: "STATUS_CHANGED";
       entityId: number;
-      status: "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED" | "CAMOUFLAGE";
+      status:
+        "POISON" | "PANIC" | "OVERWATCH" | "DEFENDING" | "HIDDEN" | "IMMOBILE" | "FLYING" | "TIMED" | "CAMOUFLAGE";
       applied: boolean;
       duration?: number;
       magnitude?: number;
@@ -180,7 +193,11 @@ export type GameEvent =
   | { type: "OVERWATCH_FIRED"; watcherId: number; triggerId: number; at: CellPos }
   | { type: "REVEALED"; entityId: number; snapshot: EntityState }
   | { type: "OBJECTIVE_CHANGED"; carrierId: number | null; pos: CellPos }
-  | { type: "MATCH_ENDED"; winnerPlayerId: string | null; reason: "ELIMINATION" | "OBJECTIVE" | "SURRENDER" | "CAMPAIGN_RESULT" };
+  | {
+      type: "MATCH_ENDED";
+      winnerPlayerId: string | null;
+      reason: "ELIMINATION" | "OBJECTIVE" | "SURRENDER" | "CAMPAIGN_RESULT";
+    };
 
 export type RejectReason =
   | "ILLEGAL"
@@ -193,6 +210,4 @@ export type RejectReason =
   | "NO_LOS"
   | "OUT_OF_RANGE";
 
-export type ApplyResult =
-  | { ok: true; events: GameEvent[] }
-  | { ok: false; reason: RejectReason };
+export type ApplyResult = { ok: true; events: GameEvent[] } | { ok: false; reason: RejectReason };

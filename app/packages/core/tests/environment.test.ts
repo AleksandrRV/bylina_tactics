@@ -9,39 +9,85 @@ import { makeGrid, tileAt } from "../src/grid.js";
 import type { EntityState, MatchState } from "../src/types.js";
 
 const MACE: WeaponStats = {
-  id: "mace", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 5, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 1,
+  id: "mace",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 5,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 1,
 };
 
 const SHIELD_BASH: SkillStats = {
-  id: "shield_bash", apCost: 1, endsTurn: true, range: 1, requiresLOS: false,
-  category: "melee", resolution: "attack", envDmg: 0, filter: "enemies",
-  effects: [
-    { type: "damage", minDmg: 1, maxDmg: 1, crit: 0, critBonus: 0 },
-    { type: "knockback" },
-  ],
+  id: "shield_bash",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee",
+  resolution: "attack",
+  envDmg: 0,
+  filter: "enemies",
+  effects: [{ type: "damage", minDmg: 1, maxDmg: 1, crit: 0, critBonus: 0 }, { type: "knockback" }],
 };
 
 const ENV_BOW: WeaponStats = {
-  id: "env_bow", category: "ranged", apCost: 1, endsTurn: true, range: 8,
-  requiresLOS: true, aimMod: 100, minDmg: 3, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 1,
+  id: "env_bow",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 100,
+  minDmg: 3,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 1,
 };
 
 const SWEEP: SkillStats = {
-  id: "circular_sweep", apCost: 1, endsTurn: true, range: 0, requiresLOS: false,
-  category: "self", resolution: "attack", envDmg: 0, radius: 1, filter: "enemies",
+  id: "circular_sweep",
+  apCost: 1,
+  endsTurn: true,
+  range: 0,
+  requiresLOS: false,
+  category: "self",
+  resolution: "attack",
+  envDmg: 0,
+  radius: 1,
+  filter: "enemies",
   effects: [{ type: "damage", minDmg: 3, maxDmg: 5, crit: 0, critBonus: 0 }],
 };
 
 const DROP_FLIGHT: SkillStats = {
-  id: "drop_flight", apCost: 1, endsTurn: true, range: 0, requiresLOS: false,
-  category: "self", resolution: "auto", envDmg: 0,
+  id: "drop_flight",
+  apCost: 1,
+  endsTurn: true,
+  range: 0,
+  requiresLOS: false,
+  category: "self",
+  resolution: "auto",
+  envDmg: 0,
   effects: [{ type: "removeStatus", status: "flying" }],
 };
 
 const BREACH: SkillStats = {
-  id: "breach", apCost: 1, endsTurn: true, range: 1, requiresLOS: false,
-  category: "melee", resolution: "attack", envDmg: 1, affectsEnvironment: true, filter: "all",
+  id: "breach",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee",
+  resolution: "attack",
+  envDmg: 1,
+  affectsEnvironment: true,
+  filter: "all",
   effects: [
     { type: "damage", minDmg: 1, maxDmg: 1, crit: 0, critBonus: 0 },
     { type: "destroyCover" },
@@ -51,22 +97,62 @@ const BREACH: SkillStats = {
 
 function fighter(partial: Partial<EntityState>): EntityState {
   return {
-    id: 1, configId: "fighter", owner: PLAYER_OWNER, x: 1, y: 1, z: 1, dir: 1,
-    ap: 2, maxAp: 2, mobility: 5, hp: 20, maxHp: 20, aim: 100, defense: 0, vision: 10,
-    weaponId: MACE.id, weaponIds: [MACE.id], skillIds: [], obstacle: true, dead: false,
-    flying: false, hidden: false, coverType: 0, overwatch: false, defending: false,
+    id: 1,
+    configId: "fighter",
+    owner: PLAYER_OWNER,
+    x: 1,
+    y: 1,
+    z: 1,
+    dir: 1,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 20,
+    maxHp: 20,
+    aim: 100,
+    defense: 0,
+    vision: 10,
+    weaponId: MACE.id,
+    weaponIds: [MACE.id],
+    skillIds: [],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType: 0,
+    overwatch: false,
+    defending: false,
     movementSpent: 0,
     ...partial,
   } as EntityState;
 }
 
-function edgeMaceScenario(coverType: 1 | 2): { state: MatchState; attacker: EntityState; target: EntityState; cover: EntityState } {
+function edgeMaceScenario(coverType: 1 | 2): {
+  state: MatchState;
+  attacker: EntityState;
+  target: EntityState;
+  cover: EntityState;
+} {
   const attacker = fighter({ id: 1, owner: PLAYER_OWNER, x: 1, y: 1, dir: 1 });
   const target = fighter({ id: 2, owner: ENEMY_OWNER, x: 2, y: 1, dir: 3, weaponId: "", weaponIds: [] });
   const cover = fighter({
-    id: 200, configId: "edge_cover", owner: 0, x: 2, y: 1, ap: 0, maxAp: 0,
-    mobility: 0, hp: 2, maxHp: 2, aim: 0, vision: 0, weaponId: "", weaponIds: [],
-    obstacle: false, coverType, edge: 3,
+    id: 200,
+    configId: "edge_cover",
+    owner: 0,
+    x: 2,
+    y: 1,
+    ap: 0,
+    maxAp: 0,
+    mobility: 0,
+    hp: 2,
+    maxHp: 2,
+    aim: 0,
+    vision: 0,
+    weaponId: "",
+    weaponIds: [],
+    obstacle: false,
+    coverType,
+    edge: 3,
   });
   return {
     attacker,
@@ -119,7 +205,9 @@ describe("cover destruction (§12)", () => {
     expect(kernel.apply({ type: "ATTACK", actorId: strelets.id, targetId: cover.id, weaponId: "bow" }).ok).toBe(false);
     strelets.weaponIds = [ENV_BOW.id];
     // A forged, unowned weapon is rejected by the host regardless of its stats.
-    expect(kernel.apply({ type: "ATTACK", actorId: strelets.id, targetId: cover.id, weaponId: "sword" }).ok).toBe(false);
+    expect(kernel.apply({ type: "ATTACK", actorId: strelets.id, targetId: cover.id, weaponId: "sword" }).ok).toBe(
+      false,
+    );
   });
 });
 
@@ -130,7 +218,10 @@ describe("mace attack through edge cover", () => {
     attacker.weaponId = sword.id;
     attacker.weaponIds = [sword.id, MACE.id];
     const kernel = createTacticsKernel({ initial: state, weapons: { [sword.id]: sword, [MACE.id]: MACE } });
-    expect(kernel.getHitPreview(attacker.id, target.id, sword.id)).toMatchObject({ available: false, reason: "ILLEGAL" });
+    expect(kernel.getHitPreview(attacker.id, target.id, sword.id)).toMatchObject({
+      available: false,
+      reason: "ILLEGAL",
+    });
     expect(kernel.getHitPreview(attacker.id, target.id, MACE.id).available).toBe(true);
   });
 
@@ -170,11 +261,22 @@ describe("0.8 skills and displacement", () => {
   it("circular sweep resolves all adjacent enemies in ascending id order", () => {
     const match = createQuickMatch({ enemyCount: 3, seed: 400 });
     const bogatyr = match.entities.find((entity) => entity.configId === "bogatyr")!;
-    const enemies = match.entities.filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0).slice(0, 2);
-    enemies[0]!.x = bogatyr.x + 1; enemies[0]!.y = bogatyr.y; enemies[0]!.z = bogatyr.z;
-    enemies[1]!.x = bogatyr.x; enemies[1]!.y = bogatyr.y + 1; enemies[1]!.z = bogatyr.z;
+    const enemies = match.entities
+      .filter((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0)
+      .slice(0, 2);
+    enemies[0]!.x = bogatyr.x + 1;
+    enemies[0]!.y = bogatyr.y;
+    enemies[0]!.z = bogatyr.z;
+    enemies[1]!.x = bogatyr.x;
+    enemies[1]!.y = bogatyr.y + 1;
+    enemies[1]!.z = bogatyr.z;
     bogatyr.skillIds = [SWEEP.id];
-    const kernel = createTacticsKernel({ initial: match, weapons: defaultTrainingWeapons(), skills: { [SWEEP.id]: SWEEP }, seed: 2 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      weapons: defaultTrainingWeapons(),
+      skills: { [SWEEP.id]: SWEEP },
+      seed: 2,
+    });
     const result = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: SWEEP.id });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
@@ -193,13 +295,20 @@ describe("0.8 skills and displacement", () => {
       skills: { [SHIELD_BASH.id]: SHIELD_BASH },
       seed: 1,
     });
-    const result = kernel.apply({ type: "USE_SKILL", actorId: attacker.id, skillId: SHIELD_BASH.id, targetId: target.id });
+    const result = kernel.apply({
+      type: "USE_SKILL",
+      actorId: attacker.id,
+      skillId: SHIELD_BASH.id,
+      targetId: target.id,
+    });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events).toEqual(expect.arrayContaining([
-      expect.objectContaining({ type: "COMBAT_RESOLVED", damageDealt: 1 }),
-      expect.objectContaining({ type: "ENTITY_DISPLACED", entityId: target.id, cause: "KNOCKBACK" }),
-    ]));
+    expect(result.events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: "COMBAT_RESOLVED", damageDealt: 1 }),
+        expect.objectContaining({ type: "ENTITY_DISPLACED", entityId: target.id, cause: "KNOCKBACK" }),
+      ]),
+    );
     const after = kernel.getSnapshot().entities.find((entity) => entity.id === target.id)!;
     expect(after.hp).toBe(19);
     expect(after.x).toBe(3);
@@ -211,11 +320,17 @@ describe("0.8 skills and displacement", () => {
     tileAt(match.grid, bogatyr.x, bogatyr.y)!.pit = true;
     bogatyr.flying = true;
     bogatyr.skillIds = [DROP_FLIGHT.id];
-    const kernel = createTacticsKernel({ initial: match, weapons: defaultTrainingWeapons(), skills: { [DROP_FLIGHT.id]: DROP_FLIGHT } });
+    const kernel = createTacticsKernel({
+      initial: match,
+      weapons: defaultTrainingWeapons(),
+      skills: { [DROP_FLIGHT.id]: DROP_FLIGHT },
+    });
     const result = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: DROP_FLIGHT.id });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")).toBe(true);
+    expect(result.events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")).toBe(
+      true,
+    );
   });
 
   it("knockback into a pit displaces and kills the target", () => {
@@ -223,22 +338,36 @@ describe("0.8 skills and displacement", () => {
     const bogatyr = match.entities.find((entity) => entity.configId === "bogatyr")!;
     const enemy = match.entities.find((entity) => entity.owner === ENEMY_OWNER && entity.coverType === 0)!;
     // Place A,T,D horizontally in visible open cells.
-    bogatyr.x = 2; bogatyr.y = 4; bogatyr.z = tileAt(match.grid, 2, 4)!.z;
-    enemy.x = 3; enemy.y = 4; enemy.z = bogatyr.z;
+    bogatyr.x = 2;
+    bogatyr.y = 4;
+    bogatyr.z = tileAt(match.grid, 2, 4)!.z;
+    enemy.x = 3;
+    enemy.y = 4;
+    enemy.z = bogatyr.z;
     const pit = tileAt(match.grid, 4, 4)!;
-    pit.z = bogatyr.z; pit.pit = true; pit.blockLOS = false;
+    pit.z = bogatyr.z;
+    pit.pit = true;
+    pit.blockLOS = false;
     match.entities.forEach((entity) => {
       if (entity.id !== bogatyr.id && entity.id !== enemy.id && entity.x === 4 && entity.y === 4) {
-        entity.dead = true; entity.obstacle = false;
+        entity.dead = true;
+        entity.obstacle = false;
       }
     });
     bogatyr.skillIds = [BREACH.id];
     bogatyr.aim = 100;
-    const kernel = createTacticsKernel({ initial: match, weapons: defaultTrainingWeapons(), skills: { [BREACH.id]: BREACH }, seed: 1 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      weapons: defaultTrainingWeapons(),
+      skills: { [BREACH.id]: BREACH },
+      seed: 1,
+    });
     const result = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: BREACH.id, targetId: enemy.id });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.events.some((event) => event.type === "ENTITY_DISPLACED" && event.cause === "FALL")).toBe(true);
-    expect(result.events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")).toBe(true);
+    expect(result.events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")).toBe(
+      true,
+    );
   });
 });

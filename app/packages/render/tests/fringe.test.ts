@@ -31,7 +31,9 @@ describe("fringe (0.20.41)", () => {
 
   it("stays within the fringe radius", () => {
     for (const item of fringeDecor(COLS, ROWS, 4)) {
-      expect(Math.max(-item.cellX, item.cellX - (COLS - 1), -item.cellY, item.cellY - (ROWS - 1))).toBeLessThanOrEqual(4);
+      expect(Math.max(-item.cellX, item.cellX - (COLS - 1), -item.cellY, item.cellY - (ROWS - 1))).toBeLessThanOrEqual(
+        4,
+      );
     }
   });
 

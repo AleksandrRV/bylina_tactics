@@ -217,7 +217,7 @@ describe("edge-based covers do not occupy cells", () => {
       edge: 3, // west edge
       obstacle: false,
     });
-    
+
     // Moving from (0,1) to (1,1) crosses the west edge of (1,1) → blocked.
     expect(edgeCost(grid, [edgeCover], walker, 0, 1, 1, 1)).toBe(Number.POSITIVE_INFINITY);
     // Moving from (1,1) to (1,2) does NOT cross the west edge → allowed.
@@ -237,7 +237,7 @@ describe("edge-based covers do not occupy cells", () => {
       edge: 3, // west edge
       obstacle: false,
     });
-    
+
     // Moving from (0,1) to (1,1) crosses the west edge → +1 MP.
     expect(edgeCost(grid, [edgeCover], walker, 0, 1, 1, 1)).toBe(2); // base 1 + edge 1
   });

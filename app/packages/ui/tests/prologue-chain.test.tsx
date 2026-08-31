@@ -28,9 +28,11 @@ import { dataTree } from "./training-sim.js";
 /** Журнал обращений к средству отображения: порядок и аргументы. */
 const calls: { name: string; args: unknown[] }[] = [];
 
-const record = (name: string) => (...args: unknown[]): void => {
-  calls.push({ name, args });
-};
+const record =
+  (name: string) =>
+  (...args: unknown[]): void => {
+    calls.push({ name, args });
+  };
 
 let activate: ((x: number, y: number) => void) | null = null;
 
@@ -74,16 +76,19 @@ vi.mock("@bylina/render", () => ({
 
 beforeEach(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia = window.matchMedia ?? ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
   window.scrollTo = window.scrollTo ?? (() => undefined);
   window.localStorage.clear();
 });
@@ -227,7 +232,10 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
 
       // Палка подобрана, крыса вышла (сцена появления доигрывается заглушкой).
       const afterPickup = session.getBattleSnapshot(1);
-      expect(afterPickup.entities.some((entity) => entity.configId === "stick"), "stick is taken").toBe(false);
+      expect(
+        afterPickup.entities.some((entity) => entity.configId === "stick"),
+        "stick is taken",
+      ).toBe(false);
       expect(
         afterPickup.entities.some((entity) => entity.configId === "forest_rat" && !entity.dead),
         "rat has entered",
@@ -400,7 +408,10 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       const intro = calls.find((entry) => entry.name === "playCinematic")?.args[0] as {
         steps: { kind: string; accent?: boolean }[];
       };
-      expect(intro.steps.some((step) => step.accent === true), "the stick is accented").toBe(true);
+      expect(
+        intro.steps.some((step) => step.accent === true),
+        "the stick is accented",
+      ).toBe(true);
 
       calls.length = 0;
       const hero = () =>
@@ -418,10 +429,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
 
       // Сцена выхода крысы: кадр на опушке, вбегание с трекингом, передача
       // хода Нави и возврат камеры к герою.
-      await waitFor(
-        () => calls.filter((entry) => entry.name === "playCinematic").length >= 2,
-        12000,
-      );
+      await waitFor(() => calls.filter((entry) => entry.name === "playCinematic").length >= 2, 12000);
       const plans = calls
         .filter((entry) => entry.name === "playCinematic")
         .map(
@@ -443,7 +451,10 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       // чужого хода — камера возвращается к герою.
       const after = plans.find((plan) => plan.id === "m1_rat_appear_after");
       expect(after, "the scene continues after the hand-off").toBeDefined();
-      expect(after!.steps.some((step) => step.kind === "pan"), "camera returns to the hero").toBe(true);
+      expect(
+        after!.steps.some((step) => step.kind === "pan"),
+        "camera returns to the hero",
+      ).toBe(true);
       // Первая половина держит приближение: укус играется крупным планом,
       // а вторая возвращает игровой масштаб, а не удвоенное приближение.
       expect(appear!.holdZoom, "the first half keeps the close-up").toBe(true);
@@ -527,7 +538,9 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       await waitFor(() => calls.some((entry) => entry.name === "playCinematic"));
 
       // Свой боец: клик по портрету в верхней панели ведёт камеру к нему.
-      const hero = session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
+      const hero = session
+        .getBattleSnapshot(1)
+        .entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
       const cards = () => Array.from(document.querySelectorAll<HTMLButtonElement>(".roster .roster-card"));
       await waitFor(() => cards().length > 0);
       calls.length = 0;
@@ -544,7 +557,9 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       await walkToStick(session);
       await waitFor(() => document.querySelector(".enemies-strip .enemy-face") !== null, 12000);
 
-      const rat = session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "forest_rat" && !entity.dead);
+      const rat = session
+        .getBattleSnapshot(1)
+        .entities.find((entity) => entity.configId === "forest_rat" && !entity.dead);
       const face = () => document.querySelector<HTMLButtonElement>(".enemies-strip .enemy-face");
       // Крыса в поле зрения дружины: портрет кликабелен и ведёт камеру.
       expect(face()!.className, "a visible enemy is not dimmed").not.toContain("is-unseen");

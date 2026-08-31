@@ -94,11 +94,7 @@ export type CutsceneEvent =
  * не выбирается (0.20.45), и её триггер достаётся следующей подходящей
  * сцене из данных миссии.
  */
-export function cutsceneMatches(
-  config: CutsceneConfig,
-  event: CutsceneEvent,
-  fired: readonly string[] = [],
-): boolean {
+export function cutsceneMatches(config: CutsceneConfig, event: CutsceneEvent, fired: readonly string[] = []): boolean {
   if (config.once && fired.includes(config.id)) return false;
   const trigger = config.trigger;
   switch (trigger.kind) {

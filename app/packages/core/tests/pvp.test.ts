@@ -49,15 +49,27 @@ describe("createPvpMatch (0.14.0)", () => {
     const second = createPvpMatch(options);
     expect(second.grid.tiles).toEqual(first.grid.tiles);
     const entities = (state: typeof first) =>
-      state.entities.filter((entity) => entity.coverType === 0).map((entity) => [entity.id, entity.configId, entity.x, entity.y]);
+      state.entities
+        .filter((entity) => entity.coverType === 0)
+        .map((entity) => [entity.id, entity.configId, entity.x, entity.y]);
     expect(entities(second)).toEqual(entities(first));
   });
 });
 
 describe("pvp battle flow", () => {
   const SWORD: WeaponStats = {
-    id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-    requiresLOS: false, aimMod: 0, minDmg: 20, maxDmg: 20, crit: 0, critBonus: 0, envDmg: 0,
+    id: "sword",
+    category: "melee",
+    apCost: 1,
+    endsTurn: true,
+    range: 1,
+    requiresLOS: false,
+    aimMod: 0,
+    minDmg: 20,
+    maxDmg: 20,
+    crit: 0,
+    critBonus: 0,
+    envDmg: 0,
   };
 
   it("ends by elimination when one side is wiped out", () => {
@@ -91,7 +103,11 @@ describe("pvp battle flow", () => {
     const result = kernel.apply({ type: "ATTACK", actorId: side1.id, targetId: side2.id, weaponId: "sword" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "ELIMINATION" });
+    expect(result.events).toContainEqual({
+      type: "MATCH_ENDED",
+      winnerPlayerId: String(PLAYER_OWNER),
+      reason: "ELIMINATION",
+    });
   });
 
   it("rotates turns between the two human sides", () => {

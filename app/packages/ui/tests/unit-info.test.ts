@@ -154,7 +154,18 @@ describe("unit info window (0.20.53)", () => {
   it("marks the enemy by its side and omits empty sections", () => {
     // Крыса пролога: только укус, умений нет — раздела умений быть не должно.
     const rat = buildUnitInfo(
-      entity({ id: 4, configId: "forest_rat", hp: 2, maxHp: 2, aim: 50, defense: 0, will: 10, vision: 10, weaponId: "teeth", weaponIds: ["teeth"] }),
+      entity({
+        id: 4,
+        configId: "forest_rat",
+        hp: 2,
+        maxHp: 2,
+        aim: 50,
+        defense: 0,
+        will: 10,
+        vision: 10,
+        weaponId: "teeth",
+        weaponIds: ["teeth"],
+      }),
       { weapons: maps.weapons, skills: maps.skills, side: "enemy" },
       t,
     );
@@ -164,7 +175,19 @@ describe("unit info window (0.20.53)", () => {
 
     // Княжна: оружия нет, умение есть — раздел ровно один.
     const captive = buildUnitInfo(
-      entity({ id: 5, configId: "captive", hp: 5, maxHp: 5, aim: 0, defense: 0, will: 20, vision: 8, weaponId: "", weaponIds: [], skillIds: ["evacuate"] }),
+      entity({
+        id: 5,
+        configId: "captive",
+        hp: 5,
+        maxHp: 5,
+        aim: 0,
+        defense: 0,
+        will: 20,
+        vision: 8,
+        weaponId: "",
+        weaponIds: [],
+        skillIds: ["evacuate"],
+      }),
       { weapons: maps.weapons, skills: maps.skills, side: "ally" },
       t,
     );

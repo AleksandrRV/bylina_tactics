@@ -9,9 +9,11 @@ function flatten(value, prefix = "") {
 }
 function keysFor(language) {
   const dir = new URL(`${language}/`, root);
-  return new Set(readdirSync(dir).filter((file) => file.endsWith(".json")).flatMap((file) =>
-    flatten(JSON.parse(readFileSync(new URL(file, dir), "utf8"))),
-  ));
+  return new Set(
+    readdirSync(dir)
+      .filter((file) => file.endsWith(".json"))
+      .flatMap((file) => flatten(JSON.parse(readFileSync(new URL(file, dir), "utf8")))),
+  );
 }
 const reference = keysFor(manifest.fallback);
 let failed = false;
@@ -25,4 +27,7 @@ for (const { code } of manifest.languages) {
   }
 }
 if (failed) process.exitCode = 1;
-else console.log(`Dictionary completeness check passed for ${manifest.languages.length} locales (${reference.size} keys).`);
+else
+  console.log(
+    `Dictionary completeness check passed for ${manifest.languages.length} locales (${reference.size} keys).`,
+  );

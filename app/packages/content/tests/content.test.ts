@@ -57,11 +57,12 @@ describe("parseContent", () => {
       "volkhv",
       "znaharka",
     ]);
-    expect(result.data.units.filter((unit) => unit.side === "pvp").map((unit) => unit.id).sort()).toEqual([
-      "kikimora_pvp",
-      "leshy_pvp",
-      "upyr_pvp",
-    ]);
+    expect(
+      result.data.units
+        .filter((unit) => unit.side === "pvp")
+        .map((unit) => unit.id)
+        .sort(),
+    ).toEqual(["kikimora_pvp", "leshy_pvp", "upyr_pvp"]);
     expect(result.data.pvp.pool).toEqual(["bogatyr", "strelets", "znaharka", "upyr_pvp", "leshy_pvp", "kikimora_pvp"]);
     expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual([
       "circular_sweep",
@@ -108,18 +109,32 @@ describe("parseContent", () => {
     expect(result.data.skills.find((skill) => skill.id === "evacuate")?.extract).toBe(true);
     expect(result.data.units.find((unit) => unit.id === "captive")?.skills).toContain("evacuate");
     expect(result.data.campaign.missions.map((mission) => mission.type)).toEqual([
-      "purge", "purge", "purge", "destroy", "rescue", "recon", "purge", "purge",
+      "purge",
+      "purge",
+      "purge",
+      "destroy",
+      "rescue",
+      "recon",
+      "purge",
+      "purge",
     ]);
     expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_5")?.generals).toEqual(["solovey"]);
     // Генералы вводятся последними (0.20.0): Яга — в седьмой миссии цепочки,
     // Соловей — в восьмой; ранние миссии генералов не содержат.
-    expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_4")?.generals).toEqual(["baba_yaga"]);
-    expect(result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1")?.generals).toBeUndefined();
+    expect(result.data.campaign.missions.find((mission) => mission.id === "clearing_4")?.generals).toEqual([
+      "baba_yaga",
+    ]);
+    expect(
+      result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1")?.generals,
+    ).toBeUndefined();
     expect(result.data.campaign.missions.find((mission) => mission.id === "recon_route_1")?.generals).toBeUndefined();
     expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.tags).toContain("flying");
     expect(result.data.units.find((unit) => unit.id === "baba_yaga")?.fleeHp).toBe(6);
     expect(result.data.units.find((unit) => unit.id === "solovey")?.tags).toContain("hiddenStart");
-    expect(result.data.skills.find((skill) => skill.id === "whistle")?.effects.map((effect) => effect.type)).toEqual(["damage", "knockback"]);
+    expect(result.data.skills.find((skill) => skill.id === "whistle")?.effects.map((effect) => effect.type)).toEqual([
+      "damage",
+      "knockback",
+    ]);
     const destroy = result.data.campaign.missions.find((mission) => mission.id === "destroy_idol_1");
     expect(destroy?.objectiveUnitId).toBe("idol");
     const rescue = result.data.campaign.missions.find((mission) => mission.id === "rescue_captive_1");
@@ -179,13 +194,15 @@ describe("parseContent", () => {
     // Обычное умение без следствий — отклоняется.
     const emptyRegular = { ...files };
     emptyRegular[rootsKey!] = files[rootsKey]!.replace(
-      "effects: [{ type: \"applyStatus\", status: \"immobile\", duration: 1 }],",
+      'effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],',
       "effects: [],",
     );
     expect(parseContent(emptyRegular).ok).toBe(false);
 
     // Умение извлечения без следствий — допустимо (само извлечение и есть следствие).
-    const extractSkill = { ...files, "skills/evacuate.json5": `{
+    const extractSkill = {
+      ...files,
+      "skills/evacuate.json5": `{
       id: "evacuate",
       apCost: 1,
       endsTurn: true,
@@ -197,7 +214,8 @@ describe("parseContent", () => {
       extract: true,
       cooldownTurns: 1,
       effects: [],
-    }` };
+    }`,
+    };
     expect(parseContent(extractSkill).ok).toBe(true);
   });
 
@@ -208,16 +226,26 @@ describe("parseContent", () => {
     if (!campaignKey) return;
 
     const brokenRecruit = { ...files };
-    brokenRecruit[campaignKey!] = files[campaignKey]!.replace('recruitUnitId: "recruit"', 'recruitUnitId: "recruit_typo"');
+    brokenRecruit[campaignKey!] = files[campaignKey]!.replace(
+      'recruitUnitId: "recruit"',
+      'recruitUnitId: "recruit_typo"',
+    );
     const recruitResult = parseContent(brokenRecruit);
     expect(recruitResult.ok).toBe(false);
-    expect(recruitResult.ok || recruitResult.issues.some((issue) => issue.message.includes("unknown recruit unit"))).toBe(true);
+    expect(
+      recruitResult.ok || recruitResult.issues.some((issue) => issue.message.includes("unknown recruit unit")),
+    ).toBe(true);
 
     const brokenRoster = { ...files };
-    brokenRoster[campaignKey!] = files[campaignKey]!.replace('initialRoster: ["bogatyr", "strelets", "znaharka"]', 'initialRoster: ["bogatyr", "bogatyr_typo"]');
+    brokenRoster[campaignKey!] = files[campaignKey]!.replace(
+      'initialRoster: ["bogatyr", "strelets", "znaharka"]',
+      'initialRoster: ["bogatyr", "bogatyr_typo"]',
+    );
     const rosterResult = parseContent(brokenRoster);
     expect(rosterResult.ok).toBe(false);
-    expect(rosterResult.ok || rosterResult.issues.some((issue) => issue.message.includes("unknown initial roster unit"))).toBe(true);
+    expect(
+      rosterResult.ok || rosterResult.issues.some((issue) => issue.message.includes("unknown initial roster unit")),
+    ).toBe(true);
   });
 
   it("accepts legacy maps without a biome (backward compatibility)", () => {
@@ -241,17 +269,22 @@ describe("parseContent", () => {
 
     // Миссия типа needle, но её id не совпадает с needleMissionId.
     const wrongId = { ...files };
-    wrongId[campaignKey!] = files[campaignKey]!.replace('type: "purge",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,', 'type: "needle",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,');
+    wrongId[campaignKey!] = files[campaignKey]!.replace(
+      'type: "purge",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,',
+      'type: "needle",\n      darknessOnVictory: 2,\n      darknessOnDefeat: 4,\n      x: 10,',
+    );
     const idResult = parseContent(wrongId);
     expect(idResult.ok).toBe(false);
-    expect(idResult.ok || idResult.issues.some((issue) => issue.message.includes("does not match needleMissionId"))).toBe(true);
+    expect(
+      idResult.ok || idResult.issues.some((issue) => issue.message.includes("does not match needleMissionId")),
+    ).toBe(true);
 
     // needleMissionId ссылается на точку иного типа.
     const wrongType = { ...files };
     wrongType[campaignKey!] = files[campaignKey]!.replace('needleMissionId: "needle"', 'needleMissionId: "clearing_1"');
     const typeResult = parseContent(wrongType);
     expect(typeResult.ok).toBe(false);
-    expect(typeResult.ok || typeResult.issues.some((issue) => issue.message.includes("expected \"needle\""))).toBe(true);
+    expect(typeResult.ok || typeResult.issues.some((issue) => issue.message.includes('expected "needle"'))).toBe(true);
   });
 });
 
@@ -292,13 +325,17 @@ describe("parseContent mission objectives (0.13.0)", () => {
   it("rejects destroy without objectiveUnitId", () => {
     const result = parseContent(missionFiles("destroy", ""));
     expect(result.ok).toBe(false);
-    expect(result.ok || result.issues.some((issue) => issue.message.includes("destroy missions require objectiveUnitId"))).toBe(true);
+    expect(
+      result.ok || result.issues.some((issue) => issue.message.includes("destroy missions require objectiveUnitId")),
+    ).toBe(true);
   });
 
   it("rejects rescue without escorteeUnitId", () => {
     const result = parseContent(missionFiles("rescue", "extract: true,"));
     expect(result.ok).toBe(false);
-    expect(result.ok || result.issues.some((issue) => issue.message.includes("rescue missions require escorteeUnitId"))).toBe(true);
+    expect(
+      result.ok || result.issues.some((issue) => issue.message.includes("rescue missions require escorteeUnitId")),
+    ).toBe(true);
   });
 
   it("rejects rescue and recon without an evacuation zone", () => {
@@ -306,7 +343,9 @@ describe("parseContent mission objectives (0.13.0)", () => {
     expect(rescue.ok).toBe(false);
     const recon = parseContent(missionFiles("recon", ""));
     expect(recon.ok).toBe(false);
-    expect(recon.ok || recon.issues.some((issue) => issue.message.includes("recon missions require map.extract"))).toBe(true);
+    expect(recon.ok || recon.issues.some((issue) => issue.message.includes("recon missions require map.extract"))).toBe(
+      true,
+    );
   });
 
   it("rejects destroy with an unknown objective unit", () => {
@@ -330,7 +369,11 @@ describe("training config (0.19.0)", () => {
     // Строгий сценарий (0.20.13): «Бой» открывается ознакомительным шагом,
     // затем приближение и атака предписанным оружием до гибели цели.
     expect(combat.hints[0]?.until).toBe("noop");
-    expect(combat.hints.some((hint) => hint.until === "attack" && hint.weaponId === "sword" && hint.repeatUntil === "targetDead")).toBe(true);
+    expect(
+      combat.hints.some(
+        (hint) => hint.until === "attack" && hint.weaponId === "sword" && hint.repeatUntil === "targetDead",
+      ),
+    ).toBe(true);
     expect(combat.enemyScript?.actions.length).toBeGreaterThan(0);
     // Доводка 0.20.1: карта «Боя» гарантирует укрытия, «Первые шаги» учат рывку,
     // «Умения» несут реактивные плашки.
@@ -359,8 +402,8 @@ describe("training config (0.19.0)", () => {
     // исполняет подсказки по полю step (0.19.1), поэтому шаги обязаны
     // образовывать полную уникальную последовательность.
     files[key] = files[key]!.replace(
-      "step: 2,\n          textKey: \"training.combat.hint2\",",
-      "step: 3,\n          textKey: \"training.combat.hint2\",",
+      'step: 2,\n          textKey: "training.combat.hint2",',
+      'step: 3,\n          textKey: "training.combat.hint2",',
     );
     const result = parseContent(files);
     expect(result.ok).toBe(false);
@@ -415,19 +458,33 @@ describe("prologue content (0.20.31)", () => {
       "prologue_village",
     ]);
     expect(result.data.prologue.prologueFinalMissionId).toBe("prologue_village");
-    expect(result.data.prologue.missions.map((mission: { fog: boolean }) => mission.fog)).toEqual([false, false, true, true]);
+    expect(result.data.prologue.missions.map((mission: { fog: boolean }) => mission.fog)).toEqual([
+      false,
+      false,
+      true,
+      true,
+    ]);
     expect(result.data.prologue.missions.map((mission: { map: { biome?: string } }) => mission.map.biome)).toEqual([
-      "meadow", "swamp", "thicket", "meadow",
+      "meadow",
+      "swamp",
+      "thicket",
+      "meadow",
     ]);
     const prologueUnitIds = result.data.prologueBestiary.units.map((unit: { id: string }) => unit.id).sort();
     expect(prologueUnitIds).toEqual(["fedot_stranded", "forest_rat", "mikula_peasant", "slug"]);
     expect(result.data.units.some((unit) => unit.id === "forest_rat")).toBe(false);
-    expect(result.data.prologueBestiary.weapons.map((weapon: { id: string }) => weapon.id).sort()).toEqual(["club", "spit", "teeth"]);
+    expect(result.data.prologueBestiary.weapons.map((weapon: { id: string }) => weapon.id).sort()).toEqual([
+      "club",
+      "spit",
+      "teeth",
+    ]);
     const hintKeys = result.data.prologueHints.hints.map((hint: { key: string }) => hint.key);
     expect(hintKeys).toContain("m1.endTurn");
     expect(hintKeys).toContain("m4.source");
     expect(result.data.reinforcements.profiles?.m2_cry_wave?.mode).toBe("onKill");
-    expect(result.data.prologueBestiary.units.find((unit: { id: string }) => unit.id === "mikula_peasant")?.weapons).toEqual([]);
+    expect(
+      result.data.prologueBestiary.units.find((unit: { id: string }) => unit.id === "mikula_peasant")?.weapons,
+    ).toEqual([]);
     expect(result.data.prologue.missions[0]?.enemies).toEqual([]);
   });
 
@@ -451,17 +508,14 @@ describe("prologue content (0.20.31)", () => {
   it("rejects an unknown layout field (strict layout schema)", () => {
     const files = readDataTree();
     const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
-    files[key] = files[key]!.replace('heights: [', 'relief: [');
+    files[key] = files[key]!.replace("heights: [", "relief: [");
     expect(parseContent(files).ok).toBe(false);
   });
 
   it("rejects an unknown unit referenced by a prologue mission", () => {
     const files = readDataTree();
     const key = Object.keys(files).find((path) => path.endsWith("prologue_missions.json5"))!;
-    files[key] = files[key]!.replace(
-      'playerSlots: ["mikula_peasant"],',
-      'playerSlots: ["unknown_hero"],',
-    );
+    files[key] = files[key]!.replace('playerSlots: ["mikula_peasant"],', 'playerSlots: ["unknown_hero"],');
     const result = parseContent(files);
     expect(result.ok).toBe(false);
     expect(result.ok || result.issues.some((issue) => issue.message.includes("unknown player unit"))).toBe(true);

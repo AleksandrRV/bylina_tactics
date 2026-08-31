@@ -3,7 +3,13 @@ import { createCampaign } from "@bylina/campaign";
 import { collectCatalogsFromModules, createI18n, manifest } from "@bylina/i18n";
 import { APP_VERSION, createSession, type DifficultyId } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
-import { createReplayStorage, createSaveSerializer, createSaveStorage, deserializeFog, SAVE_FORMAT_VERSION } from "@bylina/storage";
+import {
+  createReplayStorage,
+  createSaveSerializer,
+  createSaveStorage,
+  deserializeFog,
+  SAVE_FORMAT_VERSION,
+} from "@bylina/storage";
 import { createReplayRecorder, isReplayJournal, type ReplayJournal } from "@bylina/replay";
 import type { CampaignState } from "@bylina/campaign";
 import type { FogState, MatchState } from "@bylina/core";
@@ -25,12 +31,11 @@ const localeModules = import.meta.glob("../../../packages/i18n/locales/*/*.json"
 export function App() {
   const install = useInstallPrompt();
   const [content, setContent] = useState<Awaited<ReturnType<typeof loadAppContent>> | null>(null);
-  useEffect(() => { void Promise.resolve(loadAppContent()).then(setContent); }, []);
+  useEffect(() => {
+    void Promise.resolve(loadAppContent()).then(setContent);
+  }, []);
   const catalogs = useMemo(() => collectCatalogsFromModules(localeModules), []);
-  const allowedLanguages = useMemo(
-    () => manifest.languages.map((item) => item.code),
-    [],
-  );
+  const allowedLanguages = useMemo(() => manifest.languages.map((item) => item.code), []);
 
   const settings = useMemo(
     () =>
@@ -71,12 +76,12 @@ export function App() {
   // карты, Тьму не копит и миссий не отмечает, поэтому прежний перечень
   // признаков считал сохранение пустым и скрывал «Продолжить».
   const savedCampaignHasProgress = saved?.campaign
-    ? saved.campaign.darkness > 0
-      || saved.campaign.activeMissionId !== null
-      || saved.campaign.chapter === "prologue"
-      || saved.session?.battleKind === "prologue"
-      || Boolean(saved.session?.prologueMissionId)
-      || saved.campaign.missions.some((mission) => mission.status === "done")
+    ? saved.campaign.darkness > 0 ||
+      saved.campaign.activeMissionId !== null ||
+      saved.campaign.chapter === "prologue" ||
+      saved.session?.battleKind === "prologue" ||
+      Boolean(saved.session?.prologueMissionId) ||
+      saved.campaign.missions.some((mission) => mission.status === "done")
     : false;
   const [campaignRestore, setCampaignRestore] = useState<CampaignState | "pending" | null>(
     savedCampaignHasProgress ? "pending" : null,
@@ -140,12 +145,9 @@ export function App() {
     // записей прежних версий, где пролог был помечен как бой кампании,
     // сюжет узнаётся по идентификатору миссии.
     const storyId =
-      entry.prologueMissionId
-      ?? (entry.activeMissionId?.startsWith("prologue_") ? entry.activeMissionId : null);
+      entry.prologueMissionId ?? (entry.activeMissionId?.startsWith("prologue_") ? entry.activeMissionId : null);
     const inCampaignBattle =
-      entry.screen === "battle"
-      && (entry.battleKind === "campaign" || storyId !== null)
-      && Boolean(saved.match);
+      entry.screen === "battle" && (entry.battleKind === "campaign" || storyId !== null) && Boolean(saved.match);
     if (inCampaignBattle && saved.match) {
       lastMatchRef.current = { match: saved.match, fog: deserializeFog(saved.fog) };
     }
@@ -157,7 +159,7 @@ export function App() {
           ? entry.screen
           : "campaign",
       prologueMissionId: inCampaignBattle ? storyId : null,
-      activeMissionId: storyId ? null : entry.activeMissionId ?? null,
+      activeMissionId: storyId ? null : (entry.activeMissionId ?? null),
       deployment: entry.deployment ?? [],
       matchSeed: entry.matchSeed ?? 0,
       outcome: entry.outcome ?? null,
@@ -227,7 +229,11 @@ export function App() {
     const state = session.get();
     // Сохранение повтора состязательной партии (0.17.0): при завершении
     // либо обрыве боя черновик журнала превращается в запись.
-    if ((state.screen === "result" || state.netDisconnected === true) && (state.battleKind === "pvp" || state.battleKind === "pvpNet") && state.replayDraft) {
+    if (
+      (state.screen === "result" || state.netDisconnected === true) &&
+      (state.battleKind === "pvp" || state.battleKind === "pvpNet") &&
+      state.replayDraft
+    ) {
       const draft = state.replayDraft;
       const pvpOptions = {
         units: contentData!.units,
@@ -237,7 +243,10 @@ export function App() {
         objective: draft.objective ?? "elimination",
         seed: draft.seed,
       };
-      const recorder = createReplayRecorder(pvpOptions, `${state.battleKind === "pvpNet" ? "Сеть" : "Поочерёдная"} · ${new Date().toLocaleDateString()}`);
+      const recorder = createReplayRecorder(
+        pvpOptions,
+        `${state.battleKind === "pvpNet" ? "Сеть" : "Поочерёдная"} · ${new Date().toLocaleDateString()}`,
+      );
       for (const command of draft.commands) recorder.record(command);
       const journal = recorder.finish(state.replayWinner ?? null, recorder.getJournal()?.title ?? "Бой");
       if (isReplayJournal(journal)) replayStorage.saveReplay(journal);
@@ -252,37 +261,39 @@ export function App() {
     if (campaignRestore === "pending") {
       if (!saved) return;
       const pendingRequest = ++saveRequestRef.current;
-      void saveSerializer.serialize({
-        formatVersion: SAVE_FORMAT_VERSION,
-        version: APP_VERSION,
-        savedAt: Date.now(),
-        campaign: saved.campaign,
-        session: {
-          screen: saved.session.screen,
-          battleKind: saved.session.battleKind,
-          activeMissionId: saved.session.activeMissionId,
-          deployment: saved.session.deployment,
-          matchSeed: saved.session.matchSeed,
-          outcome: saved.session.outcome,
-          difficulty: state.difficulty ?? saved.session.difficulty,
-          trainingDone: state.trainingDone ?? [],
-          campaignHintsDone: state.campaignHintsDone ?? [],
-        },
-        match: saved.match,
-        fog: saved.fog ? deserializeFog(saved.fog) : undefined,
-      }).then((serialized) => {
-        if (pendingRequest === saveRequestRef.current) saveStorage.saveSerialized(serialized);
-      }).catch(() => {
-        /* рабочий поток может исчезнуть при закрытии — следующий автосейв повторит */
-      });
+      void saveSerializer
+        .serialize({
+          formatVersion: SAVE_FORMAT_VERSION,
+          version: APP_VERSION,
+          savedAt: Date.now(),
+          campaign: saved.campaign,
+          session: {
+            screen: saved.session.screen,
+            battleKind: saved.session.battleKind,
+            activeMissionId: saved.session.activeMissionId,
+            deployment: saved.session.deployment,
+            matchSeed: saved.session.matchSeed,
+            outcome: saved.session.outcome,
+            difficulty: state.difficulty ?? saved.session.difficulty,
+            trainingDone: state.trainingDone ?? [],
+            campaignHintsDone: state.campaignHintsDone ?? [],
+          },
+          match: saved.match,
+          fog: saved.fog ? deserializeFog(saved.fog) : undefined,
+        })
+        .then((serialized) => {
+          if (pendingRequest === saveRequestRef.current) saveStorage.saveSerialized(serialized);
+        })
+        .catch(() => {
+          /* рабочий поток может исчезнуть при закрытии — следующий автосейв повторит */
+        });
       return;
     }
     // Сюжетная миссия пролога сохраняется так же, как миссия карты
     // (0.20.51): иначе выход из пролога или перезапуск обозревателя
     // выбрасывал игрока из былины, начатой сюжетом.
     const inPrologueBattle = state.screen === "battle" && state.battleKind === "prologue";
-    const inCampaignBattle =
-      (state.screen === "battle" && state.battleKind === "campaign") || inPrologueBattle;
+    const inCampaignBattle = (state.screen === "battle" && state.battleKind === "campaign") || inPrologueBattle;
     const inCampaignDeployment = state.screen === "deployment" && state.battleKind === "campaign";
     // Приостановленная миссия кампании (0.20.17–0.20.19): контекст — в слоте,
     // не зависящем от навигации (заход в обучение/быстрый матч/настройки из
@@ -324,59 +335,64 @@ export function App() {
         ? slot!.activeMissionId
         : null;
     // Контекст ветки кампании в записи — из боя либо из слота.
-    const campaignSession = inCampaignBattle || inCampaignDeployment
-      ? {
-          activeMissionId: prologueMissionId ? null : state.activeMissionId,
-          deployment: state.deployment,
-          matchSeed: state.matchSeed,
-          outcome: state.outcome,
-        }
-      : suspendedCampaign
+    const campaignSession =
+      inCampaignBattle || inCampaignDeployment
         ? {
-            activeMissionId: suspendedStory ? null : slot!.activeMissionId,
-            deployment: slot!.deployment,
-            matchSeed: slot!.matchSeed,
-            outcome: null,
+            activeMissionId: prologueMissionId ? null : state.activeMissionId,
+            deployment: state.deployment,
+            matchSeed: state.matchSeed,
+            outcome: state.outcome,
           }
-        : {
-            activeMissionId: null,
-            deployment: [],
-            matchSeed: 0,
-            outcome: null,
-          };
+        : suspendedCampaign
+          ? {
+              activeMissionId: suspendedStory ? null : slot!.activeMissionId,
+              deployment: slot!.deployment,
+              matchSeed: slot!.matchSeed,
+              outcome: null,
+            }
+          : {
+              activeMissionId: null,
+              deployment: [],
+              matchSeed: 0,
+              outcome: null,
+            };
     const request = ++saveRequestRef.current;
     // MatchState, fog conversion and JSON.stringify run in packages/storage's
     // worker. localStorage itself remains synchronous but receives ready JSON.
-    void saveSerializer.serialize({
-      formatVersion: SAVE_FORMAT_VERSION,
-      version: APP_VERSION,
-      savedAt: Date.now(),
-      campaign: campaign.getState(),
-      session: {
-        screen,
-        battleKind: inCampaignBattle || inCampaignDeployment
-          ? state.battleKind
-          : suspendedCampaign
-            ? suspendedStory
-              ? "prologue"
-              : "campaign"
-            : state.battleKind,
-        prologueMissionId,
-        activeMissionId: campaignSession.activeMissionId,
-        deployment: campaignSession.deployment,
-        matchSeed: campaignSession.matchSeed,
-        outcome: campaignSession.outcome,
-        difficulty: state.difficulty,
-        trainingDone: state.trainingDone ?? [],
-        campaignHintsDone: state.campaignHintsDone ?? [],
-      },
-      match,
-      fog,
-    }).then((serialized) => {
-      if (request === saveRequestRef.current) saveStorage.saveSerialized(serialized);
-    }).catch(() => {
-      // The worker can disappear during page shutdown; the next autosave retries.
-    });
+    void saveSerializer
+      .serialize({
+        formatVersion: SAVE_FORMAT_VERSION,
+        version: APP_VERSION,
+        savedAt: Date.now(),
+        campaign: campaign.getState(),
+        session: {
+          screen,
+          battleKind:
+            inCampaignBattle || inCampaignDeployment
+              ? state.battleKind
+              : suspendedCampaign
+                ? suspendedStory
+                  ? "prologue"
+                  : "campaign"
+                : state.battleKind,
+          prologueMissionId,
+          activeMissionId: campaignSession.activeMissionId,
+          deployment: campaignSession.deployment,
+          matchSeed: campaignSession.matchSeed,
+          outcome: campaignSession.outcome,
+          difficulty: state.difficulty,
+          trainingDone: state.trainingDone ?? [],
+          campaignHintsDone: state.campaignHintsDone ?? [],
+        },
+        match,
+        fog,
+      })
+      .then((serialized) => {
+        if (request === saveRequestRef.current) saveStorage.saveSerialized(serialized);
+      })
+      .catch(() => {
+        // The worker can disappear during page shutdown; the next autosave retries.
+      });
   };
 
   useEffect(() => () => saveSerializer.dispose(), [saveSerializer]);
@@ -402,11 +418,14 @@ export function App() {
         return;
       }
       if (pendingTimer !== undefined) return;
-      pendingTimer = window.setTimeout(() => {
-        pendingTimer = undefined;
-        lastSave = Date.now();
-        persistRef.current();
-      }, 400 - (now - lastSave));
+      pendingTimer = window.setTimeout(
+        () => {
+          pendingTimer = undefined;
+          lastSave = Date.now();
+          persistRef.current();
+        },
+        400 - (now - lastSave),
+      );
     };
     const subscribeBattle = (): void => {
       if (unBattle || session.get().screen !== "battle") return;
@@ -455,21 +474,15 @@ export function App() {
     // «Новая былина», 0.20.15) также переподписывает и сразу сохраняет.
   }, [session, campaign]);
 
-
-
   // Отладочный режим (0.20.1, doc/debug-mode.md): средства QA (автопобеда,
   // оверлей стоимости) доступны при адресе с параметром ?debug=1 либо при
   // включённой настройкой отладочного режима. Настройка реактивна: включение
   // в «Настройках» сразу открывает служебные кнопки в бою.
   const [debugMode, setDebugMode] = useState(settings.get().debugMode ?? false);
-  useEffect(
-    () => settings.subscribe((state) => setDebugMode(Boolean(state.debugMode))),
-    [settings],
-  );
+  useEffect(() => settings.subscribe((state) => setDebugMode(Boolean(state.debugMode))), [settings]);
   const debug = useMemo(
     () =>
-      debugMode ||
-      (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
+      debugMode || (typeof window === "undefined" ? false : new URLSearchParams(window.location.search).has("debug")),
     [debugMode],
   );
 
@@ -487,11 +500,11 @@ export function App() {
     // Пролог (0.20.51): былина начата сюжетом — «Продолжить» обязана
     // вернуть игрока в недойденный бой, а не предлагать начать заново.
     return (
-      snapshot.darkness > 0
-      || snapshot.activeMissionId !== null
-      || snapshot.chapter === "prologue"
-      || snapshot.missions.some((mission) => mission.status === "done")
-      || Boolean(session.get().suspendedCampaign)
+      snapshot.darkness > 0 ||
+      snapshot.activeMissionId !== null ||
+      snapshot.chapter === "prologue" ||
+      snapshot.missions.some((mission) => mission.status === "done") ||
+      Boolean(session.get().suspendedCampaign)
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign, campaignRestore, campaignTick]);
@@ -507,7 +520,12 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaign, hasActiveBylina]);
 
-  if (!content) return <div className="content-error"><h1>{i18n.t("app.loadingContent")}</h1></div>;
+  if (!content)
+    return (
+      <div className="content-error">
+        <h1>{i18n.t("app.loadingContent")}</h1>
+      </div>
+    );
   if (!content.ok) {
     return (
       <div className="content-error">
@@ -522,7 +540,6 @@ export function App() {
       </div>
     );
   }
-
 
   return (
     <ServicesProvider

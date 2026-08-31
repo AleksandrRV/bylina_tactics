@@ -173,85 +173,73 @@ const rowValue = (label: string): string | undefined => {
 };
 
 describe("portrait cards in the top panel (0.20.53)", () => {
-  it(
-    "opens the fighter window on a long press: description, parameters, equipment",
-    async () => {
-      const card = face(".roster .roster-card");
-      expect(document.querySelector(".unit-info"), "окно закрыто").toBeNull();
+  it("opens the fighter window on a long press: description, parameters, equipment", async () => {
+    const card = face(".roster .roster-card");
+    expect(document.querySelector(".unit-info"), "окно закрыто").toBeNull();
 
-      await hold(card);
+    await hold(card);
 
-      expect(dialog().getAttribute("role")).toBe("dialog");
-      expect(dialog().querySelector(".eyebrow")?.textContent).toBe("Дружина");
-      expect(dialog().querySelector("h3")?.textContent).toBe("Богатырь");
-      // Описание из словаря — не сырой ключ.
-      expect(dialog().querySelector(".unit-info-flavor")?.textContent?.length ?? 0).toBeGreaterThan(20);
-      // Параметры из снимка боя: полное здоровье и полные очки действия.
-      expect(rowValue("Здоровье")).toBe("12 / 12");
-      expect(rowValue("Очки действия")).toBe("2 / 2");
-      expect(rowValue("Меткость")).toBe("70");
-      // Экипировка: в руках — меч, остальное перечислено рядом.
-      const items = [...dialog().querySelectorAll(".unit-info-item")].map((item) => item.textContent ?? "");
-      expect(items.join(" | ")).toContain("Меч");
-      expect(items.join(" | ")).toContain("Палица");
-      expect(dialog().querySelector(".unit-info-item-mark")?.textContent).toBe("в руках");
-      expect(document.querySelector(".unit-info-backdrop"), "затемнение поверх боя").not.toBeNull();
+    expect(dialog().getAttribute("role")).toBe("dialog");
+    expect(dialog().querySelector(".eyebrow")?.textContent).toBe("Дружина");
+    expect(dialog().querySelector("h3")?.textContent).toBe("Богатырь");
+    // Описание из словаря — не сырой ключ.
+    expect(dialog().querySelector(".unit-info-flavor")?.textContent?.length ?? 0).toBeGreaterThan(20);
+    // Параметры из снимка боя: полное здоровье и полные очки действия.
+    expect(rowValue("Здоровье")).toBe("12 / 12");
+    expect(rowValue("Очки действия")).toBe("2 / 2");
+    expect(rowValue("Меткость")).toBe("70");
+    // Экипировка: в руках — меч, остальное перечислено рядом.
+    const items = [...dialog().querySelectorAll(".unit-info-item")].map((item) => item.textContent ?? "");
+    expect(items.join(" | ")).toContain("Меч");
+    expect(items.join(" | ")).toContain("Палица");
+    expect(dialog().querySelector(".unit-info-item-mark")?.textContent).toBe("в руках");
+    expect(document.querySelector(".unit-info-backdrop"), "затемнение поверх боя").not.toBeNull();
 
-      // Кнопка закрывает окно.
-      await act(async () => {
-        dialog().querySelector<HTMLButtonElement>(".unit-info-close")!.click();
-      });
-      expect(document.querySelector(".unit-info"), "окно закрыто кнопкой").toBeNull();
-    },
-    60000,
-  );
+    // Кнопка закрывает окно.
+    await act(async () => {
+      dialog().querySelector<HTMLButtonElement>(".unit-info-close")!.click();
+    });
+    expect(document.querySelector(".unit-info"), "окно закрыто кнопкой").toBeNull();
+  }, 60000);
 
-  it(
-    "keeps the short press: it selects the fighter and never opens the window",
-    async () => {
-      const card = face(".roster .roster-card");
-      await act(async () => {
-        card.dispatchEvent(pointerEvent("pointerdown"));
-      });
-      await act(async () => {
-        await tick(80);
-      });
-      await act(async () => {
-        card.dispatchEvent(pointerEvent("pointerup"));
-        card.dispatchEvent(pointerEvent("click"));
-      });
-      await act(async () => {
-        await tick(40);
-      });
-      expect(document.querySelector(".unit-info"), "короткое нажатие — не окно").toBeNull();
-      expect(card.classList.contains("is-on"), "боец выбран").toBe(true);
-    },
-    60000,
-  );
+  it("keeps the short press: it selects the fighter and never opens the window", async () => {
+    const card = face(".roster .roster-card");
+    await act(async () => {
+      card.dispatchEvent(pointerEvent("pointerdown"));
+    });
+    await act(async () => {
+      await tick(80);
+    });
+    await act(async () => {
+      card.dispatchEvent(pointerEvent("pointerup"));
+      card.dispatchEvent(pointerEvent("click"));
+    });
+    await act(async () => {
+      await tick(40);
+    });
+    expect(document.querySelector(".unit-info"), "короткое нажатие — не окно").toBeNull();
+    expect(card.classList.contains("is-on"), "боец выбран").toBe(true);
+  }, 60000);
 
-  it(
-    "shows the enemy card with its own side and weapon",
-    async () => {
-      await waitFor(() => document.querySelector(".enemies-strip .enemy-face") !== null);
-      const enemy = face(".enemies-strip .enemy-face");
-      expect(enemy.disabled, "противник в поле зрения — портрет кликабелен").toBe(false);
+  it("shows the enemy card with its own side and weapon", async () => {
+    await waitFor(() => document.querySelector(".enemies-strip .enemy-face") !== null);
+    const enemy = face(".enemies-strip .enemy-face");
+    expect(enemy.disabled, "противник в поле зрения — портрет кликабелен").toBe(false);
 
-      await hold(enemy);
+    await hold(enemy);
 
-      expect(dialog().querySelector(".eyebrow")?.textContent).toBe("Навь");
-      expect(dialog().querySelector("h3")?.textContent).toBe("Упырь");
-      expect(rowValue("Здоровье")).toBe("8 / 8");
-      const items = [...dialog().querySelectorAll(".unit-info-item")].map((item) => item.textContent ?? "");
-      // Упырь воюет когтями: умений у него нет, раздел один.
-      expect(items.join(" | ")).toContain("Когти");
-      expect(dialog().querySelectorAll(".unit-info-section").length).toBe(1);
+    expect(dialog().querySelector(".eyebrow")?.textContent).toBe("Навь");
+    expect(dialog().querySelector("h3")?.textContent).toBe("Упырь");
+    expect(rowValue("Здоровье")).toBe("8 / 8");
+    const items = [...dialog().querySelectorAll(".unit-info-item")].map((item) => item.textContent ?? "");
+    // Упырь воюет когтями: умений у него нет, раздел один.
+    expect(items.join(" | ")).toContain("Когти");
+    expect(dialog().querySelectorAll(".unit-info-section").length).toBe(1);
 
-      // Клик по фону закрывает окно, как у окна информации о действии.
-      await act(async () => {
-        document.querySelector<HTMLElement>(".unit-info-backdrop")!.click();
-      });
-      expect(document.querySelector(".unit-info"), "окно закрыто по фону").toBeNull();
-    },
-    60000,
-  );
+    // Клик по фону закрывает окно, как у окна информации о действии.
+    await act(async () => {
+      document.querySelector<HTMLElement>(".unit-info-backdrop")!.click();
+    });
+    expect(document.querySelector(".unit-info"), "окно закрыто по фону").toBeNull();
+  }, 60000);
 });

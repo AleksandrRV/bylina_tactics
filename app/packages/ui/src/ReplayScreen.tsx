@@ -6,7 +6,17 @@ import { useI18nTick } from "./hooks.js";
 
 function BackIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M12.5 4 6.5 10l6 6" />
     </svg>
   );
@@ -43,7 +53,8 @@ export function ReplayScreen() {
               <div className="replay-meta">
                 <span className="replay-title">{journal.title}</span>
                 <span className="muted">
-                  {new Date(journal.createdAt).toLocaleString()} · {journal.options.side1.length}×{journal.options.side2.length} ·{" "}
+                  {new Date(journal.createdAt).toLocaleString()} · {journal.options.side1.length}×
+                  {journal.options.side2.length} ·{" "}
                   {journal.winner === null ? t("replay.aborted") : t("replay.winner", { side: journal.winner })}
                 </span>
               </div>

@@ -161,22 +161,15 @@ describe("edges and occupancy", () => {
 
 describe("path optimality", () => {
   it("uses an admissible heuristic and returns the least MP cost", () => {
-    const rows = [
-      "11211110",
-      "2011#111",
-      "1111#21#",
-      "01011210",
-      "21112011",
-      "12210101",
-      "110#1010",
-      "011###11",
-    ];
+    const rows = ["11211110", "2011#111", "1111#21#", "01011210", "21112011", "12210101", "110#1010", "011###11"];
     const grid = makeGrid(8, 8, 1);
-    rows.forEach((row, y) => [...row].forEach((value, x) => {
-      const tile = tileAt(grid, x, y)!;
-      if (value === "#") tile.blockLOS = true;
-      else tile.z = Number(value);
-    }));
+    rows.forEach((row, y) =>
+      [...row].forEach((value, x) => {
+        const tile = tileAt(grid, x, y)!;
+        if (value === "#") tile.blockLOS = true;
+        else tile.z = Number(value);
+      }),
+    );
     const self = walker({ x: 0, y: 0, z: 1, mobility: 20 });
     // Эталон — полный перебор Дейкстрой на тех же рёбрах: A* с admissible-
     // эвристикой обязан дать ту же сумму шагов, округлённую вверх (0.20.43).

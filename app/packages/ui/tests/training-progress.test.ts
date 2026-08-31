@@ -19,7 +19,16 @@ const hint = (fields: Partial<TrainingHintConfig>): TrainingHintConfig => ({
 });
 
 const moved = (isDash = false): GameEvent[] => [
-  { type: "ENTITY_MOVED", entityId: 1, path: [{ x: 0, y: 0, z: 0 }, { x: 1, y: 0, z: 0 }], isDash, apSpent: 1 },
+  {
+    type: "ENTITY_MOVED",
+    entityId: 1,
+    path: [
+      { x: 0, y: 0, z: 0 },
+      { x: 1, y: 0, z: 0 },
+    ],
+    isDash,
+    apSpent: 1,
+  },
 ];
 
 describe("hintCompletedByEvents", () => {
@@ -27,14 +36,34 @@ describe("hintCompletedByEvents", () => {
     expect(hintCompletedByEvents(hint({ until: "move" }), moved())).toBe(true);
     expect(hintCompletedByEvents(hint({ until: "dash" }), moved(false))).toBe(false);
     expect(hintCompletedByEvents(hint({ until: "dash" }), moved(true))).toBe(true);
-    expect(hintCompletedByEvents(hint({ until: "attack" }), [{ type: "COMBAT_RESOLVED", result: "HIT", damageDealt: 3 } as never])).toBe(true);
+    expect(
+      hintCompletedByEvents(hint({ until: "attack" }), [
+        { type: "COMBAT_RESOLVED", result: "HIT", damageDealt: 3 } as never,
+      ]),
+    ).toBe(true);
     expect(hintCompletedByEvents(hint({ until: "skill" }), [{ type: "SKILL_RESOLVED" } as never])).toBe(true);
-    expect(hintCompletedByEvents(hint({ until: "defend" }), [{ type: "STATUS_CHANGED", entityId: 1, status: "DEFENDING", applied: true } as never])).toBe(true);
-    expect(hintCompletedByEvents(hint({ until: "overwatch" }), [{ type: "STATUS_CHANGED", entityId: 1, status: "OVERWATCH", applied: true } as never])).toBe(true);
-    expect(hintCompletedByEvents(hint({ until: "end_turn" }), [{ type: "TURN_CHANGED", activePlayerId: "2", turnNumber: 2 } as never])).toBe(true);
+    expect(
+      hintCompletedByEvents(hint({ until: "defend" }), [
+        { type: "STATUS_CHANGED", entityId: 1, status: "DEFENDING", applied: true } as never,
+      ]),
+    ).toBe(true);
+    expect(
+      hintCompletedByEvents(hint({ until: "overwatch" }), [
+        { type: "STATUS_CHANGED", entityId: 1, status: "OVERWATCH", applied: true } as never,
+      ]),
+    ).toBe(true);
+    expect(
+      hintCompletedByEvents(hint({ until: "end_turn" }), [
+        { type: "TURN_CHANGED", activePlayerId: "2", turnNumber: 2 } as never,
+      ]),
+    ).toBe(true);
     expect(hintCompletedByEvents(hint({ until: "approach" }), moved())).toBe(true);
     expect(hintCompletedByEvents(hint({ until: "noop" }), [])).toBe(false);
-    expect(hintCompletedByEvents(hint({ until: "move" }), [{ type: "TURN_CHANGED", activePlayerId: "1", turnNumber: 2 } as never])).toBe(false);
+    expect(
+      hintCompletedByEvents(hint({ until: "move" }), [
+        { type: "TURN_CHANGED", activePlayerId: "1", turnNumber: 2 } as never,
+      ]),
+    ).toBe(false);
   });
 });
 
@@ -68,7 +97,17 @@ describe("shouldAutoEndTurn in training (0.20.13)", () => {
     });
 
   it("never auto-ends while a scenario step is active", () => {
-    for (const until of ["move", "dash", "attack", "skill", "defend", "overwatch", "end_turn", "approach", "noop"] as const) {
+    for (const until of [
+      "move",
+      "dash",
+      "attack",
+      "skill",
+      "defend",
+      "overwatch",
+      "end_turn",
+      "approach",
+      "noop",
+    ] as const) {
       expect(conditions({ activeHint: hint({ until }) })).toBe(false);
     }
   });

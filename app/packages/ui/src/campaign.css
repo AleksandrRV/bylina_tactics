@@ -40,7 +40,9 @@
   color: var(--mist);
   font-size: 0.86rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .campaign-exit-btn:hover,
@@ -114,11 +116,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: repeating-linear-gradient(
-    90deg,
-    transparent 0 24.5%,
-    rgba(213, 207, 192, 0.18) 24.5% 25.5%
-  );
+  background: repeating-linear-gradient(90deg, transparent 0 24.5%, rgba(213, 207, 192, 0.18) 24.5% 25.5%);
   pointer-events: none;
 }
 
@@ -242,7 +240,11 @@
   color: #8fa1ad;
   font-size: 0.9rem;
   line-height: 1;
-  transition: transform 0.16s ease, border-color 0.16s ease, background 0.16s ease, box-shadow 0.16s ease;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
 }
 
 .map-marker:hover .marker-medallion,
@@ -528,7 +530,9 @@
   padding: 11px 18px;
   font-size: 0.9rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .campaign-abandon-btn:hover,
@@ -557,7 +561,10 @@
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .campaign-start-btn:hover,
@@ -605,7 +612,9 @@
   color: var(--mist-dim);
   font-size: 0.88rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
 }
 
 .campaign-tab svg {
@@ -824,7 +833,11 @@
   padding: 12px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
 }
 
 .deploy-card:hover,
@@ -837,7 +850,9 @@
 .deploy-card.is-picked {
   border-color: var(--amber);
   background: linear-gradient(180deg, #2c2a20, #201d14);
-  box-shadow: 0 0 0 1px rgba(224, 179, 74, 0.35), 0 6px 18px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 0 0 1px rgba(224, 179, 74, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.3);
   animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
 }
 
@@ -944,7 +959,10 @@
   place-items: center;
   font-size: 0.72rem;
   color: transparent;
-  transition: color 0.12s ease, background 0.12s ease, border-color 0.12s ease;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
 }
 
 .deploy-card.is-picked .pick-mark {
@@ -1205,7 +1223,10 @@
   padding: 12px 8px 10px;
   cursor: pointer;
   font-size: 0.85rem;
-  transition: border-color 0.15s ease, transform 0.12s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    background 0.15s ease;
 }
 
 .class-card:hover,
@@ -1462,7 +1483,10 @@
   padding: 8px 12px;
   font-size: 0.88rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .scan-btn:hover:not(:disabled),
@@ -1595,7 +1619,9 @@
 }
 
 @keyframes road-draw {
-  to { stroke-dashoffset: 0; }
+  to {
+    stroke-dashoffset: 0;
+  }
 }
 
 /* 4.3: иконка типа миссии внутри медальона отметки. */
@@ -1665,10 +1691,21 @@
 }
 
 @keyframes ship-trail-draw {
-  0% { stroke-dashoffset: 100; opacity: 0; }
-  16% { opacity: 0.9; }
-  76% { stroke-dashoffset: 0; opacity: 0.72; }
-  100% { stroke-dashoffset: 0; opacity: 0; }
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  76% {
+    stroke-dashoffset: 0;
+    opacity: 0.72;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -1783,7 +1820,9 @@
   border: 1px solid var(--line);
   background: linear-gradient(180deg, var(--ink-2), var(--ink));
   padding: 14px 14px 12px;
-  transition: border-color 0.15s ease, transform 0.12s ease;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease;
 }
 
 .forge-card:hover {
@@ -1843,7 +1882,10 @@
   padding: 8px 10px;
   font-size: 0.86rem;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
 }
 
 .craft-btn:hover:not(:disabled),
@@ -1915,7 +1957,10 @@
   background: var(--ink-3);
   color: var(--mist-dim);
   cursor: pointer;
-  transition: color 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
 }
 
 .equip-btn:hover,
@@ -1956,7 +2001,9 @@
   padding: 10px 12px;
   text-align: left;
   cursor: pointer;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .equip-item:hover:not(:disabled),
@@ -2116,7 +2163,9 @@
   font-size: 0.86rem;
   cursor: pointer;
   margin-bottom: 8px;
-  transition: border-color 0.15s ease, background 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
 }
 
 .equip-unequip:hover,
@@ -2128,7 +2177,11 @@
 
 /* Мягкое свечение кнопки снаряжения, когда есть что надеть */
 .deploy-card .equip-btn {
-  transition: color 0.15s ease, border-color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
 }
 
 .deploy-card .equip-btn:hover,
@@ -2222,7 +2275,10 @@
 }
 
 .mission-card {
-  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .mission-card:hover {
@@ -2308,7 +2364,9 @@
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 6px;
-  transition: transform 160ms ease, background 160ms ease;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
 }
 
 .pvp-slot:hover {
@@ -2419,7 +2477,8 @@
 }
 
 @keyframes pass-pulse {
-  0%, 100% {
+  0%,
+  100% {
     text-shadow: 0 0 6px rgba(224, 179, 74, 0.25);
   }
   50% {
@@ -2737,7 +2796,8 @@
 }
 
 @keyframes draft-glow {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 6px rgba(224, 179, 74, 0.25);
   }
   50% {
@@ -2852,7 +2912,8 @@
 }
 
 @keyframes apple-pulse {
-  0%, 100% {
+  0%,
+  100% {
     transform: scale(1);
   }
   50% {
@@ -2888,7 +2949,9 @@
 }
 
 @keyframes eye-blink {
-  0%, 92%, 100% {
+  0%,
+  92%,
+  100% {
     opacity: 1;
   }
   96% {
@@ -2919,7 +2982,9 @@
   border: 1px solid rgba(120, 140, 160, 0.22);
   border-radius: 8px;
   background: rgba(12, 16, 12, 0.55);
-  transition: border-color 180ms ease, transform 180ms ease;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
 }
 
 .replay-row:hover {

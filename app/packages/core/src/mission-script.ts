@@ -48,7 +48,8 @@ export interface MissionTriggerFire {
 
 function livingCombatants(state: MatchState, owner: number): EntityState[] {
   return state.entities.filter(
-    (entity) => !entity.dead && entity.owner === owner && entity.coverType === 0 && entity.countsForElimination !== false,
+    (entity) =>
+      !entity.dead && entity.owner === owner && entity.coverType === 0 && entity.countsForElimination !== false,
   );
 }
 

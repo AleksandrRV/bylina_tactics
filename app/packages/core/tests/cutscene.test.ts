@@ -41,9 +41,18 @@ describe("cutscene triggers (0.20.37)", () => {
   });
 
   it("matches flags and pickups by their key", () => {
-    expect(cutsceneMatches({ ...RAT, trigger: { kind: "onFlag", flag: "fedotFreed" } }, { type: "flag", flag: "fedotFreed" })).toBe(true);
-    expect(cutsceneMatches({ ...RAT, trigger: { kind: "onFlag", flag: "fedotFreed" } }, { type: "flag", flag: "other" })).toBe(false);
-    expect(cutsceneMatches({ ...RAT, trigger: { kind: "onPickup", itemId: "stick" } }, { type: "pickup", itemId: "stick" })).toBe(true);
+    expect(
+      cutsceneMatches(
+        { ...RAT, trigger: { kind: "onFlag", flag: "fedotFreed" } },
+        { type: "flag", flag: "fedotFreed" },
+      ),
+    ).toBe(true);
+    expect(
+      cutsceneMatches({ ...RAT, trigger: { kind: "onFlag", flag: "fedotFreed" } }, { type: "flag", flag: "other" }),
+    ).toBe(false);
+    expect(
+      cutsceneMatches({ ...RAT, trigger: { kind: "onPickup", itemId: "stick" } }, { type: "pickup", itemId: "stick" }),
+    ).toBe(true);
   });
 
   it("picks the first matching scene and nothing when there is no match", () => {

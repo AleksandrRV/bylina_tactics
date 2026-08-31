@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { createChannelPair, createLocalTransport, decodeSessionCode, encodeSessionCode, createQrDataUrl } from "../src/index.js";
+import {
+  createChannelPair,
+  createLocalTransport,
+  decodeSessionCode,
+  encodeSessionCode,
+  createQrDataUrl,
+} from "../src/index.js";
 import type { Envelope } from "../src/index.js";
 
 describe("session codec (0.15.0)", () => {
@@ -57,7 +63,13 @@ describe("runtime tactical payload validation", () => {
     expect(isCommandPayload({ type: "ATTACK", actorId: "1", targetId: 2, weaponId: "bow" })).toBe(false);
     expect(isEventBatchPayload([{ type: "ENTITY_MOVED" }])).toBe(true);
     expect(isEventBatchPayload({ type: "ENTITY_MOVED" })).toBe(false);
-    expect(isSyncPayload({ match: { turnNumber: 1, activeOwner: 1, grid: { tiles: [] }, entities: [] }, visible: [], explored: [] })).toBe(true);
+    expect(
+      isSyncPayload({
+        match: { turnNumber: 1, activeOwner: 1, grid: { tiles: [] }, entities: [] },
+        visible: [],
+        explored: [],
+      }),
+    ).toBe(true);
     expect(isSyncPayload({ match: {}, visible: [1], explored: [] })).toBe(false);
   });
 });

@@ -112,7 +112,16 @@ export function previewAttack(
   const los = hasLineOfSight(grid, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
   if (weapon.requiresLOS && !los) {
     // Compute breakCell from obstacles for NO_LOS visualization.
-    const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
+    const obstacles = evaluateObstacles(
+      grid,
+      entities,
+      attacker.x,
+      attacker.y,
+      attacker.z,
+      target.x,
+      target.y,
+      target.z,
+    );
     breakCell = obstacles.breakCell;
     return { available: false, reason: "NO_LOS", heightMod, breakCell };
   }
@@ -124,7 +133,10 @@ export function previewAttack(
   });
 
   let rangePenalty = 0;
-  if (weapon.closeRangePenalty && distH(attacker.x, attacker.y, target.x, target.y) < weapon.closeRangePenalty.distHLessThan) {
+  if (
+    weapon.closeRangePenalty &&
+    distH(attacker.x, attacker.y, target.x, target.y) < weapon.closeRangePenalty.distHLessThan
+  ) {
     rangePenalty = weapon.closeRangePenalty.penalty;
   }
 
@@ -134,15 +146,20 @@ export function previewAttack(
   const targetDefense = target.defense;
   const stanceDefense = target.defending ? 25 : 0;
   const obstacles = evaluateObstacles(grid, entities, attacker.x, attacker.y, attacker.z, target.x, target.y, target.z);
-  const camouflage = !melee && Boolean(target.camouflageMinCover) && entities.some((entity) =>
-    !entity.dead &&
-    entity.id !== target.id &&
-    entity.owner === target.owner &&
-    entity.providesCamouflage &&
-    distH(target.x, target.y, entity.x, entity.y) === 1
-  );
+  const camouflage =
+    !melee &&
+    Boolean(target.camouflageMinCover) &&
+    entities.some(
+      (entity) =>
+        !entity.dead &&
+        entity.id !== target.id &&
+        entity.owner === target.owner &&
+        entity.providesCamouflage &&
+        distH(target.x, target.y, entity.x, entity.y) === 1,
+    );
   const camouflagePenalty = camouflage && !weapon.ignoreHalfCover ? 25 : 0;
-  const coverPenalty = options.coverPenaltyOverride ?? Math.max(cover.penalty, obstacles.obstaclePenalty, camouflagePenalty);
+  const coverPenalty =
+    options.coverPenaltyOverride ?? Math.max(cover.penalty, obstacles.obstaclePenalty, camouflagePenalty);
 
   const chance = clampChance(
     baseAim + weaponMod + heightAim - targetDefense - stanceDefense - coverPenalty - rangePenalty,

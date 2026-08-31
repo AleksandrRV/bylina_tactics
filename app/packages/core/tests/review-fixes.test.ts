@@ -8,25 +8,73 @@ import type { EntityState, MatchState } from "../src/types.js";
 import type { WeaponStats } from "../src/weapons.js";
 
 const BOW: WeaponStats = {
-  id: "bow", category: "ranged", apCost: 1, endsTurn: true, range: 8,
-  requiresLOS: true, aimMod: 0, minDmg: 3, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 0,
+  id: "bow",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 3,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 const FIXED_DMG: WeaponStats = {
-  id: "fixed", category: "ranged", apCost: 1, endsTurn: true, range: 8,
-  requiresLOS: true, aimMod: 0, minDmg: 5, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 0,
+  id: "fixed",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 5,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 const FIXED_DMG2: WeaponStats = {
-  id: "fixed2", category: "ranged", apCost: 1, endsTurn: true, range: 8,
-  requiresLOS: true, aimMod: 0, minDmg: 2, maxDmg: 2, crit: 0, critBonus: 0, envDmg: 0,
+  id: "fixed2",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 2,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 const SWORD: WeaponStats = {
-  id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 3, maxDmg: 3, crit: 0, critBonus: 0, envDmg: 0,
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 3,
+  maxDmg: 3,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 const ROOTS: SkillStats = {
-  id: "roots", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "auto", envDmg: 0, filter: "enemies", cooldownTurns: 2,
+  id: "roots",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "auto",
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 2,
   effects: [{ type: "applyStatus", status: "immobile", duration: 1 }],
 };
 const ROOTS_FLYING: SkillStats = {
@@ -35,39 +83,81 @@ const ROOTS_FLYING: SkillStats = {
   affectsFlying: true,
 };
 const PANIC: SkillStats = {
-  id: "panic", apCost: 1, endsTurn: true, range: 6, requiresLOS: true, category: "ranged",
-  resolution: "will", willPower: 100, envDmg: 0, filter: "enemies", cooldownTurns: 4,
+  id: "panic",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  category: "ranged",
+  resolution: "will",
+  willPower: 100,
+  envDmg: 0,
+  filter: "enemies",
+  cooldownTurns: 4,
   effects: [{ type: "applyStatus", status: "panic", duration: 1 }],
 };
 const BREACH: SkillStats = {
-  id: "breach", apCost: 1, endsTurn: true, range: 1, requiresLOS: false, category: "melee",
-  resolution: "attack", envDmg: 1, affectsEnvironment: true, filter: "all", cooldownTurns: 4,
-  effects: [
-    { type: "damage", minDmg: 6, maxDmg: 6, crit: 0, critBonus: 0 },
-    { type: "destroyCover" },
-  ],
+  id: "breach",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee",
+  resolution: "attack",
+  envDmg: 1,
+  affectsEnvironment: true,
+  filter: "all",
+  cooldownTurns: 4,
+  effects: [{ type: "damage", minDmg: 6, maxDmg: 6, crit: 0, critBonus: 0 }, { type: "destroyCover" }],
 };
 const NO_ENV_ATTACK: SkillStats = {
-  id: "no_env_attack", apCost: 1, endsTurn: true, range: 5, requiresLOS: false, category: "ranged",
-  resolution: "attack", envDmg: 0, filter: "all", cooldownTurns: 2,
+  id: "no_env_attack",
+  apCost: 1,
+  endsTurn: true,
+  range: 5,
+  requiresLOS: false,
+  category: "ranged",
+  resolution: "attack",
+  envDmg: 0,
+  filter: "all",
+  cooldownTurns: 2,
   effects: [{ type: "damage", minDmg: 2, maxDmg: 2, crit: 0, critBonus: 0 }],
 };
 const ENV_ATTACK: SkillStats = {
   ...NO_ENV_ATTACK,
   id: "env_attack",
   envDmg: 1,
-  effects: [
-    { type: "damage", minDmg: 2, maxDmg: 2, crit: 0, critBonus: 0 },
-    { type: "destroyCover" },
-  ],
+  effects: [{ type: "damage", minDmg: 2, maxDmg: 2, crit: 0, critBonus: 0 }, { type: "destroyCover" }],
 };
 
 function fighter(partial: Partial<EntityState>): EntityState {
   return {
-    id: 1, configId: "fighter", owner: 1, x: 1, y: 2, z: 1, dir: 1,
-    ap: 2, maxAp: 2, mobility: 5, hp: 20, maxHp: 20, aim: 100, defense: 0, will: 20, vision: 10,
-    weaponId: BOW.id, weaponIds: [BOW.id], skillIds: [], obstacle: true,
-    dead: false, flying: false, hidden: false, coverType: 0, overwatch: false, defending: false,
+    id: 1,
+    configId: "fighter",
+    owner: 1,
+    x: 1,
+    y: 2,
+    z: 1,
+    dir: 1,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 20,
+    maxHp: 20,
+    aim: 100,
+    defense: 0,
+    will: 20,
+    vision: 10,
+    weaponId: BOW.id,
+    weaponIds: [BOW.id],
+    skillIds: [],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType: 0,
+    overwatch: false,
+    defending: false,
     movementSpent: 0,
     ...partial,
   };
@@ -75,10 +165,33 @@ function fighter(partial: Partial<EntityState>): EntityState {
 
 function coverEntity(id: number, x: number, y: number, coverType: 1 | 2, edge?: 0 | 1 | 2 | 3): EntityState {
   return {
-    id, configId: "cover", owner: 0, x, y, z: 1, dir: 0, ap: 0, maxAp: 0, mobility: 0,
-    hp: 2, maxHp: 2, aim: 0, defense: 0, vision: 0, weaponId: "", weaponIds: [], skillIds: [],
-    obstacle: edge === undefined, dead: false, flying: false, hidden: false, coverType, edge,
-    overwatch: false, defending: false, movementSpent: 0,
+    id,
+    configId: "cover",
+    owner: 0,
+    x,
+    y,
+    z: 1,
+    dir: 0,
+    ap: 0,
+    maxAp: 0,
+    mobility: 0,
+    hp: 2,
+    maxHp: 2,
+    aim: 0,
+    defense: 0,
+    vision: 0,
+    weaponId: "",
+    weaponIds: [],
+    skillIds: [],
+    obstacle: edge === undefined,
+    dead: false,
+    flying: false,
+    hidden: false,
+    coverType,
+    edge,
+    overwatch: false,
+    defending: false,
+    movementSpent: 0,
   };
 }
 
@@ -86,7 +199,12 @@ function state(...entities: EntityState[]): MatchState {
   return { turnNumber: 1, activeOwner: 1, grid: makeGrid(8, 6, 1), entities };
 }
 
-function kernel(initial: MatchState, skills: SkillStats[] = [], weapons: Record<string, WeaponStats> = {}, units: SpawnUnitConfig[] = []) {
+function kernel(
+  initial: MatchState,
+  skills: SkillStats[] = [],
+  weapons: Record<string, WeaponStats> = {},
+  units: SpawnUnitConfig[] = [],
+) {
   return createTacticsKernel({
     initial,
     weapons: { bow: BOW, fixed: FIXED_DMG, fixed2: FIXED_DMG2, sword: SWORD, ...weapons },
@@ -152,7 +270,16 @@ describe("review fixes: overwatch", () => {
   });
 
   it("forbids melee overwatch through a full edge and keeps the watcher's order", () => {
-    const watcher = fighter({ id: 1, x: 0, y: 1, dir: 1, ap: 0, overwatch: true, weaponId: "sword", weaponIds: ["sword"] });
+    const watcher = fighter({
+      id: 1,
+      x: 0,
+      y: 1,
+      dir: 1,
+      ap: 0,
+      overwatch: true,
+      weaponId: "sword",
+      weaponIds: ["sword"],
+    });
     const mover = fighter({ id: 2, owner: 2, x: 3, y: 1, dir: 3 });
     const edge = coverEntity(3, 1, 1, 2, 3); // full cover on the west edge of (1,1)
     const initial = state(watcher, mover, edge);
@@ -167,7 +294,16 @@ describe("review fixes: overwatch", () => {
   });
 
   it("applies the half-edge penalty to melee overwatch fire", () => {
-    const watcher = fighter({ id: 1, x: 0, y: 1, dir: 1, ap: 0, overwatch: true, weaponId: "sword", weaponIds: ["sword"] });
+    const watcher = fighter({
+      id: 1,
+      x: 0,
+      y: 1,
+      dir: 1,
+      ap: 0,
+      overwatch: true,
+      weaponId: "sword",
+      weaponIds: ["sword"],
+    });
     const mover = fighter({ id: 2, owner: 2, x: 3, y: 1, dir: 3 });
     const edge = coverEntity(3, 1, 1, 1, 3); // half cover on the west edge of (1,1)
     const initial = state(watcher, mover, edge);
@@ -221,7 +357,9 @@ describe("review fixes: line of sight and terrain cover", () => {
 
   it("does not grant terrain cover when the surface stays at or below the ray", () => {
     const grid = makeGrid(8, 6, 1);
-    grid.tiles.forEach((tile) => { tile.z = 0; });
+    grid.tiles.forEach((tile) => {
+      tile.z = 0;
+    });
     tileAt(grid, 1, 3)!.z = 1;
     tileAt(grid, 2, 3)!.z = 1;
     tileAt(grid, 3, 3)!.z = 1;
@@ -238,7 +376,9 @@ describe("review fixes: line of sight and terrain cover", () => {
 
   it("keeps terrain cover for a genuine rise above the ray", () => {
     const grid = makeGrid(8, 6, 1);
-    grid.tiles.forEach((tile) => { tile.z = 0; });
+    grid.tiles.forEach((tile) => {
+      tile.z = 0;
+    });
     tileAt(grid, 1, 3)!.z = 1;
     tileAt(grid, 2, 3)!.z = 1;
     tileAt(grid, 3, 3)!.z = 1;
@@ -310,7 +450,9 @@ describe("review fixes: panic and flee threshold", () => {
     const result = game.apply({ type: "ATTACK", actorId: 1, targetId: 2, weaponId: "fixed2" });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(result.events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "FLED" && event.entityId === 2)).toBe(true);
+    expect(
+      result.events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "FLED" && event.entityId === 2),
+    ).toBe(true);
     expect(game.getSnapshot().entities.some((entity) => entity.id === 2)).toBe(false);
   });
 });

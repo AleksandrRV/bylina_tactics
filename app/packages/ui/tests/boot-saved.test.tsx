@@ -32,16 +32,19 @@ vi.mock("@bylina/render", () => {
 let standalone = false;
 
 beforeEach(() => {
-  window.matchMedia = window.matchMedia ?? ((query: string) => ({
-    matches: standalone && query.includes("standalone"),
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: standalone && query.includes("standalone"),
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
   window.scrollTo = window.scrollTo ?? (() => undefined);
 });
 
@@ -90,9 +93,7 @@ async function waitFor(predicate: () => boolean, timeoutMs = 2500): Promise<bool
 }
 
 const buttonByText = (part: string): HTMLButtonElement => {
-  const found = [...document.querySelectorAll("button")].find((button) =>
-    (button.textContent ?? "").includes(part),
-  );
+  const found = [...document.querySelectorAll("button")].find((button) => (button.textContent ?? "").includes(part));
   if (!found) throw new Error(`button not found: ${part}`);
   return found as HTMLButtonElement;
 };

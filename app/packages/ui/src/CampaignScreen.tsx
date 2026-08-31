@@ -46,7 +46,10 @@ function itemName(itemId: string): string {
 /* ---------- Экран -------------------------------------------------- */
 
 /** Строка эффекта предмета для карточки Кузни и снаряжения. */
-function itemEffectParts(item: ItemConfig, t: (key: string, vars?: Record<string, string | number>) => string): string[] {
+function itemEffectParts(
+  item: ItemConfig,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string[] {
   const parts: string[] = [];
   if (item.weaponId) parts.push(t(`weapon.${item.weaponId}.name`));
   if (item.aimMod) parts.push(`${item.aimMod > 0 ? "+" : ""}${item.aimMod} ${t("item.aim")}`);
@@ -60,7 +63,15 @@ function itemEffectParts(item: ItemConfig, t: (key: string, vars?: Record<string
 
 function CoinIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+    >
       <circle cx="8" cy="8" r="6.2" />
       <circle cx="8" cy="8" r="2.6" />
       <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2" />
@@ -70,7 +81,16 @@ function CoinIcon() {
 
 function HerbIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    >
       <path d="M8 14V6" />
       <path d="M8 7c-2.4 0-3.6-1.6-3.4-3.8 2.3-.2 3.7 1 3.4 3.8Z" />
       <path d="M8 9.5c2.4 0 3.6-1.6 3.4-3.8-2.3-.2-3.7 1-3.4 3.8Z" />
@@ -81,7 +101,16 @@ function HerbIcon() {
 
 function GemIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    >
       <path d="M6 2.5h4l3 3.5-5 7.5L3 6l3-3.5Z" />
       <path d="M3 6h10M8 13.5 6.6 6M8 13.5 9.4 6" />
     </svg>
@@ -90,7 +119,16 @@ function GemIcon() {
 
 function ShieldIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinejoin="round"
+    >
       <path d="M10 2.5 16 5v5c0 3.6-2.4 6.2-6 7.5C6.4 16.2 4 13.6 4 10V5l6-2.5Z" />
       <path d="M7 10h6" />
     </svg>
@@ -99,7 +137,17 @@ function ShieldIcon() {
 
 function HammerIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M8.5 10.5 3 16l1.5 1.5 5.5-5.5" />
       <path d="m10 9 4.6-4.6a2.4 2.4 0 0 1 3.4 3.4L13.4 12.4 10 9Z" />
       <path d="M13 4.5 15.5 7" />
@@ -109,7 +157,16 @@ function HammerIcon() {
 
 function ChamberIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+    >
       <path d="M4 4.5h12M4 15.5h12" />
       <path d="M10 2v4M10 14v4" />
       <path d="M7 10h6" />
@@ -119,7 +176,17 @@ function ChamberIcon() {
 
 function SwordsIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
       <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
       <path d="M6 14 3.5 16.5 8 17l3-3" />
@@ -129,7 +196,17 @@ function SwordsIcon() {
 
 function IdolIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M6 2.5h8" />
       <path d="M7 2.5v3.5M13 2.5v3.5" />
       <path d="M5.5 6h9l-.8 9.5h-7.4L5.5 6Z" />
@@ -141,7 +218,17 @@ function IdolIcon() {
 
 function RescueIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M10 2.5 15 4.5v4.6c0 3.4-2.2 6-5 7.4-2.8-1.4-5-4-5-7.4V4.5l5-2Z" />
       <path d="M10 6.5v4M8 8.5h4" />
     </svg>
@@ -150,7 +237,17 @@ function RescueIcon() {
 
 function ReconIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M2.5 10c2-4.5 4.5-6.5 7.5-6.5s5.5 2 7.5 6.5c-2 4.5-4.5 6.5-7.5 6.5S4.5 14.5 2.5 10Z" />
       <circle cx="10" cy="10" r="2.2" />
       <path d="M10 7.8v-2M12.2 10h2M10 12.2v2M7.8 10h-2" />
@@ -160,7 +257,17 @@ function ReconIcon() {
 
 function ShipIcon() {
   return (
-    <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="20"
+      height="20"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3 13.5h14l-1.8 3H4.8L3 13.5Z" />
       <path d="M10 3v10" />
       <path d="M10 3.5c2.8.8 3.6 2.6 3.4 5H10V3.5Z" />
@@ -171,7 +278,16 @@ function ShipIcon() {
 
 function CompassIcon() {
   return (
-    <svg width="22" height="22" viewBox="0 0 22 22" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round">
+    <svg
+      width="22"
+      height="22"
+      viewBox="0 0 22 22"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.4"
+      strokeLinejoin="round"
+    >
       <circle cx="11" cy="11" r="9" />
       <path d="m14.8 7.2-1.7 5-5 1.7 1.7-5 5-1.7Z" />
     </svg>
@@ -180,7 +296,16 @@ function CompassIcon() {
 
 function CrossIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+    >
       <path d="M8 2.5v11M2.5 8h11" />
     </svg>
   );
@@ -188,7 +313,16 @@ function CrossIcon() {
 
 function RadarIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    >
       <circle cx="10" cy="10" r="8" strokeDasharray="4 2.6" />
       <path d="M10 10 16 4" />
       <circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none" />
@@ -198,7 +332,17 @@ function RadarIcon() {
 
 function AnvilIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 14h12" />
       <path d="M5 14v-3a5 5 0 0 1 10 0v3" />
       <path d="M3 11h14M10 6V4.2M7 4.2h6" />
@@ -208,7 +352,15 @@ function AnvilIcon() {
 
 function RecruitSilhouette() {
   return (
-    <svg width="56" height="56" viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      width="56"
+      height="56"
+      viewBox="0 0 64 64"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <circle cx="32" cy="22" r="9" />
       <path d="M14 54c2-12 9-17 18-17s16 5 18 17" />
     </svg>
@@ -270,9 +422,7 @@ export function CampaignScreen() {
   const resources = state.resources;
   const scanCost = content.campaign.scan.cost;
   const canScan =
-    resources.gold >= scanCost.gold
-    && resources.herbs >= scanCost.herbs
-    && resources.artifacts >= scanCost.artifacts;
+    resources.gold >= scanCost.gold && resources.herbs >= scanCost.herbs && resources.artifacts >= scanCost.artifacts;
   const lockedCount = state.missions.filter((point) => point.status === "locked").length;
 
   const shipPosition = state.shipPosition;
@@ -298,19 +448,20 @@ export function CampaignScreen() {
   // Туториалы «первого раза» (0.20.0): желаемые по условиям экрана, ещё не
   // показанные и при включённой настройке подсказок — добавляются в очередь.
   const wantedHints = useMemo(
-    () => pendingCampaignHints({
-      showHints: settings.showHints,
-      done: campaignHintsDone ?? [],
-      onCampaignMap: tab === "map",
-      lockedCount,
-      hasWounded: woundedFighters.length > 0,
-      rosterTabActive: tab === "roster",
-      forgeTabActive: tab === "forge",
-      onDeployment: false,
-      onBattleWithGeneral: false,
-      onBattle: false,
-      enemyTypes: [],
-    }),
+    () =>
+      pendingCampaignHints({
+        showHints: settings.showHints,
+        done: campaignHintsDone ?? [],
+        onCampaignMap: tab === "map",
+        lockedCount,
+        hasWounded: woundedFighters.length > 0,
+        rosterTabActive: tab === "roster",
+        forgeTabActive: tab === "forge",
+        onDeployment: false,
+        onBattleWithGeneral: false,
+        onBattle: false,
+        enemyTypes: [],
+      }),
     [settings.showHints, campaignHintsDone, tab, lockedCount, woundedFighters.length],
   );
   useEffect(() => {
@@ -326,9 +477,7 @@ export function CampaignScreen() {
   // Активный туториал: только при включённой настройке подсказок и только
   // непоказанные (0.20.0). Проверка showHints защищает и от элементов,
   // уже успевших попасть в очередь до выключения настройки.
-  const activeHintId = settings.showHints
-    ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null)
-    : null;
+  const activeHintId = settings.showHints ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null) : null;
   const closeHint = (): void => {
     if (!activeHintId) return;
     session.markCampaignHintShown(activeHintId);
@@ -359,7 +508,17 @@ export function CampaignScreen() {
   // Иконка выхода из стратегического режима в главное меню (доработка).
   function ExitToMenuIcon() {
     return (
-      <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        width="16"
+        height="16"
+        viewBox="0 0 24 24"
+        aria-hidden="true"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M13 4H6v16h7" />
         <path d="M16 8l4 4-4 4" />
         <path d="M10 12h9" />
@@ -415,9 +574,7 @@ export function CampaignScreen() {
         <>
           <div className="map-toolbar">
             <p className="map-toolbar-note">
-              {lockedCount > 0
-                ? t("scan.hint", { radius: content.campaign.scan.radius })
-                : t("scan.allOpen")}
+              {lockedCount > 0 ? t("scan.hint", { radius: content.campaign.scan.radius }) : t("scan.allOpen")}
             </p>
             <button
               type="button"
@@ -429,9 +586,24 @@ export function CampaignScreen() {
               <RadarIcon />
               {t("scan.action")}
               <span className="scan-cost" aria-hidden="true">
-                {scanCost.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{scanCost.gold}</span> : null}
-                {scanCost.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{scanCost.herbs}</span> : null}
-                {scanCost.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{scanCost.artifacts}</span> : null}
+                {scanCost.gold > 0 ? (
+                  <span className="cost-chip gold">
+                    <CoinIcon />
+                    {scanCost.gold}
+                  </span>
+                ) : null}
+                {scanCost.herbs > 0 ? (
+                  <span className="cost-chip herbs">
+                    <HerbIcon />
+                    {scanCost.herbs}
+                  </span>
+                ) : null}
+                {scanCost.artifacts > 0 ? (
+                  <span className="cost-chip artifacts">
+                    <GemIcon />
+                    {scanCost.artifacts}
+                  </span>
+                ) : null}
               </span>
             </button>
           </div>
@@ -477,9 +649,29 @@ export function CampaignScreen() {
                   if (status === "locked") return null;
                   return (
                     <g key={`${fromMission.id}-${toMission.id}`}>
-                      <line className="road-seg-glow" x1={fromMission.x} y1={fromMission.y} x2={toMission.x} y2={toMission.y} />
-                      <line className="road-seg" x1={fromMission.x} y1={fromMission.y} x2={toMission.x} y2={toMission.y} pathLength={100} />
-                      <line className="road-seg-draw" x1={fromMission.x} y1={fromMission.y} x2={toMission.x} y2={toMission.y} pathLength={100} />
+                      <line
+                        className="road-seg-glow"
+                        x1={fromMission.x}
+                        y1={fromMission.y}
+                        x2={toMission.x}
+                        y2={toMission.y}
+                      />
+                      <line
+                        className="road-seg"
+                        x1={fromMission.x}
+                        y1={fromMission.y}
+                        x2={toMission.x}
+                        y2={toMission.y}
+                        pathLength={100}
+                      />
+                      <line
+                        className="road-seg-draw"
+                        x1={fromMission.x}
+                        y1={fromMission.y}
+                        x2={toMission.x}
+                        y2={toMission.y}
+                        pathLength={100}
+                      />
                     </g>
                   );
                 })}
@@ -488,7 +680,11 @@ export function CampaignScreen() {
             <div className="map-fog" aria-hidden="true" />
             {/* Волна сканирования от корабля */}
             {scanKey > 0 ? <div key={scanKey} className="scan-wave" aria-hidden="true" /> : null}
-            {scanMissed ? <p className="scan-toast" role="status">{t("scan.nothing")}</p> : null}
+            {scanMissed ? (
+              <p className="scan-toast" role="status">
+                {t("scan.nothing")}
+              </p>
+            ) : null}
 
             {missions.map((mission) => {
               const point = state.missions.find((candidate) => candidate.id === mission.id);
@@ -563,13 +759,19 @@ export function CampaignScreen() {
               <div className={`mission-card is-${selected.type}${selectedPoint.status === "done" ? " is-done" : ""}`}>
                 <div className="mission-head">
                   <span className={`mission-type-icon is-${selected.type}`} aria-hidden="true">
-                    {selected.type === "destroy" ? <IdolIcon /> : selected.type === "rescue" ? <RescueIcon /> : selected.type === "recon" ? <ReconIcon /> : <SwordsIcon />}
+                    {selected.type === "destroy" ? (
+                      <IdolIcon />
+                    ) : selected.type === "rescue" ? (
+                      <RescueIcon />
+                    ) : selected.type === "recon" ? (
+                      <ReconIcon />
+                    ) : (
+                      <SwordsIcon />
+                    )}
                   </span>
                   <div>
                     <p className="mission-id">{selected.id}</p>
-                    <h2 className="mission-title">
-                      {t(`campaign.type.${selected.type}`)}
-                    </h2>
+                    <h2 className="mission-title">{t(`campaign.type.${selected.type}`)}</h2>
                   </div>
                 </div>
                 {selectedPoint.status === "done" ? <p className="mission-status done">{t("campaign.done")}</p> : null}
@@ -604,9 +806,24 @@ export function CampaignScreen() {
                     <dt>{t("campaign.reward")}</dt>
                     <dd>
                       <span className="reward-chips" aria-label={t("campaign.reward")}>
-                        {selected.rewards.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{selected.rewards.gold}</span> : null}
-                        {selected.rewards.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{selected.rewards.herbs}</span> : null}
-                        {selected.rewards.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{selected.rewards.artifacts}</span> : null}
+                        {selected.rewards.gold > 0 ? (
+                          <span className="cost-chip gold">
+                            <CoinIcon />
+                            {selected.rewards.gold}
+                          </span>
+                        ) : null}
+                        {selected.rewards.herbs > 0 ? (
+                          <span className="cost-chip herbs">
+                            <HerbIcon />
+                            {selected.rewards.herbs}
+                          </span>
+                        ) : null}
+                        {selected.rewards.artifacts > 0 ? (
+                          <span className="cost-chip artifacts">
+                            <GemIcon />
+                            {selected.rewards.artifacts}
+                          </span>
+                        ) : null}
                       </span>
                     </dd>
                   </div>
@@ -634,11 +851,7 @@ export function CampaignScreen() {
                   // Начатая миссия (0.20.18): вернуться в неё либо осознанно
                   // покинуть — молча миссия не теряется ни из боя, ни из меню.
                   <div className="mission-actions">
-                    <button
-                      type="button"
-                      className="campaign-start-btn"
-                      onClick={() => session.resumeCampaign()}
-                    >
+                    <button type="button" className="campaign-start-btn" onClick={() => session.resumeCampaign()}>
                       {t("campaign.resumeMission")}
                       <span aria-hidden="true">→</span>
                     </button>
@@ -656,7 +869,12 @@ export function CampaignScreen() {
                 ) : selectedPoint.status === "open" && state.activeMissionId !== null ? (
                   // Другая точка, пока миссия начата: старт недоступен.
                   <div className="mission-actions">
-                    <button type="button" className="campaign-start-btn" disabled title={t("campaign.missionActiveHint")}>
+                    <button
+                      type="button"
+                      className="campaign-start-btn"
+                      disabled
+                      title={t("campaign.missionActiveHint")}
+                    >
                       {t("campaign.start")}
                     </button>
                     <p className="mission-active-note">{t("campaign.missionActiveHint")}</p>
@@ -703,7 +921,10 @@ export function CampaignScreen() {
           <div className="panel-head">
             <h2>{t("campaign.tabRoster")}</h2>
             <p className="muted">
-              {t("roster.count", { current: state.fighters.filter((fighter) => fighter.alive).length, max: content.campaign.rosterCap })}
+              {t("roster.count", {
+                current: state.fighters.filter((fighter) => fighter.alive).length,
+                max: content.campaign.rosterCap,
+              })}
             </p>
           </div>
           <div className="fighter-list">
@@ -732,14 +953,19 @@ export function CampaignScreen() {
                       {fighter.name}
                       {!fighter.alive ? <span className="fallen-tag">{t("roster.fallen")}</span> : null}
                       {fighter.wounded ? (
-                        <span className="wounded-tag" title={t("roster.woundedHint", { aim: penalty.aim, defense: penalty.defense, mobility: penalty.mobility })}>
+                        <span
+                          className="wounded-tag"
+                          title={t("roster.woundedHint", {
+                            aim: penalty.aim,
+                            defense: penalty.defense,
+                            mobility: penalty.mobility,
+                          })}
+                        >
                           {t("roster.wounded")}
                         </span>
                       ) : null}
                     </span>
-                    <span className="fighter-class">
-                      {recruit ? t("roster.recruit") : t(unitName(fighter.unitId))}
-                    </span>
+                    <span className="fighter-class">{recruit ? t("roster.recruit") : t(unitName(fighter.unitId))}</span>
                     <span className="fighter-hp">
                       {fighter.alive
                         ? t("battle.hp", { current: fighter.hp, max: fighter.maxHp })
@@ -757,7 +983,11 @@ export function CampaignScreen() {
                     <span className="level-label">{t("roster.level", { level: fighter.level })}</span>
                   </span>
                   {canTrain ? (
-                    <button type="button" className="btn btn-primary train-btn" onClick={() => setTrainingId(fighter.id)}>
+                    <button
+                      type="button"
+                      className="btn btn-primary train-btn"
+                      onClick={() => setTrainingId(fighter.id)}
+                    >
                       {t("roster.train")}
                     </button>
                   ) : null}
@@ -819,9 +1049,7 @@ export function CampaignScreen() {
                       <span className="fighter-class">
                         {recruit ? t("roster.recruit") : t(unitName(fighter.unitId))}
                       </span>
-                      <span className="fighter-hp">
-                        {t("battle.hp", { current: fighter.hp, max: fighter.maxHp })}
-                      </span>
+                      <span className="fighter-hp">{t("battle.hp", { current: fighter.hp, max: fighter.maxHp })}</span>
                     </span>
                     <button
                       type="button"
@@ -848,17 +1076,15 @@ export function CampaignScreen() {
         <div className="roster-panel forge-panel" aria-label={t("campaign.tabForge")}>
           <div className="panel-head">
             <h2>{t("campaign.tabForge")}</h2>
-            <p className="muted">
-              {t("forge.inventory", { current: state.inventory.length })}
-            </p>
+            <p className="muted">{t("forge.inventory", { current: state.inventory.length })}</p>
           </div>
           <div className="forge-grid">
             {items.map((item) => {
               const crafted = state.inventory.includes(item.id);
               const affordable =
-                resources.gold >= item.cost.gold
-                && resources.herbs >= item.cost.herbs
-                && resources.artifacts >= item.cost.artifacts;
+                resources.gold >= item.cost.gold &&
+                resources.herbs >= item.cost.herbs &&
+                resources.artifacts >= item.cost.artifacts;
               const parts = itemEffectParts(item, t);
               return (
                 <div key={item.id} className={`forge-card${crafted ? " is-crafted" : ""}`}>
@@ -868,9 +1094,24 @@ export function CampaignScreen() {
                   <span className="forge-name">{t(itemName(item.id))}</span>
                   <span className="forge-effects">{parts.join(" · ")}</span>
                   <span className="forge-cost" aria-label={t("forge.cost")}>
-                    {item.cost.gold > 0 ? <span className="cost-chip gold"><CoinIcon />{item.cost.gold}</span> : null}
-                    {item.cost.herbs > 0 ? <span className="cost-chip herbs"><HerbIcon />{item.cost.herbs}</span> : null}
-                    {item.cost.artifacts > 0 ? <span className="cost-chip artifacts"><GemIcon />{item.cost.artifacts}</span> : null}
+                    {item.cost.gold > 0 ? (
+                      <span className="cost-chip gold">
+                        <CoinIcon />
+                        {item.cost.gold}
+                      </span>
+                    ) : null}
+                    {item.cost.herbs > 0 ? (
+                      <span className="cost-chip herbs">
+                        <HerbIcon />
+                        {item.cost.herbs}
+                      </span>
+                    ) : null}
+                    {item.cost.artifacts > 0 ? (
+                      <span className="cost-chip artifacts">
+                        <GemIcon />
+                        {item.cost.artifacts}
+                      </span>
+                    ) : null}
                   </span>
                   {crafted ? (
                     <span className="crafted-tag">{t("forge.crafted")}</span>
@@ -889,11 +1130,7 @@ export function CampaignScreen() {
               );
             })}
           </div>
-          {state.inventory.length > 0 ? (
-            <p className="forge-note">
-              {t("forge.equipHint")}
-            </p>
-          ) : null}
+          {state.inventory.length > 0 ? <p className="forge-note">{t("forge.equipHint")}</p> : null}
         </div>
       ) : null}
 
@@ -922,7 +1159,11 @@ export function CampaignScreen() {
         >
           <ChamberIcon />
           {t("campaign.tabChamber")}
-          {woundedFighters.length > 0 ? <span className="tab-alert" aria-label={t("chamber.count", { current: woundedFighters.length })}>{woundedFighters.length}</span> : null}
+          {woundedFighters.length > 0 ? (
+            <span className="tab-alert" aria-label={t("chamber.count", { current: woundedFighters.length })}>
+              {woundedFighters.length}
+            </span>
+          ) : null}
         </button>
         <button
           type="button"
@@ -931,13 +1172,18 @@ export function CampaignScreen() {
         >
           <HammerIcon />
           {t("campaign.tabForge")}
-          {state.inventory.length > 0 ? <span className="tab-alert forge-alert" aria-label={t("forge.inventory", { current: state.inventory.length })}>{state.inventory.length}</span> : null}
+          {state.inventory.length > 0 ? (
+            <span
+              className="tab-alert forge-alert"
+              aria-label={t("forge.inventory", { current: state.inventory.length })}
+            >
+              {state.inventory.length}
+            </span>
+          ) : null}
         </button>
       </nav>
 
-      {activeHintId ? (
-        <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} />
-      ) : null}
+      {activeHintId ? <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} /> : null}
 
       {training ? (
         <div className="pause-root" role="presentation">
@@ -956,7 +1202,11 @@ export function CampaignScreen() {
                       if (campaign.assignClass(training.id, classId)) setTrainingId(null);
                     }}
                   >
-                    {face ? <img src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+                    {face ? (
+                      <img src={face} alt="" draggable={false} />
+                    ) : (
+                      <span className="deploy-face-empty" aria-hidden="true" />
+                    )}
                     <span>{t(unitName(classId))}</span>
                   </button>
                 );
@@ -971,7 +1221,12 @@ export function CampaignScreen() {
 
       {state.phase === "lost" ? (
         <div className="pause-root" role="presentation">
-          <div className="pause-card campaign-lost-card" role="dialog" aria-modal="true" aria-labelledby="campaign-lost-title">
+          <div
+            className="pause-card campaign-lost-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="campaign-lost-title"
+          >
             <h2 id="campaign-lost-title">{t("campaign.lostTitle")}</h2>
             <p>{t("campaign.lostBody", { value: state.darknessMax })}</p>
             <button type="button" className="hud-btn hud-btn-primary" onClick={() => session.goTo("menu")}>

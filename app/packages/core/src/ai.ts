@@ -30,7 +30,12 @@ function repeatsAppliedStatus(kernel: TacticsKernel, skillId: string, target: En
   return Boolean(skill?.effects.some((effect) => effect.type === "applyStatus" && hasStatus(target, effect.status)));
 }
 
-function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly EntityState[], all: readonly EntityState[]): Command | null {
+function bestSkill(
+  kernel: TacticsKernel,
+  actor: EntityState,
+  foes: readonly EntityState[],
+  all: readonly EntityState[],
+): Command | null {
   for (const skillId of actor.skillIds ?? []) {
     const skill = kernel.getSkillDefinition(skillId);
     if (!skill) continue;
@@ -49,13 +54,18 @@ function bestSkill(kernel: TacticsKernel, actor: EntityState, foes: readonly Ent
       const corpse = all
         .filter((entity) => entity.dead && entity.owner === actor.owner && entity.configId === spawnEffect.unitId)
         .sort((a, b) => a.id - b.id)
-        .find((entity) => kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available);
-      if (corpse) return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
+        .find(
+          (entity) =>
+            kernel.getSkillPreview(actor.id, skillId, undefined, { x: entity.x, y: entity.y, z: entity.z }).available,
+        );
+      if (corpse)
+        return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
       continue;
     }
     if (skill.filter === "enemies") {
-      const target = foes.find((foe) =>
-        !repeatsAppliedStatus(kernel, skillId, foe) && kernel.getSkillPreview(actor.id, skillId, foe.id).available
+      const target = foes.find(
+        (foe) =>
+          !repeatsAppliedStatus(kernel, skillId, foe) && kernel.getSkillPreview(actor.id, skillId, foe.id).available,
       );
       if (target) return { type: "USE_SKILL", actorId: actor.id, skillId, targetId: target.id };
     }
@@ -86,8 +96,8 @@ function scoreMove(actor: EntityState, cell: ReachableCell, foe: EntityState): n
   const next = distH(cell.x, cell.y, foe.x, foe.y);
   if (actor.preferredRange !== undefined) {
     const now = distH(actor.x, actor.y, foe.x, foe.y);
-    if (now < (actor.preferredRange! - 1)) return next * 10 - cell.apCost;
-    if (now > (actor.preferredRange! + 1)) return -next * 10 - cell.apCost;
+    if (now < actor.preferredRange! - 1) return next * 10 - cell.apCost;
+    if (now > actor.preferredRange! + 1) return -next * 10 - cell.apCost;
     return -Math.abs(next - actor.preferredRange!) * 10 - cell.apCost;
   }
   return -next * 10 - cell.apCost;
@@ -111,8 +121,8 @@ function bestMove(kernel: TacticsKernel, actor: EntityState, foes: readonly Enti
   if (!best) return null;
   const next = distH(best.x, best.y, foe.x, foe.y);
   if (actor.preferredRange !== undefined) {
-    if (now < (actor.preferredRange! - 1) && next <= now) return null;
-    if (now > (actor.preferredRange! + 1) && next >= now) return null;
+    if (now < actor.preferredRange! - 1 && next <= now) return null;
+    if (now > actor.preferredRange! + 1 && next >= now) return null;
   } else if (next >= now) {
     return null;
   }
@@ -123,7 +133,9 @@ export function pickEnemyCommand(kernel: TacticsKernel): Command | null {
   const snap = kernel.getSnapshot();
   if (snap.activeOwner !== ENEMY_OWNER) return null;
   const visible = kernel.getVisibleCells(ENEMY_OWNER);
-  const foes = livingOf(snap, PLAYER_OWNER).filter((entity) => !entity.hidden && visible.has(`${entity.x},${entity.y}`));
+  const foes = livingOf(snap, PLAYER_OWNER).filter(
+    (entity) => !entity.hidden && visible.has(`${entity.x},${entity.y}`),
+  );
   const enemies = livingOf(snap, ENEMY_OWNER)
     .filter((entity) => entity.ap > 0)
     .sort((a, b) => a.id - b.id);

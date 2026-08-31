@@ -5,9 +5,29 @@ import manifest from "../../../package.json";
 
 const OPTIONS: PvpMatchOptions = {
   units: [
-    { id: "bogatyr", maxHealth: 12, maxAP: 2, mobility: 5, aim: 100, defense: 0, will: 40, vision: 12, weapons: ["sword"], skills: [] },
+    {
+      id: "bogatyr",
+      maxHealth: 12,
+      maxAP: 2,
+      mobility: 5,
+      aim: 100,
+      defense: 0,
+      will: 40,
+      vision: 12,
+      weapons: ["sword"],
+      skills: [],
+    },
   ],
-  map: { width: 14, height: 10, pitChance: 0.02, coverDensity: 0.03, wallDensity: 0.01, edgeCoverChance: 0.4, halfCoverChance: 0.5, heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 } },
+  map: {
+    width: 14,
+    height: 10,
+    pitChance: 0.02,
+    coverDensity: 0.03,
+    wallDensity: 0.01,
+    edgeCoverChance: 0.4,
+    halfCoverChance: 0.5,
+    heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
+  },
   side1: ["bogatyr"],
   side2: ["bogatyr"],
   objective: "elimination",
@@ -33,13 +53,23 @@ describe("replay journal (0.20.19)", () => {
 
   it("reproduces the same battle from the journal", () => {
     const recorder = createReplayRecorder(OPTIONS, "repro");
-    const kernel = createTacticsKernel({ initial: createPvpMatch(OPTIONS), weapons: {}, skills: {}, seed: OPTIONS.seed });
+    const kernel = createTacticsKernel({
+      initial: createPvpMatch(OPTIONS),
+      weapons: {},
+      skills: {},
+      seed: OPTIONS.seed,
+    });
     // Ход 1 (игрок): завершение хода.
     recorder.record({ type: "END_TURN", playerId: "1" });
     kernel.apply({ type: "END_TURN", playerId: "1" });
     expect(kernel.getSnapshot().activeOwner).toBe(2);
     // Воспроизведение журнала с нуля даёт ту же смену хода.
-    const replayKernel = createTacticsKernel({ initial: createPvpMatch(OPTIONS), weapons: {}, skills: {}, seed: OPTIONS.seed });
+    const replayKernel = createTacticsKernel({
+      initial: createPvpMatch(OPTIONS),
+      weapons: {},
+      skills: {},
+      seed: OPTIONS.seed,
+    });
     for (const command of recorder.getJournal()!.commands) {
       replayKernel.apply(command);
     }
