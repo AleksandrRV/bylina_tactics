@@ -3,9 +3,7 @@ import type { InstallController } from "@bylina/ui";
 
 export function useInstallPrompt(): InstallController {
   const [event, setEvent] = useState<BeforeInstallPromptEvent | null>(null);
-  const [installed, setInstalled] = useState(
-    () => window.matchMedia("(display-mode: standalone)").matches,
-  );
+  const [installed, setInstalled] = useState(() => window.matchMedia("(display-mode: standalone)").matches);
 
   useEffect(() => {
     const onPrompt = (raw: Event) => {

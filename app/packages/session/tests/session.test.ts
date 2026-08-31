@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEBUG_BOW,
-  createDebugMatch,
-  createTacticsKernel,
-} from "@bylina/core";
+import { DEBUG_BOW, createDebugMatch, createTacticsKernel } from "@bylina/core";
 import { createCampaign } from "@bylina/campaign";
 import type { CampaignConfig } from "@bylina/content";
 import { APP_VERSION, createSession } from "../src/index.js";
@@ -207,7 +203,9 @@ describe("createSession", () => {
 
     const attack = session.applyBattleCommand({ type: "ATTACK", actorId: 1, targetId: 4, weaponId: DEBUG_BOW.id });
     expect(attack.ok).toBe(true);
-    expect(attack.ok && attack.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+    expect(
+      attack.ok && attack.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1"),
+    ).toBe(true);
     expect(session.getBattleOutcome()).toBe("victory");
 
     const result = session.finishCampaignMission(
@@ -217,7 +215,12 @@ describe("createSession", () => {
     expect(result).toMatchObject({ darknessGained: 2, campaignLost: false });
     expect(session.get().screen).toBe("missionResult");
     // Следующая точка открывается сканированием корабля.
-    expect(session.getCampaign().getState().missions.map((point) => point.status)).toEqual(["done", "locked"]);
+    expect(
+      session
+        .getCampaign()
+        .getState()
+        .missions.map((point) => point.status),
+    ).toEqual(["done", "locked"]);
     const scan = session.getCampaign().scan();
     expect(scan?.opened).toEqual(["clearing_2"]);
     session.backToCampaign();
@@ -232,7 +235,10 @@ describe("createSession", () => {
     const fighters = session.getCampaign().getState().fighters;
     session.confirmDeployment(fighters.map((fighter) => fighter.id));
     expect(
-      session.finishCampaignMission("defeat", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 5 }))),
+      session.finishCampaignMission(
+        "defeat",
+        fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 5 })),
+      ),
     ).toMatchObject({ darknessGained: 4, campaignLost: true });
     expect(session.getCampaign().getState().phase).toBe("lost");
     expect(session.startCampaignMission("clearing_2")).toBe(false);
@@ -248,7 +254,9 @@ describe("createSession debug auto win", () => {
     session.bindTacticsHost(host);
     const result = session.debugAutoWinBattle();
     expect(result.ok).toBe(true);
-    expect(result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1")).toBe(true);
+    expect(
+      result.ok && result.events.some((event) => event.type === "MATCH_ENDED" && event.winnerPlayerId === "1"),
+    ).toBe(true);
     expect(session.getBattleOutcome()).toBe("victory");
   });
 
@@ -311,10 +319,74 @@ describe("createSession pvp (0.14.0)", () => {
       initial: {
         turnNumber: 1,
         activeOwner: 1,
-        grid: { width: 8, height: 6, tiles: Array.from({ length: 48 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), z: 1, pit: false, blockLOS: false })) },
+        grid: {
+          width: 8,
+          height: 6,
+          tiles: Array.from({ length: 48 }, (_, i) => ({
+            x: i % 8,
+            y: Math.floor(i / 8),
+            z: 1,
+            pit: false,
+            blockLOS: false,
+          })),
+        },
         entities: [
-          { id: 1, configId: "bogatyr", owner: 1, x: 1, y: 2, z: 1, dir: 1, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 70, defense: 10, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
-          { id: 11, configId: "bogatyr", owner: 2, x: 6, y: 2, z: 1, dir: 3, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 70, defense: 10, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
+          {
+            id: 1,
+            configId: "bogatyr",
+            owner: 1,
+            x: 1,
+            y: 2,
+            z: 1,
+            dir: 1,
+            ap: 2,
+            maxAp: 2,
+            mobility: 5,
+            hp: 12,
+            maxHp: 12,
+            aim: 70,
+            defense: 10,
+            will: 40,
+            vision: 12,
+            weaponId: "sword",
+            weaponIds: ["sword"],
+            skillIds: [],
+            obstacle: true,
+            dead: false,
+            flying: false,
+            coverType: 0,
+            overwatch: false,
+            defending: false,
+            movementSpent: 0,
+          },
+          {
+            id: 11,
+            configId: "bogatyr",
+            owner: 2,
+            x: 6,
+            y: 2,
+            z: 1,
+            dir: 3,
+            ap: 2,
+            maxAp: 2,
+            mobility: 5,
+            hp: 12,
+            maxHp: 12,
+            aim: 70,
+            defense: 10,
+            will: 40,
+            vision: 12,
+            weaponId: "sword",
+            weaponIds: ["sword"],
+            skillIds: [],
+            obstacle: true,
+            dead: false,
+            flying: false,
+            coverType: 0,
+            overwatch: false,
+            defending: false,
+            movementSpent: 0,
+          },
         ],
       },
     });
@@ -645,7 +717,9 @@ describe("suspend/resume campaign battle (0.20.17–0.20.19)", () => {
     session.bindCampaign(campaign);
     expect(session.startCampaignMission("clearing_1")).toBe(true);
     expect(session.confirmDeployment([1, 2, 3])).toBe(true);
-    session.bindTacticsHost(createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 7 }));
+    session.bindTacticsHost(
+      createTacticsKernel({ initial: createDebugMatch(), weapons: { sword: DEBUG_BOW }, seed: 7 }),
+    );
     for (let cycle = 0; cycle < 2; cycle += 1) {
       session.suspendCampaignBattle();
       const suspended = session.get();

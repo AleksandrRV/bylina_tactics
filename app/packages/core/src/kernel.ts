@@ -10,16 +10,16 @@ import { apCostFor, findPath, listReachable } from "./pathfinding.js";
 import { inMeleeReach, inRangedReach } from "./range.js";
 import { createMulberry32, clampChance, type Rng } from "./rng.js";
 import { spawnUnitState } from "./match.js";
-import { isResurrectionSpawn, spawnCause, type SkillEffect, type SkillPreview, type SkillStats, type SpawnCause, type StatusId } from "./skills.js";
-import type {
-  ApplyResult,
-  CellPos,
-  Command,
-  EntityState,
-  GameEvent,
-  MatchState,
-  ReachableCell,
-} from "./types.js";
+import {
+  isResurrectionSpawn,
+  spawnCause,
+  type SkillEffect,
+  type SkillPreview,
+  type SkillStats,
+  type SpawnCause,
+  type StatusId,
+} from "./skills.js";
+import type { ApplyResult, CellPos, Command, EntityState, GameEvent, MatchState, ReachableCell } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 import { APP_VERSION } from "./version.js";
 
@@ -71,7 +71,12 @@ export interface TacticsKernel {
    * истребления» (0.20.45): крысы М2 выходят не целью миссии, а угрозой,
    * и их гибель не должна закрывать бой.
    */
-  spawnScripted(unitId: string, owner: number, pos: CellPos, options?: { countsForElimination?: boolean }): EntityState | null;
+  spawnScripted(
+    unitId: string,
+    owner: number,
+    pos: CellPos,
+    options?: { countsForElimination?: boolean },
+  ): EntityState | null;
   /**
    * События скриптовых появлений, накопленные с прошлого вызова (0.20.37).
    * Появление происходит внутри `spawnScripted`, а не внутри `apply`, поэтому
@@ -119,7 +124,9 @@ function nextOwner(state: MatchState, current: number): number {
   // фиксированной паре сторон: состязательный режим допускает произвольное
   // число участников (game-design §7).
   const living = new Set(
-    state.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.maxAp > 0).map((entity) => entity.owner),
+    state.entities
+      .filter((entity) => !entity.dead && entity.coverType === 0 && entity.maxAp > 0)
+      .map((entity) => entity.owner),
   );
   const order = [...living].sort((a, b) => a - b);
   if (order.length === 0) return current;
@@ -129,10 +136,13 @@ function nextOwner(state: MatchState, current: number): number {
 }
 
 function samePath(a: readonly CellPos[], b: readonly CellPos[]): boolean {
-  return a.length === b.length && a.every((cell, index) => {
-    const other = b[index];
-    return other?.x === cell.x && other.y === cell.y && other.z === cell.z;
-  });
+  return (
+    a.length === b.length &&
+    a.every((cell, index) => {
+      const other = b[index];
+      return other?.x === cell.x && other.y === cell.y && other.z === cell.z;
+    })
+  );
 }
 
 function cellPos(entity: EntityState): CellPos {
@@ -142,17 +152,29 @@ function cellPos(entity: EntityState): CellPos {
 function inFrontHalfPlane(observer: EntityState, cx: number, cy: number): boolean {
   const dx = cx - observer.x;
   const dy = cy - observer.y;
-  const dirs: [number, number][] = [[0, -1], [1, 0], [0, 1], [-1, 0]];
+  const dirs: [number, number][] = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+  ];
   const [fx, fy] = dirs[observer.dir] ?? [0, -1];
   return fx * dx + fy * dy >= 0;
 }
 
-function canWeaponReach(grid: MatchState["grid"], actor: EntityState, target: EntityState, weapon: WeaponStats): "OUT_OF_RANGE" | "NO_LOS" | null {
-  const inReach = weapon.category === "melee"
-    ? inMeleeReach(actor.x, actor.y, actor.z, target.x, target.y, target.z)
-    : inRangedReach(actor.x, actor.y, actor.z, target.x, target.y, target.z, weapon.range);
+function canWeaponReach(
+  grid: MatchState["grid"],
+  actor: EntityState,
+  target: EntityState,
+  weapon: WeaponStats,
+): "OUT_OF_RANGE" | "NO_LOS" | null {
+  const inReach =
+    weapon.category === "melee"
+      ? inMeleeReach(actor.x, actor.y, actor.z, target.x, target.y, target.z)
+      : inRangedReach(actor.x, actor.y, actor.z, target.x, target.y, target.z, weapon.range);
   if (!inReach) return "OUT_OF_RANGE";
-  if (weapon.requiresLOS && !hasLineOfSight(grid, actor.x, actor.y, actor.z, target.x, target.y, target.z)) return "NO_LOS";
+  if (weapon.requiresLOS && !hasLineOfSight(grid, actor.x, actor.y, actor.z, target.x, target.y, target.z))
+    return "NO_LOS";
   return null;
 }
 
@@ -200,7 +222,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   // drainSpawnEvents и проигрывается средством отображения.
   let pendingSpawnEvents: GameEvent[] = [];
   const activeOwners = (): number[] =>
-    [...new Set(state.entities.filter((entity) => entity.owner > 0).map((entity) => entity.owner))].sort((a, b) => a - b);
+    [...new Set(state.entities.filter((entity) => entity.owner > 0).map((entity) => entity.owner))].sort(
+      (a, b) => a - b,
+    );
   const fog: FogState = createFogState(state, activeOwners());
   // Восстановление сохранённой партии: туман войны переносится из снимка.
   if (options.fog) {
@@ -242,9 +266,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
    * выигранным в момент их выхода: партия «заканчивалась», ход Нави не
    * начинался, и миссия вставала.
    */
-  const eliminationOwners = new Set(state.entities
-    .filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false)
-    .map((entity) => entity.owner));
+  const eliminationOwners = new Set(
+    state.entities
+      .filter(
+        (entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false,
+      )
+      .map((entity) => entity.owner),
+  );
   let eliminationEnabled = eliminationOwners.size >= 2;
 
   const actorOf = (id: number): EntityState | undefined => state.entities.find((entity) => entity.id === id);
@@ -276,11 +304,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return !entity.hidden;
   };
 
-  const knownEntitiesForPath = (owner: number): EntityState[] => state.entities.filter((entity) => {
-    if (entity.owner === owner) return true;
-    if (entity.owner === 0) return fog[owner]?.explored.has(`${entity.x},${entity.y}`) ?? false;
-    return visibleTo(owner, entity);
-  });
+  const knownEntitiesForPath = (owner: number): EntityState[] =>
+    state.entities.filter((entity) => {
+      if (entity.owner === owner) return true;
+      if (entity.owner === 0) return fog[owner]?.explored.has(`${entity.x},${entity.y}`) ?? false;
+      return visibleTo(owner, entity);
+    });
 
   const knownGridForPath = (owner: number): MatchState["grid"] => {
     const explored = fog[owner]?.explored;
@@ -288,9 +317,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return {
       width: state.grid.width,
       height: state.grid.height,
-      tiles: state.grid.tiles.map((tile) => explored.has(`${tile.x},${tile.y}`)
-        ? tile
-        : { ...tile, pit: false, blockLOS: true }),
+      tiles: state.grid.tiles.map((tile) =>
+        explored.has(`${tile.x},${tile.y}`) ? tile : { ...tile, pit: false, blockLOS: true },
+      ),
     };
   };
 
@@ -298,7 +327,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const previous = actor.ap;
     const spent = endsTurn ? previous : apCost;
     actor.ap = Math.max(0, previous - spent);
-    if (spent > 0) events.push({ type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: actor.ap, delta: -spent });
+    if (spent > 0)
+      events.push({ type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: actor.ap, delta: -spent });
   };
 
   const reveal = (entity: EntityState, events: GameEvent[]): void => {
@@ -311,14 +341,25 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const revealAdjacent = (events: GameEvent[]): void => {
     for (const entity of state.entities) {
       if (!entity.hidden || entity.dead || entity.coverType > 0) continue;
-      if (state.entities.some((other) =>
-        !other.dead && other.coverType === 0 && other.owner > 0 && other.owner !== entity.owner &&
-        distH(entity.x, entity.y, other.x, other.y) <= 1
-      )) reveal(entity, events);
+      if (
+        state.entities.some(
+          (other) =>
+            !other.dead &&
+            other.coverType === 0 &&
+            other.owner > 0 &&
+            other.owner !== entity.owner &&
+            distH(entity.x, entity.y, other.x, other.y) <= 1,
+        )
+      )
+        reveal(entity, events);
     }
   };
 
-  const kill = (entity: EntityState, causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON", events: GameEvent[]): void => {
+  const kill = (
+    entity: EntityState,
+    causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON",
+    events: GameEvent[],
+  ): void => {
     if (entity.dead) return;
     entity.dead = true;
     entity.obstacle = false;
@@ -378,11 +419,22 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     events.push({ type: "ENTITY_REMOVED", entityId: entity.id, reason });
   };
 
-  const applyDamage = (target: EntityState, damage: number, events: GameEvent[], cause: "DAMAGE" | "POISON" = "DAMAGE"): void => {
+  const applyDamage = (
+    target: EntityState,
+    damage: number,
+    events: GameEvent[],
+    cause: "DAMAGE" | "POISON" = "DAMAGE",
+  ): void => {
     if (damage <= 0 || target.dead) return;
     const before = target.hp;
     target.hp = Math.max(0, target.hp - damage);
-    events.push({ type: "STAT_CHANGED", entityId: target.id, stat: "HP", newValue: target.hp, delta: target.hp - before });
+    events.push({
+      type: "STAT_CHANGED",
+      entityId: target.id,
+      stat: "HP",
+      newValue: target.hp,
+      delta: target.hp - before,
+    });
     // Гибель (включая снижение здоровья до нуля) окончательна: пороговый уход
     // (§15.6) применяется только при положительном запасе здоровья.
     if (target.hp <= 0) {
@@ -456,33 +508,76 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     const duration = effect.duration;
     if (effect.status === "poison") {
       target.poison = { damagePerTurn: Math.max(1, Math.round(effect.magnitude ?? 1)), turnsLeft: duration };
-      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "POISON", applied: true, duration, magnitude: target.poison.damagePerTurn, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: target.id,
+        status: "POISON",
+        applied: true,
+        duration,
+        magnitude: target.poison.damagePerTurn,
+        sourceId: source.id,
+      });
       return true;
     }
     if (effect.status === "panic") {
       target.panic = { sourceId: source.id, turnsLeft: duration };
-      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "PANIC", applied: true, duration, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: target.id,
+        status: "PANIC",
+        applied: true,
+        duration,
+        sourceId: source.id,
+      });
       return true;
     }
     if (effect.status === "immobile") {
       // §15.4: полёт отменяет обездвиживание, кроме умений с признаком affectsFlying.
       if (target.flying && !affectsFlying) return false;
       target.immobileTurns = Math.max(target.immobileTurns ?? 0, duration);
-      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "IMMOBILE", applied: true, duration: target.immobileTurns, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: target.id,
+        status: "IMMOBILE",
+        applied: true,
+        duration: target.immobileTurns,
+        sourceId: source.id,
+      });
       return true;
     }
     if (effect.status === "hidden") {
       target.hidden = true;
-      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "HIDDEN", applied: true, duration, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: target.id,
+        status: "HIDDEN",
+        applied: true,
+        duration,
+        sourceId: source.id,
+      });
       return true;
     }
     if (effect.status === "flying") {
       target.flying = true;
-      events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "FLYING", applied: true, duration, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: target.id,
+        status: "FLYING",
+        applied: true,
+        duration,
+        sourceId: source.id,
+      });
       return true;
     }
     target.timedLife = duration;
-    events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "TIMED", applied: true, duration, sourceId: source.id });
+    events.push({
+      type: "STATUS_CHANGED",
+      entityId: target.id,
+      status: "TIMED",
+      applied: true,
+      duration,
+      sourceId: source.id,
+    });
     return true;
   };
 
@@ -498,9 +593,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (!config || !tile || tile.blockLOS) return null;
     const flying = config.tags?.includes("flying") ?? false;
     if (tile.pit && !flying) return null;
-    if (state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === pos.x && entity.y === pos.y)) return null;
+    if (state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === pos.x && entity.y === pos.y))
+      return null;
     if (cause === "RESURRECTION") {
-      const corpse = state.entities.find((entity) => entity.dead && entity.configId === unitId && entity.x === pos.x && entity.y === pos.y);
+      const corpse = state.entities.find(
+        (entity) => entity.dead && entity.configId === unitId && entity.x === pos.x && entity.y === pos.y,
+      );
       if (!corpse) return null;
       state.entities = state.entities.filter((entity) => entity.id !== corpse.id);
     }
@@ -520,7 +618,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       cause,
     });
     if (spawned.timedLife !== undefined) {
-      events.push({ type: "STATUS_CHANGED", entityId: spawned.id, status: "TIMED", applied: true, duration: spawned.timedLife, sourceId: source.id });
+      events.push({
+        type: "STATUS_CHANGED",
+        entityId: spawned.id,
+        status: "TIMED",
+        applied: true,
+        duration: spawned.timedLife,
+        sourceId: source.id,
+      });
     }
     return spawned;
   };
@@ -537,13 +642,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
    * разрешает атаку по оставшейся ступени. Полученный средой урон вычитается
    * из урона по цели.
    */
-  const edgeCoverOnLine = (attacker: EntityState, target: EntityState): EntityState | undefined => state.entities
-    .filter((entity) =>
-      entity.edge !== undefined &&
-      isCoverCandidate(target, entity) &&
-      isCoverOnFireLine(attacker, target, entity)
-    )
-    .sort((a, b) => b.coverType - a.coverType || a.id - b.id)[0];
+  const edgeCoverOnLine = (attacker: EntityState, target: EntityState): EntityState | undefined =>
+    state.entities
+      .filter(
+        (entity) =>
+          entity.edge !== undefined && isCoverCandidate(target, entity) && isCoverOnFireLine(attacker, target, entity),
+      )
+      .sort((a, b) => b.coverType - a.coverType || a.id - b.id)[0];
 
   const edgeAttackOptions = (
     attacker: EntityState,
@@ -553,9 +658,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     ignoreHalfCover: boolean,
     damageReduction = 0,
   ): AttackOptions => {
-    const effectiveTier = target.flying
-      ? 0
-      : effectiveCoverTier(rawTier, false, attacker.z, target.z, cover.z);
+    const effectiveTier = target.flying ? 0 : effectiveCoverTier(rawTier, false, attacker.z, target.z, cover.z);
     const rawPenalty = effectiveTier === 2 ? 50 : effectiveTier === 1 ? 25 : 0;
     return {
       coverPenaltyOverride: ignoreHalfCover && rawPenalty === 25 ? 0 : rawPenalty,
@@ -620,7 +723,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
     }
 
-    const livingOwners = new Set(state.entities.filter((entity) => !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false).map((entity) => entity.owner));
+    const livingOwners = new Set(
+      state.entities
+        .filter(
+          (entity) =>
+            !entity.dead && entity.owner > 0 && entity.coverType === 0 && entity.countsForElimination !== false,
+        )
+        .map((entity) => entity.owner),
+    );
     const players = livingOwners.has(PLAYER_OWNER);
     const enemies = [...livingOwners].some((owner) => owner !== PLAYER_OWNER);
 
@@ -727,15 +837,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (!tile || tile.blockLOS || Math.abs(tile.z - target.z) === 2) return false;
     const dx = x - target.x;
     const dy = y - target.y;
-    const crossed = dx !== 0 && dy !== 0
-      ? [
-          edgeCoverBetween(state.entities, target.x, target.y, target.x + dx, target.y),
-          edgeCoverBetween(state.entities, target.x, target.y, target.x, target.y + dy),
-        ]
-      : [edgeCoverBetween(state.entities, target.x, target.y, x, y)];
+    const crossed =
+      dx !== 0 && dy !== 0
+        ? [
+            edgeCoverBetween(state.entities, target.x, target.y, target.x + dx, target.y),
+            edgeCoverBetween(state.entities, target.x, target.y, target.x, target.y + dy),
+          ]
+        : [edgeCoverBetween(state.entities, target.x, target.y, x, y)];
     if (crossed.some((cover) => cover?.coverType === 2)) return false;
-    return state.entities.every((entity) =>
-      entity.id === target.id || entity.dead || entity.x !== x || entity.y !== y || !entity.obstacle
+    return state.entities.every(
+      (entity) => entity.id === target.id || entity.dead || entity.x !== x || entity.y !== y || !entity.obstacle,
     );
   };
 
@@ -764,7 +875,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     target.y = y;
     target.z = tile.z;
     const fall = tile.pit && !target.flying;
-    events.push({ type: "ENTITY_DISPLACED", entityId: target.id, from, to: cellPos(target), cause: fall ? "FALL" : "KNOCKBACK" });
+    events.push({
+      type: "ENTITY_DISPLACED",
+      entityId: target.id,
+      from,
+      to: cellPos(target),
+      cause: fall ? "FALL" : "KNOCKBACK",
+    });
     refresh();
     revealAdjacent(events);
     if (fall) {
@@ -781,7 +898,17 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   const teleport = (target: EntityState, destination: CellPos, events: GameEvent[]): boolean => {
     const tile = tileAt(state.grid, destination.x, destination.y);
     if (!tile || tile.blockLOS || (tile.pit && !target.flying)) return false;
-    if (state.entities.some((entity) => entity.id !== target.id && !entity.dead && entity.obstacle && entity.x === destination.x && entity.y === destination.y)) return false;
+    if (
+      state.entities.some(
+        (entity) =>
+          entity.id !== target.id &&
+          !entity.dead &&
+          entity.obstacle &&
+          entity.x === destination.x &&
+          entity.y === destination.y,
+      )
+    )
+      return false;
     const from = cellPos(target);
     target.x = destination.x;
     target.y = destination.y;
@@ -803,7 +930,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     if (source && !source.dead) {
       const probe = { ...unit, ap: 1, movementSpent: 0, panic: undefined };
       const candidates = listReachable(state.grid, state.entities, probe)
-        .filter((cell) => cell.apCost === 1 && distH(cell.x, cell.y, source.x, source.y) > distH(unit.x, unit.y, source.x, source.y))
+        .filter(
+          (cell) =>
+            cell.apCost === 1 && distH(cell.x, cell.y, source.x, source.y) > distH(unit.x, unit.y, source.x, source.y),
+        )
         .sort((a, b) => {
           const distance = distH(b.x, b.y, source.x, source.y) - distH(a.x, a.y, source.x, source.y);
           if (distance !== 0) return distance;
@@ -825,7 +955,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             unit.y = step.y;
             unit.z = step.z;
             unit.dir = facingAfterStep(previous.x, previous.y, step.x, step.y, unit.dir);
-            events.push({ type: "ENTITY_MOVED", entityId: unit.id, path: [previous, step], isDash: false, apSpent: index === 1 ? 1 : 0 });
+            events.push({
+              type: "ENTITY_MOVED",
+              entityId: unit.id,
+              path: [previous, step],
+              isDash: false,
+              apSpent: index === 1 ? 1 : 0,
+            });
             refresh();
             revealAdjacent(events);
             if (triggerOverwatch(unit, events)) break;
@@ -862,7 +998,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const before = effectTarget.hp;
         effectTarget.hp = Math.min(effectTarget.maxHp, effectTarget.hp + effect.amount);
         if (effectTarget.hp !== before) {
-          events.push({ type: "STAT_CHANGED", entityId: effectTarget.id, stat: "HP", newValue: effectTarget.hp, delta: effectTarget.hp - before });
+          events.push({
+            type: "STAT_CHANGED",
+            entityId: effectTarget.id,
+            stat: "HP",
+            newValue: effectTarget.hp,
+            delta: effectTarget.hp - before,
+          });
           changed = true;
         }
       } else if (effect.type === "applyStatus") {
@@ -901,16 +1043,28 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
     return changed;
   };
 
-  const areaTargets = (source: EntityState, skill: SkillStats, epicenter: CellPos): EntityState[] => state.entities
-    .filter((entity) => {
-      if (entity.dead || entity.coverType > 0 || distH(epicenter.x, epicenter.y, entity.x, entity.y) > (skill.radius ?? 0) || Math.abs(epicenter.z - entity.z) > 1) return false;
-      if (skill.filter === "enemies") return entity.owner > 0 && entity.owner !== source.owner;
-      if (skill.filter === "allies") return entity.owner === source.owner;
-      return skill.filter !== "cover";
-    })
-    .sort((a, b) => a.id - b.id);
+  const areaTargets = (source: EntityState, skill: SkillStats, epicenter: CellPos): EntityState[] =>
+    state.entities
+      .filter((entity) => {
+        if (
+          entity.dead ||
+          entity.coverType > 0 ||
+          distH(epicenter.x, epicenter.y, entity.x, entity.y) > (skill.radius ?? 0) ||
+          Math.abs(epicenter.z - entity.z) > 1
+        )
+          return false;
+        if (skill.filter === "enemies") return entity.owner > 0 && entity.owner !== source.owner;
+        if (skill.filter === "allies") return entity.owner === source.owner;
+        return skill.filter !== "cover";
+      })
+      .sort((a, b) => a.id - b.id);
 
-  const skillPreview = (actor: EntityState, skill: SkillStats, target?: EntityState, targetPos?: CellPos): SkillPreview => {
+  const skillPreview = (
+    actor: EntityState,
+    skill: SkillStats,
+    target?: EntityState,
+    targetPos?: CellPos,
+  ): SkillPreview => {
     // Клетки области действия для предпросмотра (0.20.31, этап 2.6):
     // та же геометрия, что у areaTargets — дистанция по горизонтали и
     // перепад ярусов не более единицы; непроходимые клетки исключаются.
@@ -926,7 +1080,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       }
       return cells;
     };
-    if (actor.dead || actor.panic || actor.owner !== state.activeOwner || (actor.decoy && skill.resolution === "attack")) return { available: false, reason: "ILLEGAL" };
+    if (
+      actor.dead ||
+      actor.panic ||
+      actor.owner !== state.activeOwner ||
+      (actor.decoy && skill.resolution === "attack")
+    )
+      return { available: false, reason: "ILLEGAL" };
     if (actor.ap < skill.apCost) return { available: false, reason: "NO_AP" };
     if ((actor.skillCooldowns?.[skill.id] ?? 0) > 0) return { available: false, reason: "ON_COOLDOWN" };
     if (skill.maxUsesPerBattle !== undefined && (actor.skillUses?.[skill.id] ?? 0) >= skill.maxUsesPerBattle) {
@@ -938,20 +1098,22 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (!tile?.extract) return { available: false, reason: "ILLEGAL" };
       return { available: true, targetPos: cellPos(actor), areaCells: [cellPos(actor)] };
     }
-    if (skill.category === "self") return { available: true, targetPos: cellPos(actor), areaCells: previewAreaCells(cellPos(actor)) };
+    if (skill.category === "self")
+      return { available: true, targetPos: cellPos(actor), areaCells: previewAreaCells(cellPos(actor)) };
     if (!target && !targetPos) return { available: false, reason: "NOT_FOUND" };
     // §15.7: погибшая сущность не является допустимой целью.
     if (target && target.dead) return { available: false, reason: "ILLEGAL" };
     if (target) {
       const isCover = target.coverType > 0;
       const filter = skill.filter;
-      const matches = filter === "cover"
-        ? isCover
-        : filter === "enemies"
-          ? !isCover && target.owner > 0 && target.owner !== actor.owner
-          : filter === "allies"
-            ? !isCover && target.owner === actor.owner
-            : true;
+      const matches =
+        filter === "cover"
+          ? isCover
+          : filter === "enemies"
+            ? !isCover && target.owner > 0 && target.owner !== actor.owner
+            : filter === "allies"
+              ? !isCover && target.owner === actor.owner
+              : true;
       if (!matches) return { available: false, reason: "ILLEGAL" };
     }
     // §10.4: атака по укрытию допустима только при разрушающей силе ≥ 1.
@@ -960,11 +1122,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (!destroysCover) return { available: false, reason: "ILLEGAL" };
     }
     const requestedTile = targetPos ? tileAt(state.grid, targetPos.x, targetPos.y) : undefined;
-    const normalizedTargetPos = targetPos && requestedTile ? { x: targetPos.x, y: targetPos.y, z: requestedTile.z } : targetPos;
+    const normalizedTargetPos =
+      targetPos && requestedTile ? { x: targetPos.x, y: targetPos.y, z: requestedTile.z } : targetPos;
     const pos = target ? cellPos(target) : normalizedTargetPos!;
-    const inReach = skill.category === "melee"
-      ? inMeleeReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)
-      : inRangedReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z, skill.range);
+    const inReach =
+      skill.category === "melee"
+        ? inMeleeReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z)
+        : inRangedReach(actor.x, actor.y, actor.z, pos.x, pos.y, pos.z, skill.range);
     if (!inReach) return { available: false, reason: "OUT_OF_RANGE" };
     // §12.1: полную грань пробивает только разрушающее оружие/умение ближнего боя.
     if (target && skill.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2) {
@@ -985,11 +1149,22 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         !spawnTile ||
         spawnTile.blockLOS ||
         (spawnTile.pit && !spawnConfig.tags?.includes("flying")) ||
-        state.entities.some((entity) => !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y)
-      ) return { available: false, reason: "ILLEGAL" };
-      if (isResurrectionSpawn(spawnEffect, skill.id) && !state.entities.some((entity) =>
-        entity.dead && entity.configId === spawnEffect.unitId && entity.x === targetPos.x && entity.y === targetPos.y
-      )) return { available: false, reason: "ILLEGAL" };
+        state.entities.some(
+          (entity) => !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y,
+        )
+      )
+        return { available: false, reason: "ILLEGAL" };
+      if (
+        isResurrectionSpawn(spawnEffect, skill.id) &&
+        !state.entities.some(
+          (entity) =>
+            entity.dead &&
+            entity.configId === spawnEffect.unitId &&
+            entity.x === targetPos.x &&
+            entity.y === targetPos.y,
+        )
+      )
+        return { available: false, reason: "ILLEGAL" };
     }
     if (skill.effects.some((effect) => effect.type === "displace")) {
       if (!target || !targetPos) return { available: false, reason: "NOT_FOUND" };
@@ -998,12 +1173,23 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         !destination ||
         destination.blockLOS ||
         (destination.pit && !target.flying) ||
-        state.entities.some((entity) => entity.id !== target.id && !entity.dead && entity.obstacle && entity.x === targetPos.x && entity.y === targetPos.y)
-      ) return { available: false, reason: "ILLEGAL" };
+        state.entities.some(
+          (entity) =>
+            entity.id !== target.id &&
+            !entity.dead &&
+            entity.obstacle &&
+            entity.x === targetPos.x &&
+            entity.y === targetPos.y,
+        )
+      )
+        return { available: false, reason: "ILLEGAL" };
       if (!inRangedReach(actor.x, actor.y, actor.z, targetPos.x, targetPos.y, destination.z, skill.range)) {
         return { available: false, reason: "OUT_OF_RANGE" };
       }
-      if (skill.requiresLOS && !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, targetPos.x, targetPos.y, destination.z)) {
+      if (
+        skill.requiresLOS &&
+        !hasLineOfSight(state.grid, actor.x, actor.y, actor.z, targetPos.x, targetPos.y, destination.z)
+      ) {
         return { available: false, reason: "NO_LOS" };
       }
     }
@@ -1023,14 +1209,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           return { available: false, reason: "ILLEGAL" };
         }
         const edgeOptions = breach?.options ?? currentEdgeOptions(actor, target, weapon);
-        const combat = previewAttack(
-          state.grid,
-          state.entities,
-          actor,
-          target,
-          weapon,
-          edgeOptions,
-        );
+        const combat = previewAttack(state.grid, state.entities, actor, target, weapon, edgeOptions);
         return {
           available: combat.available,
           reason: combat.reason,
@@ -1098,9 +1277,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const snapshot = cloneState(state);
       const entry = fog[owner];
       if (!entry) return snapshot;
-      snapshot.grid.tiles = snapshot.grid.tiles.map((tile) => entry.explored.has(`${tile.x},${tile.y}`)
-        ? tile
-        : { x: tile.x, y: tile.y, z: 0, pit: false, blockLOS: false });
+      snapshot.grid.tiles = snapshot.grid.tiles.map((tile) =>
+        entry.explored.has(`${tile.x},${tile.y}`) ? tile : { x: tile.x, y: tile.y, z: 0, pit: false, blockLOS: false },
+      );
       snapshot.entities = snapshot.entities.filter((entity) => {
         if (entity.owner === owner) return true;
         if (entity.owner === 0) return entry.explored.has(`${entity.x},${entity.y}`);
@@ -1114,8 +1293,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       // §8.3: перемещение допустимо в любые известные стороне клетки
       // (разведанные, включая не наблюдаемые сейчас).
       const explored = fog[actor.owner]?.explored;
-      return listReachable(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor)
-        .filter((cell) => !explored || explored.has(`${cell.x},${cell.y}`));
+      return listReachable(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor).filter(
+        (cell) => !explored || explored.has(`${cell.x},${cell.y}`),
+      );
     },
     getPath: (actorId, to) => {
       const actor = actorOf(actorId);
@@ -1141,17 +1321,19 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         if ((weapon.envDmg ?? 0) < 1) return { available: false, reason: "ILLEGAL" };
         if (actor.ap < weapon.apCost) return { available: false, reason: "NO_AP" };
         const reason = canWeaponReach(state.grid, actor, target, weapon);
-        return reason ? { available: false, reason } : {
-          available: true,
-          chance: 100,
-          dmgMin: 0,
-          dmgMax: 0,
-          cover: target.coverType,
-          heightMod: actor.z > target.z ? 1 : actor.z < target.z ? -1 : 0,
-          flanked: false,
-          actionType: weapon.category === "melee" ? "MELEE" : "RANGED",
-          coverTarget: true,
-        };
+        return reason
+          ? { available: false, reason }
+          : {
+              available: true,
+              chance: 100,
+              dmgMin: 0,
+              dmgMax: 0,
+              cover: target.coverType,
+              heightMod: actor.z > target.z ? 1 : actor.z < target.z ? -1 : 0,
+              flanked: false,
+              actionType: weapon.category === "melee" ? "MELEE" : "RANGED",
+              coverTarget: true,
+            };
       }
       const breach = edgeBreach(actor, target, weapon);
       if (weapon.category === "melee" && edgeCoverOnLine(actor, target)?.coverType === 2 && !breach) {
@@ -1168,7 +1350,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const target = targetId === undefined ? undefined : actorOf(targetId);
       if (targetId !== undefined && !target) return { available: false, reason: "NOT_FOUND" };
       if (target && !visibleTo(actor.owner, target)) return { available: false };
-      if (targetPos && !(fog[actor.owner]?.visible.has(`${targetPos.x},${targetPos.y}`) ?? true)) return { available: false };
+      if (targetPos && !(fog[actor.owner]?.visible.has(`${targetPos.x},${targetPos.y}`) ?? true))
+        return { available: false };
       return skillPreview(actor, skill, target, targetPos);
     },
     getSkillDefinition: (skillId) => skills[skillId],
@@ -1287,7 +1470,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         state.activeOwner = upcoming;
 
         // §16.1: poison before every other beginning-of-turn system.
-        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && !candidate.dead).sort((a, b) => a.id - b.id)) {
+        for (const entity of [...state.entities]
+          .filter((candidate) => candidate.owner === upcoming && !candidate.dead)
+          .sort((a, b) => a.id - b.id)) {
           if (!entity.poison) continue;
           const poison = entity.poison;
           applyDamage(entity, poison.damagePerTurn, events, "POISON");
@@ -1300,7 +1485,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         }
 
         // §16.2: limited life expires before AP refill.
-        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && !candidate.dead).sort((a, b) => a.id - b.id)) {
+        for (const entity of [...state.entities]
+          .filter((candidate) => candidate.owner === upcoming && !candidate.dead)
+          .sort((a, b) => a.id - b.id)) {
           if (entity.timedLife === undefined) continue;
           entity.timedLife -= 1;
           if (entity.timedLife <= 0) {
@@ -1344,11 +1531,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           if (entity.dead || entity.maxAp <= 0) continue;
           const delta = entity.maxAp - entity.ap;
           entity.ap = entity.maxAp;
-          if (delta !== 0) events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: entity.ap, delta });
+          if (delta !== 0)
+            events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: entity.ap, delta });
         }
 
         // §16.5: panic performs its forced one-AP flight after refill.
-        for (const entity of [...state.entities].filter((candidate) => candidate.owner === upcoming && candidate.panic).sort((a, b) => a.id - b.id)) {
+        for (const entity of [...state.entities]
+          .filter((candidate) => candidate.owner === upcoming && candidate.panic)
+          .sort((a, b) => a.id - b.id)) {
           processPanic(entity, events);
         }
 
@@ -1438,8 +1628,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const skill = skillOf(actor, command.skillId);
         if (!skill || (actor.decoy && skill.resolution === "attack")) return { ok: false, reason: "ILLEGAL" };
         const target = command.targetId === undefined ? undefined : actorOf(command.targetId);
-        if (command.targetId !== undefined && (!target || !visibleTo(actor.owner, target))) return { ok: false, reason: target ? "ILLEGAL" : "NOT_FOUND" };
-        if (command.targetPos && !(fog[actor.owner]?.visible.has(`${command.targetPos.x},${command.targetPos.y}`) ?? true)) return { ok: false, reason: "ILLEGAL" };
+        if (command.targetId !== undefined && (!target || !visibleTo(actor.owner, target)))
+          return { ok: false, reason: target ? "ILLEGAL" : "NOT_FOUND" };
+        if (
+          command.targetPos &&
+          !(fog[actor.owner]?.visible.has(`${command.targetPos.x},${command.targetPos.y}`) ?? true)
+        )
+          return { ok: false, reason: "ILLEGAL" };
         const preview = skillPreview(actor, skill, target, command.targetPos);
         if (!preview.available) return { ok: false, reason: preview.reason ?? "ILLEGAL" };
         const events: GameEvent[] = [];
@@ -1472,7 +1667,12 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         } else if (skill.detectsHidden && preview.targetPos) {
           const radius = skill.radius ?? 0;
           for (const hidden of state.entities
-            .filter((entity) => entity.hidden && !entity.dead && distH(preview.targetPos!.x, preview.targetPos!.y, entity.x, entity.y) <= radius)
+            .filter(
+              (entity) =>
+                entity.hidden &&
+                !entity.dead &&
+                distH(preview.targetPos!.x, preview.targetPos!.y, entity.x, entity.y) <= radius,
+            )
             .sort((a, b) => a.id - b.id)) {
             reveal(hidden, events);
             success = true;
@@ -1502,9 +1702,15 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             if (!hit) continue;
             success = true;
             applySkillEffects(actor, skill, areaTarget, command.targetPos, events, Boolean(breach));
-            if (!areaTarget.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, areaTarget, events);
+            if (!areaTarget.dead && skill.effects.some((effect) => effect.type === "knockback"))
+              displace(actor, areaTarget, events);
           }
-        } else if (skill.resolution === "attack" && target?.coverType && skill.effects.some((effect) => effect.type === "destroyCover") && skill.envDmg >= 1) {
+        } else if (
+          skill.resolution === "attack" &&
+          target?.coverType &&
+          skill.effects.some((effect) => effect.type === "destroyCover") &&
+          skill.envDmg >= 1
+        ) {
           success = applySkillEffects(actor, skill, target, command.targetPos, events);
         } else if (skill.resolution === "attack" && target && weapon) {
           // §12.1: разрушающее умение ближнего боя пробивает полную грань, как палица.
@@ -1514,7 +1720,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           success = resolveCombatAgainst(actor, target, weapon, events, edgeOptions);
           if (success) {
             applySkillEffects(actor, skill, target, command.targetPos, events, Boolean(breach));
-            if (!target.dead && skill.effects.some((effect) => effect.type === "knockback")) displace(actor, target, events);
+            if (!target.dead && skill.effects.some((effect) => effect.type === "knockback"))
+              displace(actor, target, events);
           }
         } else if (skill.resolution === "auto") {
           if (skill.category === "self" && (skill.radius ?? 0) > 0) {
@@ -1543,9 +1750,10 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           skillId: skill.id,
           cooldown: actor.skillCooldowns[skill.id] ?? 0,
           uses: actor.skillUses[skill.id] ?? 0,
-          usesLeft: skill.maxUsesPerBattle === undefined
-            ? undefined
-            : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
+          usesLeft:
+            skill.maxUsesPerBattle === undefined
+              ? undefined
+              : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
         });
         spendAction(actor, skill.apCost, skill.endsTurn, events);
         appendOutcome(events);
@@ -1560,7 +1768,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       if (explored && !explored.has(`${command.to.x},${command.to.y}`)) return { ok: false, reason: "ILLEGAL" };
       const tile = tileAt(state.grid, command.to.x, command.to.y);
       if (!tile) return { ok: false, reason: "NOT_FOUND" };
-      const knownPath = findPath(knownGridForPath(actor.owner), knownEntitiesForPath(actor.owner), actor, command.to.x, command.to.y);
+      const knownPath = findPath(
+        knownGridForPath(actor.owner),
+        knownEntitiesForPath(actor.owner),
+        actor,
+        command.to.x,
+        command.to.y,
+      );
       const found = findPath(state.grid, state.entities, actor, command.to.x, command.to.y);
       if (!knownPath || !found || found.mpCost <= 0) return { ok: false, reason: "OCCUPIED" };
       if (!samePath(knownPath.path, found.path)) {
@@ -1578,12 +1792,26 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const events: GameEvent[] = [];
       const previousAp = actor.ap;
       actor.ap -= ap;
-      events.push({ type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: actor.ap, delta: actor.ap - previousAp });
+      events.push({
+        type: "STAT_CHANGED",
+        entityId: actor.id,
+        stat: "AP",
+        newValue: actor.ap,
+        delta: actor.ap - previousAp,
+      });
       let traversedMp = 0;
       for (let index = 1; index < found.path.length; index += 1) {
         const previous = found.path[index - 1]!;
         const destination = found.path[index]!;
-        traversedMp += edgeCost(state.grid, state.entities, actor, previous.x, previous.y, destination.x, destination.y);
+        traversedMp += edgeCost(
+          state.grid,
+          state.entities,
+          actor,
+          previous.x,
+          previous.y,
+          destination.x,
+          destination.y,
+        );
         actor.x = destination.x;
         actor.y = destination.y;
         actor.z = destination.z;
@@ -1629,8 +1857,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           objectiveVictory = true;
         }
       } else if (objective?.kind === "recon") {
-        const scout = state.entities.find((entity) =>
-          !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.rosterIndex !== undefined,
+        const scout = state.entities.find(
+          (entity) =>
+            !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.rosterIndex !== undefined,
         );
         if (scout) {
           if (scout.rosterIndex !== undefined) {

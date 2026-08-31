@@ -56,7 +56,16 @@ export function createReplayRecorder(options: PvpMatchOptions, title = "Бой")
     finish: (winner, nextTitle) => {
       journal.winner = winner;
       journal.title = nextTitle;
-      return { ...journal, commands: [...journal.commands], options: { ...journal.options, side1: [...journal.options.side1], side2: [...journal.options.side2], units: [...journal.options.units] } };
+      return {
+        ...journal,
+        commands: [...journal.commands],
+        options: {
+          ...journal.options,
+          side1: [...journal.options.side1],
+          side2: [...journal.options.side2],
+          units: [...journal.options.units],
+        },
+      };
     },
     getJournal: () => journal,
   };

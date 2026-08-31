@@ -50,12 +50,32 @@ const FEDOT: SpawnUnitConfig = {
 };
 
 const CLUB = weaponStatsFromRecord({
-  id: "club", category: "melee", apCost: 1, endsTurn: true, range: 1, requiresLOS: false,
-  aimMod: 0, minDmg: 3, maxDmg: 5, crit: 10, critBonus: 1, envDmg: 0,
+  id: "club",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 3,
+  maxDmg: 5,
+  crit: 10,
+  critBonus: 1,
+  envDmg: 0,
 });
 const TEETH = weaponStatsFromRecord({
-  id: "teeth", category: "melee", apCost: 1, endsTurn: true, range: 1, requiresLOS: false,
-  aimMod: 0, minDmg: 2, maxDmg: 3, crit: 10, critBonus: 1, envDmg: 0,
+  id: "teeth",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 3,
+  crit: 10,
+  critBonus: 1,
+  envDmg: 0,
 });
 
 // Раскладка М1 «Хворост» (синхронна с prologue_missions.json5, 0.20.37).
@@ -142,12 +162,18 @@ describe("prologue M1 sim", () => {
     mik.x = stick.x;
     mik.y = stick.y;
     kernel.restoreMatch(placed, kernel.getFog());
-    state = afterPrologueApply(kernel, { type: "MOVE", actorId: mik.id, to: { x: stick.x, y: stick.y, z: 1 } }, [{ type: "ENTITY_MOVED", entityId: mik.id, path: [{ x: stick.x, y: stick.y, z: 1 }], isDash: false, apSpent: 1 }], state, {
-      missionId: "prologue_brushwood",
-      hints: [],
-      showHints: true,
-      ratMarker: compiled.markers.F![0],
-    });
+    state = afterPrologueApply(
+      kernel,
+      { type: "MOVE", actorId: mik.id, to: { x: stick.x, y: stick.y, z: 1 } },
+      [{ type: "ENTITY_MOVED", entityId: mik.id, path: [{ x: stick.x, y: stick.y, z: 1 }], isDash: false, apSpent: 1 }],
+      state,
+      {
+        missionId: "prologue_brushwood",
+        hints: [],
+        showHints: true,
+        ratMarker: compiled.markers.F![0],
+      },
+    );
     const after = kernel.getSnapshot();
     const armed = after.entities.find((entity) => entity.configId === "mikula_peasant")!;
     expect(armed.weaponIds).toContain("club");
@@ -201,7 +227,9 @@ describe("prologue M2 gate", () => {
       });
     }
     expect(state.forceDefend).toBe(true);
-    expect(gatePrologueCommand(state, { type: "ATTACK", actorId: mikula.id, targetId: 2, weaponId: "club" })).toBe(false);
+    expect(gatePrologueCommand(state, { type: "ATTACK", actorId: mikula.id, targetId: 2, weaponId: "club" })).toBe(
+      false,
+    );
     expect(gatePrologueCommand(state, { type: "DEFEND", actorId: mikula.id })).toBe(true);
     expect(gatePrologueCommand(state, { type: "END_TURN", playerId: "1" })).toBe(false);
   });
@@ -266,10 +294,7 @@ describe("prologue script waits for its actor (0.20.45)", () => {
     // и обещанный сценой укус разыгрывался бы обычным алгоритмом — с
     // обычным шансом промаха.
     const layout = {
-      rows: [
-        ".M......S.F.",
-        "............",
-      ],
+      rows: [".M......S.F.", "............"],
       legend: {
         M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
         S: { kind: "pickup", itemId: "stick", weaponId: "club" },
@@ -288,7 +313,14 @@ describe("prologue script waits for its actor (0.20.45)", () => {
     });
     const script = {
       actions: [
-        { unitId: "forest_rat", side: "enemy" as const, kind: "attack" as const, targetUnitId: "mikula_peasant", weaponId: "teeth", forceOutcome: "min" as const },
+        {
+          unitId: "forest_rat",
+          side: "enemy" as const,
+          kind: "attack" as const,
+          targetUnitId: "mikula_peasant",
+          weaponId: "teeth",
+          forceOutcome: "min" as const,
+        },
         { kind: "endTurn" as const },
       ],
     };
@@ -313,16 +345,16 @@ describe("prologue M2 ambush budget (0.20.45)", () => {
     const { kernel, state } = m2Setup();
     const mikula = heroOf(kernel);
     const cells = kernel.getReachable(mikula.id);
-    const dash = cells
-      .filter((cell) => cell.apCost === 2)
-      .sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
+    const dash = cells.filter((cell) => cell.apCost === 2).sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
     const command = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
     const clamped = clampPrologueCommand(kernel, state, command, ["mikula_peasant"]);
     if (clamped.type !== "MOVE") throw new Error("ожидалась команда перемещения");
     // Цель не достигнута, но герой не стоит: рывок обрывается на полпути.
     expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${dash.x},${dash.y}`);
     expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${mikula.x},${mikula.y}`);
-    expect(kernel.getReachable(mikula.id).find((cell) => cell.x === clamped.to.x && cell.y === clamped.to.y)?.apCost).toBe(1);
+    expect(
+      kernel.getReachable(mikula.id).find((cell) => cell.x === clamped.to.x && cell.y === clamped.to.y)?.apCost,
+    ).toBe(1);
     // Остановка — на маршруте: она ближе к цели, чем клетка старта.
     const toward = Math.abs(clamped.to.x - dash.x) + Math.abs(clamped.to.y - dash.y);
     const fromStart = Math.abs(mikula.x - dash.x) + Math.abs(mikula.y - dash.y);
@@ -342,7 +374,9 @@ describe("prologue M2 ambush budget (0.20.45)", () => {
     const dash = kernel.getReachable(mikula.id).filter((cell) => cell.apCost === 2)[0]!;
     const dashCommand = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
     // Засада уже позади — бюджет больше не держит.
-    expect(clampPrologueCommand(kernel, { ...state, ambushPending: false }, dashCommand, ["mikula_peasant"])).toEqual(dashCommand);
+    expect(clampPrologueCommand(kernel, { ...state, ambushPending: false }, dashCommand, ["mikula_peasant"])).toEqual(
+      dashCommand,
+    );
     // Чужой боец бюджетом не связан.
     expect(clampPrologueCommand(kernel, state, dashCommand, ["fedot_stranded"])).toEqual(dashCommand);
     // Не перемещение — не наша забота.
@@ -374,7 +408,9 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     expect(next.fedotFreed).toBe(true);
     expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")?.maxAp).toBe(2);
     // Стая вышла — шесть крыс из чащи, а не ноль, как было бы без маркеров.
-    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length).toBe(6);
+    expect(
+      kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length,
+    ).toBe(6);
     // Выход ещё тёмен: его покажет сцена, а не само освобождение.
     expect(next.extractPending).toBe(true);
     expect(kernel.getSnapshot().grid.tiles.filter((tile) => tile.extract).length).toBe(0);
@@ -388,7 +424,9 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
         .map((tile) => `${tile.x},${tile.y}`)
         .sort(),
     ).toEqual(["0,0", "0,1", "0,2", "0,6", "0,7", "0,8"]);
-    expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")?.skillIds).toContain("evacuate");
+    expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")?.skillIds).toContain(
+      "evacuate",
+    );
   });
 
   it("opens the exit by itself if the screen missed the beat", () => {
@@ -519,7 +557,9 @@ describe("prologue M3 wave", () => {
     );
     expect(state.firstWave).toBe(true);
     const after = kernel.getSnapshot();
-    expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead).length).toBeGreaterThanOrEqual(2);
+    expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead).length).toBeGreaterThanOrEqual(
+      2,
+    );
     const fedot = after.entities.find((entity) => entity.configId === "strelets" && !entity.dead);
     expect(fedot).toBeTruthy();
     expect(fedot?.skillIds ?? []).not.toContain("aimed_eye");
@@ -559,7 +599,18 @@ describe("prologue M4 vasilisa", () => {
     state = afterPrologueApply(
       kernel,
       { type: "MOVE", actorId: bogatyr.id, to: { x: 8, y: 3, z: 1 } },
-      [{ type: "ENTITY_MOVED", entityId: bogatyr.id, path: [{ x: 0, y: 3, z: 1 }, { x: 8, y: 3, z: 1 }], isDash: false, apSpent: 1 }],
+      [
+        {
+          type: "ENTITY_MOVED",
+          entityId: bogatyr.id,
+          path: [
+            { x: 0, y: 3, z: 1 },
+            { x: 8, y: 3, z: 1 },
+          ],
+          isDash: false,
+          apSpent: 1,
+        },
+      ],
       state,
       { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
     );
@@ -568,14 +619,23 @@ describe("prologue M4 vasilisa", () => {
     state = afterPrologueApply(
       kernel,
       { type: "USE_SKILL", actorId: 2, skillId: "poison_needles", targetId: bogatyr.id },
-      [{ type: "STATUS_CHANGED", entityId: bogatyr.id, status: "POISON", applied: true, duration: 2, magnitude: 1, sourceId: 99 }],
+      [
+        {
+          type: "STATUS_CHANGED",
+          entityId: bogatyr.id,
+          status: "POISON",
+          applied: true,
+          duration: 2,
+          magnitude: 1,
+          sourceId: 99,
+        },
+      ],
       state,
       { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
     );
     expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
   });
 });
-
 
 describe("prologue checkpoint restore", () => {
   it("restores after firstWave, not only fedotFreed", () => {
@@ -584,14 +644,42 @@ describe("prologue checkpoint restore", () => {
       activeOwner: 1,
       grid: { width: 4, height: 4, tiles: [] },
       entities: [
-        { id: 1, configId: "bogatyr", owner: 1, dead: true, coverType: 0, x: 0, y: 0, z: 1, dir: 1, ap: 0, maxAp: 2, mobility: 4, hp: 0, maxHp: 12, aim: 70, defense: 0, vision: 10, weaponId: "sword", obstacle: true, flying: false, overwatch: false, defending: false, movementSpent: 0 },
+        {
+          id: 1,
+          configId: "bogatyr",
+          owner: 1,
+          dead: true,
+          coverType: 0,
+          x: 0,
+          y: 0,
+          z: 1,
+          dir: 1,
+          ap: 0,
+          maxAp: 2,
+          mobility: 4,
+          hp: 0,
+          maxHp: 12,
+          aim: 70,
+          defense: 0,
+          vision: 10,
+          weaponId: "sword",
+          obstacle: true,
+          flying: false,
+          overwatch: false,
+          defending: false,
+          movementSpent: 0,
+        },
       ],
     };
     const wave = createPrologueRunState("prologue_glade");
     wave.firstWave = true;
-    expect(shouldRestoreCheckpoint(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never)).toBe(true);
+    expect(
+      shouldRestoreCheckpoint(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+    ).toBe(true);
     const start = createPrologueRunState("prologue_glade");
-    expect(shouldRestoreCheckpoint(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never)).toBe(false);
+    expect(
+      shouldRestoreCheckpoint(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+    ).toBe(false);
   });
 });
 
@@ -609,10 +697,24 @@ describe("prologue player script", () => {
     const kernel = createTacticsKernel({
       initial: match,
       units: [BOGATYR, UPYR, STRELETS],
-      weapons: { club: CLUB, teeth: TEETH, bow: weaponStatsFromRecord({
-        id: "bow", category: "ranged", apCost: 1, endsTurn: true, range: 8, requiresLOS: true,
-        aimMod: 0, minDmg: 3, maxDmg: 5, crit: 15, critBonus: 2, envDmg: 0,
-      }) },
+      weapons: {
+        club: CLUB,
+        teeth: TEETH,
+        bow: weaponStatsFromRecord({
+          id: "bow",
+          category: "ranged",
+          apCost: 1,
+          endsTurn: true,
+          range: 8,
+          requiresLOS: true,
+          aimMod: 0,
+          minDmg: 3,
+          maxDmg: 5,
+          crit: 15,
+          critBonus: 2,
+          envDmg: 0,
+        }),
+      },
       seed: 705,
       fogDisabled: true,
     });
@@ -626,7 +728,14 @@ describe("prologue player script", () => {
       script: {
         actions: [
           { unitId: "strelets", side: "player", kind: "appear", at: { x: 2, y: 2 } },
-          { unitId: "strelets", side: "player", kind: "attack", targetUnitId: "upyr", weaponId: "bow", forceOutcome: "hit" },
+          {
+            unitId: "strelets",
+            side: "player",
+            kind: "attack",
+            targetUnitId: "upyr",
+            weaponId: "bow",
+            forceOutcome: "hit",
+          },
         ],
       },
     });
@@ -690,7 +799,8 @@ function armMikula(kernel: ReturnType<typeof createTacticsKernel>) {
     const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant")!;
     if (mikula.x === stick.x && mikula.y === stick.y) {
       const applied = kernel.apply({ type: "END_TURN", playerId: "1" });
-      if (applied.ok) state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
+      if (applied.ok)
+        state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
       break;
     }
     const reach = kernel.getReachable(mikula.id);
@@ -700,7 +810,8 @@ function armMikula(kernel: ReturnType<typeof createTacticsKernel>) {
     )[0];
     if (!best) {
       const applied = kernel.apply({ type: "END_TURN", playerId: "1" });
-      if (applied.ok) state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
+      if (applied.ok)
+        state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, applied.events, state, ctx);
       continue;
     }
     const command = { type: "MOVE", actorId: mikula.id, to: best } as const;
@@ -870,9 +981,7 @@ describe("prologue M1 checkpoint (0.20.37)", () => {
       events: [{ type: "ENTITY_DIED", entityId: mikula.id, causeOfDeath: "DAMAGE" }] as never[],
       match: {
         ...snap,
-        entities: snap.entities.map((entity) =>
-          entity.id === mikula.id ? { ...entity, hp: 0, dead: true } : entity,
-        ),
+        entities: snap.entities.map((entity) => (entity.id === mikula.id ? { ...entity, hp: 0, dead: true } : entity)),
       },
     };
   }

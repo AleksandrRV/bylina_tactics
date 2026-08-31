@@ -35,13 +35,17 @@ function pixiResolvePlugin(): Plugin {
   };
 }
 
-
 /** Emits JSON5 as fetchable assets instead of importing all content into the entry chunk. */
 function contentAssetsPlugin(): Plugin {
   const contentRoot = path.resolve(appRoot, "packages/content/data");
-  const files = (dir: string, prefix = ""): string[] => readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
-    entry.isDirectory() ? files(path.join(dir, entry.name), `${prefix}${entry.name}/`) : entry.name.endsWith(".json5") ? [`${prefix}${entry.name}`] : [],
-  );
+  const files = (dir: string, prefix = ""): string[] =>
+    readdirSync(dir, { withFileTypes: true }).flatMap((entry) =>
+      entry.isDirectory()
+        ? files(path.join(dir, entry.name), `${prefix}${entry.name}/`)
+        : entry.name.endsWith(".json5")
+          ? [`${prefix}${entry.name}`]
+          : [],
+    );
   const names = files(contentRoot);
   return {
     name: "bylina-content-assets",
@@ -53,11 +57,8 @@ function contentAssetsPlugin(): Plugin {
         // путь вроде "../data-copy/file" не должен считаться дочерним
         // каталогом только потому, что его строковый префикс совпал.
         const relativeTarget = path.relative(contentRoot, target);
-        if (
-          relativeTarget.startsWith("..")
-          || path.isAbsolute(relativeTarget)
-          || !names.includes(relative)
-        ) return next();
+        if (relativeTarget.startsWith("..") || path.isAbsolute(relativeTarget) || !names.includes(relative))
+          return next();
         res.setHeader("Content-Type", "application/json; charset=utf-8");
         res.end(readFileSync(target));
       });
@@ -67,8 +68,17 @@ function contentAssetsPlugin(): Plugin {
       });
     },
     generateBundle() {
-      this.emitFile({ type: "asset", fileName: "content-manifest.json", source: JSON.stringify(names.map((name) => `content/${name}`)) });
-      for (const name of names) this.emitFile({ type: "asset", fileName: `content/${name}`, source: readFileSync(path.join(contentRoot, name)) });
+      this.emitFile({
+        type: "asset",
+        fileName: "content-manifest.json",
+        source: JSON.stringify(names.map((name) => `content/${name}`)),
+      });
+      for (const name of names)
+        this.emitFile({
+          type: "asset",
+          fileName: `content/${name}`,
+          source: readFileSync(path.join(contentRoot, name)),
+        });
     },
   };
 }

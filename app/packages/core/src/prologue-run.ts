@@ -10,7 +10,12 @@ import {
   type HintsManagerState,
 } from "./hints-manager.js";
 import type { TacticsKernel } from "./kernel.js";
-import { createMissionScriptState, evaluateMissionTriggers, type MissionScriptState, type MissionTrigger } from "./mission-script.js";
+import {
+  createMissionScriptState,
+  evaluateMissionTriggers,
+  type MissionScriptState,
+  type MissionTrigger,
+} from "./mission-script.js";
 import { pickScriptedCommand, type PrologueScript, type PrologueScriptState } from "./prologue-script.js";
 import {
   createReinforcementsState,
@@ -123,7 +128,14 @@ const M1_TRIGGERS: MissionTrigger[] = [
 ];
 
 const M2_TRIGGERS: MissionTrigger[] = [
-  { id: "free_fedot", kind: "OnUnitAdjacent", unitId: "mikula_peasant", otherUnitId: "fedot_stranded", once: true, flag: "fedotFreed" },
+  {
+    id: "free_fedot",
+    kind: "OnUnitAdjacent",
+    unitId: "mikula_peasant",
+    otherUnitId: "fedot_stranded",
+    once: true,
+    flag: "fedotFreed",
+  },
 ];
 
 const M3_TRIGGERS: MissionTrigger[] = [
@@ -133,7 +145,15 @@ const M3_TRIGGERS: MissionTrigger[] = [
 
 const M4_TRIGGERS: MissionTrigger[] = [
   { id: "poison_join", kind: "OnPoisonApplied", side: "player", once: true, flag: "vasilisa_joined" },
-  { id: "line_join", kind: "OnCrossLine", side: "player", lineAxis: "x", lineValue: 8, once: true, flag: "vasilisa_joined" },
+  {
+    id: "line_join",
+    kind: "OnCrossLine",
+    side: "player",
+    lineAxis: "x",
+    lineValue: 8,
+    once: true,
+    flag: "vasilisa_joined",
+  },
 ];
 
 function living(match: MatchState, configId: string) {
@@ -299,9 +319,14 @@ function spawnUnits(
     // Пометка «в счёт истребления» передаётся ядру при появлении (0.20.45):
     // ядро ведёт счёт сторон само, и снятие пометки после появления
     // оставляло бы бой «выигранным» в момент выхода стаи М2.
-    const spawned = kernel.spawnScripted(unitId, owner, { x: cell.x, y: cell.y, z: tile?.z ?? 1 }, {
-      countsForElimination: countForElim,
-    });
+    const spawned = kernel.spawnScripted(
+      unitId,
+      owner,
+      { x: cell.x, y: cell.y, z: tile?.z ?? 1 },
+      {
+        countsForElimination: countForElim,
+      },
+    );
     spawnEvents = [...spawnEvents, ...kernel.drainSpawnEvents()];
     if (!spawned) continue;
     restorePatch(kernel, (match) => {
@@ -326,7 +351,8 @@ function apSpendingCommand(command: Command): boolean {
 
 function livingEnemies(match: MatchState) {
   return match.entities.filter(
-    (entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false,
+    (entity) =>
+      !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false,
   );
 }
 
@@ -396,7 +422,10 @@ export function afterPrologueApply(
       next.outcome = next.ratSpawned ? "ongoing" : "defeat";
       return harvest(next);
     }
-    if (next.pickupDone && !kernel.getSnapshot().entities.some((entity) => entity.configId === "forest_rat" && !entity.dead)) {
+    if (
+      next.pickupDone &&
+      !kernel.getSnapshot().entities.some((entity) => entity.configId === "forest_rat" && !entity.dead)
+    ) {
       next.outcome = "victory";
     }
   }
@@ -434,8 +463,12 @@ export function afterPrologueApply(
       // (0.20.45): сначала крысы и их сцена, потом пан камеры к выходу.
       next.extractPending = true;
       const wave = ctx.fedotWaveSpawns ?? [
-        { x: 11, y: 1 }, { x: 11, y: 2 }, { x: 11, y: 3 },
-        { x: 11, y: 4 }, { x: 11, y: 5 }, { x: 11, y: 6 },
+        { x: 11, y: 1 },
+        { x: 11, y: 2 },
+        { x: 11, y: 3 },
+        { x: 11, y: 4 },
+        { x: 11, y: 5 },
+        { x: 11, y: 6 },
       ];
       spawnRats(kernel, wave, false);
       next.waveArmed = true;
@@ -545,7 +578,13 @@ function applyScriptDecision(
   const next = { ...state, script: decision.state };
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
   if (decision.spawn) {
-    spawnUnits(kernel, decision.spawn.unitId, decision.spawn.owner, [decision.spawn.at], decision.spawn.owner === ENEMY_OWNER);
+    spawnUnits(
+      kernel,
+      decision.spawn.unitId,
+      decision.spawn.owner,
+      [decision.spawn.at],
+      decision.spawn.owner === ENEMY_OWNER,
+    );
   }
   return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
 }
@@ -559,7 +598,11 @@ export function tickPrologueEnemyTurn(
   if (ctx.missionId === "prologue_cry" && next.waveArmed && ctx.reinforcements) {
     const tick = tickReinforcements(kernel.getSnapshot(), ctx.reinforcements, next.reinforcements);
     next.reinforcements = tick.state;
-    spawnRats(kernel, tick.spawns.map((spawn) => spawn.at), false);
+    spawnRats(
+      kernel,
+      tick.spawns.map((spawn) => spawn.at),
+      false,
+    );
   }
   return applyScriptDecision(kernel, next, ctx, ENEMY_OWNER);
 }
@@ -577,7 +620,11 @@ function checkpointArmed(state: PrologueRunState): boolean {
   return state.fedotFreed || state.firstWave || state.vasilisaJoined || state.ratSpawned;
 }
 
-export function shouldRestoreCheckpoint(state: PrologueRunState, events: readonly GameEvent[], match: MatchState): boolean {
+export function shouldRestoreCheckpoint(
+  state: PrologueRunState,
+  events: readonly GameEvent[],
+  match: MatchState,
+): boolean {
   if (!checkpointArmed(state)) return false;
   const died = events.some((event) => event.type === "ENTITY_DIED" || event.type === "MATCH_ENDED");
   if (!died) return false;

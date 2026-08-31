@@ -65,13 +65,7 @@ function fighter(id: number, owner: number, x: number, record: typeof rat, weapo
 }
 
 const chanceOf = (attacker: EntityState, target: EntityState, stats: typeof club): number | undefined =>
-  previewAttack(
-    makeGrid(4, 1),
-    [attacker, target],
-    attacker,
-    target,
-    weaponStatsFromRecord(stats),
-  ).chance;
+  previewAttack(makeGrid(4, 1), [attacker, target], attacker, target, weaponStatsFromRecord(stats)).chance;
 
 describe("баланс пролога (0.20.52)", () => {
   it("крыса слабее: два здоровья и укус 1–2", () => {

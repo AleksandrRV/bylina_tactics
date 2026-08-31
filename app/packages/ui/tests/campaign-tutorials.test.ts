@@ -2,9 +2,18 @@ import { describe, expect, it } from "vitest";
 import { pendingCampaignHints, type CampaignHintsContext } from "../src/campaign-hints.js";
 
 const ctx = (patch: Partial<CampaignHintsContext>): CampaignHintsContext => ({
-  showHints: true, done: [], onCampaignMap: false, lockedCount: 0, hasWounded: false,
-  rosterTabActive: false, forgeTabActive: false, onDeployment: false, onBattle: false,
-  enemyTypes: [], onBattleWithGeneral: false, ...patch,
+  showHints: true,
+  done: [],
+  onCampaignMap: false,
+  lockedCount: 0,
+  hasWounded: false,
+  rosterTabActive: false,
+  forgeTabActive: false,
+  onDeployment: false,
+  onBattle: false,
+  enemyTypes: [],
+  onBattleWithGeneral: false,
+  ...patch,
 });
 
 describe("QA manual: campaign tutorial journey (0.20.1)", () => {
@@ -42,8 +51,17 @@ describe("QA manual: campaign tutorial journey (0.20.1)", () => {
     step(ctx({ onBattle: true, enemyTypes: ["leshy", "kikimora"], onBattleWithGeneral: true }));
 
     expect(shown).toEqual([
-      "darkness", "scan", "roster", "wound", "forge", "deploy", "first_battle",
-      "first_leshy", "first_kikimora", "evacuation", "general",
+      "darkness",
+      "scan",
+      "roster",
+      "wound",
+      "forge",
+      "deploy",
+      "first_battle",
+      "first_leshy",
+      "first_kikimora",
+      "evacuation",
+      "general",
     ]);
   });
 
@@ -54,12 +72,26 @@ describe("QA manual: campaign tutorial journey (0.20.1)", () => {
 
   it("a completed campaign with all missions visited shows nothing new", () => {
     const all = [
-      "darkness", "scan", "roster", "wound", "forge", "deploy", "first_battle",
-      "first_leshy", "first_kikimora", "evacuation", "general",
+      "darkness",
+      "scan",
+      "roster",
+      "wound",
+      "forge",
+      "deploy",
+      "first_battle",
+      "first_leshy",
+      "first_kikimora",
+      "evacuation",
+      "general",
     ];
     const c: CampaignHintsContext = ctx({
-      done: all, onCampaignMap: true, lockedCount: 0, hasWounded: true,
-      onBattle: true, enemyTypes: ["upyr", "leshy", "kikimora"], onBattleWithGeneral: true,
+      done: all,
+      onCampaignMap: true,
+      lockedCount: 0,
+      hasWounded: true,
+      onBattle: true,
+      enemyTypes: ["upyr", "leshy", "kikimora"],
+      onBattleWithGeneral: true,
     });
     expect(pendingCampaignHints(c)).toEqual([]);
   });

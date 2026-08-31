@@ -75,7 +75,8 @@ export function fringeDecor(cols: number, rows: number, radius: number = FRINGE_
       const roll = hash(cellX, cellY, 0x11b7d3);
       const kind: FringeKind = roll < 0.44 ? "canopy" : roll < 0.76 ? "bush" : "grass";
       const sizeRoll = hash(cellX, cellY, 0x2c9d55);
-      const size = kind === "canopy" ? 0.36 + sizeRoll * 0.22 : kind === "bush" ? 0.22 + sizeRoll * 0.16 : 0.12 + sizeRoll * 0.12;
+      const size =
+        kind === "canopy" ? 0.36 + sizeRoll * 0.22 : kind === "bush" ? 0.22 + sizeRoll * 0.16 : 0.12 + sizeRoll * 0.12;
       // Свет гаснет с глубиной: взгляд не ищет конца леса.
       const strength = (kind === "canopy" ? 0.9 : kind === "bush" ? 0.75 : 0.6) * (1 - depth * 0.7);
       items.push({

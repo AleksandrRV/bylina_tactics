@@ -150,7 +150,9 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
   }
   const enemies = enemySpawns(expanded.length, map.width, map.height);
   if (enemies.length !== expanded.length) {
-    throw new Error(`Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${expanded.length}`);
+    throw new Error(
+      `Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${expanded.length}`,
+    );
   }
   const generated = generateBattlefield(map, rng, players, enemies);
   const roster = options.playerSlots.map((slot) => {
@@ -208,10 +210,18 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
 
   // Генералы (0.18.0): появляются у восточного края по правилам конфигурации
   // миссии. Погибшие ранее в кампании генералы не возвращаются.
-  const generals = (options.generals ?? []).filter((generalId) => !(options.excludedGenerals ?? []).includes(generalId));
+  const generals = (options.generals ?? []).filter(
+    (generalId) => !(options.excludedGenerals ?? []).includes(generalId),
+  );
   generals.forEach((generalId, index) => {
     const config = pickUnit(options.units, generalId);
-    const point = freeCellNear(generated.grid, generated.covers, state.entities, state.grid.width - 3, Math.floor(state.grid.height / 2));
+    const point = freeCellNear(
+      generated.grid,
+      generated.covers,
+      state.entities,
+      state.grid.width - 3,
+      Math.floor(state.grid.height / 2),
+    );
     if (!point) throw new Error(`No free spawn cell for general ${generalId}`);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     state.entities.push(spawnUnitState(500 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
@@ -221,7 +231,12 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
   // может покинуть поле из зоны эвакуации (game-design §3.2, тип «Разведка»).
   if (options.objective?.kind === "recon") {
     for (const entity of state.entities) {
-      if (entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0 && !(entity.skillIds ?? []).includes("evacuate")) {
+      if (
+        entity.owner === PLAYER_OWNER &&
+        entity.coverType === 0 &&
+        entity.maxAp > 0 &&
+        !(entity.skillIds ?? []).includes("evacuate")
+      ) {
         entity.skillIds = [...(entity.skillIds ?? []), "evacuate"];
       }
     }
@@ -233,7 +248,13 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
   const objective = options.objective;
   if (objective?.kind === "destroy") {
     const config = pickUnit(options.units, objective.unitId);
-    const point = freeCellNear(generated.grid, generated.covers, state.entities, state.grid.width - 3, Math.floor(state.grid.height / 2));
+    const point = freeCellNear(
+      generated.grid,
+      generated.covers,
+      state.entities,
+      state.grid.width - 3,
+      Math.floor(state.grid.height / 2),
+    );
     if (!point) throw new Error(`No free spawn cell for objective ${objective.unitId}`);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     const idol = spawnUnitState(1000, config, 0, point.x, point.y, z, 3);
@@ -264,7 +285,9 @@ export function createQuickMatch(options: QuickMatchOptions): MatchState {
   const players = playerSpawns(map.height);
   const enemies = enemySpawns(options.enemyCount, map.width, map.height);
   if (enemies.length !== options.enemyCount) {
-    throw new Error(`Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${options.enemyCount}`);
+    throw new Error(
+      `Map ${map.width}x${map.height} has only ${enemies.length} enemy spawn cells for requested ${options.enemyCount}`,
+    );
   }
   const generated = generateBattlefield(map, rng, players, enemies);
   const roster = slots.map((id) => pickUnit(options.units, id));
@@ -320,12 +343,16 @@ export function createPvpMatch(options: PvpMatchOptions): MatchState {
   const map = options.map;
   const allSide1Spawns = playerSpawns(map.height);
   if (options.side1.length > allSide1Spawns.length) {
-    throw new Error(`Map ${map.width}x${map.height} has only ${allSide1Spawns.length} side-1 spawn cells for requested ${options.side1.length}`);
+    throw new Error(
+      `Map ${map.width}x${map.height} has only ${allSide1Spawns.length} side-1 spawn cells for requested ${options.side1.length}`,
+    );
   }
   const side1Spawns = allSide1Spawns.slice(0, options.side1.length);
   const side2Spawns = enemySpawns(options.side2.length, map.width, map.height);
   if (side2Spawns.length !== options.side2.length) {
-    throw new Error(`Map ${map.width}x${map.height} has only ${side2Spawns.length} side-2 spawn cells for requested ${options.side2.length}`);
+    throw new Error(
+      `Map ${map.width}x${map.height} has only ${side2Spawns.length} side-2 spawn cells for requested ${options.side2.length}`,
+    );
   }
   const generated = generateBattlefield(map, rng, side1Spawns, side2Spawns);
 
@@ -362,7 +389,10 @@ export function createPvpMatch(options: PvpMatchOptions): MatchState {
     const midY = Math.floor(map.height / 2);
     const appleCell = freeCellNear(generated.grid, generated.covers, state.entities, midX, midY);
     if (!appleCell) throw new Error("No free cell for the apple objective");
-    state.apple = { pos: { x: appleCell.x, y: appleCell.y, z: tileAt(generated.grid, appleCell.x, appleCell.y)?.z ?? 1 }, carrierId: null };
+    state.apple = {
+      pos: { x: appleCell.x, y: appleCell.y, z: tileAt(generated.grid, appleCell.x, appleCell.y)?.z ?? 1 },
+      carrierId: null,
+    };
   }
 
   state.rngState = String(rng.getState());

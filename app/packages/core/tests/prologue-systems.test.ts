@@ -102,12 +102,28 @@ describe("mission triggers", () => {
     const script = createMissionScriptState();
     const zone = evaluateMissionTriggers(
       match,
-      [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 1, y: 2, z: 1 }, { x: 3, y: 2, z: 1 }], isDash: false, apSpent: 1 }],
+      [
+        {
+          type: "ENTITY_MOVED",
+          entityId: 1,
+          path: [
+            { x: 1, y: 2, z: 1 },
+            { x: 3, y: 2, z: 1 },
+          ],
+          isDash: false,
+          apSpent: 1,
+        },
+      ],
       [{ id: "z", kind: "OnZoneEnter", once: true, zone: { x0: 3, y0: 2, x1: 3, y1: 2 }, flag: "entered" }],
       script,
     );
     expect(zone.fired[0]?.flag).toBe("entered");
-    const again = evaluateMissionTriggers(match, [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 3, y: 2, z: 1 }], isDash: false, apSpent: 1 }], [{ id: "z", kind: "OnZoneEnter", once: true, zone: { x0: 3, y0: 2, x1: 3, y1: 2 } }], zone.state);
+    const again = evaluateMissionTriggers(
+      match,
+      [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 3, y: 2, z: 1 }], isDash: false, apSpent: 1 }],
+      [{ id: "z", kind: "OnZoneEnter", once: true, zone: { x0: 3, y0: 2, x1: 3, y1: 2 } }],
+      zone.state,
+    );
     expect(again.fired).toHaveLength(0);
 
     const adj = evaluateMissionTriggers(
@@ -118,10 +134,20 @@ describe("mission triggers", () => {
     );
     expect(adj.fired.map((item) => item.triggerId)).toContain("adj");
 
-    const turn = evaluateMissionTriggers(match, [{ type: "TURN_CHANGED", activePlayerId: "2", turnNumber: 3 }], [{ id: "t", kind: "OnTurnStart", side: "enemy", turnNumber: 3, once: true }], createMissionScriptState());
+    const turn = evaluateMissionTriggers(
+      match,
+      [{ type: "TURN_CHANGED", activePlayerId: "2", turnNumber: 3 }],
+      [{ id: "t", kind: "OnTurnStart", side: "enemy", turnNumber: 3, once: true }],
+      createMissionScriptState(),
+    );
     expect(turn.fired).toHaveLength(1);
 
-    const below = evaluateMissionTriggers(match, [], [{ id: "e", kind: "OnEnemyAliveBelow", n: 2, once: true }], createMissionScriptState());
+    const below = evaluateMissionTriggers(
+      match,
+      [],
+      [{ id: "e", kind: "OnEnemyAliveBelow", n: 2, once: true }],
+      createMissionScriptState(),
+    );
     expect(below.fired).toHaveLength(1);
 
     const hp = evaluateMissionTriggers(
@@ -132,21 +158,53 @@ describe("mission triggers", () => {
     );
     expect(hp.fired).toHaveLength(1);
 
-    const skill = evaluateMissionTriggers(match, [{ type: "SKILL_RESOLVED", sourceId: 1, skillId: "heal", success: true }], [{ id: "s", kind: "OnSkillUsed", skillId: "heal", unitId: "mikula", once: true }], createMissionScriptState());
+    const skill = evaluateMissionTriggers(
+      match,
+      [{ type: "SKILL_RESOLVED", sourceId: 1, skillId: "heal", success: true }],
+      [{ id: "s", kind: "OnSkillUsed", skillId: "heal", unitId: "mikula", once: true }],
+      createMissionScriptState(),
+    );
     expect(skill.fired).toHaveLength(1);
 
     const pickup = evaluateMissionTriggers(
-      { ...match, entities: [...match.entities, { ...fighter(9, 0, 3, 2, { configId: "stick" }), obstacle: false, maxAp: 0, ap: 0 }] },
-      [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 2, y: 2, z: 1 }, { x: 3, y: 2, z: 1 }], isDash: false, apSpent: 1 }],
+      {
+        ...match,
+        entities: [
+          ...match.entities,
+          { ...fighter(9, 0, 3, 2, { configId: "stick" }), obstacle: false, maxAp: 0, ap: 0 },
+        ],
+      },
+      [
+        {
+          type: "ENTITY_MOVED",
+          entityId: 1,
+          path: [
+            { x: 2, y: 2, z: 1 },
+            { x: 3, y: 2, z: 1 },
+          ],
+          isDash: false,
+          apSpent: 1,
+        },
+      ],
       [{ id: "p", kind: "OnPickup", itemId: "stick", once: true }],
       createMissionScriptState(),
     );
     expect(pickup.fired).toHaveLength(1);
 
-    const destroyed = evaluateMissionTriggers(match, [{ type: "COVER_DESTROYED", gridPos: { x: 1, y: 1, z: 1 }, newStatus: "NONE" }], [{ id: "d", kind: "OnObjectDestroyed", once: true }], createMissionScriptState());
+    const destroyed = evaluateMissionTriggers(
+      match,
+      [{ type: "COVER_DESTROYED", gridPos: { x: 1, y: 1, z: 1 }, newStatus: "NONE" }],
+      [{ id: "d", kind: "OnObjectDestroyed", once: true }],
+      createMissionScriptState(),
+    );
     expect(destroyed.fired).toHaveLength(1);
 
-    const interacted = evaluateMissionTriggers(match, [{ type: "SKILL_RESOLVED", sourceId: 1, skillId: "open", success: true }], [{ id: "i", kind: "OnObjectInteracted", once: true }], createMissionScriptState());
+    const interacted = evaluateMissionTriggers(
+      match,
+      [{ type: "SKILL_RESOLVED", sourceId: 1, skillId: "open", success: true }],
+      [{ id: "i", kind: "OnObjectInteracted", once: true }],
+      createMissionScriptState(),
+    );
     expect(interacted.fired).toHaveLength(1);
 
     const died = evaluateMissionTriggers(
@@ -159,15 +217,46 @@ describe("mission triggers", () => {
 
     const line = evaluateMissionTriggers(
       match,
-      [{ type: "ENTITY_MOVED", entityId: 1, path: [{ x: 2, y: 2, z: 1 }, { x: 8, y: 2, z: 1 }], isDash: false, apSpent: 1 }],
-      [{ id: "line", kind: "OnCrossLine", side: "player", lineAxis: "x", lineValue: 8, once: true, flag: "vasilisa_joined" }],
+      [
+        {
+          type: "ENTITY_MOVED",
+          entityId: 1,
+          path: [
+            { x: 2, y: 2, z: 1 },
+            { x: 8, y: 2, z: 1 },
+          ],
+          isDash: false,
+          apSpent: 1,
+        },
+      ],
+      [
+        {
+          id: "line",
+          kind: "OnCrossLine",
+          side: "player",
+          lineAxis: "x",
+          lineValue: 8,
+          once: true,
+          flag: "vasilisa_joined",
+        },
+      ],
       createMissionScriptState(),
     );
     expect(line.fired[0]?.flag).toBe("vasilisa_joined");
 
     const poison = evaluateMissionTriggers(
       match,
-      [{ type: "STATUS_CHANGED", entityId: 1, status: "POISON", applied: true, duration: 2, magnitude: 1, sourceId: 2 }],
+      [
+        {
+          type: "STATUS_CHANGED",
+          entityId: 1,
+          status: "POISON",
+          applied: true,
+          duration: 2,
+          magnitude: 1,
+          sourceId: 2,
+        },
+      ],
       [{ id: "poi", kind: "OnPoisonApplied", side: "player", once: true, flag: "vasilisa_joined" }],
       createMissionScriptState(),
     );
@@ -191,9 +280,22 @@ describe("prologue script player actor", () => {
       weapons: { sword: SWORD, bow: BOW },
       seed: 3,
     });
-    const decision = pickScriptedCommand(kernel, {
-      actions: [{ unitId: "fedot", side: "player", kind: "attack", targetUnitId: "upyr", weaponId: "bow", forceOutcome: "hit" }],
-    }, { index: 0 });
+    const decision = pickScriptedCommand(
+      kernel,
+      {
+        actions: [
+          {
+            unitId: "fedot",
+            side: "player",
+            kind: "attack",
+            targetUnitId: "upyr",
+            weaponId: "bow",
+            forceOutcome: "hit",
+          },
+        ],
+      },
+      { index: 0 },
+    );
     expect(decision.command?.type).toBe("ATTACK");
     expect(decision.forceOutcome).toBe("hit");
     kernel.setForcedOutcome(decision.forceOutcome ?? null);
@@ -219,9 +321,16 @@ describe("prologue script player actor", () => {
       weapons: { sword: SWORD },
       seed: 1,
     });
-    const decision = pickScriptedCommand(kernel, {
-      actions: [{ unitId: "ghost", side: "player", kind: "attack", targetUnitId: "nobody" }, { unitId: "mikula", kind: "endTurn" }],
-    }, { index: 0 });
+    const decision = pickScriptedCommand(
+      kernel,
+      {
+        actions: [
+          { unitId: "ghost", side: "player", kind: "attack", targetUnitId: "nobody" },
+          { unitId: "mikula", kind: "endTurn" },
+        ],
+      },
+      { index: 0 },
+    );
     expect(decision.command).toBeNull();
   });
 });
@@ -229,11 +338,7 @@ describe("prologue script player actor", () => {
 describe("layout compiler", () => {
   it("compiles pits, walls, extract and half cover", () => {
     const compiled = compilePrologueLayout({
-      rows: [
-        "E..P",
-        ".McW",
-        "....",
-      ],
+      rows: ["E..P", ".McW", "...."],
     });
     expect(compiled.grid.width).toBe(4);
     expect(compiled.grid.height).toBe(3);
@@ -327,7 +432,9 @@ describe("kernel restore, fogDisabled, consume-once force", () => {
     expect(kernel.getVisibleCells(1).size).toBe(8 * 6);
     kernel.setForcedOutcome("miss");
     const first = kernel.apply({ type: "ATTACK", actorId: 1, targetId: 2, weaponId: "sword" });
-    expect(first.ok && first.events.some((event) => event.type === "COMBAT_RESOLVED" && event.result === "MISS")).toBe(true);
+    expect(first.ok && first.events.some((event) => event.type === "COMBAT_RESOLVED" && event.result === "MISS")).toBe(
+      true,
+    );
     const snap = kernel.getSnapshot();
     kernel.apply({ type: "END_TURN", playerId: "1" });
     kernel.restoreMatch(snap, kernel.getFog());

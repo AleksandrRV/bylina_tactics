@@ -69,15 +69,18 @@ function makeKernel(playerSlots: string[], enemies: { unitId: string; count: num
     enemies,
     seed,
   });
-  return createTacticsKernel({ initial, weapons: defaultWeapons(), skills: SKILLS, units: Object.values(DEFAULT_TRAINING_UNITS), seed });
+  return createTacticsKernel({
+    initial,
+    weapons: defaultWeapons(),
+    skills: SKILLS,
+    units: Object.values(DEFAULT_TRAINING_UNITS),
+    seed,
+  });
 }
 
 const COMBAT_SCRIPT: TrainingEnemyScript = {
   priority: [],
-  actions: [
-    { unitId: "upyr", kind: "attack", targetUnitId: "bogatyr", weaponId: "claws" },
-    { kind: "endTurn" },
-  ],
+  actions: [{ unitId: "upyr", kind: "attack", targetUnitId: "bogatyr", weaponId: "claws" }, { kind: "endTurn" }],
 };
 
 describe("pickScriptedEnemyCommand (0.20.13)", () => {
@@ -138,8 +141,22 @@ describe("pickScriptedEnemyCommand (0.20.13)", () => {
   });
 
   it("is deterministic: identical runs yield identical commands", () => {
-    const a = makeKernel(["bogatyr", "znaharka", "strelets"], [{ unitId: "upyr", count: 1 }, { unitId: "kikimora", count: 1 }], 303);
-    const b = makeKernel(["bogatyr", "znaharka", "strelets"], [{ unitId: "upyr", count: 1 }, { unitId: "kikimora", count: 1 }], 303);
+    const a = makeKernel(
+      ["bogatyr", "znaharka", "strelets"],
+      [
+        { unitId: "upyr", count: 1 },
+        { unitId: "kikimora", count: 1 },
+      ],
+      303,
+    );
+    const b = makeKernel(
+      ["bogatyr", "znaharka", "strelets"],
+      [
+        { unitId: "upyr", count: 1 },
+        { unitId: "kikimora", count: 1 },
+      ],
+      303,
+    );
     a.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
     b.apply({ type: "END_TURN", playerId: String(PLAYER_OWNER) });
     for (let i = 0; i < 6; i += 1) {

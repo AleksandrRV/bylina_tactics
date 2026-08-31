@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  DEFAULT_TRAINING_UNITS,
-  ENEMY_OWNER,
-  PLAYER_OWNER,
-  createMissionMatch,
-  livingOf,
-} from "../src/index.js";
+import { DEFAULT_TRAINING_UNITS, ENEMY_OWNER, PLAYER_OWNER, createMissionMatch, livingOf } from "../src/index.js";
 
 const MAP = {
   width: 12,
@@ -89,10 +83,7 @@ describe("createMissionMatch roster modifiers", () => {
     const match = createMissionMatch({
       units: Object.values(DEFAULT_TRAINING_UNITS),
       map: MAP,
-      playerSlots: [
-        { unitId: "bogatyr", aimMod: -15, defenseMod: -10, mobilityMod: -1, hp: 4 },
-        "strelets",
-      ],
+      playerSlots: [{ unitId: "bogatyr", aimMod: -15, defenseMod: -10, mobilityMod: -1, hp: 4 }, "strelets"],
       enemies: [{ unitId: "upyr", count: 2 }],
       seed: 51,
     });
@@ -114,10 +105,7 @@ describe("createMissionMatch equipment", () => {
     const match = createMissionMatch({
       units: Object.values(DEFAULT_TRAINING_UNITS),
       map: MAP,
-      playerSlots: [
-        { unitId: "bogatyr", extraWeaponIds: ["bow"], aimMod: 15, maxHpMod: 3, hp: 10 },
-        "strelets",
-      ],
+      playerSlots: [{ unitId: "bogatyr", extraWeaponIds: ["bow"], aimMod: 15, maxHpMod: 3, hp: 10 }, "strelets"],
       enemies: [{ unitId: "upyr", count: 2 }],
       seed: 61,
     });

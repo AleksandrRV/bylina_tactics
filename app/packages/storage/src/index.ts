@@ -203,7 +203,11 @@ export function createReplayStorage(key: string = DEFAULT_REPLAYS_KEY, backend?:
 
 export const DEFAULT_SAVE_KEY = "bylina.save.v1";
 
-export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: StorageBackend, options: SaveStorageOptions = {}): SaveStorage {
+export function createSaveStorage(
+  key: string = DEFAULT_SAVE_KEY,
+  backend?: StorageBackend,
+  options: SaveStorageOptions = {},
+): SaveStorage {
   const storage = backend ?? {
     getItem: (storageKey) => {
       if (typeof localStorage === "undefined") return null;
@@ -239,7 +243,8 @@ export function createSaveStorage(key: string = DEFAULT_SAVE_KEY, backend?: Stor
         const migrated = migrateSave(parsed);
         if (!migrated) return null;
         // Persist a successful migration immediately, so it runs once.
-        if ((parsed as { formatVersion?: unknown }).formatVersion !== SAVE_FORMAT_VERSION) write(JSON.stringify(migrated));
+        if ((parsed as { formatVersion?: unknown }).formatVersion !== SAVE_FORMAT_VERSION)
+          write(JSON.stringify(migrated));
         return migrated;
       } catch {
         return null;
@@ -301,11 +306,12 @@ export function createSaveSerializer(): SaveSerializer {
       pending.clear();
     };
     return {
-      serialize: (data) => new Promise<string>((resolve, reject) => {
-        const id = nextId++;
-        pending.set(id, { resolve, reject });
-        worker.postMessage({ id, data } satisfies WorkerRequest);
-      }),
+      serialize: (data) =>
+        new Promise<string>((resolve, reject) => {
+          const id = nextId++;
+          pending.set(id, { resolve, reject });
+          worker.postMessage({ id, data } satisfies WorkerRequest);
+        }),
       dispose: () => {
         worker.terminate();
         for (const request of pending.values()) request.reject(new Error("Save worker disposed"));

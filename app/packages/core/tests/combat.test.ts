@@ -76,7 +76,7 @@ describe("LOS", () => {
     tileAt(grid, 1, 0)!.blockLOS = true;
     const glancing = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
     expect(glancing.available).toBe(true);
-    expect((glancing.chance ?? 0)).toBe((open.chance ?? 0) - 50);
+    expect(glancing.chance ?? 0).toBe((open.chance ?? 0) - 50);
   });
 
   it("is blocked by a hill that the ray hits", () => {
@@ -130,7 +130,7 @@ describe("cover and flank", () => {
     const edgeCover = unit({ id: 3, owner: 0, x: 3, y: 2, coverType: 2, edge: 1, obstacle: false, weaponId: "" });
     const open = previewAttack(grid, [attacker, target], attacker, target, DEBUG_BOW);
     const protectedPreview = previewAttack(grid, [attacker, target, edgeCover], attacker, target, DEBUG_BOW);
-    expect((protectedPreview.chance ?? 0)).toBe((open.chance ?? 0) - 50);
+    expect(protectedPreview.chance ?? 0).toBe((open.chance ?? 0) - 50);
   });
 
   it("grants leshy at least half cover next to a camouflage provider", () => {
@@ -204,7 +204,11 @@ describe("kernel attack", () => {
     const closePreview = previewAttack(grid, [attacker, close, far], attacker, close, pishchal);
     const farPreview = previewAttack(grid, [attacker, close, far], attacker, far, pishchal);
     expect(closePreview.chance).toBe((farPreview.chance ?? 0) - 30);
-    const kernel = createTacticsKernel({ initial: { turnNumber: 1, activeOwner: 1, grid, entities: [attacker, close, far] }, weapons: { [pishchal.id]: pishchal }, seed: 2 });
+    const kernel = createTacticsKernel({
+      initial: { turnNumber: 1, activeOwner: 1, grid, entities: [attacker, close, far] },
+      weapons: { [pishchal.id]: pishchal },
+      seed: 2,
+    });
     expect(kernel.apply({ type: "ATTACK", actorId: 1, targetId: 3, weaponId: pishchal.id }).ok).toBe(true);
     expect(kernel.getSnapshot().entities.find((entity) => entity.id === 1)?.ap).toBe(0);
   });

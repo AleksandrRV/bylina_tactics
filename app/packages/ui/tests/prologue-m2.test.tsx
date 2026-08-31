@@ -24,9 +24,11 @@ import { dataTree } from "./training-sim.js";
 
 /** Журнал обращений к средству отображения. */
 const calls: { name: string; args: unknown[] }[] = [];
-const record = (name: string) => (...args: unknown[]): void => {
-  calls.push({ name, args });
-};
+const record =
+  (name: string) =>
+  (...args: unknown[]): void => {
+    calls.push({ name, args });
+  };
 
 let activate: ((x: number, y: number) => void) | null = null;
 
@@ -64,16 +66,19 @@ vi.mock("@bylina/render", () => ({
 
 beforeEach(() => {
   (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia = window.matchMedia ?? ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
   window.scrollTo = window.scrollTo ?? (() => undefined);
   window.localStorage.clear();
 });
@@ -170,9 +175,7 @@ describe("prologue M2 beat (0.20.45)", () => {
 
       // В дружине один боец: Федот увяз и управлению не подлежит.
       expect(document.querySelectorAll(".roster-card")).toHaveLength(1);
-      const fedot = session
-        .getBattleSnapshot(1)
-        .entities.find((entity) => entity.configId === "fedot_stranded")!;
+      const fedot = session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "fedot_stranded")!;
       expect(fedot.maxAp).toBe(0);
       expect(fedot.immobileTurns).toBeGreaterThan(0);
 
@@ -184,9 +187,7 @@ describe("prologue M2 beat (0.20.45)", () => {
         await tick(60);
       });
       expect(
-        session
-          .getBattleSnapshot(1)
-          .entities.filter((entity) => entity.configId === "fedot_stranded")?.[0]?.maxAp,
+        session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "fedot_stranded")?.[0]?.maxAp,
       ).toBe(0);
 
       // Зона эвакуации тёмная: она появится только после стаи.
@@ -206,8 +207,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       const { session } = services;
       await startM2(root, session);
 
-      const hero = () =>
-        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const endTurn = (): HTMLButtonElement | null => document.querySelector<HTMLButtonElement>(".end-turn");
       const stanceButton = (): HTMLButtonElement | null =>
         [...document.querySelectorAll<HTMLButtonElement>("button")].find((button) =>
@@ -265,9 +265,10 @@ describe("prologue M2 beat (0.20.45)", () => {
       await act(async () => {
         stanceButton()?.click();
       });
-      await waitFor(() =>
-        session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead)
-          .length >= 2,
+      await waitFor(
+        () =>
+          session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead)
+            .length >= 2,
       );
       expect(playedScenes(), "сцена засады").toContain("m2_ambush");
       // Крысы появляются скрытыми: на поле их выводит сцена.
@@ -287,8 +288,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       const { session } = services;
       await startM2(root, session);
 
-      const hero = () =>
-        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const rats = () =>
         session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead);
       const clickCell = async (x: number, y: number): Promise<void> => {
@@ -343,8 +343,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       const { session } = services;
       await startM2(root, session);
 
-      const hero = () =>
-        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const clickCell = async (x: number, y: number): Promise<void> => {
         await act(async () => {
           activate?.(x, y);
@@ -372,7 +371,9 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(card, "окно сообщения").not.toBeNull();
       expect(card?.textContent ?? "", "текст реплики").toContain("шум в кустах");
       // Журнал боя остаётся за короткими репликами боя, а не за сюжетом.
-      expect(document.querySelector(".battle-log")?.textContent ?? "", "журнал не дублирует реплику").not.toContain("шум в кустах");
+      expect(document.querySelector(".battle-log")?.textContent ?? "", "журнал не дублирует реплику").not.toContain(
+        "шум в кустах",
+      );
 
       // Окно закрывается кнопкой.
       await act(async () => {
@@ -396,12 +397,9 @@ describe("prologue M2 beat (0.20.45)", () => {
       const { session } = services;
       await startM2(root, session);
 
-      const hero = () =>
-        session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+      const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const rats = () =>
-        session
-          .getBattleSnapshot(1)
-          .entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead);
+        session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead);
       const clickCell = async (x: number, y: number): Promise<void> => {
         await act(async () => {
           activate?.(x, y);
@@ -475,7 +473,9 @@ describe("prologue M2 beat (0.20.45)", () => {
           continue;
         }
         await clickCell(best.x, best.y);
-        freed = session.getBattleSnapshot(1).entities.some((entity) => entity.configId === "fedot_stranded" && entity.maxAp > 0);
+        freed = session
+          .getBattleSnapshot(1)
+          .entities.some((entity) => entity.configId === "fedot_stranded" && entity.maxAp > 0);
       }
 
       // Федот освобождён: он боец и входит в дружину.

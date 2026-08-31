@@ -36,8 +36,14 @@ describe("pendingCampaignHints (0.20.0)", () => {
 
   it("adds deploy and evacuation hints on deployment, evacuation only for rescue/recon", () => {
     expect(pendingCampaignHints({ ...BASE, onDeployment: true })).toEqual(["deploy"]);
-    expect(pendingCampaignHints({ ...BASE, onDeployment: true, missionType: "rescue" })).toEqual(["deploy", "evacuation"]);
-    expect(pendingCampaignHints({ ...BASE, onDeployment: true, missionType: "recon" })).toEqual(["deploy", "evacuation"]);
+    expect(pendingCampaignHints({ ...BASE, onDeployment: true, missionType: "rescue" })).toEqual([
+      "deploy",
+      "evacuation",
+    ]);
+    expect(pendingCampaignHints({ ...BASE, onDeployment: true, missionType: "recon" })).toEqual([
+      "deploy",
+      "evacuation",
+    ]);
     expect(pendingCampaignHints({ ...BASE, onDeployment: true, missionType: "purge" })).toEqual(["deploy"]);
   });
 
@@ -56,12 +62,14 @@ describe("pendingCampaignHints (0.20.0)", () => {
       "first_kikimora",
     ]);
     // Уже показанные не повторяются.
-    expect(pendingCampaignHints({
-      ...BASE,
-      done: ["first_battle", "first_leshy"],
-      onBattle: true,
-      enemyTypes: ["leshy"],
-    })).toEqual([]);
+    expect(
+      pendingCampaignHints({
+        ...BASE,
+        done: ["first_battle", "first_leshy"],
+        onBattle: true,
+        enemyTypes: ["leshy"],
+      }),
+    ).toEqual([]);
   });
 
   it("does not repeat hints that were already shown", () => {

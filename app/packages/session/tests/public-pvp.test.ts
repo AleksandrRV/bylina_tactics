@@ -4,16 +4,93 @@ import { createSignalingSession } from "@bylina/signaling";
 import { createTacticsKernel, type MatchState, type WeaponStats } from "@bylina/core";
 import { createSession } from "../src/index.js";
 
-const SWORD: WeaponStats = { id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1, requiresLOS: false, aimMod: 0, minDmg: 20, maxDmg: 20, crit: 0, critBonus: 0, envDmg: 0 };
+const SWORD: WeaponStats = {
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 20,
+  maxDmg: 20,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
+};
 
 function matchState(): MatchState {
   return {
     turnNumber: 1,
     activeOwner: 1,
-    grid: { width: 8, height: 6, tiles: Array.from({ length: 48 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), z: 1, pit: false, blockLOS: false })) },
+    grid: {
+      width: 8,
+      height: 6,
+      tiles: Array.from({ length: 48 }, (_, i) => ({
+        x: i % 8,
+        y: Math.floor(i / 8),
+        z: 1,
+        pit: false,
+        blockLOS: false,
+      })),
+    },
     entities: [
-      { id: 1, configId: "bogatyr", owner: 1, x: 3, y: 2, z: 1, dir: 1, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 100, defense: 0, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
-      { id: 11, configId: "bogatyr", owner: 2, x: 4, y: 2, z: 1, dir: 3, ap: 2, maxAp: 2, mobility: 5, hp: 12, maxHp: 12, aim: 100, defense: 0, will: 40, vision: 12, weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false, coverType: 0, overwatch: false, defending: false, movementSpent: 0 },
+      {
+        id: 1,
+        configId: "bogatyr",
+        owner: 1,
+        x: 3,
+        y: 2,
+        z: 1,
+        dir: 1,
+        ap: 2,
+        maxAp: 2,
+        mobility: 5,
+        hp: 12,
+        maxHp: 12,
+        aim: 100,
+        defense: 0,
+        will: 40,
+        vision: 12,
+        weaponId: "sword",
+        weaponIds: ["sword"],
+        skillIds: [],
+        obstacle: true,
+        dead: false,
+        flying: false,
+        coverType: 0,
+        overwatch: false,
+        defending: false,
+        movementSpent: 0,
+      },
+      {
+        id: 11,
+        configId: "bogatyr",
+        owner: 2,
+        x: 4,
+        y: 2,
+        z: 1,
+        dir: 3,
+        ap: 2,
+        maxAp: 2,
+        mobility: 5,
+        hp: 12,
+        maxHp: 12,
+        aim: 100,
+        defense: 0,
+        will: 40,
+        vision: 12,
+        weaponId: "sword",
+        weaponIds: ["sword"],
+        skillIds: [],
+        obstacle: true,
+        dead: false,
+        flying: false,
+        coverType: 0,
+        overwatch: false,
+        defending: false,
+        movementSpent: 0,
+      },
     ],
   };
 }
@@ -28,7 +105,8 @@ function fakeChannelFactory(): (initiator: boolean) => import("@bylina/signaling
         const target = channel === hostChannel ? guestChannel : hostChannel;
         if (target) {
           queueMicrotask(() => {
-            const listeners = (target as unknown as { listeners: Set<(m: import("@bylina/net").Envelope) => void> }).listeners;
+            const listeners = (target as unknown as { listeners: Set<(m: import("@bylina/net").Envelope) => void> })
+              .listeners;
             for (const listener of listeners ?? []) listener(message);
           });
         }
@@ -58,8 +136,20 @@ describe("public network pvp over the relay (0.17.0)", () => {
     try {
       const wsUrl = `ws://127.0.0.1:${relay.port}`;
       const factory = fakeChannelFactory();
-      const hostSession = createSignalingSession({ url: wsUrl, roomId: "pub-1", role: "host", name: "host", channelFactory: factory });
-      const guestSession = createSignalingSession({ url: wsUrl, roomId: "pub-1", role: "guest", name: "guest", channelFactory: factory });
+      const hostSession = createSignalingSession({
+        url: wsUrl,
+        roomId: "pub-1",
+        role: "host",
+        name: "host",
+        channelFactory: factory,
+      });
+      const guestSession = createSignalingSession({
+        url: wsUrl,
+        roomId: "pub-1",
+        role: "guest",
+        name: "guest",
+        channelFactory: factory,
+      });
 
       const host = createSession("menu");
       const guest = createSession("menu");

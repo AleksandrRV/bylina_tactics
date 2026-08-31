@@ -93,9 +93,7 @@ async function waitFor(predicate: () => boolean, timeoutMs = 4000): Promise<bool
 }
 
 const buttonByText = (part: string): HTMLButtonElement => {
-  const found = [...document.querySelectorAll("button")].find((button) =>
-    (button.textContent ?? "").includes(part),
-  );
+  const found = [...document.querySelectorAll("button")].find((button) => (button.textContent ?? "").includes(part));
   if (!found) throw new Error(`button not found: ${part}`);
   return found as HTMLButtonElement;
 };
@@ -140,94 +138,82 @@ async function exitToMenu(): Promise<void> {
 }
 
 describe("выход из сюжетной миссии пролога (0.20.51)", () => {
-  it(
-    "меню предлагает продолжить былину, а не только начать заново",
-    async () => {
-      const app = await mountApp();
-      try {
-        await startBylina();
-        expect(document.querySelector(".battle-screen"), "бой пролога начат").not.toBeNull();
-        await exitToMenu();
-        // Былина начата: «Продолжить» обязана вернуть в недойденный бой.
-        expect(menuContinue(), "кнопка «Продолжить» в главном меню").toBe(true);
-        await act(async () => {
-          document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
-        });
-        await waitFor(() => document.querySelector(".battle-screen") !== null);
-        expect(document.querySelector(".battle-screen"), "возврат в бой пролога").not.toBeNull();
-        expect(app.errors, `необработанные ошибки: ${String(app.errors[0])}`).toEqual([]);
-      } finally {
-        await act(async () => {
-          app.root.unmount();
-        });
-      }
-    },
-    120000,
-  );
+  it("меню предлагает продолжить былину, а не только начать заново", async () => {
+    const app = await mountApp();
+    try {
+      await startBylina();
+      expect(document.querySelector(".battle-screen"), "бой пролога начат").not.toBeNull();
+      await exitToMenu();
+      // Былина начата: «Продолжить» обязана вернуть в недойденный бой.
+      expect(menuContinue(), "кнопка «Продолжить» в главном меню").toBe(true);
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      expect(document.querySelector(".battle-screen"), "возврат в бой пролога").not.toBeNull();
+      expect(app.errors, `необработанные ошибки: ${String(app.errors[0])}`).toEqual([]);
+    } finally {
+      await act(async () => {
+        app.root.unmount();
+      });
+    }
+  }, 120000);
 
-  it(
-    "бой сюжетной миссии не теряется, если обозреватель закрыли в бою",
-    async () => {
-      const first = await mountApp();
-      try {
-        await startBylina();
-        // Закрытие вкладки: выхода в меню не было, бой продолжался.
-        await act(async () => {
-          await new Promise((resolve) => setTimeout(resolve, 200));
-        });
-      } finally {
-        await act(async () => {
-          first.root.unmount();
-        });
-      }
-      document.body.innerHTML = "";
-      const second = await mountApp();
-      try {
-        expect(menuContinue(), "«Продолжить» после закрытия в бою").toBe(true);
-        await act(async () => {
-          document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
-        });
-        await waitFor(() => document.querySelector(".battle-screen") !== null);
-        expect(document.querySelector(".battle-screen"), "бой пролога восстановлен").not.toBeNull();
-        expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
-      } finally {
-        await act(async () => {
-          second.root.unmount();
-        });
-      }
-    },
-    120000,
-  );
+  it("бой сюжетной миссии не теряется, если обозреватель закрыли в бою", async () => {
+    const first = await mountApp();
+    try {
+      await startBylina();
+      // Закрытие вкладки: выхода в меню не было, бой продолжался.
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+      });
+    } finally {
+      await act(async () => {
+        first.root.unmount();
+      });
+    }
+    document.body.innerHTML = "";
+    const second = await mountApp();
+    try {
+      expect(menuContinue(), "«Продолжить» после закрытия в бою").toBe(true);
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      expect(document.querySelector(".battle-screen"), "бой пролога восстановлен").not.toBeNull();
+      expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
+    } finally {
+      await act(async () => {
+        second.root.unmount();
+      });
+    }
+  }, 120000);
 
-  it(
-    "после перезапуска былина продолжается тем же боем",
-    async () => {
-      const first = await mountApp();
-      try {
-        await startBylina();
-        await exitToMenu();
-      } finally {
-        await act(async () => {
-          first.root.unmount();
-        });
-      }
-      // Тот же носитель сохранения: приложение открывается заново.
-      document.body.innerHTML = "";
-      const second = await mountApp();
-      try {
-        expect(menuContinue(), "«Продолжить» после перезапуска").toBe(true);
-        await act(async () => {
-          document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
-        });
-        await waitFor(() => document.querySelector(".battle-screen") !== null);
-        expect(document.querySelector(".battle-screen"), "бой пролога восстановлен").not.toBeNull();
-        expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
-      } finally {
-        await act(async () => {
-          second.root.unmount();
-        });
-      }
-    },
-    120000,
-  );
+  it("после перезапуска былина продолжается тем же боем", async () => {
+    const first = await mountApp();
+    try {
+      await startBylina();
+      await exitToMenu();
+    } finally {
+      await act(async () => {
+        first.root.unmount();
+      });
+    }
+    // Тот же носитель сохранения: приложение открывается заново.
+    document.body.innerHTML = "";
+    const second = await mountApp();
+    try {
+      expect(menuContinue(), "«Продолжить» после перезапуска").toBe(true);
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>(".btn-continue")!.click();
+      });
+      await waitFor(() => document.querySelector(".battle-screen") !== null);
+      expect(document.querySelector(".battle-screen"), "бой пролога восстановлен").not.toBeNull();
+      expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
+    } finally {
+      await act(async () => {
+        second.root.unmount();
+      });
+    }
+  }, 120000);
 });

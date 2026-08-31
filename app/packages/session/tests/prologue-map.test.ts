@@ -48,7 +48,10 @@ describe("prologue M2 map (0.20.43)", () => {
     const tiers = new Set(grid.tiles.map((tile) => tile.z));
     expect([...tiers].sort()).toEqual([0, 1, 2]);
     for (const tile of grid.tiles) {
-      for (const [dx, dy] of [[1, 0], [0, 1]] as const) {
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+      ] as const) {
         const other = tileAt(grid, tile.x + dx, tile.y + dy);
         if (!other) continue;
         // Перепад в два яруса между соседями — стена: движения через неё нет.
@@ -58,7 +61,16 @@ describe("prologue M2 map (0.20.43)", () => {
   });
 
   it("keeps the rescue inside one dash and the way out open", () => {
-    const adjacent = [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, -1], [-1, 1], [1, 1]] as const;
+    const adjacent = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+      [-1, -1],
+      [1, -1],
+      [-1, 1],
+      [1, 1],
+    ] as const;
     let cheapest = Number.POSITIVE_INFINITY;
     for (const [dx, dy] of adjacent) {
       const path = findPath(grid, others, walker, fedot.x + dx, fedot.y + dy);
@@ -132,7 +144,12 @@ describe("prologue M2 markers (0.20.45)", () => {
     // Зона открывается ровно этими клетками, а не всей западной колонкой:
     // в колонке двенадцать клеток, и половина из них — не выход.
     expect(compiled.extractCells.map((cell) => `${cell.x},${cell.y}`).sort()).toEqual([
-      "0,0", "0,1", "0,2", "0,6", "0,7", "0,8",
+      "0,0",
+      "0,1",
+      "0,2",
+      "0,6",
+      "0,7",
+      "0,8",
     ]);
   });
 });

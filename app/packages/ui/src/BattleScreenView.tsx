@@ -116,7 +116,17 @@ function allOwnApSpent(entities: readonly EntityState[], owner: number): boolean
 /** Иконка автопобеды: молния как знак мгновенного разрешения. */
 function AutoWinIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M13 2 4.5 13.5H11L9.5 22 19 9.5h-6.5L13 2Z" />
     </svg>
   );
@@ -125,7 +135,17 @@ function AutoWinIcon() {
 /** Иконка-жук: общепринятый символ отладочного режима. */
 function DebugIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M8 2l1.5 2.5M16 2l-1.5 2.5" />
       <ellipse cx="12" cy="14" rx="5" ry="6" />
       <path d="M12 8v12" />
@@ -138,7 +158,17 @@ function DebugIcon() {
 /** Иконка выхода из обучения: дверь с выходящей стрелкой. */
 function ExitIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="18"
+      height="18"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M13 4H6v16h7" />
       <path d="M16 8l4 4-4 4" />
       <path d="M10 12h9" />
@@ -150,7 +180,15 @@ export function BattleScreenView() {
   useI18nTick();
   const t = useT();
   const { session, content, debug } = useServices();
-  const { paused, difficulty, battleKind, activeMissionId, deployment, matchSeed, trainingDone: trainingDoneMissions } = useSessionState();
+  const {
+    paused,
+    difficulty,
+    battleKind,
+    activeMissionId,
+    deployment,
+    matchSeed,
+    trainingDone: trainingDoneMissions,
+  } = useSessionState();
   const hostRef = useRef<HTMLDivElement>(null);
   const rendererRef = useRef<FieldRenderer | null>(null);
   const hoverRef = useRef<string | null>(null);
@@ -304,13 +342,14 @@ export function BattleScreenView() {
         enemies: mission.enemies,
         generals: mission.generals,
         excludedGenerals: session.getCampaign().getState().deadGenerals,
-        objective: mission.type === "destroy"
-          ? { kind: "destroy", unitId: mission.objectiveUnitId! }
-          : mission.type === "rescue"
-            ? { kind: "rescue", unitId: mission.escorteeUnitId! }
-            : mission.type === "recon"
-              ? { kind: "recon" }
-              : undefined,
+        objective:
+          mission.type === "destroy"
+            ? { kind: "destroy", unitId: mission.objectiveUnitId! }
+            : mission.type === "rescue"
+              ? { kind: "rescue", unitId: mission.escorteeUnitId! }
+              : mission.type === "recon"
+                ? { kind: "recon" }
+                : undefined,
         seed: matchSeed || 1,
       });
     } else {
@@ -436,9 +475,7 @@ export function BattleScreenView() {
   const [prologueObjectiveKey, setPrologueObjectiveKey] = useState(
     prologueRunRef.current?.objectiveKey ?? "prologue.objective.gather",
   );
-  const trainingHints = isTraining && trainingMission
-    ? trainingHintsSorted(trainingMission.hints)
-    : [];
+  const trainingHints = isTraining && trainingMission ? trainingHintsSorted(trainingMission.hints) : [];
   const activeHint = trainingHints[hintStep] ?? null;
 
   // Обновление шага по событиям действий ИГРОКА (0.19.1): подсказка
@@ -477,9 +514,12 @@ export function BattleScreenView() {
     if (noteTimerRef.current !== undefined) window.clearTimeout(noteTimerRef.current);
     noteTimerRef.current = window.setTimeout(() => setTrainingNote(null), 6000);
   };
-  useEffect(() => () => {
-    if (noteTimerRef.current !== undefined) window.clearTimeout(noteTimerRef.current);
-  }, []);
+  useEffect(
+    () => () => {
+      if (noteTimerRef.current !== undefined) window.clearTimeout(noteTimerRef.current);
+    },
+    [],
+  );
 
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
   const { replayIndex, setReplayIndex, replayDone, setReplayDone } = useReplayControls();
@@ -501,7 +541,6 @@ export function BattleScreenView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
 
-
   // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
   const netDisconnected = session.get().netDisconnected === true;
   const [disconnectLeft, setDisconnectLeft] = useState(30);
@@ -518,9 +557,12 @@ export function BattleScreenView() {
   // (сокрытие панели чужой стороны и туман стороны при передаче устройства).
   // Сетевой ведомый всегда видит только свою сторону; ведущий — активную.
   const netOwner = battleKind === "pvpNet" ? session.get().netOwner : null;
-  const pvpActive = battleKind === "pvp" || battleKind === "pvpNet"
-    ? (isNetGuest || isSpectator ? netOwner : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER))
-    : null;
+  const pvpActive =
+    battleKind === "pvp" || battleKind === "pvpNet"
+      ? isNetGuest || isSpectator
+        ? netOwner
+        : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER)
+      : null;
   const viewOwner = pvpActive ?? PLAYER_OWNER;
   const enemyOwner = viewOwner === ENEMY_OWNER ? PLAYER_OWNER : ENEMY_OWNER;
 
@@ -590,7 +632,17 @@ export function BattleScreenView() {
       return;
     }
     if (outcome === "defeat") outcomeGate.report(() => setTrainingOver("defeat"));
-  }, [snapshot.turnNumber, snapshot.entities, busy, isTraining, trainingDone, trainingHints.length, hintStep, trainingOver, trainingMission]);
+  }, [
+    snapshot.turnNumber,
+    snapshot.entities,
+    busy,
+    isTraining,
+    trainingDone,
+    trainingHints.length,
+    hintStep,
+    trainingOver,
+    trainingMission,
+  ]);
 
   // Ограничение действий в обучении (строгий сценарий, 0.20.13): игрок может
   // совершать только то действие, которое предписывает активное указание, —
@@ -630,7 +682,12 @@ export function BattleScreenView() {
   );
 
   const isOwn = (entity: EntityState): boolean =>
-    !isSpectator && !isReplay && !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0;
+    !isSpectator &&
+    !isReplay &&
+    !entity.dead &&
+    entity.coverType === 0 &&
+    entity.owner === viewOwner &&
+    entity.maxAp > 0;
 
   /**
    * Показать сюжетное сообщение окном (0.20.52): строка журнала гасится,
@@ -673,9 +730,8 @@ export function BattleScreenView() {
   }, [snapshot.turnNumber, pvpActive]);
 
   // Миссия кампании: запись точки для формулировки задачи и цели.
-  const mission = battleKind === "campaign" && activeMissionId
-    ? session.getCampaign().getMission(activeMissionId)
-    : undefined;
+  const mission =
+    battleKind === "campaign" && activeMissionId ? session.getCampaign().getMission(activeMissionId) : undefined;
 
   // Боевые туториалы кампании (0.20.0/0.20.1): «первый бой», «первый леший»,
   // «первая кикимора», «появление генерала». Показываются один раз, отключаются
@@ -684,19 +740,20 @@ export function BattleScreenView() {
   const hintSettings = useSettingsState();
   const { campaignHintsDone } = useSessionState();
   const battleWantedHints = useMemo(
-    () => pendingCampaignHints({
-      showHints: hintSettings.showHints,
-      done: campaignHintsDone ?? [],
-      onCampaignMap: false,
-      lockedCount: 0,
-      hasWounded: false,
-      rosterTabActive: false,
-      forgeTabActive: false,
-      onDeployment: false,
-      onBattle: battleKind === "campaign" && Boolean(mission),
-      enemyTypes: mission?.enemies.map((entry) => entry.unitId) ?? [],
-      onBattleWithGeneral: Boolean(mission?.generals?.length),
-    }),
+    () =>
+      pendingCampaignHints({
+        showHints: hintSettings.showHints,
+        done: campaignHintsDone ?? [],
+        onCampaignMap: false,
+        lockedCount: 0,
+        hasWounded: false,
+        rosterTabActive: false,
+        forgeTabActive: false,
+        onDeployment: false,
+        onBattle: battleKind === "campaign" && Boolean(mission),
+        enemyTypes: mission?.enemies.map((entry) => entry.unitId) ?? [],
+        onBattleWithGeneral: Boolean(mission?.generals?.length),
+      }),
     [hintSettings.showHints, campaignHintsDone, battleKind, mission],
   );
   const [battleHintQueue, setBattleHintQueue] = useState<CampaignHintId[]>([]);
@@ -740,9 +797,10 @@ export function BattleScreenView() {
   useEffect(() => {
     // Обучение: выбран всегда исполнитель текущего указания — произвольный
     // выбор бойца в обучении запрещён (строгий сценарий, 0.20.13).
-    const first = (isTraining && trainingActorId !== null
-      ? snapshot.entities.find((entity) => entity.id === trainingActorId)
-      : undefined) ?? snapshot.entities.find(isOwn);
+    const first =
+      (isTraining && trainingActorId !== null
+        ? snapshot.entities.find((entity) => entity.id === trainingActorId)
+        : undefined) ?? snapshot.entities.find(isOwn);
     setSelectedId(first?.id ?? null);
     setAction(null);
     clearAim();
@@ -758,7 +816,20 @@ export function BattleScreenView() {
     if (isNetGuest) return session.requestNetReachable(selectedId);
     if (usesNetSnapshot || isReplay) return [] as ReachableCell[];
     return session.getBattleReachable(selectedId);
-  }, [kernel, selectedId, action, snapshot.turnNumber, selected?.x, selected?.y, selected?.ap, paused, busy, isNetGuest, usesNetSnapshot, isReplay]);
+  }, [
+    kernel,
+    selectedId,
+    action,
+    snapshot.turnNumber,
+    selected?.x,
+    selected?.y,
+    selected?.ap,
+    paused,
+    busy,
+    isNetGuest,
+    usesNetSnapshot,
+    isReplay,
+  ]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -800,7 +871,12 @@ export function BattleScreenView() {
     if (aimId === null && !skillTargetPos) return null;
     // Предпросмотр умений у гостя/наблюдателя не вычисляется (нет ядра).
     if (usesNetSnapshot) return null;
-    const result = session.getBattleSkillPreview(selectedId, action.id, aimId ?? undefined, skillTargetPos ?? undefined);
+    const result = session.getBattleSkillPreview(
+      selectedId,
+      action.id,
+      aimId ?? undefined,
+      skillTargetPos ?? undefined,
+    );
     return {
       available: result.available,
       reason: result.reason,
@@ -812,7 +888,19 @@ export function BattleScreenView() {
       flanked: result.flanked,
       areaCells: result.areaCells,
     };
-  }, [kernel, selectedId, aimId, skillTargetPos, action, selected?.x, selected?.y, selected?.ap, aimed?.x, aimed?.y, aimed?.hp]);
+  }, [
+    kernel,
+    selectedId,
+    aimId,
+    skillTargetPos,
+    action,
+    selected?.x,
+    selected?.y,
+    selected?.ap,
+    aimed?.x,
+    aimed?.y,
+    aimed?.hp,
+  ]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -830,7 +918,8 @@ export function BattleScreenView() {
     // Повтор: партия не «завершается»; обучение завершает экран отдельным эффектом.
     if (isReplay || isTraining || isPrologue) return;
     if (battleKind === "pvp" || battleKind === "pvpNet") {
-      const winner = ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
+      const winner =
+        ended.winnerPlayerId === String(PLAYER_OWNER) ? 1 : ended.winnerPlayerId === String(ENEMY_OWNER) ? 2 : null;
       if (winner) outcomeGate.report(() => session.finishPvpMatch(winner));
       return;
     }
@@ -853,10 +942,9 @@ export function BattleScreenView() {
         return general?.dead === true;
       });
       const participants = deployment.map((fighterId, index) => {
-        const entity = final.entities.find((candidate) =>
-          candidate.owner === PLAYER_OWNER &&
-          candidate.coverType === 0 &&
-          candidate.rosterIndex === index,
+        const entity = final.entities.find(
+          (candidate) =>
+            candidate.owner === PLAYER_OWNER && candidate.coverType === 0 && candidate.rosterIndex === index,
         );
         if (entity) return { fighterId, survived: !entity.dead, hp: entity.hp };
         // Эвакуированный боец (разведка) выжил: здоровье на момент ухода
@@ -1128,7 +1216,10 @@ export function BattleScreenView() {
         session.saveBattleCheckpoint();
       }
       if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
-        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
+        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+          type: "death_by",
+          cause: "checkpoint",
+        });
         if (session.hasBattleCheckpoint()) {
           prologueRunRef.current = next;
           prologueAfter = () => void restorePrologueScene();
@@ -1164,10 +1255,15 @@ export function BattleScreenView() {
     setAction(null);
     clearAim();
     // Рывок: удар подаётся после того, как боец дошёл (0.20.50).
-    playThen(result.events, after || prologueAfter ? () => {
-      prologueAfter?.();
-      after?.();
-    } : undefined);
+    playThen(
+      result.events,
+      after || prologueAfter
+        ? () => {
+            prologueAfter?.();
+            after?.();
+          }
+        : undefined,
+    );
     // После playThen: проигрывание уже началось, и гейт выдержит паузу
     // от его конца, а не от момента команды.
     if (prologueFinished) outcomeGate.report(() => setPrologueCard("outro"));
@@ -1220,9 +1316,16 @@ export function BattleScreenView() {
         return;
       }
     }
-    const command: Command = action.type === "weapon"
-      ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
-      : { type: "USE_SKILL", actorId: selectedId, targetId, targetPos: skillTargetPos ?? undefined, skillId: action.id };
+    const command: Command =
+      action.type === "weapon"
+        ? { type: "ATTACK", actorId: selectedId, targetId, weaponId: action.id }
+        : {
+            type: "USE_SKILL",
+            actorId: selectedId,
+            targetId,
+            targetPos: skillTargetPos ?? undefined,
+            skillId: action.id,
+          };
     applyCommand(command);
   };
 
@@ -1289,7 +1392,9 @@ export function BattleScreenView() {
     });
   };
 
-  const useSelfSkill = (skillId: string): void => {
+  // Имя без приставки `use`: это обработчик нажатия, а не хук (0.20.55) —
+  // прежнее имя ломало правило react-hooks/rules-of-hooks.
+  const applySelfSkill = (skillId: string): void => {
     if (selectedId === null || paused || busy || snapshot.activeOwner !== viewOwner) return;
     // Обучение: само-умение допустимо, только если предписано указанием.
     if (isTraining) {
@@ -1395,7 +1500,10 @@ export function BattleScreenView() {
           const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
           const next = afterPrologueApply(kernel, command, applied.events, prologueRunRef.current, ctx);
           if (shouldRestoreCheckpoint(next, applied.events, kernel.getSnapshot())) {
-            prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, { type: "death_by", cause: "checkpoint" });
+            prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+              type: "death_by",
+              cause: "checkpoint",
+            });
             if (session.hasBattleCheckpoint()) {
               prologueRunRef.current = next;
               // Затемнение и откат — после того, как ход Нави доигран.
@@ -1487,7 +1595,13 @@ export function BattleScreenView() {
     try {
       if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
         const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
-        const next = afterPrologueApply(kernel, { type: "END_TURN", playerId: String(viewOwner) }, result.events, prologueRunRef.current, ctx);
+        const next = afterPrologueApply(
+          kernel,
+          { type: "END_TURN", playerId: String(viewOwner) },
+          result.events,
+          prologueRunRef.current,
+          ctx,
+        );
         prologueRunRef.current = next;
         setPrologueObjectiveKey(next.objectiveKey);
         if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
@@ -1528,7 +1642,11 @@ export function BattleScreenView() {
       session.sendNetCommand({ type: "END_TURN", playerId: String(viewOwner) });
       return;
     }
-    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, { type: "END_TURN", playerId: String(viewOwner) })) {
+    if (
+      isPrologue &&
+      prologueRunRef.current &&
+      !gatePrologueCommand(prologueRunRef.current, { type: "END_TURN", playerId: String(viewOwner) })
+    ) {
       showStoryNote(t("prologue.hint.m2.noise"));
       return;
     }
@@ -1560,23 +1678,39 @@ export function BattleScreenView() {
     const ownUnits = snapshot.entities.filter(
       (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
     );
-    if (!shouldAutoEndTurn({
-      paused,
-      busy,
-      enemyPhase,
-      isReplay,
-      isSpectator,
-      isTraining,
-      activeHint,
-      activeOwner: snapshot.activeOwner,
-      viewOwner,
-      ownUnits,
-      outcomeOngoing: battleOutcome() === "ongoing",
-      isNetGuest: Boolean(isNetGuest),
-    })) return;
+    if (
+      !shouldAutoEndTurn({
+        paused,
+        busy,
+        enemyPhase,
+        isReplay,
+        isSpectator,
+        isTraining,
+        activeHint,
+        activeOwner: snapshot.activeOwner,
+        viewOwner,
+        ownUnits,
+        outcomeOngoing: battleOutcome() === "ongoing",
+        isNetGuest: Boolean(isNetGuest),
+      })
+    )
+      return;
     endTurn();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [snapshot.turnNumber, snapshot.entities, viewOwner, paused, busy, enemyPhase, isReplay, isSpectator, isNetGuest, isTraining, activeHint, hintSettings.autoEndTurn]);
+  }, [
+    snapshot.turnNumber,
+    snapshot.entities,
+    viewOwner,
+    paused,
+    busy,
+    enemyPhase,
+    isReplay,
+    isSpectator,
+    isNetGuest,
+    isTraining,
+    activeHint,
+    hintSettings.autoEndTurn,
+  ]);
 
   const onCell = (x: number, y: number): void => {
     if (paused || busy || outcomePending || snapshot.activeOwner !== viewOwner) return;
@@ -1592,13 +1726,15 @@ export function BattleScreenView() {
     const targeting = action !== null;
     const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
     const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
-    const allyTargeting = Boolean(selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"));
+    const allyTargeting = Boolean(
+      selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"),
+    );
     // Этап 2.6 (правка): умение «на себя» с областью (круговой взмах) не
     // требует цели — пока выбрано, клик по любой клетке применяет его,
     // а область уже подсвечена областным прицелом.
     const selfAreaTargeting = Boolean(selectedSkill?.category === "self" && (selectedSkill.radius ?? 0) > 0);
     if (selfAreaTargeting && action?.type === "skill") {
-      useSelfSkill(action.id);
+      applySelfSkill(action.id);
       return;
     }
     const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
@@ -1628,7 +1764,11 @@ export function BattleScreenView() {
         return;
       }
       const directive = trainingDirective;
-      if (directive?.kind === "attack" && entity?.id === directive.targetId && automaticAttack.id === directive.weaponId) {
+      if (
+        directive?.kind === "attack" &&
+        entity?.id === directive.targetId &&
+        automaticAttack.id === directive.weaponId
+      ) {
         setAction(automaticAttack);
         setAimId(entity?.id ?? null);
         setPreview(null);
@@ -1672,7 +1812,9 @@ export function BattleScreenView() {
       return;
     }
 
-    const needsPosition = selectedSkill?.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
+    const needsPosition = selectedSkill?.effects.some(
+      (effect) => effect.type === "spawn" || effect.type === "displace",
+    );
     if (needsPosition && action?.type === "skill") {
       const tile = snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
       if (tile) tryPositionSkill({ x, y, z: tile.z });
@@ -1814,23 +1956,23 @@ export function BattleScreenView() {
     if (action?.type !== "skill" || selectedId === null || paused || busy) return null;
     const skill = skills[action.id];
     if (!skill) return null;
-    const hasArea = (skill.radius ?? 0) > 0
-      || skill.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
+    const hasArea =
+      (skill.radius ?? 0) > 0 || skill.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
     if (!hasArea) return null;
 
-    const center = skill.category === "self"
-      ? selected
-      : skillTargetPos
-        ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z }
-        : undefined;
+    const center =
+      skill.category === "self"
+        ? selected
+        : skillTargetPos
+          ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z }
+          : undefined;
     if (!center) return null;
 
     // У self-навыка без цели hit намеренно null: это не одиночный target
     // preview. Запрашиваем тот же SkillPreview отдельно, чтобы получить
     // areaCells и не дублировать геометрию в UI или renderer.
-    const skillPreview = skill.category === "self" && !usesNetSnapshot
-      ? session.getBattleSkillPreview(selectedId, action.id)
-      : hit;
+    const skillPreview =
+      skill.category === "self" && !usesNetSnapshot ? session.getBattleSkillPreview(selectedId, action.id) : hit;
     if (!skillPreview?.areaCells?.length) return null;
 
     return {
@@ -1841,7 +1983,20 @@ export function BattleScreenView() {
       // допускает friendly fire; лечение/призыв с filter="all" не опасны.
       warnFriendly: skill.resolution === "attack" && (skill.filter === "all" || skill.filter === "allies"),
     };
-  }, [action, selectedId, selected, skillTargetPos, skills, paused, busy, usesNetSnapshot, session, hit, kernel, snapshot.turnNumber]);
+  }, [
+    action,
+    selectedId,
+    selected,
+    skillTargetPos,
+    skills,
+    paused,
+    busy,
+    usesNetSnapshot,
+    session,
+    hit,
+    kernel,
+    snapshot.turnNumber,
+  ]);
 
   // Этап 4.8: карточка прицеливания подтягивается к цели (доли экрана).
   const [aimCardPos, setAimCardPos] = useState<{ x: number; y: number } | null>(null);
@@ -1877,15 +2032,8 @@ export function BattleScreenView() {
       aimOk: Boolean(hit?.available) || Boolean(charge),
       // Этап 1.4: состояние кольца цели — белое (предварительно выбрана),
       // янтарное (атака готова), красное (невозможно).
-      aimState: aimId === null
-        ? undefined
-        : charge
-          ? "ready"
-          : !hit
-            ? "preselect"
-            : hit.available
-              ? "ready"
-              : "blocked",
+      aimState:
+        aimId === null ? undefined : charge ? "ready" : !hit ? "preselect" : hit.available ? "ready" : "blocked",
       // Этап 2.7: цель открыта с фланга — красные уголки-скобки.
       aimFlanked: Boolean(hit?.available && hit.flanked),
       // Этап 2.6 (правка): областной прицел — центр и радиус из определения
@@ -1909,7 +2057,30 @@ export function BattleScreenView() {
       trainingHighlight,
       trainingFocus,
     });
-  }, [matchSeed, snapshot, selectedId, aimId, reachable, previewPath, hit, hit?.heightMod, paused, debugMovement, visibleCells, exploredCells, aimBreakCell, hoverCell, trainingHighlight, trainingFocus, action, t, battleBiome, darknessRatio, areaPreview, charge]);
+  }, [
+    matchSeed,
+    snapshot,
+    selectedId,
+    aimId,
+    reachable,
+    previewPath,
+    hit,
+    hit?.heightMod,
+    paused,
+    debugMovement,
+    visibleCells,
+    exploredCells,
+    aimBreakCell,
+    hoverCell,
+    trainingHighlight,
+    trainingFocus,
+    action,
+    t,
+    battleBiome,
+    darknessRatio,
+    areaPreview,
+    charge,
+  ]);
 
   // Жесты холста закрыты, пока исход боя ещё не показан (0.20.40): пауза
   // принадлежит проигрыванию боя, а не игроку. Сцена держит замок сама,
@@ -1971,7 +2142,15 @@ export function BattleScreenView() {
         }
         return;
       }
-      if (event.key === "9" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingAllows("defend") && (!isTraining || trainingActorId === selectedId)) {
+      if (
+        event.key === "9" &&
+        selectedId !== null &&
+        selected &&
+        selected.ap > 0 &&
+        snapshot.activeOwner === viewOwner &&
+        trainingAllows("defend") &&
+        (!isTraining || trainingActorId === selectedId)
+      ) {
         applyCommand({ type: "DEFEND", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -1979,7 +2158,15 @@ export function BattleScreenView() {
         setPreview(null);
         return;
       }
-      if (event.key === "0" && selectedId !== null && selected && selected.ap > 0 && snapshot.activeOwner === viewOwner && trainingAllows("overwatch") && (!isTraining || trainingActorId === selectedId)) {
+      if (
+        event.key === "0" &&
+        selectedId !== null &&
+        selected &&
+        selected.ap > 0 &&
+        snapshot.activeOwner === viewOwner &&
+        trainingAllows("overwatch") &&
+        (!isTraining || trainingActorId === selectedId)
+      ) {
         applyCommand({ type: "OVERWATCH", actorId: selectedId });
         setAction(null);
         setSkillTargetPos(null);
@@ -1996,8 +2183,14 @@ export function BattleScreenView() {
           const directive = trainingDirective;
           const allowed =
             directive !== null &&
-            ((chosen?.type === "weapon" && directive.kind === "attack" && directive.actorId === selectedId && directive.weaponId === chosen.id) ||
-              (chosen?.type === "skill" && directive.kind === "skill" && directive.actorId === selectedId && directive.skillId === chosen.id));
+            ((chosen?.type === "weapon" &&
+              directive.kind === "attack" &&
+              directive.actorId === selectedId &&
+              directive.weaponId === chosen.id) ||
+              (chosen?.type === "skill" &&
+                directive.kind === "skill" &&
+                directive.actorId === selectedId &&
+                directive.skillId === chosen.id));
           if (!allowed) return;
         }
         if (!chosen) return;
@@ -2012,14 +2205,14 @@ export function BattleScreenView() {
           // работает как кнопка — первый тап подсвечивает, второй применяет.
           const hotkeySkill = skills[chosen.id]!;
           if ((hotkeySkill.radius ?? 0) > 0 && action?.type === "skill" && action.id === chosen.id) {
-            useSelfSkill(chosen.id);
+            applySelfSkill(chosen.id);
           } else if ((hotkeySkill.radius ?? 0) > 0) {
             setAction({ type: "skill", id: chosen.id });
             setSkillTargetPos(null);
             setAimId(null);
             setPreview(null);
           } else {
-            useSelfSkill(chosen.id);
+            applySelfSkill(chosen.id);
           }
         } else {
           const active = action?.type === chosen.type && action.id === chosen.id;
@@ -2055,18 +2248,21 @@ export function BattleScreenView() {
   // из списка: пока он immobile (maxAp 0), управлять им нельзя, и пустая
   // карточка с пустой шкалой ОД обещала бы игроку второго бойца, которого
   // у него нет. На поле он виден, а цель миссии названа в шапке.
-  const roster = snapshot.entities.filter((entity) =>
-    (isSpectator ? (entity.owner === 1 || entity.owner === 2) : entity.owner === viewOwner) &&
-    entity.coverType === 0 &&
-    (entity.dead || entity.maxAp > 0),
+  const roster = snapshot.entities.filter(
+    (entity) =>
+      (isSpectator ? entity.owner === 1 || entity.owner === 2 : entity.owner === viewOwner) &&
+      entity.coverType === 0 &&
+      (entity.dead || entity.maxAp > 0),
   );
   const sideKey = isSpectator
     ? "net.spectator"
     : battleKind === "pvp" || battleKind === "pvpNet"
-      ? (viewOwner === 1 ? "pvp.side1" : "pvp.side2")
-    : snapshot.activeOwner === ENEMY_OWNER
-      ? "field.sideEnemy"
-      : "field.sidePlayer";
+      ? viewOwner === 1
+        ? "pvp.side1"
+        : "pvp.side2"
+      : snapshot.activeOwner === ENEMY_OWNER
+        ? "field.sideEnemy"
+        : "field.sidePlayer";
 
   // Показывать портреты противников только если они в зоне видимости
   // (или уже мертвы и были видны). В поочерёдной игре — противники активной
@@ -2107,7 +2303,9 @@ export function BattleScreenView() {
               <div className="training-coach-head">
                 <span className="training-coach-name">{t("training.mentor")}</span>
                 {activeHint ? (
-                  <span className="training-hint-step">{t("training.step", { current: hintStep + 1, total: trainingHints.length })}</span>
+                  <span className="training-hint-step">
+                    {t("training.step", { current: hintStep + 1, total: trainingHints.length })}
+                  </span>
                 ) : null}
               </div>
               <p className="training-coach-line">
@@ -2143,7 +2341,9 @@ export function BattleScreenView() {
           // Реактивные плашки (яд, воскрешение, призыв) — у нижнего края,
           // над панелью действий, чтобы не перекрывать центр поля.
           <div className="training-note" role="status" aria-live="polite">
-            <span className="training-note-mark" aria-hidden="true">✦</span>
+            <span className="training-note-mark" aria-hidden="true">
+              ✦
+            </span>
             {t(trainingNote)}
           </div>
         ) : null}
@@ -2173,7 +2373,11 @@ export function BattleScreenView() {
           <div className="replay-bar" role="status">
             <span className="replay-label">{t("replay.watching")}</span>
             <span className="replay-progress">
-              <i style={{ width: `${replayJournal ? Math.min(100, (replayIndex / Math.max(1, replayJournal.commands.length)) * 100) : 0}%` }} />
+              <i
+                style={{
+                  width: `${replayJournal ? Math.min(100, (replayIndex / Math.max(1, replayJournal.commands.length)) * 100) : 0}%`,
+                }}
+              />
             </span>
             <span className="muted">
               {replayIndex}/{replayJournal?.commands.length ?? 0}
@@ -2197,7 +2401,17 @@ export function BattleScreenView() {
               title={t(fastPace ? "battle.fastPaceHint" : "battle.fastPace")}
               aria-label={t("battle.fastPace")}
             >
-              <svg width="18" height="18" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M5 5l7 7-7 7M13 5l7 7-7 7" />
               </svg>
             </button>
@@ -2257,10 +2471,10 @@ export function BattleScreenView() {
               {isPrologue
                 ? t(prologueObjectiveKey)
                 : battleKind === "campaign" && mission
-                ? t(`battle.objective.${mission.type}`)
-                : isTraining && trainingMission
-                  ? t(`training.objective.${trainingMission.id}`)
-                  : t("battle.objectiveQuick")}
+                  ? t(`battle.objective.${mission.type}`)
+                  : isTraining && trainingMission
+                    ? t(`training.objective.${trainingMission.id}`)
+                    : t("battle.objectiveQuick")}
             </p>
             <p className="muted">
               {t("field.turn", { turn: snapshot.turnNumber })}
@@ -2269,7 +2483,9 @@ export function BattleScreenView() {
             </p>
             {snapshot.apple ? (
               <div className="apple-hud" aria-label={t("pvp.appleLabel")}>
-                <span className="apple-hud-icon" aria-hidden="true">●</span>
+                <span className="apple-hud-icon" aria-hidden="true">
+                  ●
+                </span>
                 <span className="apple-hud-text">
                   {snapshot.apple.carrierId !== null
                     ? (() => {
@@ -2293,8 +2509,15 @@ export function BattleScreenView() {
                 ) : null}
                 <span className="objective-meta">
                   <span className="objective-name">{t(unitNameKey(objectiveEntity.configId))}</span>
-                  <span className="objective-hp" aria-label={t("battle.hp", { current: objectiveEntity.hp, max: objectiveEntity.maxHp })}>
-                    <i style={{ width: `${Math.max(0, Math.min(100, (objectiveEntity.hp / objectiveEntity.maxHp) * 100))}%` }} />
+                  <span
+                    className="objective-hp"
+                    aria-label={t("battle.hp", { current: objectiveEntity.hp, max: objectiveEntity.maxHp })}
+                  >
+                    <i
+                      style={{
+                        width: `${Math.max(0, Math.min(100, (objectiveEntity.hp / objectiveEntity.maxHp) * 100))}%`,
+                      }}
+                    />
                   </span>
                 </span>
               </div>
@@ -2333,7 +2556,15 @@ export function BattleScreenView() {
                 1
               </span>
               <span className="pvp-side-emblem-sep" aria-hidden="true">
-                <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 20 20"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.6"
+                  strokeLinecap="round"
+                >
                   <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
                   <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
                 </svg>
@@ -2375,7 +2606,9 @@ export function BattleScreenView() {
         <div className="battle-mid">
           {saveNotice ? (
             <p className="save-toast" role="status" aria-live="polite">
-              <span className="save-toast-mark" aria-hidden="true">✓</span>
+              <span className="save-toast-mark" aria-hidden="true">
+                ✓
+              </span>
               {t("battle.saved")}
             </p>
           ) : null}
@@ -2392,7 +2625,9 @@ export function BattleScreenView() {
               <div className="aim-header">
                 <span className={`aim-chance${hit.available ? "" : " blocked"}`}>
                   {hit.available
-                    ? hit.chance === undefined ? t("combat.available") : `${hit.chance}%`
+                    ? hit.chance === undefined
+                      ? t("combat.available")
+                      : `${hit.chance}%`
                     : t("combat.unavailable")}
                 </span>
                 {hit.available && hit.coverTarget ? (
@@ -2400,9 +2635,7 @@ export function BattleScreenView() {
                   // укрытие разрушается (§10.4 math) — числа урона не показываются.
                   <span className="aim-dmg cover-destroy">{t("combat.destroyCover")}</span>
                 ) : hit.available && hit.dmgMin !== undefined && hit.dmgMax !== undefined ? (
-                  <span className="aim-dmg">
-                    {t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}
-                  </span>
+                  <span className="aim-dmg">{t("combat.dmg", { dmg: `${hit.dmgMin}-${hit.dmgMax}` })}</span>
                 ) : null}
                 {hit.breakdown ? (
                   <button
@@ -2414,8 +2647,12 @@ export function BattleScreenView() {
                       const lines = [
                         `═══ ${t("combat.bdTotal")}: ${b.finalChance}% ═══`,
                         `${t("combat.bdBaseAim")}: +${b.baseAim}`,
-                        b.weaponMod !== 0 ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}` : null,
-                        b.heightAim !== 0 ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}` : null,
+                        b.weaponMod !== 0
+                          ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}`
+                          : null,
+                        b.heightAim !== 0
+                          ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}`
+                          : null,
                         b.targetDefense > 0 ? `${t("combat.bdDefense")}: −${b.targetDefense}` : null,
                         b.stanceDefense > 0 ? `${t("combat.bdDefend")}: −${b.stanceDefense}` : null,
                         b.coverPenalty > 0 ? `${t("combat.bdCover")}: −${b.coverPenalty}` : null,
@@ -2427,9 +2664,18 @@ export function BattleScreenView() {
                       navigator.clipboard.writeText(lines.join("\n")).catch(() => {});
                     }}
                   >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/>
-                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+                    <svg
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+                      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
                     </svg>
                   </button>
                 ) : null}
@@ -2441,12 +2687,14 @@ export function BattleScreenView() {
                   </span>
                   {hit.breakdown.weaponMod !== 0 ? (
                     <span className={`bd-item${hit.breakdown.weaponMod > 0 ? " pos" : " neg"}`}>
-                      {t("combat.bdWeaponMod")}: {hit.breakdown.weaponMod > 0 ? "+" : ""}{hit.breakdown.weaponMod}
+                      {t("combat.bdWeaponMod")}: {hit.breakdown.weaponMod > 0 ? "+" : ""}
+                      {hit.breakdown.weaponMod}
                     </span>
                   ) : null}
                   {hit.breakdown.heightAim !== 0 ? (
                     <span className={`bd-item${hit.breakdown.heightAim > 0 ? " pos" : " neg"}`}>
-                      {t("combat.bdHeight")}: {hit.breakdown.heightAim > 0 ? "+" : ""}{hit.breakdown.heightAim}
+                      {t("combat.bdHeight")}: {hit.breakdown.heightAim > 0 ? "+" : ""}
+                      {hit.breakdown.heightAim}
                     </span>
                   ) : null}
                   {hit.breakdown.targetDefense > 0 ? (
@@ -2495,189 +2743,242 @@ export function BattleScreenView() {
         {isSpectator ? (
           <footer className="battle-bottom spectator-bar">
             <div className="spectator-note" role="status">
-              <span className="spectator-eye" aria-hidden="true">◉</span>
+              <span className="spectator-eye" aria-hidden="true">
+                ◉
+              </span>
               {t("net.spectator")}
               <span className="muted"> — {t("net.spectatorBody")}</span>
             </div>
           </footer>
         ) : (
-        <footer className={`battle-bottom${outcomePending ? " is-outcome-pending" : ""}`}>
-          <div className="battle-selected">
-            {selected ? (
-              <div className="sel-row">
-                {unitPortrait(selected.configId) ? (
-                  <img className="sel-face" src={unitPortrait(selected.configId)} alt="" draggable={false} />
-                ) : null}
-                <div className="sel-info">
-                  <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
-                  <p>{t("battle.hp", { current: selected.hp, max: selected.maxHp })}</p>
-                  <div className="hp-segs" aria-hidden="true">
-                    {Array.from({ length: selected.maxHp }, (_, index) => (
-                      <i key={index} className={index < selected.hp ? "on" : ""} />
-                    ))}
-                  </div>
-                  <div className={`diamonds${hintPanelKey === "ap" ? " hint-pulse" : ""}`} aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}>
-                    {Array.from({ length: selected.maxAp }, (_, index) => (
-                      <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
-                    ))}
-                  </div>
-                  <div className="status-list" aria-label={t("battle.statuses")}>
-                    {selected.poison ? <span className="status-chip poison">{t("status.poison", { turns: selected.poison.turnsLeft })}</span> : null}
-                    {selected.panic ? <span className="status-chip panic">{t("status.panic")}</span> : null}
-                    {selected.immobileTurns ? <span className="status-chip immobile">{t("status.immobile")}</span> : null}
-                    {selected.hidden ? <span className="status-chip hidden">{t("status.hidden")}</span> : null}
-                    {selected.flying ? <span className="status-chip flying">{t("status.flying")}</span> : null}
-                    {selected.timedLife !== undefined ? <span className="status-chip timed">{t("status.timed", { turns: selected.timedLife })}</span> : null}
-                    {selected.defending ? <span className="status-chip defending">{t("status.defending")}</span> : null}
-                    {selected.overwatch ? <span className="status-chip overwatch">{t("status.overwatch")}</span> : null}
+          <footer className={`battle-bottom${outcomePending ? " is-outcome-pending" : ""}`}>
+            <div className="battle-selected">
+              {selected ? (
+                <div className="sel-row">
+                  {unitPortrait(selected.configId) ? (
+                    <img className="sel-face" src={unitPortrait(selected.configId)} alt="" draggable={false} />
+                  ) : null}
+                  <div className="sel-info">
+                    <p className="eyebrow">{t(unitNameKey(selected.configId))}</p>
+                    <p>{t("battle.hp", { current: selected.hp, max: selected.maxHp })}</p>
+                    <div className="hp-segs" aria-hidden="true">
+                      {Array.from({ length: selected.maxHp }, (_, index) => (
+                        <i key={index} className={index < selected.hp ? "on" : ""} />
+                      ))}
+                    </div>
+                    <div
+                      className={`diamonds${hintPanelKey === "ap" ? " hint-pulse" : ""}`}
+                      aria-label={t("field.ap", { current: selected.ap, max: selected.maxAp })}
+                    >
+                      {Array.from({ length: selected.maxAp }, (_, index) => (
+                        <span key={index} className={index < selected.ap ? "diamond is-on" : "diamond"} />
+                      ))}
+                    </div>
+                    <div className="status-list" aria-label={t("battle.statuses")}>
+                      {selected.poison ? (
+                        <span className="status-chip poison">
+                          {t("status.poison", { turns: selected.poison.turnsLeft })}
+                        </span>
+                      ) : null}
+                      {selected.panic ? <span className="status-chip panic">{t("status.panic")}</span> : null}
+                      {selected.immobileTurns ? (
+                        <span className="status-chip immobile">{t("status.immobile")}</span>
+                      ) : null}
+                      {selected.hidden ? <span className="status-chip hidden">{t("status.hidden")}</span> : null}
+                      {selected.flying ? <span className="status-chip flying">{t("status.flying")}</span> : null}
+                      {selected.timedLife !== undefined ? (
+                        <span className="status-chip timed">{t("status.timed", { turns: selected.timedLife })}</span>
+                      ) : null}
+                      {selected.defending ? (
+                        <span className="status-chip defending">{t("status.defending")}</span>
+                      ) : null}
+                      {selected.overwatch ? (
+                        <span className="status-chip overwatch">{t("status.overwatch")}</span>
+                      ) : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <p>{t("battle.empty")}</p>
-            )}
-          </div>
-          <div className="skill-row">
-            {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => {
-              const weapon = weapons[weaponId];
-              const active = action?.type === "weapon" && action.id === weaponId;
-              const info = weapon ? weaponActionInfo(weaponId, weapon, t) : null;
-              return (
-                <ActionSlot
-                  key={`weapon-${weaponId}`}
-                  id={weaponId}
-                  name={t(`weapon.${weaponId}.name`)}
-                  art={actionArt(weaponId)}
-                  shortcut={ACTION_SHORTCUTS[index]}
-                  active={active}
-                  hinted={hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId)}
-                  accent={accentWeaponId === weaponId}
-                  disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingWeaponAllowed(weaponId) || prologueStanceLock}
-                  info={info}
-                  onInspect={info ? () => setActionInfo(info) : undefined}
-                  onPress={() => {
-                    setAction(active ? null : { type: "weapon", id: weaponId });
-                    // Рывок считался под прежнее оружие: снимаем (0.20.50).
-                    setCharge(null);
-                    setChargeArmed(false);
-                    setSkillTargetPos(null);
-                    setAimId(null);
-                    setPreview(null);
-                  }}
-                />
-              );
-            })}
-            {(selected?.skillIds ?? []).map((skillId) => {
-              const skill = skills[skillId];
-              const active = action?.type === "skill" && action.id === skillId;
-              const shortcut = selected ? shortcutForAction(selected, "skill", skillId) : undefined;
-              const cooldown = selected?.skillCooldowns?.[skillId] ?? 0;
-              const uses = selected?.skillUses?.[skillId] ?? 0;
-              const usesLeft = skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses);
-              const exhausted = usesLeft === 0;
-              const info = skill ? skillActionInfo(skillId, skill, t) : null;
-              return (
-                <ActionSlot
-                  key={`skill-${skillId}`}
-                  id={skillId}
-                  name={t(`skill.${skillId}.name`)}
-                  art={actionArt(skillId)}
-                  shortcut={shortcut}
-                  active={active}
-                  hinted={hintPanelKey === "skill" && trainingSkillAllowed(skillId)}
-                  cooldown={cooldown}
-                  usesLeft={usesLeft}
-                  title={cooldown > 0 ? t("battle.cooldownHint", { turns: cooldown }) : exhausted ? t("battle.noUsesHint") : undefined}
-                  disabled={!selected || selected.ap < (skill?.apCost ?? 1) || cooldown > 0 || exhausted || busy || snapshot.activeOwner !== viewOwner || !trainingSkillAllowed(skillId) || prologueStanceLock}
-                  info={info}
-                  onInspect={info ? () => setActionInfo(info) : undefined}
-                  onPress={() => {
-                    // Рывок считался под прежнее действие: снимаем (0.20.50).
-                    setCharge(null);
-                    setChargeArmed(false);
-                    // Этап-правка: умение «на себя» с областью (круговой взмах)
-                    // подтверждается вторым тапом — первый показывает область.
-                    if (skill?.category === "self") {
-                      if ((skill.radius ?? 0) > 0) {
-                        const alreadyArmed = action?.type === "skill" && action.id === skillId;
-                        if (alreadyArmed) useSelfSkill(skillId);
-                        else {
-                          setAction({ type: "skill", id: skillId });
-                          setSkillTargetPos(null);
-                          setAimId(null);
-                          setPreview(null);
-                        }
-                      } else {
-                        useSelfSkill(skillId);
-                      }
-                    } else {
-                      setAction(active ? null : { type: "skill", id: skillId });
+              ) : (
+                <p>{t("battle.empty")}</p>
+              )}
+            </div>
+            <div className="skill-row">
+              {(selected?.weaponIds ?? (selected?.weaponId ? [selected.weaponId] : [])).map((weaponId, index) => {
+                const weapon = weapons[weaponId];
+                const active = action?.type === "weapon" && action.id === weaponId;
+                const info = weapon ? weaponActionInfo(weaponId, weapon, t) : null;
+                return (
+                  <ActionSlot
+                    key={`weapon-${weaponId}`}
+                    id={weaponId}
+                    name={t(`weapon.${weaponId}.name`)}
+                    art={actionArt(weaponId)}
+                    shortcut={ACTION_SHORTCUTS[index]}
+                    active={active}
+                    hinted={hintPanelKey === "weapon" && trainingWeaponAllowed(weaponId)}
+                    accent={accentWeaponId === weaponId}
+                    disabled={
+                      !selected ||
+                      selected.ap <= 0 ||
+                      busy ||
+                      snapshot.activeOwner !== viewOwner ||
+                      !trainingWeaponAllowed(weaponId) ||
+                      prologueStanceLock
+                    }
+                    info={info}
+                    onInspect={info ? () => setActionInfo(info) : undefined}
+                    onPress={() => {
+                      setAction(active ? null : { type: "weapon", id: weaponId });
+                      // Рывок считался под прежнее оружие: снимаем (0.20.50).
+                      setCharge(null);
+                      setChargeArmed(false);
                       setSkillTargetPos(null);
                       setAimId(null);
                       setPreview(null);
+                    }}
+                  />
+                );
+              })}
+              {(selected?.skillIds ?? []).map((skillId) => {
+                const skill = skills[skillId];
+                const active = action?.type === "skill" && action.id === skillId;
+                const shortcut = selected ? shortcutForAction(selected, "skill", skillId) : undefined;
+                const cooldown = selected?.skillCooldowns?.[skillId] ?? 0;
+                const uses = selected?.skillUses?.[skillId] ?? 0;
+                const usesLeft =
+                  skill?.maxUsesPerBattle === undefined ? undefined : Math.max(0, skill.maxUsesPerBattle - uses);
+                const exhausted = usesLeft === 0;
+                const info = skill ? skillActionInfo(skillId, skill, t) : null;
+                return (
+                  <ActionSlot
+                    key={`skill-${skillId}`}
+                    id={skillId}
+                    name={t(`skill.${skillId}.name`)}
+                    art={actionArt(skillId)}
+                    shortcut={shortcut}
+                    active={active}
+                    hinted={hintPanelKey === "skill" && trainingSkillAllowed(skillId)}
+                    cooldown={cooldown}
+                    usesLeft={usesLeft}
+                    title={
+                      cooldown > 0
+                        ? t("battle.cooldownHint", { turns: cooldown })
+                        : exhausted
+                          ? t("battle.noUsesHint")
+                          : undefined
                     }
-                  }}
-                />
-              );
-            })}
-            <ActionSlot
-              id="defend"
-              name={t("battle.defend")}
-              art={actionArt("defend")}
-              shortcut="9"
-              active={Boolean(selected?.defending)}
-              hinted={hintPanelKey === "defend"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("defend")}
-              title={t("battle.defendHint")}
-              info={stanceActionInfo("defend", t)}
-              onInspect={() => setActionInfo(stanceActionInfo("defend", t))}
-              onPress={() => {
-                if (selectedId === null) return;
-                // Единый путь команд (0.19.2): как и клавиша 9 — через
-                // applyCommand (транспорт в состязательном режиме, анимация
-                // и продвижение подсказки в обучении).
-                applyCommand({ type: "DEFEND", actorId: selectedId });
-                setAction(null);
-                setSkillTargetPos(null);
-                setAimId(null);
-                setPreview(null);
-              }}
-            />
-            <ActionSlot
-              id="overwatch"
-              name={t("battle.overwatch")}
-              art={actionArt("overwatch")}
-              shortcut="0"
-              active={Boolean(selected?.overwatch)}
-              hinted={hintPanelKey === "overwatch"}
-              disabled={!selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("overwatch") || prologueStanceLock}
-              title={t("battle.overwatchHint")}
-              info={stanceActionInfo("overwatch", t)}
-              onInspect={() => setActionInfo(stanceActionInfo("overwatch", t))}
-              onPress={() => {
-                if (selectedId === null) return;
-                // Единый путь команд (0.19.2): как и клавиша 0 — через
-                // applyCommand (транспорт в состязательном режиме, анимация
-                // и продвижение подсказки в обучении).
-                applyCommand({ type: "OVERWATCH", actorId: selectedId });
-                setAction(null);
-                setSkillTargetPos(null);
-                setAimId(null);
-                setPreview(null);
-              }}
-            />
-          </div>
-          <button
-            type="button"
-            className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
-            // Принудительная стойка закрывает и «Конец хода» (0.20.45):
-            // иначе игрок уходил бы от засады ценой пропущенного урока.
-            disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn") || prologueStanceLock}
-            onClick={() => endTurn()}
-          >
-            {t("field.endTurn")}
-          </button>
-        </footer>
+                    disabled={
+                      !selected ||
+                      selected.ap < (skill?.apCost ?? 1) ||
+                      cooldown > 0 ||
+                      exhausted ||
+                      busy ||
+                      snapshot.activeOwner !== viewOwner ||
+                      !trainingSkillAllowed(skillId) ||
+                      prologueStanceLock
+                    }
+                    info={info}
+                    onInspect={info ? () => setActionInfo(info) : undefined}
+                    onPress={() => {
+                      // Рывок считался под прежнее действие: снимаем (0.20.50).
+                      setCharge(null);
+                      setChargeArmed(false);
+                      // Этап-правка: умение «на себя» с областью (круговой взмах)
+                      // подтверждается вторым тапом — первый показывает область.
+                      if (skill?.category === "self") {
+                        if ((skill.radius ?? 0) > 0) {
+                          const alreadyArmed = action?.type === "skill" && action.id === skillId;
+                          if (alreadyArmed) applySelfSkill(skillId);
+                          else {
+                            setAction({ type: "skill", id: skillId });
+                            setSkillTargetPos(null);
+                            setAimId(null);
+                            setPreview(null);
+                          }
+                        } else {
+                          applySelfSkill(skillId);
+                        }
+                      } else {
+                        setAction(active ? null : { type: "skill", id: skillId });
+                        setSkillTargetPos(null);
+                        setAimId(null);
+                        setPreview(null);
+                      }
+                    }}
+                  />
+                );
+              })}
+              <ActionSlot
+                id="defend"
+                name={t("battle.defend")}
+                art={actionArt("defend")}
+                shortcut="9"
+                active={Boolean(selected?.defending)}
+                hinted={hintPanelKey === "defend"}
+                disabled={
+                  !selected ||
+                  selected.ap <= 0 ||
+                  busy ||
+                  snapshot.activeOwner !== viewOwner ||
+                  !trainingAllows("defend")
+                }
+                title={t("battle.defendHint")}
+                info={stanceActionInfo("defend", t)}
+                onInspect={() => setActionInfo(stanceActionInfo("defend", t))}
+                onPress={() => {
+                  if (selectedId === null) return;
+                  // Единый путь команд (0.19.2): как и клавиша 9 — через
+                  // applyCommand (транспорт в состязательном режиме, анимация
+                  // и продвижение подсказки в обучении).
+                  applyCommand({ type: "DEFEND", actorId: selectedId });
+                  setAction(null);
+                  setSkillTargetPos(null);
+                  setAimId(null);
+                  setPreview(null);
+                }}
+              />
+              <ActionSlot
+                id="overwatch"
+                name={t("battle.overwatch")}
+                art={actionArt("overwatch")}
+                shortcut="0"
+                active={Boolean(selected?.overwatch)}
+                hinted={hintPanelKey === "overwatch"}
+                disabled={
+                  !selected ||
+                  selected.ap <= 0 ||
+                  busy ||
+                  snapshot.activeOwner !== viewOwner ||
+                  !trainingAllows("overwatch") ||
+                  prologueStanceLock
+                }
+                title={t("battle.overwatchHint")}
+                info={stanceActionInfo("overwatch", t)}
+                onInspect={() => setActionInfo(stanceActionInfo("overwatch", t))}
+                onPress={() => {
+                  if (selectedId === null) return;
+                  // Единый путь команд (0.19.2): как и клавиша 0 — через
+                  // applyCommand (транспорт в состязательном режиме, анимация
+                  // и продвижение подсказки в обучении).
+                  applyCommand({ type: "OVERWATCH", actorId: selectedId });
+                  setAction(null);
+                  setSkillTargetPos(null);
+                  setAimId(null);
+                  setPreview(null);
+                }}
+              />
+            </div>
+            <button
+              type="button"
+              className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
+              // Принудительная стойка закрывает и «Конец хода» (0.20.45):
+              // иначе игрок уходил бы от засады ценой пропущенного урока.
+              disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn") || prologueStanceLock}
+              onClick={() => endTurn()}
+            >
+              {t("field.endTurn")}
+            </button>
+          </footer>
         )}
       </div>
 
@@ -2706,7 +3007,9 @@ export function BattleScreenView() {
         <div className="pass-device-root" role="presentation">
           <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="net-sync-title">
             <p className="eyebrow">{t("net.waitHint")}</p>
-            <h2 id="net-sync-title" className="pass-side-title">{t("net.syncing")}</h2>
+            <h2 id="net-sync-title" className="pass-side-title">
+              {t("net.syncing")}
+            </h2>
             <p className="muted">{t("net.syncingBody")}</p>
             <span className="net-sync-spinner" aria-hidden="true" />
           </div>
@@ -2729,11 +3032,11 @@ export function BattleScreenView() {
         <div className="pass-device-root" role="presentation">
           <div className="pass-device-card" role="dialog" aria-modal="true" aria-labelledby="net-lost-title">
             <p className="eyebrow">{t("net.waitHint")}</p>
-            <h2 id="net-lost-title" className="pass-side-title">{t("net.connectionLost")}</h2>
+            <h2 id="net-lost-title" className="pass-side-title">
+              {t("net.connectionLost")}
+            </h2>
             <p className="muted">
-              {disconnectLeft > 0
-                ? t("net.reconnectIn", { seconds: disconnectLeft })
-                : t("net.reconnectExpired")}
+              {disconnectLeft > 0 ? t("net.reconnectIn", { seconds: disconnectLeft }) : t("net.reconnectExpired")}
             </p>
             <div className="net-lost-actions">
               <button
@@ -2795,7 +3098,13 @@ export function BattleScreenView() {
                 session.advancePrologue(nextId);
               }}
             >
-              {t(prologueCard === "intro" ? "common.ok" : prologueMission.nextMissionId && prologueMission.id === "prologue_brushwood" ? "prologue.next.toCry" : "prologue.next.toMap")}
+              {t(
+                prologueCard === "intro"
+                  ? "common.ok"
+                  : prologueMission.nextMissionId && prologueMission.id === "prologue_brushwood"
+                    ? "prologue.next.toCry"
+                    : "prologue.next.toMap",
+              )}
             </button>
           </div>
         </div>
@@ -2804,11 +3113,7 @@ export function BattleScreenView() {
       {storyNote ? (
         // Сюжетное сообщение (0.20.52): окно поверх поля, закрывается
         // кнопкой либо щелчком по фону; кнопки панели оно не задевает.
-        <div
-          className="pause-root story-note-root"
-          role="presentation"
-          onClick={() => setStoryNote(null)}
-        >
+        <div className="pause-root story-note-root" role="presentation" onClick={() => setStoryNote(null)}>
           <div
             className="pause-card story-note-card"
             role="dialog"
@@ -2841,7 +3146,12 @@ export function BattleScreenView() {
 
       {isTraining && trainingOver ? (
         <div className="pause-root" role="presentation">
-          <div className="pause-card training-over-card" role="dialog" aria-modal="true" aria-labelledby="training-over-title">
+          <div
+            className="pause-card training-over-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="training-over-title"
+          >
             <p className="eyebrow">{trainingMission ? t(trainingMission.titleKey) : t("training.title")}</p>
             <h2 id="training-over-title">
               {trainingOver === "victory" ? t("training.over.victory") : t("training.over.defeat")}
@@ -2863,11 +3173,21 @@ export function BattleScreenView() {
             <details className="controls-help">
               <summary>{t("battle.controlsTitle")}</summary>
               <ul>
-                <li><kbd>1–8</kbd> {t("battle.controls.weapons")}</li>
-                <li><kbd>9</kbd> {t("battle.controls.defend")}</li>
-                <li><kbd>0</kbd> {t("battle.controls.overwatch")}</li>
-                <li><kbd>Tab</kbd> {t("battle.controls.next")}</li>
-                <li><kbd>Esc</kbd> {t("battle.controls.pause")}</li>
+                <li>
+                  <kbd>1–8</kbd> {t("battle.controls.weapons")}
+                </li>
+                <li>
+                  <kbd>9</kbd> {t("battle.controls.defend")}
+                </li>
+                <li>
+                  <kbd>0</kbd> {t("battle.controls.overwatch")}
+                </li>
+                <li>
+                  <kbd>Tab</kbd> {t("battle.controls.next")}
+                </li>
+                <li>
+                  <kbd>Esc</kbd> {t("battle.controls.pause")}
+                </li>
                 <li>{t("battle.controls.touch")}</li>
               </ul>
             </details>

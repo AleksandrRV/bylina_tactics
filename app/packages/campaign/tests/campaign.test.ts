@@ -153,7 +153,11 @@ describe("createCampaign: points and darkness", () => {
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
     expect(
-      automaton.finishMission("clearing_1", "defeat", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 5 }))),
+      automaton.finishMission(
+        "clearing_1",
+        "defeat",
+        fighters.map((fighterId) => ({ fighterId, survived: true, hp: 5 })),
+      ),
     ).toMatchObject({ darknessGained: 4, campaignLost: true, lostReason: "darkness" });
     expect(automaton.getState().phase).toBe("lost");
   });
@@ -166,7 +170,11 @@ describe("createCampaign: points and darkness", () => {
     });
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     automaton.abandonMission();
     expect(calls).toBe(2);
   });
@@ -220,23 +228,45 @@ describe("createCampaign: druzhina", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     // Исходные трое повысили уровень; рекрут-новобранец остаётся первого уровня.
     const ids = new Set(fighters.map((fighter) => fighter.id));
-    expect(automaton.getState().fighters.filter((fighter) => ids.has(fighter.id)).every((fighter) => fighter.level === CONFIG.classUnlockLevel + 1)).toBe(true);
+    expect(
+      automaton
+        .getState()
+        .fighters.filter((fighter) => ids.has(fighter.id))
+        .every((fighter) => fighter.level === CONFIG.classUnlockLevel + 1),
+    ).toBe(true);
 
     automaton.scan();
     automaton.startMission("clearing_2");
-    automaton.finishMission("clearing_2", "defeat", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_2",
+      "defeat",
+      automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     // Уровни не растут при поражении.
-    expect(automaton.getState().fighters.filter((fighter) => ids.has(fighter.id)).every((fighter) => fighter.level === CONFIG.classUnlockLevel + 1)).toBe(true);
+    expect(
+      automaton
+        .getState()
+        .fighters.filter((fighter) => ids.has(fighter.id))
+        .every((fighter) => fighter.level === CONFIG.classUnlockLevel + 1),
+    ).toBe(true);
   });
 
   it("adds a new recruit after a victory while under the roster cap", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    const result = automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    const result = automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     expect(result?.newRecruit).toBeTruthy();
     const state = automaton.getState();
     expect(state.fighters).toHaveLength(4);
@@ -250,13 +280,21 @@ describe("createCampaign: druzhina", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "defeat", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 6 })));
+    automaton.finishMission(
+      "clearing_1",
+      "defeat",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 6 })),
+    );
     expect(automaton.getState().fighters).toHaveLength(3);
 
     const full = campaign({ ...CONFIG, rosterCap: 3 });
     const fullFighters = full.getState().fighters;
     full.startMission("clearing_1");
-    const result = full.finishMission("clearing_1", "victory", fullFighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    const result = full.finishMission(
+      "clearing_1",
+      "victory",
+      fullFighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     expect(result?.newRecruit).toBeNull();
     expect(full.getState().fighters).toHaveLength(3);
   });
@@ -282,7 +320,11 @@ describe("createCampaign: druzhina", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     const recruit = automaton.getState().fighters.find((fighter) => fighter.unitId === "recruit")!;
     // Уровень 1 < 2: назначение недоступно.
     expect(automaton.assignClass(recruit.id, "volkhv")).toBe(false);
@@ -291,7 +333,11 @@ describe("createCampaign: druzhina", () => {
     const ids = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.scan();
     automaton.startMission("clearing_2");
-    automaton.finishMission("clearing_2", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_2",
+      "victory",
+      ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     const trained = automaton.getState().fighters.find((fighter) => fighter.id === recruit.id)!;
     expect(trained.level).toBe(2);
     expect(automaton.assignClass(trained.id, "volkhv")).toBe(true);
@@ -308,11 +354,19 @@ describe("createCampaign: druzhina", () => {
     const fighters = automaton.getState().fighters;
     // Две победы доводят рекрута до уровня 2 (classUnlockLevel).
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     const ids = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.scan();
     automaton.startMission("clearing_2");
-    automaton.finishMission("clearing_2", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_2",
+      "victory",
+      ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     const recruit = automaton.getState().fighters.find((fighter) => fighter.unitId === "recruit")!;
     expect(recruit.level).toBe(2);
     // Чужая/несуществующая запись отклоняется перечнем допустимых классов.
@@ -339,7 +393,11 @@ describe("createCampaign: druzhina", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    const result = automaton.finishMission("clearing_1", "victory", fighters.map((fighter) => ({ fighterId: fighter.id, survived: false, hp: 0 })));
+    const result = automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: false, hp: 0 })),
+    );
     expect(result?.newRecruit).toBeNull();
   });
 
@@ -356,14 +414,22 @@ describe("createCampaign: хозяйство 0.12", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    const result = automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    const result = automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     expect(result?.rewards).toEqual({ gold: 10, herbs: 3, artifacts: 1 });
     expect(automaton.getState().resources).toEqual({ gold: 16, herbs: 6, artifacts: 1 });
 
     // Сканирование расходует 1 траву: 3 + 3 − 1 = 5.
     automaton.scan();
     automaton.startMission("clearing_2");
-    const lost = automaton.finishMission("clearing_2", "defeat", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    const lost = automaton.finishMission(
+      "clearing_2",
+      "defeat",
+      automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     expect(lost?.rewards).toEqual({ gold: 0, herbs: 0, artifacts: 0 });
     expect(automaton.getState().resources).toEqual({ gold: 16, herbs: 5, artifacts: 1 });
   });
@@ -373,11 +439,19 @@ describe("createCampaign: хозяйство 0.12", () => {
     expect(automaton.getState().shipPosition).toEqual({ x: 20, y: 50 });
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     expect(automaton.getState().shipPosition).toEqual({ x: 20, y: 50 });
     automaton.scan();
     automaton.startMission("clearing_2");
-    automaton.finishMission("clearing_2", "victory", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_2",
+      "victory",
+      automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     expect(automaton.getState().shipPosition).toEqual({ x: 60, y: 50 });
   });
 
@@ -412,7 +486,11 @@ describe("createCampaign: хозяйство 0.12", () => {
     expect(automaton.craftItem("aim_charm")).toBe(false);
     const fighters = automaton.getState().fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     // Запасы { gold 16, herbs 6, artifacts 1 }.
     expect(automaton.craftItem("aim_charm")).toBe(true);
     expect(automaton.getState().resources).toEqual({ gold: 8, herbs: 3, artifacts: 1 });
@@ -426,7 +504,11 @@ describe("createCampaign: хозяйство 0.12", () => {
     // Вторая победа: +10 золота, −1 трава за сканирование.
     automaton.scan();
     automaton.startMission("clearing_2");
-    automaton.finishMission("clearing_2", "victory", automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_2",
+      "victory",
+      automaton.getState().fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: 10 })),
+    );
     expect(automaton.craftItem("mace_of_trail")).toBe(true);
     expect(automaton.getState().inventory).toEqual(["aim_charm", "mace_of_trail"]);
   });
@@ -439,10 +521,16 @@ describe("createCampaign: хозяйство 0.12", () => {
     expect(automaton.equipItem(bogatyr.id, "aim_charm")).toBe(false);
     const ids = fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     automaton.craftItem("aim_charm");
     expect(automaton.equipItem(bogatyr.id, "aim_charm")).toBe(true);
-    expect(automaton.getState().fighters.find((fighter) => fighter.id === bogatyr.id)?.equippedItemId).toBe("aim_charm");
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === bogatyr.id)?.equippedItemId).toBe(
+      "aim_charm",
+    );
     // Предмет единственный: второй боец надеть не может.
     expect(automaton.equipItem(fighters[1]!.id, "aim_charm")).toBe(false);
     // Снятие.
@@ -464,7 +552,11 @@ describe("createCampaign: снаряжение и гибель", () => {
     const fighters = automaton.getState().fighters;
     const ids = fighters.map((fighter) => fighter.id);
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })));
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      ids.map((fighterId) => ({ fighterId, survived: true, hp: 10 })),
+    );
     automaton.craftItem("aim_charm");
     automaton.equipItem(fighters[0]!.id, "aim_charm");
 
@@ -489,7 +581,12 @@ describe("generals in campaign (0.18.0)", () => {
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
     // Миссия без генералов — generalDeaths пуст; затем имитируем гибель Яги.
-    automaton.finishMission("clearing_1", "victory", fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })), ["baba_yaga"]);
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })),
+      ["baba_yaga"],
+    );
     expect(automaton.getState().deadGenerals).toContain("baba_yaga");
   });
 
@@ -497,7 +594,12 @@ describe("generals in campaign (0.18.0)", () => {
     const automaton = campaign();
     const fighters = automaton.getState().fighters;
     automaton.startMission("clearing_1");
-    automaton.finishMission("clearing_1", "victory", fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })), []);
+    automaton.finishMission(
+      "clearing_1",
+      "victory",
+      fighters.map((f) => ({ fighterId: f.id, survived: true, hp: 10 })),
+      [],
+    );
     expect(automaton.getState().deadGenerals).toEqual([]);
   });
 });
@@ -577,9 +679,39 @@ describe("createCampaign: sandbox after prologue (0.20.35)", () => {
           { id: "clearing_3", status: "locked" },
         ],
         fighters: [
-          { id: 1, name: "Микула", unitId: "mikula_peasant", level: 2, hp: 8, maxHp: 8, wounded: false, alive: true, equippedItemId: null },
-          { id: 2, name: "Федот", unitId: "fedot_stranded", level: 1, hp: 5, maxHp: 5, wounded: false, alive: true, equippedItemId: null },
-          { id: 3, name: "Василиса", unitId: "vasilisa", level: 1, hp: 7, maxHp: 7, wounded: false, alive: true, equippedItemId: null },
+          {
+            id: 1,
+            name: "Микула",
+            unitId: "mikula_peasant",
+            level: 2,
+            hp: 8,
+            maxHp: 8,
+            wounded: false,
+            alive: true,
+            equippedItemId: null,
+          },
+          {
+            id: 2,
+            name: "Федот",
+            unitId: "fedot_stranded",
+            level: 1,
+            hp: 5,
+            maxHp: 5,
+            wounded: false,
+            alive: true,
+            equippedItemId: null,
+          },
+          {
+            id: 3,
+            name: "Василиса",
+            unitId: "vasilisa",
+            level: 1,
+            hp: 7,
+            maxHp: 7,
+            wounded: false,
+            alive: true,
+            equippedItemId: null,
+          },
         ],
         deadGenerals: [],
         activeMissionId: null,

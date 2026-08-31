@@ -25,11 +25,7 @@ import type { CellPos, Command, EntityState } from "./types.js";
  */
 
 /** Условие применимости записи сценария (проверяется перед исполнением). */
-export type TrainingEnemyCondition =
-  | "targetAlive"
-  | "targetNotPoisoned"
-  | "targetWounded"
-  | "corpseExists";
+export type TrainingEnemyCondition = "targetAlive" | "targetNotPoisoned" | "targetWounded" | "corpseExists";
 
 export interface TrainingEnemyAction {
   /** Исполнитель (configId). Отсутствует у маркера конца хода. */
@@ -69,15 +65,15 @@ function livingByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, config
   return snap.entities.find((entity) => entity.configId === configId && !entity.dead);
 }
 
-function deadByConfigId(snap: ReturnType<TacticsKernel["getSnapshot"]>, configId: string, owner: number): EntityState | undefined {
+function deadByConfigId(
+  snap: ReturnType<TacticsKernel["getSnapshot"]>,
+  configId: string,
+  owner: number,
+): EntityState | undefined {
   return snap.entities.find((entity) => entity.configId === configId && entity.dead && entity.owner === owner);
 }
 
-function conditionHolds(
-  kernel: TacticsKernel,
-  action: TrainingEnemyAction,
-  actor: EntityState | undefined,
-): boolean {
+function conditionHolds(kernel: TacticsKernel, action: TrainingEnemyAction, actor: EntityState | undefined): boolean {
   if (!action.onlyIf) return true;
   const snap = kernel.getSnapshot();
   if (action.onlyIf === "corpseExists") {
@@ -139,10 +135,14 @@ function resolveAction(kernel: TacticsKernel, action: TrainingEnemyAction): Acti
   if (!conditionHolds(kernel, action, actor)) return { command: null, done: true };
 
   if (action.kind === "defend") {
-    return actor.defending ? { command: null, done: true } : { command: { type: "DEFEND", actorId: actor.id }, done: true };
+    return actor.defending
+      ? { command: null, done: true }
+      : { command: { type: "DEFEND", actorId: actor.id }, done: true };
   }
   if (action.kind === "overwatch") {
-    return actor.overwatch ? { command: null, done: true } : { command: { type: "OVERWATCH", actorId: actor.id }, done: true };
+    return actor.overwatch
+      ? { command: null, done: true }
+      : { command: { type: "OVERWATCH", actorId: actor.id }, done: true };
   }
 
   if (action.kind === "resurrect") {

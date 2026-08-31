@@ -99,8 +99,12 @@ export function ActionSlot({
         <span className="action-art action-art-empty" aria-hidden="true" />
       )}
       <span className="action-name">{name}</span>
-      {cooldown > 0 ? <span className="skill-resource cooldown">{t("battle.cooldownShort", { turns: cooldown })}</span> : null}
-      {usesLeft !== undefined ? <span className="skill-resource uses">{t("battle.usesShort", { uses: usesLeft })}</span> : null}
+      {cooldown > 0 ? (
+        <span className="skill-resource cooldown">{t("battle.cooldownShort", { turns: cooldown })}</span>
+      ) : null}
+      {usesLeft !== undefined ? (
+        <span className="skill-resource uses">{t("battle.usesShort", { uses: usesLeft })}</span>
+      ) : null}
     </button>
   );
 }

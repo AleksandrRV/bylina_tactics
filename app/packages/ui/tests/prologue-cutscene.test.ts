@@ -106,7 +106,10 @@ describe("prologue cutscene plan (0.20.37)", () => {
   });
 
   it("carries the accent and the run-in tracking to the renderer (0.20.40)", () => {
-    const plan = buildCinematicPlan({ ...INTRO, steps: [{ kind: "pan", target: { marker: "S" }, accent: true }] }, MARKERS);
+    const plan = buildCinematicPlan(
+      { ...INTRO, steps: [{ kind: "pan", target: { marker: "S" }, accent: true }] },
+      MARKERS,
+    );
     // Кадр называет палку не только приближением, но и светом.
     expect(plan.steps[0]?.accent).toBe(true);
     const rat = buildCinematicPlan(RAT_HANDOFF, MARKERS);

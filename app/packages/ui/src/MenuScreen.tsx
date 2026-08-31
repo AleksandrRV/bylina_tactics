@@ -33,13 +33,11 @@ export function MenuScreen() {
         {campaignFlow?.canContinue ? (
           // «Продолжить» (0.20.15): акцентная кнопка поверх остальных —
           // сохранённая былина ждёт решения игрока в главном меню.
-          <button
-            type="button"
-            className="btn btn-continue"
-            onClick={() => campaignFlow.continueCampaign()}
-          >
+          <button type="button" className="btn btn-continue" onClick={() => campaignFlow.continueCampaign()}>
             <span>{t("menu.continue")}</span>
-            <span className="btn-continue-note" aria-hidden="true">→</span>
+            <span className="btn-continue-note" aria-hidden="true">
+              →
+            </span>
           </button>
         ) : null}
         <button type="button" className="btn btn-primary" onClick={() => session.openTraining()}>
@@ -80,11 +78,7 @@ export function MenuScreen() {
             <p>{t("menu.newBylinaBody")}</p>
             <p className="muted">{t("menu.newBylinaNote")}</p>
             <div className="modal-actions">
-              <button
-                type="button"
-                className="btn btn-ghost"
-                onClick={() => setConfirmNewBylina(false)}
-              >
+              <button type="button" className="btn btn-ghost" onClick={() => setConfirmNewBylina(false)}>
                 {t("common.cancel")}
               </button>
               <button
@@ -102,7 +96,6 @@ export function MenuScreen() {
           </div>
         </div>
       ) : null}
-
     </div>
   );
 }

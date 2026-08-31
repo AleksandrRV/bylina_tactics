@@ -236,12 +236,7 @@ export function finishCameraCue(state: CameraDirectorState): CameraDirectorState
   return { ...state, current: null, inputLocked: false };
 }
 
-export function trainingGlideOffset(
-  point: Point,
-  plane: CameraPlane,
-  screen: ScreenSize,
-  map: MapPlane,
-): Point {
+export function trainingGlideOffset(point: Point, plane: CameraPlane, screen: ScreenSize, map: MapPlane): Point {
   const at = worldToScreen(point, plane);
   const rawX = plane.offset.x + (screen.width * 0.5 - at.x);
   const rawY = plane.offset.y + (screen.height * 0.44 - at.y);

@@ -15,7 +15,10 @@ function itemName(itemId: string): string {
   return `item.${itemId}.name`;
 }
 
-function itemEffectParts(item: ItemConfig, t: (key: string, vars?: Record<string, string | number>) => string): string[] {
+function itemEffectParts(
+  item: ItemConfig,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+): string[] {
   const parts: string[] = [];
   if (item.weaponId) parts.push(t(`weapon.${item.weaponId}.name`));
   if (item.aimMod) parts.push(`${item.aimMod > 0 ? "+" : ""}${item.aimMod} ${t("item.aim")}`);
@@ -27,7 +30,15 @@ function itemEffectParts(item: ItemConfig, t: (key: string, vars?: Record<string
 
 function RecruitSilhouette() {
   return (
-    <svg width="64" height="64" viewBox="0 0 64 64" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2">
+    <svg
+      width="64"
+      height="64"
+      viewBox="0 0 64 64"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+    >
       <circle cx="32" cy="22" r="9" />
       <path d="M14 54c2-12 9-17 18-17s16 5 18 17" />
     </svg>
@@ -36,7 +47,17 @@ function RecruitSilhouette() {
 
 function SwordsIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
       <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
     </svg>
@@ -45,7 +66,16 @@ function SwordsIcon() {
 
 function GemIcon() {
   return (
-    <svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round">
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 16 16"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinejoin="round"
+    >
       <path d="M6 2.5h4l3 3.5-5 7.5L3 6l3-3.5Z" />
       <path d="M3 6h10M8 13.5 6.6 6M8 13.5 9.4 6" />
     </svg>
@@ -54,7 +84,17 @@ function GemIcon() {
 
 function AnvilIcon() {
   return (
-    <svg width="14" height="14" viewBox="0 0 20 20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+    <svg
+      width="14"
+      height="14"
+      viewBox="0 0 20 20"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
       <path d="M4 14h12" />
       <path d="M5 14v-3a5 5 0 0 1 10 0v3" />
       <path d="M3 11h14" />
@@ -122,20 +162,21 @@ export function DeploymentScreen() {
   // Туториалы «первого раза» высадки (0.20.0): формирование высадки, затем —
   // эвакуация для миссий спасения и разведки.
   const wantedHints = useMemo(
-    () => pendingCampaignHints({
-      showHints: settings.showHints,
-      done: campaignHintsDone ?? [],
-      onCampaignMap: false,
-      lockedCount: 0,
-      hasWounded: false,
-      rosterTabActive: false,
-      forgeTabActive: false,
-      onDeployment: true,
-      missionType: mission?.type,
-      onBattleWithGeneral: false,
-      onBattle: false,
-      enemyTypes: [],
-    }),
+    () =>
+      pendingCampaignHints({
+        showHints: settings.showHints,
+        done: campaignHintsDone ?? [],
+        onCampaignMap: false,
+        lockedCount: 0,
+        hasWounded: false,
+        rosterTabActive: false,
+        forgeTabActive: false,
+        onDeployment: true,
+        missionType: mission?.type,
+        onBattleWithGeneral: false,
+        onBattle: false,
+        enemyTypes: [],
+      }),
     [settings.showHints, campaignHintsDone, mission?.type],
   );
   useEffect(() => {
@@ -151,9 +192,7 @@ export function DeploymentScreen() {
   // Активный туториал: только при включённой настройке подсказок и только
   // непоказанные (0.20.0). Проверка showHints защищает и от элементов,
   // уже успевших попасть в очередь до выключения настройки.
-  const activeHintId = settings.showHints
-    ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null)
-    : null;
+  const activeHintId = settings.showHints ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null) : null;
   const closeHint = (): void => {
     if (!activeHintId) return;
     session.markCampaignHintShown(activeHintId);
@@ -163,7 +202,9 @@ export function DeploymentScreen() {
   return (
     <div className="screen deployment-screen">
       <header className="deployment-head">
-        <p className="eyebrow">{t("campaign.mission")} · {activeMissionId ?? ""}</p>
+        <p className="eyebrow">
+          {t("campaign.mission")} · {activeMissionId ?? ""}
+        </p>
         <h1 className="display-title">{t("deployment.title")}</h1>
         <p className="muted">
           {t("deployment.hint", { min: deployMin, max: deployMax })}
@@ -200,19 +241,22 @@ export function DeploymentScreen() {
                 ) : (
                   <span className="deploy-face-empty" aria-hidden="true" />
                 )}
-                {fighter.wounded ? <span className="wound-badge" title={t("deployment.woundedHint", { aim: penalty.aim, defense: penalty.defense, mobility: penalty.mobility })} /> : null}
+                {fighter.wounded ? (
+                  <span
+                    className="wound-badge"
+                    title={t("deployment.woundedHint", {
+                      aim: penalty.aim,
+                      defense: penalty.defense,
+                      mobility: penalty.mobility,
+                    })}
+                  />
+                ) : null}
               </span>
               <span className="deploy-meta">
                 <span className="deploy-name">{fighter.name}</span>
-                <span className="deploy-class">
-                  {isRecruit ? t("roster.recruit") : t(unitName(fighter.unitId))}
-                </span>
-                <span className="deploy-hp">
-                  {t("battle.hp", { current: fighter.hp, max: fighter.maxHp })}
-                </span>
-                {fighter.wounded ? (
-                  <span className="deploy-wound-note">{t("deployment.wounded")}</span>
-                ) : null}
+                <span className="deploy-class">{isRecruit ? t("roster.recruit") : t(unitName(fighter.unitId))}</span>
+                <span className="deploy-hp">{t("battle.hp", { current: fighter.hp, max: fighter.maxHp })}</span>
+                {fighter.wounded ? <span className="deploy-wound-note">{t("deployment.wounded")}</span> : null}
                 {equipped ? (
                   <span className="equip-chip">
                     {equipped.weaponId ? <SwordsIcon /> : <GemIcon />}
@@ -232,7 +276,9 @@ export function DeploymentScreen() {
               >
                 <AnvilIcon />
               </button>
-              <span className="pick-mark" aria-hidden="true">✓</span>
+              <span className="pick-mark" aria-hidden="true">
+                ✓
+              </span>
             </div>
           );
         })}
@@ -266,9 +312,7 @@ export function DeploymentScreen() {
         </div>
       </footer>
 
-      {activeHintId ? (
-        <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} />
-      ) : null}
+      {activeHintId ? <CampaignHint key={activeHintId} hintId={activeHintId} onClose={closeHint} /> : null}
 
       {equipTarget ? (
         <div className="pause-root" role="presentation">
@@ -285,9 +329,7 @@ export function DeploymentScreen() {
                   {t("deployment.unequip")}
                 </button>
               ) : null}
-              {inventory.length === 0 ? (
-                <p className="muted equip-empty">{t("deployment.equipEmpty")}</p>
-              ) : null}
+              {inventory.length === 0 ? <p className="muted equip-empty">{t("deployment.equipEmpty")}</p> : null}
               {inventory.map((itemId) => {
                 const item = itemById.get(itemId);
                 if (!item) return null;

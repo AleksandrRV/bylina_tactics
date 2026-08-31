@@ -12,7 +12,14 @@ import type {
   TacticsKernel,
 } from "@bylina/core";
 import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
-import { createLocalTransport, isCommandPayload, isEventBatchPayload, isSyncPayload, type Envelope, type Transport } from "@bylina/net";
+import {
+  createLocalTransport,
+  isCommandPayload,
+  isEventBatchPayload,
+  isSyncPayload,
+  type Envelope,
+  type Transport,
+} from "@bylina/net";
 import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
@@ -222,7 +229,12 @@ export interface SessionApi {
   /** Открыть комнату сбора поочерёдной игры (0.14.0). */
   openPvpRoom(): void;
   /** Начать поочерёдный бой: составы сторон, условие победы (0.16.0). */
-  startPvpBattle(side1: string[], side2: string[], seed: number, options?: { objective?: "elimination" | "apple" }): void;
+  startPvpBattle(
+    side1: string[],
+    side2: string[],
+    seed: number,
+    options?: { objective?: "elimination" | "apple" },
+  ): void;
   /** Составы сторон текущего поочерёдного боя. */
   getPvpSides(): { side1: string[]; side2: string[] } | null;
   /** Отправить команду активной стороны через локальный транспорт (0.14.0). */
@@ -399,8 +411,8 @@ export function createSession(
       // idle его не несёт — сохраняется текущий; очищается только явно
       // (null в next: покинута миссия, завершена, новая былина).
       suspendedCampaign: Object.prototype.hasOwnProperty.call(next, "suspendedCampaign")
-        ? next.suspendedCampaign ?? null
-        : state.suspendedCampaign ?? null,
+        ? (next.suspendedCampaign ?? null)
+        : (state.suspendedCampaign ?? null),
     };
     for (const listener of listeners) listener(state);
   };
@@ -476,7 +488,12 @@ export function createSession(
   /** Ведущий: запросы предпросмотра ведомого (network-protocol.md §4). */
   const handleGuestQuery = (message: Envelope): void => {
     if (!tacticsHost || !netHostTransport) return;
-    const query = message.payload as { type: "REACHABLE" | "HIT"; actorId: number; targetId?: number; weaponId?: string };
+    const query = message.payload as {
+      type: "REACHABLE" | "HIT";
+      actorId: number;
+      targetId?: number;
+      weaponId?: string;
+    };
     if (query.type === "REACHABLE") {
       netHostTransport.send({
         type: "QUERY_RESULT",
@@ -489,7 +506,13 @@ export function createSession(
         type: "QUERY_RESULT",
         senderId: "host",
         timestamp: Date.now(),
-        payload: { type: "HIT", actorId: query.actorId, targetId: query.targetId, weaponId: query.weaponId, preview: tacticsHost.getHitPreview(query.actorId, query.targetId, query.weaponId) },
+        payload: {
+          type: "HIT",
+          actorId: query.actorId,
+          targetId: query.targetId,
+          weaponId: query.weaponId,
+          preview: tacticsHost.getHitPreview(query.actorId, query.targetId, query.weaponId),
+        },
       });
     }
   };
@@ -497,7 +520,14 @@ export function createSession(
   /** Ведомый: применить ответ предпросмотра в кэш. */
   const applyGuestQueryResult = (payload: unknown): void => {
     if (!netGuest) return;
-    const result = payload as { type: "REACHABLE" | "HIT"; actorId: number; targetId?: number; weaponId?: string; cells?: ReachableCell[]; preview?: HitPreview };
+    const result = payload as {
+      type: "REACHABLE" | "HIT";
+      actorId: number;
+      targetId?: number;
+      weaponId?: string;
+      cells?: ReachableCell[];
+      preview?: HitPreview;
+    };
     if (result.type === "REACHABLE" && result.cells) {
       netGuest.reachable.set(result.actorId, result.cells);
     } else if (result.type === "HIT" && result.preview && result.targetId !== undefined) {
@@ -569,8 +599,7 @@ export function createSession(
     continueCampaign: (entry) => {
       // Бой восстанавливается только со снимком партии: без ядра и снимка
       // BattleScreen не смонтируется — возвращаемся на карту корабля.
-      const screen =
-        entry.screen === "battle" && !entry.restoredMatch ? "campaign" : entry.screen;
+      const screen = entry.screen === "battle" && !entry.restoredMatch ? "campaign" : entry.screen;
       // Сюжетная миссия (0.20.51): бой пролога восстанавливается как пролог,
       // иначе экран боя искал бы миссию среди точек карты и падал.
       const story = screen === "battle" ? (entry.prologueMissionId ?? null) : null;
@@ -580,7 +609,7 @@ export function createSession(
         screen,
         battleKind: screen === "battle" ? (story ? "prologue" : "campaign") : null,
         prologueMissionId: story,
-        activeMissionId: story ? null : entry.activeMissionId ?? null,
+        activeMissionId: story ? null : (entry.activeMissionId ?? null),
         deployment: entry.deployment ?? [],
         matchSeed: entry.matchSeed ?? 0,
         outcome: entry.outcome ?? null,
@@ -758,7 +787,16 @@ export function createSession(
     },
     getCampaign: () => requireCampaign(),
     startPvpBattle: (side1, side2, seed, options?: { objective?: "elimination" | "apple" }) => {
-      state = { ...state, replayDraft: { seed, sides: { side1: [...side1], side2: [...side2] }, objective: options?.objective ?? null, commands: [] }, netDisconnected: null };
+      state = {
+        ...state,
+        replayDraft: {
+          seed,
+          sides: { side1: [...side1], side2: [...side2] },
+          objective: options?.objective ?? null,
+          commands: [],
+        },
+        netDisconnected: null,
+      };
       // Локальный транспорт: обе стороны на одном устройстве, правила
       // исполняет ведущий (этот же процесс). Команда стороны применяется
       // ядром, набор событий рассылается обратно через транспорт.
@@ -767,7 +805,12 @@ export function createSession(
       transport.subscribe((message: Envelope) => {
         if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
         const command = message.payload as Command;
-        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
+        state = {
+          ...state,
+          replayDraft: state.replayDraft
+            ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
+            : state.replayDraft,
+        };
         const applied = tacticsHost?.apply(command);
         if (!applied) return;
         if (applied.ok) {
@@ -806,12 +849,14 @@ export function createSession(
     subscribePvpEvents: (listener) => {
       if (netGuest) {
         return netGuest.transport.subscribe((message: Envelope) => {
-          if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload)) listener(message.payload as GameEvent[]);
+          if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload))
+            listener(message.payload as GameEvent[]);
         });
       }
       if (!pvpTransport) return () => undefined;
       return pvpTransport.subscribe((message: Envelope) => {
-        if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload)) listener(message.payload as GameEvent[]);
+        if (message.type === "EVENT_BATCH" && isEventBatchPayload(message.payload))
+          listener(message.payload as GameEvent[]);
       });
     },
     finishPvpMatch: (winnerSide) => {
@@ -825,8 +870,22 @@ export function createSession(
         replayWinner: winnerSide,
       });
     },
-    startNetPvpBattle: (sides, seed, transport, options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean }) => {
-      state = { ...state, replayDraft: { seed, sides: { side1: [...sides.side1], side2: [...sides.side2] }, objective: options?.objective ?? null, commands: [] }, netDisconnected: null };
+    startNetPvpBattle: (
+      sides,
+      seed,
+      transport,
+      options?: { objective?: "elimination" | "apple"; peerRole?: "guest" | "spectator"; omniscient?: boolean },
+    ) => {
+      state = {
+        ...state,
+        replayDraft: {
+          seed,
+          sides: { side1: [...sides.side1], side2: [...sides.side2] },
+          objective: options?.objective ?? null,
+          commands: [],
+        },
+        netDisconnected: null,
+      };
       netHostTransport = transport;
       // Ведущий исполняет правила: команды ведомого применяются ядром,
       // события и снимок стороны ведомого уходят по каналу.
@@ -847,16 +906,21 @@ export function createSession(
         }
         if (message.type !== "COMMAND" || !isCommandPayload(message.payload)) return;
         const command = message.payload as Command;
-        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
+        state = {
+          ...state,
+          replayDraft: state.replayDraft
+            ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
+            : state.replayDraft,
+        };
         // Ведомый управляет только своей стороной (номер 2): чужие ходы
         // отклоняются, даже если команда формально допустима.
         const guestOwner = 2;
-        const actor = command.type === "END_TURN"
-          ? undefined
-          : tacticsHost?.getSnapshot().entities.find((entity) => entity.id === command.actorId);
-        const ownerOk = command.type === "END_TURN"
-          ? command.playerId === String(guestOwner)
-          : actor?.owner === guestOwner;
+        const actor =
+          command.type === "END_TURN"
+            ? undefined
+            : tacticsHost?.getSnapshot().entities.find((entity) => entity.id === command.actorId);
+        const ownerOk =
+          command.type === "END_TURN" ? command.playerId === String(guestOwner) : actor?.owner === guestOwner;
         if (!ownerOk) {
           transport.send({
             type: "REJECT",
@@ -1016,7 +1080,12 @@ export function createSession(
           notifyBattle();
         }
       });
-      transport.send({ type: "SYNC_REQUEST", senderId: "spectator", timestamp: Date.now(), payload: { role: "spectator" } });
+      transport.send({
+        type: "SYNC_REQUEST",
+        senderId: "spectator",
+        timestamp: Date.now(),
+        payload: { role: "spectator" },
+      });
     },
     setNetOmniscient: (omniscient) => {
       emit({ ...state, netOmniscient: omniscient });
@@ -1026,7 +1095,14 @@ export function createSession(
     setNetDisconnected: (disconnected) => {
       emit({ ...state, netDisconnected: disconnected });
     },
-    getReplayDraft: () => (state.replayDraft ? { ...state.replayDraft, sides: { side1: [...state.replayDraft.sides.side1], side2: [...state.replayDraft.sides.side2] }, commands: [...state.replayDraft.commands] } : null),
+    getReplayDraft: () =>
+      state.replayDraft
+        ? {
+            ...state.replayDraft,
+            sides: { side1: [...state.replayDraft.sides.side1], side2: [...state.replayDraft.sides.side2] },
+            commands: [...state.replayDraft.commands],
+          }
+        : null,
     setReplayDraft: (draft) => {
       emit({ ...state, replayDraft: draft });
     },
@@ -1139,7 +1215,12 @@ export function createSession(
       // в миссиях обучения отклонялись бы и подсказки не продвигались (0.20.1).
       if (!tacticsHost || !isBattleScreen(state.screen)) return { ok: false, reason: "ILLEGAL" };
       if (state.battleKind === "pvp" || state.battleKind === "pvpNet") {
-        state = { ...state, replayDraft: state.replayDraft ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] } : state.replayDraft };
+        state = {
+          ...state,
+          replayDraft: state.replayDraft
+            ? { ...state.replayDraft, commands: [...state.replayDraft.commands, command] }
+            : state.replayDraft,
+        };
       }
       const result = tacticsHost.apply(command);
       // Сетевой ведущий: любое изменение состояния (своё или гостя) уходит
@@ -1164,7 +1245,8 @@ export function createSession(
     getBattleFog: () => (tacticsHost ? tacticsHost.getFog() : null),
     getBattleReachable: (actorId) => requireTacticsHost().getReachable(actorId),
     getBattlePath: (actorId, to) => requireTacticsHost().getPath(actorId, to),
-    getBattleHitPreview: (actorId, targetId, weaponId) => requireTacticsHost().getHitPreview(actorId, targetId, weaponId),
+    getBattleHitPreview: (actorId, targetId, weaponId) =>
+      requireTacticsHost().getHitPreview(actorId, targetId, weaponId),
     getBattleSkillPreview: (actorId, skillId, targetId, targetPos) =>
       requireTacticsHost().getSkillPreview(actorId, skillId, targetId, targetPos),
     getBattleVisible: (owner) => requireTacticsHost().getVisibleCells(owner),

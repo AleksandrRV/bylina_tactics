@@ -206,7 +206,8 @@ export function runMission(missionId: string, options: RunOptions = {}): Mission
         }
         if (intruded) continue; // непослушная команда отвергнута — шаг не двигается
         const applied = rig.kernel.apply(command);
-        if (!applied.ok) throw new Error(`kernel rejected directive command: ${JSON.stringify(command)} → ${applied.reason}`);
+        if (!applied.ok)
+          throw new Error(`kernel rejected directive command: ${JSON.stringify(command)} → ${applied.reason}`);
         track(applied.events);
         if (trainingStepCompleted(hint, applied.events, rig.kernel.getSnapshot())) {
           visited.push(hint.until);

@@ -188,11 +188,7 @@ export function apCostFor(mpCost: number, mobility: number): 1 | 2 | null {
   return null;
 }
 
-export function listReachable(
-  grid: Grid,
-  entities: readonly EntityState[],
-  walker: EntityState,
-): ReachableCell[] {
+export function listReachable(grid: Grid, entities: readonly EntityState[], walker: EntityState): ReachableCell[] {
   const actionBudget = walker.ap <= 0 ? 0 : walker.ap >= 2 ? walker.mobility * 2 : walker.mobility;
   const turnBudget = Math.max(0, walker.mobility * 2 - (walker.movementSpent ?? 0));
   const maxMp = Math.min(actionBudget, turnBudget);

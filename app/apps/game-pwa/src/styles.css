@@ -41,16 +41,8 @@ body {
   min-height: 100dvh;
   background:
     linear-gradient(180deg, rgba(20, 24, 28, 0.2), rgba(20, 24, 28, 0.72)),
-    repeating-linear-gradient(
-      0deg,
-      transparent 0 27px,
-      rgba(224, 179, 74, 0.035) 27px 28px
-    ),
-    repeating-linear-gradient(
-      90deg,
-      transparent 0 27px,
-      rgba(224, 179, 74, 0.035) 27px 28px
-    ),
+    repeating-linear-gradient(0deg, transparent 0 27px, rgba(224, 179, 74, 0.035) 27px 28px),
+    repeating-linear-gradient(90deg, transparent 0 27px, rgba(224, 179, 74, 0.035) 27px 28px),
     radial-gradient(1200px 600px at 50% -10%, #2a333c, var(--ink));
 }
 
@@ -184,7 +176,10 @@ input {
   justify-content: space-between;
   align-items: center;
   gap: 12px;
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    color 0.15s ease;
 }
 
 .btn:hover,
@@ -289,7 +284,9 @@ input {
   background: rgba(28, 35, 32, 0.9);
   position: relative;
   cursor: pointer;
-  transition: background 180ms ease, border-color 180ms ease;
+  transition:
+    background 180ms ease,
+    border-color 180ms ease;
   flex: none;
 }
 
@@ -302,7 +299,9 @@ input {
   height: 18px;
   border-radius: 50%;
   background: #8a93a0;
-  transition: transform 180ms ease, background 180ms ease;
+  transition:
+    transform 180ms ease,
+    background 180ms ease;
 }
 
 .toggle-row input[type="checkbox"]:checked {

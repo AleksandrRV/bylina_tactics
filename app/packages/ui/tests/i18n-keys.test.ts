@@ -114,8 +114,15 @@ describe("i18n catalogs cover every static key used by the UI (0.20.2)", () => {
 
   it("covers dynamic reject reasons of the kernel", () => {
     const reasons = [
-      "ILLEGAL", "NO_AP", "ON_COOLDOWN", "NO_USES", "NOT_YOUR_TURN",
-      "OCCUPIED", "NOT_FOUND", "NO_LOS", "OUT_OF_RANGE",
+      "ILLEGAL",
+      "NO_AP",
+      "ON_COOLDOWN",
+      "NO_USES",
+      "NOT_YOUR_TURN",
+      "OCCUPIED",
+      "NOT_FOUND",
+      "NO_LOS",
+      "OUT_OF_RANGE",
     ];
     for (const locale of ["ru", "en"]) {
       for (const reason of reasons) {

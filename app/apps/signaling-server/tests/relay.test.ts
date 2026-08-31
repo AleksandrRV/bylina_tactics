@@ -48,7 +48,14 @@ beforeAll(async () => {
         clients.set(id, socket);
         const count = roomCounts.get(message.roomId) ?? 0;
         roomCounts.set(message.roomId, count + 1);
-        socket.send(JSON.stringify({ type: "JOINED", roomId: message.roomId, role: count === 0 ? "host" : (message.role ?? "guest"), peers: [] }));
+        socket.send(
+          JSON.stringify({
+            type: "JOINED",
+            roomId: message.roomId,
+            role: count === 0 ? "host" : (message.role ?? "guest"),
+            peers: [],
+          }),
+        );
       } else if (message.type === "SIGNAL" && message.to) {
         const target = clients.get(message.to);
         if (target) target.send(JSON.stringify({ type: "SIGNAL", from: id, signal: message.signal }));

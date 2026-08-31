@@ -43,16 +43,19 @@ vi.mock("@bylina/render", () => ({
 }));
 
 beforeEach(() => {
-  window.matchMedia = window.matchMedia ?? ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
   window.scrollTo = window.scrollTo ?? (() => undefined);
 });
 
@@ -92,9 +95,7 @@ describe("training battle DOM (0.20.13)", () => {
 
       // Меню → экран обучения.
       const byText = (part: string): HTMLElement => {
-        const found = [...document.querySelectorAll("button")].find((b) =>
-          (b.textContent ?? "").includes(part),
-        );
+        const found = [...document.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes(part));
         if (!found) throw new Error(`button not found: ${part}`);
         return found as HTMLElement;
       };
@@ -136,13 +137,20 @@ describe("training battle DOM (0.20.13)", () => {
       if (view.directive.kind !== "move") throw new Error("expected move directive");
       const target = view.directive.cell;
 
-      const last = updates[updates.length - 1] as { trainingFocus: boolean; trainingHighlight: { kind: string; x: number; y: number } | null };
+      const last = updates[updates.length - 1] as {
+        trainingFocus: boolean;
+        trainingHighlight: { kind: string; x: number; y: number } | null;
+      };
       expect(last.trainingFocus).toBe(true);
       expect(last.trainingHighlight).toEqual({ kind: "cell", x: target.x, y: target.y });
 
       // Посторонние действия заблокированы: оружие, стойка, дозор и конец хода.
-      const sword = [...document.querySelectorAll<HTMLButtonElement>(".skill-slot")].find((b) => b.textContent?.includes("Меч"));
-      const defend = [...document.querySelectorAll<HTMLButtonElement>(".skill-slot")].find((b) => b.textContent?.includes("Защитная стойка"));
+      const sword = [...document.querySelectorAll<HTMLButtonElement>(".skill-slot")].find((b) =>
+        b.textContent?.includes("Меч"),
+      );
+      const defend = [...document.querySelectorAll<HTMLButtonElement>(".skill-slot")].find((b) =>
+        b.textContent?.includes("Защитная стойка"),
+      );
       const endTurn = document.querySelector<HTMLButtonElement>(".hud-btn-primary");
       expect(sword?.disabled).toBe(true);
       expect(defend?.disabled).toBe(true);

@@ -303,14 +303,30 @@
   background: rgba(10, 14, 13, 0.78);
 }
 
-.status-chip.poison { color: #8ee44f; }
-.status-chip.panic { color: #d278ff; }
-.status-chip.immobile { color: #a8c66c; }
-.status-chip.hidden { color: #8fd3bc; }
-.status-chip.flying { color: #9edfff; }
-.status-chip.timed { color: #67dce8; }
-.status-chip.defending { color: #78b8ff; }
-.status-chip.overwatch { color: #e8b64c; }
+.status-chip.poison {
+  color: #8ee44f;
+}
+.status-chip.panic {
+  color: #d278ff;
+}
+.status-chip.immobile {
+  color: #a8c66c;
+}
+.status-chip.hidden {
+  color: #8fd3bc;
+}
+.status-chip.flying {
+  color: #9edfff;
+}
+.status-chip.timed {
+  color: #67dce8;
+}
+.status-chip.defending {
+  color: #78b8ff;
+}
+.status-chip.overwatch {
+  color: #e8b64c;
+}
 
 /* 4.5 (0.20.46): кнопка действия — квадратная миниатюра: образ наверху,
    название мелко под ним. Активность обозначает подсветка самой кнопки,
@@ -339,7 +355,11 @@
   border-color: #46504d;
   background: linear-gradient(180deg, #202724, #171d1a);
   color: #bdb7aa;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease, box-shadow 120ms ease;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease,
+    color 120ms ease,
+    box-shadow 120ms ease;
 }
 
 .skill-slot .action-art {
@@ -351,7 +371,10 @@
   border: 1px solid rgba(224, 179, 74, 0.18);
   background: #101410;
   pointer-events: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease, filter 120ms ease;
+  transition:
+    border-color 120ms ease,
+    box-shadow 120ms ease,
+    filter 120ms ease;
 }
 
 /* Действие без собственного образа: рамка вместо пустого места. */
@@ -379,7 +402,9 @@
   border-color: #e0b34a;
   background: linear-gradient(180deg, #4a3b1e, #2d2819);
   color: #fff2c4;
-  box-shadow: 0 0 0 1px rgba(224, 179, 74, 0.25), 0 0 14px rgba(224, 179, 74, 0.2);
+  box-shadow:
+    0 0 0 1px rgba(224, 179, 74, 0.25),
+    0 0 14px rgba(224, 179, 74, 0.2);
 }
 
 .skill-slot.is-active .action-art,
@@ -750,7 +775,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  transition:
+    border-color 0.15s,
+    color 0.15s,
+    background 0.15s;
 }
 
 .aim-copy-btn:hover {
@@ -1296,7 +1324,9 @@
   border-radius: 3px;
   object-fit: cover;
   border: 1px solid rgba(224, 179, 74, 0.5);
-  transition: filter 300ms ease, opacity 300ms ease;
+  transition:
+    filter 300ms ease,
+    opacity 300ms ease;
 }
 
 .objective-face.is-dead {
@@ -1356,7 +1386,9 @@
   letter-spacing: 0.06em;
   box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
   z-index: 60;
-  animation: save-toast-in 260ms ease-out, save-toast-out 420ms ease-in 1200ms forwards;
+  animation:
+    save-toast-in 260ms ease-out,
+    save-toast-out 420ms ease-in 1200ms forwards;
   pointer-events: none;
 }
 
@@ -1446,7 +1478,8 @@
 }
 
 @keyframes emblem-pulse {
-  0%, 100% {
+  0%,
+  100% {
     box-shadow: 0 0 8px rgba(224, 179, 74, 0.35);
   }
   50% {
@@ -1462,7 +1495,8 @@
 }
 
 @keyframes sep-sway {
-  0%, 100% {
+  0%,
+  100% {
     transform: rotate(-4deg);
   }
   50% {
@@ -1842,7 +1876,9 @@
   color: #c9c2b0;
   font-size: 0.75rem;
   cursor: pointer;
-  transition: border-color 160ms ease, color 160ms ease;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
   /* Баннер подсказки не перехватывает клики по полю (0.19.2), но кнопка
      «Пропустить» должна оставаться кликабельной (0.20.1). */
   pointer-events: auto;
@@ -1866,7 +1902,9 @@
   font-size: 0.85rem;
   cursor: pointer;
   pointer-events: auto;
-  transition: background 160ms ease, color 160ms ease;
+  transition:
+    background 160ms ease,
+    color 160ms ease;
 }
 
 .training-continue:hover,
@@ -1890,7 +1928,9 @@
   height: 7px;
   border-radius: 50%;
   background: rgba(120, 140, 160, 0.35);
-  transition: background 200ms ease, transform 200ms ease;
+  transition:
+    background 200ms ease,
+    transform 200ms ease;
 }
 
 .training-step-dot.is-done {
@@ -2055,7 +2095,9 @@
   letter-spacing: 0.02em;
   cursor: pointer;
   backdrop-filter: blur(3px);
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease;
 }
 
 .cutscene-skip:hover,

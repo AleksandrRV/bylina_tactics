@@ -15,14 +15,14 @@ export function ResultScreen() {
         <p className="eyebrow">{isPvp ? t("menu.pvp") : t("menu.quickMatch")}</p>
         <h1 className="display-title">
           {isPvp
-            ? (pvpWinner === 1 ? t("pvp.side1") : t("pvp.side2"))
-            : (victory ? t("result.victory") : t("result.defeat"))}
+            ? pvpWinner === 1
+              ? t("pvp.side1")
+              : t("pvp.side2")
+            : victory
+              ? t("result.victory")
+              : t("result.defeat")}
         </h1>
-        <p className="muted">
-          {isPvp
-            ? t("pvp.won")
-            : (victory ? t("result.victoryHint") : t("result.defeatHint"))}
-        </p>
+        <p className="muted">{isPvp ? t("pvp.won") : victory ? t("result.victoryHint") : t("result.defeatHint")}</p>
       </header>
       <nav className="menu-nav">
         {!isPvp ? (

@@ -16,12 +16,31 @@ const MAP = {
 };
 
 const BOGATYR: SpawnUnitConfig = {
-  id: "bogatyr", maxHealth: 12, maxAP: 2, mobility: 5, aim: 100, defense: 0, will: 40,
-  vision: 12, weapons: ["sword"], skills: [], tags: [],
+  id: "bogatyr",
+  maxHealth: 12,
+  maxAP: 2,
+  mobility: 5,
+  aim: 100,
+  defense: 0,
+  will: 40,
+  vision: 12,
+  weapons: ["sword"],
+  skills: [],
+  tags: [],
 };
 const SWORD: WeaponStats = {
-  id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 20, maxDmg: 20, crit: 0, critBonus: 0, envDmg: 0,
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 20,
+  maxDmg: 20,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 function appleMatch() {
@@ -62,7 +81,9 @@ describe("apple objective (0.16.0, math §17)", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(kernel.getSnapshot().apple?.carrierId).toBe(player.id);
-    expect(result.events.some((event) => event.type === "OBJECTIVE_CHANGED" && event.carrierId === player.id)).toBe(true);
+    expect(result.events.some((event) => event.type === "OBJECTIVE_CHANGED" && event.carrierId === player.id)).toBe(
+      true,
+    );
   });
 
   it("carrying the apple to the home edge wins by OBJECTIVE", () => {
@@ -87,7 +108,11 @@ describe("apple objective (0.16.0, math §17)", () => {
     const carry = kernel.apply({ type: "MOVE", actorId: player.id, to: { x: 0, y: 5, z: match.apple!.pos.z } });
     expect(carry.ok).toBe(true);
     if (!carry.ok) return;
-    expect(carry.events).toContainEqual({ type: "MATCH_ENDED", winnerPlayerId: String(PLAYER_OWNER), reason: "OBJECTIVE" });
+    expect(carry.events).toContainEqual({
+      type: "MATCH_ENDED",
+      winnerPlayerId: String(PLAYER_OWNER),
+      reason: "OBJECTIVE",
+    });
   });
 
   it("the apple drops where the carrier dies", () => {

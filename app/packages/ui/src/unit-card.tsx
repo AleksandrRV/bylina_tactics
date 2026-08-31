@@ -33,13 +33,7 @@ export function RosterCard({ entity, selected, name, onSelect, onInspect }: Rost
   const t = useT();
   const press = useLongPress({ onLongPress: onInspect, onClick: onSelect });
   const face = unitPortrait(entity.configId);
-  const classes = [
-    "roster-card",
-    selected ? "is-on" : "",
-    entity.dead ? "is-dead" : "",
-  ]
-    .filter(Boolean)
-    .join(" ");
+  const classes = ["roster-card", selected ? "is-on" : "", entity.dead ? "is-dead" : ""].filter(Boolean).join(" ");
 
   return (
     <button

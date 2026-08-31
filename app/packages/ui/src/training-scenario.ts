@@ -19,14 +19,7 @@ import { hintCompletedByEvents } from "./training-progress.js";
  */
 
 /** Действия игрока, различаемые блокировкой обучения. */
-export type TrainingActionKind =
-  | "move"
-  | "dash"
-  | "attack"
-  | "skill"
-  | "defend"
-  | "overwatch"
-  | "endTurn";
+export type TrainingActionKind = "move" | "dash" | "attack" | "skill" | "defend" | "overwatch" | "endTurn";
 
 export interface TrainingScenarioDeps {
   /** Полный снимок ведущего (обучение всегда выполняет локальное ядро). */
@@ -67,10 +60,7 @@ const PLAYER_OWNER = 1;
 
 function ownFighters(snapshot: MatchState): EntityState[] {
   return snapshot.entities
-    .filter(
-      (entity) =>
-        !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0,
-    )
+    .filter((entity) => !entity.dead && entity.owner === PLAYER_OWNER && entity.coverType === 0 && entity.maxAp > 0)
     .sort((a, b) => a.id - b.id);
 }
 
@@ -97,10 +87,7 @@ function stepActor(hint: TrainingHintConfig, snapshot: MatchState): EntityState 
 function farthestCell(reachable: readonly ReachableCell[], apCost: 1 | 2): ReachableCell | null {
   const pool = reachable.filter((cell) => cell.apCost === apCost);
   const source = pool.length > 0 ? pool : [...reachable];
-  return source.reduce<ReachableCell | null>(
-    (best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best),
-    null,
-  );
+  return source.reduce<ReachableCell | null>((best, cell) => (!best || cell.mpCost > best.mpCost ? cell : best), null);
 }
 
 /**
@@ -113,14 +100,7 @@ function farthestCell(reachable: readonly ReachableCell[], apCost: 1 | 2): Reach
 function approachCell(reachable: readonly ReachableCell[], target: { x: number; y: number }): ReachableCell | null {
   const adjacent = reachable
     .filter((cell) => distH(cell.x, cell.y, target.x, target.y) === 1)
-    .sort(
-      (a, b) =>
-        a.apCost - b.apCost ||
-        a.mpCost - b.mpCost ||
-        (b.z ?? 0) - (a.z ?? 0) ||
-        a.y - b.y ||
-        a.x - b.x,
-    );
+    .sort((a, b) => a.apCost - b.apCost || a.mpCost - b.mpCost || (b.z ?? 0) - (a.z ?? 0) || a.y - b.y || a.x - b.x);
   if (adjacent.length > 0) return adjacent[0]!;
   return (
     [...reachable].sort((a, b) => {
@@ -134,19 +114,34 @@ function approachCell(reachable: readonly ReachableCell[], target: { x: number; 
 }
 
 /** Клетка призыва: кольцами от заклинателя в фиксированном порядке сторон. */
-function summonCell(
-  deps: TrainingScenarioDeps,
-  actor: EntityState,
-  skillId: string,
-): CellPos | undefined {
+function summonCell(deps: TrainingScenarioDeps, actor: EntityState, skillId: string): CellPos | undefined {
   const skill = deps.skills[skillId];
   const range = skill?.range ?? 1;
   const orders: Array<[number, number]> = [
-    [1, 0], [0, 1], [-1, 0], [0, -1],
-    [1, 1], [-1, 1], [1, -1], [-1, -1],
-    [2, 0], [0, 2], [-2, 0], [0, -2],
-    [2, 1], [1, 2], [-1, 2], [-2, 1], [-2, -1], [-1, -2], [1, -2], [2, -1],
-    [2, 2], [-2, 2], [2, -2], [-2, -2],
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1],
+    [1, 1],
+    [-1, 1],
+    [1, -1],
+    [-1, -1],
+    [2, 0],
+    [0, 2],
+    [-2, 0],
+    [0, -2],
+    [2, 1],
+    [1, 2],
+    [-1, 2],
+    [-2, 1],
+    [-2, -1],
+    [-1, -2],
+    [1, -2],
+    [2, -1],
+    [2, 2],
+    [-2, 2],
+    [2, -2],
+    [-2, -2],
   ];
   const seen = new Set<string>();
   for (const [dx, dy] of orders) {
@@ -228,8 +223,9 @@ function raisableCorpseExists(deps: TrainingScenarioDeps, snapshot: MatchState):
 function finaleDirective(deps: TrainingScenarioDeps): TrainingDirective {
   const snapshot = deps.snapshot;
   const fighters = ownFighters(snapshot).filter((entity) => entity.ap > 0);
-  const enemies = snapshot.entities
-    .filter((entity) => !entity.dead && entity.owner !== PLAYER_OWNER && entity.coverType === 0);
+  const enemies = snapshot.entities.filter(
+    (entity) => !entity.dead && entity.owner !== PLAYER_OWNER && entity.coverType === 0,
+  );
   const resurrector = resurrectorOf(deps, enemies);
 
   // Передышка: тело для воскрешения лежит, воскрешатель жив и способен —
@@ -266,7 +262,11 @@ function finaleDirective(deps: TrainingScenarioDeps): TrainingDirective {
     for (const skillId of actor.skillIds ?? []) {
       const skill = deps.skills[skillId];
       if (!skill || !hasSkillEffect(skill, "heal")) continue;
-      if (wounded && wounded.hp * 10 <= wounded.maxHp * 6 && deps.skillPreview(actor.id, skillId, wounded.id).available) {
+      if (
+        wounded &&
+        wounded.hp * 10 <= wounded.maxHp * 6 &&
+        deps.skillPreview(actor.id, skillId, wounded.id).available
+      ) {
         return {
           kind: "skill",
           actorId: actor.id,
@@ -298,8 +298,8 @@ function finaleDirective(deps: TrainingScenarioDeps): TrainingDirective {
   // воскрешатель, пока живы прочие).
   const actor = fighters[0];
   const foe = actor
-    ? [...targetOrder].sort((a, b) =>
-        distH(actor.x, actor.y, a.x, a.y) - distH(actor.x, actor.y, b.x, b.y) || a.id - b.id,
+    ? [...targetOrder].sort(
+        (a, b) => distH(actor.x, actor.y, a.x, a.y) - distH(actor.x, actor.y, b.x, b.y) || a.id - b.id,
       )[0]
     : undefined;
   if (actor && foe) {
@@ -337,9 +337,7 @@ export function resolveTrainingDirective(
   // Финальный шаг атаки (без исполнителя) ведёт политика — исполнитель ему
   // не нужен. end_turn и ознакомительный шаг исполнителя не требуют.
   const needsActor =
-    hint.until !== "end_turn" &&
-    hint.until !== "noop" &&
-    !(hint.until === "attack" && hint.actorUnitId === undefined);
+    hint.until !== "end_turn" && hint.until !== "noop" && !(hint.until === "attack" && hint.actorUnitId === undefined);
   if (!actor && needsActor) return null;
 
   const cellHighlight = (cell: CellPos): { kind: "cell"; x: number; y: number } => ({
@@ -371,7 +369,8 @@ export function resolveTrainingDirective(
       const reachable = deps.reachable(actor.id);
       if (reachable.length === 0) return null;
       let cell: ReachableCell | null = null;
-      let reason: "move" | "dash" | "approach" = hint.until === "move" ? "move" : hint.until === "dash" ? "dash" : "approach";
+      let reason: "move" | "dash" | "approach" =
+        hint.until === "move" ? "move" : hint.until === "dash" ? "dash" : "approach";
       if (hint.until === "approach") {
         const target = hint.targetUnitId ? livingByUnitId(snapshot, hint.targetUnitId) : undefined;
         if (!target || target.owner === PLAYER_OWNER) return null;
@@ -401,7 +400,8 @@ export function resolveTrainingDirective(
           return { directive: inner, highlight: target ? entityHighlight(target) : null, panelKey: "weapon" };
         }
         if (inner.kind === "skill") {
-          const target = inner.targetId !== undefined ? snapshot.entities.find((entity) => entity.id === inner.targetId) : undefined;
+          const target =
+            inner.targetId !== undefined ? snapshot.entities.find((entity) => entity.id === inner.targetId) : undefined;
           return { directive: inner, highlight: target ? entityHighlight(target) : null, panelKey: "skill" };
         }
         if (inner.kind === "move") {
@@ -419,7 +419,14 @@ export function resolveTrainingDirective(
           return { directive: { kind: "endTurn" }, highlight: null, panelKey: "end_turn" };
         }
         return {
-          directive: { kind: "attack", actorId: actor.id, actorUnitId: actor.configId, targetId: target.id, targetUnitId: target.configId, weaponId },
+          directive: {
+            kind: "attack",
+            actorId: actor.id,
+            actorUnitId: actor.configId,
+            targetId: target.id,
+            targetUnitId: target.configId,
+            weaponId,
+          },
           highlight: entityHighlight(target),
           panelKey: panel() ?? "weapon",
         };
@@ -476,7 +483,14 @@ export function resolveTrainingDirective(
       if (!target) return null;
       if (!deps.skillPreview(actor.id, skillId, target.id).available) return null;
       return {
-        directive: { kind: "skill", actorId: actor.id, actorUnitId: actor.configId, skillId, targetId: target.id, targetUnitId: target.configId },
+        directive: {
+          kind: "skill",
+          actorId: actor.id,
+          actorUnitId: actor.configId,
+          skillId,
+          targetId: target.id,
+          targetUnitId: target.configId,
+        },
         highlight: entityHighlight(target),
         panelKey: panel() ?? "skill",
       };
@@ -488,7 +502,11 @@ export function resolveTrainingDirective(
       if (actor.ap <= 0) {
         return { directive: { kind: "endTurn" }, highlight: null, panelKey: "end_turn" };
       }
-      return { directive: { kind: "defend", actorId: actor.id, actorUnitId: actor.configId }, highlight: entityHighlight(actor), panelKey: panel() ?? "defend" };
+      return {
+        directive: { kind: "defend", actorId: actor.id, actorUnitId: actor.configId },
+        highlight: entityHighlight(actor),
+        panelKey: panel() ?? "defend",
+      };
     }
 
     case "overwatch": {
@@ -497,7 +515,11 @@ export function resolveTrainingDirective(
       if (actor.ap <= 0) {
         return { directive: { kind: "endTurn" }, highlight: null, panelKey: "end_turn" };
       }
-      return { directive: { kind: "overwatch", actorId: actor.id, actorUnitId: actor.configId }, highlight: entityHighlight(actor), panelKey: panel() ?? "overwatch" };
+      return {
+        directive: { kind: "overwatch", actorId: actor.id, actorUnitId: actor.configId },
+        highlight: entityHighlight(actor),
+        panelKey: panel() ?? "overwatch",
+      };
     }
 
     default:
@@ -509,10 +531,7 @@ export function resolveTrainingDirective(
  * Допустима ли категория действия на активном указании. Точные цели
  (клетка, оружие, умение, цель) проверяет интерфейс по самому указанию.
  */
-export function directiveAllowsAction(
-  view: TrainingDirectiveView | null,
-  action: TrainingActionKind,
-): boolean {
+export function directiveAllowsAction(view: TrainingDirectiveView | null, action: TrainingActionKind): boolean {
   if (!view) return true;
   const kind = view.directive.kind;
   switch (action) {
@@ -541,19 +560,13 @@ export function directiveAllowsAction(
  * проверок интерфейса (кнопки и клики) — единая точка правды для интерфейса
  * и автотестов. Вне обучения (указания нет) разрешено всё.
  */
-export function trainingCommandAllowed(
-  view: TrainingDirectiveView | null,
-  command: Command,
-): boolean {
+export function trainingCommandAllowed(view: TrainingDirectiveView | null, command: Command): boolean {
   if (!view) return true;
   const d = view.directive;
   switch (command.type) {
     case "MOVE":
       return (
-        d.kind === "move" &&
-        d.actorId === command.actorId &&
-        d.cell.x === command.to.x &&
-        d.cell.y === command.to.y
+        d.kind === "move" && d.actorId === command.actorId && d.cell.x === command.to.x && d.cell.y === command.to.y
       );
     case "ATTACK":
       return (
@@ -612,13 +625,13 @@ export function trainingStepCompleted(
   snapshot: MatchState,
 ): boolean {
   if (hint.repeatUntil === "targetDead") {
-    const target = hint.targetUnitId ? snapshot.entities.find((entity) => entity.configId === hint.targetUnitId) : undefined;
+    const target = hint.targetUnitId
+      ? snapshot.entities.find((entity) => entity.configId === hint.targetUnitId)
+      : undefined;
     return target === undefined || target.dead;
   }
   if (hint.repeatUntil === "victory") {
-    return snapshot.entities.every(
-      (entity) => entity.owner === PLAYER_OWNER || entity.dead || entity.coverType > 0,
-    );
+    return snapshot.entities.every((entity) => entity.owner === PLAYER_OWNER || entity.dead || entity.coverType > 0);
   }
   return hintCompletedByEvents(hint, events);
 }

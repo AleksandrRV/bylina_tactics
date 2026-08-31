@@ -80,7 +80,9 @@ function drawMikulaPeasant({ g, cx, cy, entity }: TokenCtx): void {
 
   // Дубина: суковатая ветвь с утолщением на конце.
   if (armed) {
-    g.moveTo(cx + 9, cy + 3).lineTo(cx + 16, cy - 8).stroke({ width: 3.4, color: MIKULA_ART.club, cap: "round" });
+    g.moveTo(cx + 9, cy + 3)
+      .lineTo(cx + 16, cy - 8)
+      .stroke({ width: 3.4, color: MIKULA_ART.club, cap: "round" });
     g.ellipse(cx + 16.5, cy - 8.5, 3, 2.6).fill(MIKULA_ART.clubDark);
     g.circle(cx + 13.5, cy - 4, 1.1).fill(MIKULA_ART.clubDark);
     g.circle(cx + 11, cy + 0.6, 0.9).fill(MIKULA_ART.clubDark);
@@ -128,7 +130,10 @@ function drawForestRat({ g, cx, cy }: TokenCtx): void {
   g.circle(cx + 14, cy + 1.6, 1.5).fill(RAT_ART.nose);
 
   // Уши: внешнее тёмное, внутреннее розовое.
-  for (const [dx, dy, r] of [[-0.5, -5.4, 3.4], [4.2, -4.2, 2.9]] as const) {
+  for (const [dx, dy, r] of [
+    [-0.5, -5.4, 3.4],
+    [4.2, -4.2, 2.9],
+  ] as const) {
     g.ellipse(cx + dx, cy + dy, r, r * 1.25).fill(RAT_ART.body);
     g.ellipse(cx + dx, cy + dy, r * 0.55, r * 0.8).fill(RAT_ART.ear);
   }
@@ -139,8 +144,12 @@ function drawForestRat({ g, cx, cy }: TokenCtx): void {
   g.circle(cx + 3.4, cy + 0.8, 1.1).fill(RAT_ART.eye);
 
   // Усы и резцы.
-  g.moveTo(cx + 11, cy + 2.6).lineTo(cx + 16.5, cy + 1).stroke({ width: 0.6, color: 0xcbbcae, alpha: 0.75 });
-  g.moveTo(cx + 11, cy + 3.6).lineTo(cx + 16, cy + 5).stroke({ width: 0.6, color: 0xcbbcae, alpha: 0.75 });
+  g.moveTo(cx + 11, cy + 2.6)
+    .lineTo(cx + 16.5, cy + 1)
+    .stroke({ width: 0.6, color: 0xcbbcae, alpha: 0.75 });
+  g.moveTo(cx + 11, cy + 3.6)
+    .lineTo(cx + 16, cy + 5)
+    .stroke({ width: 0.6, color: 0xcbbcae, alpha: 0.75 });
   g.rect(cx + 11.6, cy + 3.4, 1.6, 2).fill(0xf0e6d2);
 }
 
@@ -164,9 +173,15 @@ function drawStick({ g, cx, cy, motionNow }: TokenCtx): void {
   g.ellipse(cx, cy + 4, 11, 4.5).fill({ color: 0x000000, alpha: 0.3 });
 
   // Ветвь с обломанными сучьями.
-  g.moveTo(cx - 10, cy + 4).lineTo(cx + 9, cy - 3.5).stroke({ width: 3.6, color: STICK_ART.wood, cap: "round" });
-  g.moveTo(cx - 1.5, cy + 0.6).lineTo(cx + 1, cy + 5).stroke({ width: 2.2, color: STICK_ART.woodDark, cap: "round" });
-  g.moveTo(cx - 6, cy + 2).lineTo(cx - 4.5, cy - 1.5).stroke({ width: 1.8, color: STICK_ART.woodDark, cap: "round" });
+  g.moveTo(cx - 10, cy + 4)
+    .lineTo(cx + 9, cy - 3.5)
+    .stroke({ width: 3.6, color: STICK_ART.wood, cap: "round" });
+  g.moveTo(cx - 1.5, cy + 0.6)
+    .lineTo(cx + 1, cy + 5)
+    .stroke({ width: 2.2, color: STICK_ART.woodDark, cap: "round" });
+  g.moveTo(cx - 6, cy + 2)
+    .lineTo(cx - 4.5, cy - 1.5)
+    .stroke({ width: 1.8, color: STICK_ART.woodDark, cap: "round" });
   g.circle(cx + 8.6, cy - 3.4, 2.2).fill(STICK_ART.knot);
   g.circle(cx - 3.5, cy - 1.8, 1.2).fill(STICK_ART.knot);
 
@@ -180,7 +195,6 @@ function drawStick({ g, cx, cy, motionNow }: TokenCtx): void {
     });
   }
 }
-
 
 /** Раскладка рекрута (0.20.43): холстина, шапка, рогатина. */
 const RECRUIT_LOOK = {
@@ -230,7 +244,9 @@ function drawRecruit({ g, cx, cy }: TokenCtx): void {
   g.circle(cx + 2.1, cy - 3.6, 0.9).fill(0x2a1d12);
 
   // Лопасть рогатины: листовидный наконечник с перекрестием.
-  g.poly([cx + 12.5, cy - 11.5, cx + 15.8, cy - 5.5, cx + 13.4, cy - 4.4, cx + 11.2, cy - 5.8]).fill(RECRUIT_LOOK.blade);
+  g.poly([cx + 12.5, cy - 11.5, cx + 15.8, cy - 5.5, cx + 13.4, cy - 4.4, cx + 11.2, cy - 5.8]).fill(
+    RECRUIT_LOOK.blade,
+  );
   g.rect(cx + 9.6, cy - 5.2, 6.4, 1.4).fill(RECRUIT_LOOK.shaft);
 }
 

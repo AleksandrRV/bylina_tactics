@@ -28,10 +28,10 @@ const ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
 function isWebRtcSignal(value: unknown): value is WebRtcSignal {
   const candidate = value as Partial<WebRtcSignal> | null;
   return (
-    !!candidate
-    && typeof candidate === "object"
-    && (candidate.type === "offer" || candidate.type === "answer")
-    && typeof candidate.sdp === "string"
+    !!candidate &&
+    typeof candidate === "object" &&
+    (candidate.type === "offer" || candidate.type === "answer") &&
+    typeof candidate.sdp === "string"
   );
 }
 

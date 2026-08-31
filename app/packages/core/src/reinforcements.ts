@@ -36,10 +36,7 @@ export interface ReinforcementTick {
 function livingEnemies(match: MatchState): EntityState[] {
   return match.entities.filter(
     (entity) =>
-      !entity.dead &&
-      entity.owner === ENEMY_OWNER &&
-      entity.coverType === 0 &&
-      entity.countsForElimination !== false,
+      !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false,
   );
 }
 
@@ -118,9 +115,8 @@ export function tickReinforcements(
   let next: ReinforcementsState = { ...state, telegraph: [] };
 
   if (mode === "onKill") {
-    const extra = state.killsThisNavTurn > 0
-      ? (config.perKill ?? 2) * state.killsThisNavTurn
-      : (config.perTurnNoKill ?? 1);
+    const extra =
+      state.killsThisNavTurn > 0 ? (config.perKill ?? 2) * state.killsThisNavTurn : (config.perTurnNoKill ?? 1);
     const room = Math.max(0, cap - living);
     const count = Math.min(extra, room);
     next.killsThisNavTurn = 0;

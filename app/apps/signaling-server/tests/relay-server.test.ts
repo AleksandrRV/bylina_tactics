@@ -5,41 +5,68 @@ import { createRelayServer } from "../src/server.mjs";
 let relay: Awaited<ReturnType<typeof createRelayServer>> | null = null;
 async function connect(): Promise<WebSocket> {
   const ws = new WebSocket(`ws://127.0.0.1:${relay!.port}`);
-  await new Promise<void>((resolve, reject) => { ws.on("open", resolve); ws.on("error", reject); });
+  await new Promise<void>((resolve, reject) => {
+    ws.on("open", resolve);
+    ws.on("error", reject);
+  });
   return ws;
 }
 function nextMessage(socket: WebSocket, type: string): Promise<Record<string, unknown>> {
   return new Promise((resolve) => {
-    const listener = (raw: Buffer) => { const message = JSON.parse(String(raw)) as Record<string, unknown>; if (message.type === type) { socket.off("message", listener); resolve(message); } };
+    const listener = (raw: Buffer) => {
+      const message = JSON.parse(String(raw)) as Record<string, unknown>;
+      if (message.type === type) {
+        socket.off("message", listener);
+        resolve(message);
+      }
+    };
     socket.on("message", listener);
   });
 }
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-afterEach(() => { relay?.wss.close(); relay?.server.close(); relay = null; });
+afterEach(() => {
+  relay?.wss.close();
+  relay?.server.close();
+  relay = null;
+});
 
 describe("signaling relay server", () => {
   it("delivers SIGNAL only to the addressed peer in a three-member room", async () => {
     relay = await createRelayServer({ port: 0, heartbeatMs: 10_000 });
-    const host = await connect(); const guest = await connect(); const spectator = await connect();
-    const hostJoined = nextMessage(host, "JOINED"); host.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "host", role: "host" }));
+    const host = await connect();
+    const guest = await connect();
+    const spectator = await connect();
+    const hostJoined = nextMessage(host, "JOINED");
+    host.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "host", role: "host" }));
     const hostInfo = await hostJoined;
-    const guestJoined = nextMessage(guest, "JOINED"); guest.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "guest", role: "guest" }));
+    const guestJoined = nextMessage(guest, "JOINED");
+    guest.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "guest", role: "guest" }));
     const guestInfo = await guestJoined;
-    const spectatorJoined = nextMessage(spectator, "JOINED"); spectator.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "watch", role: "spectator" })); await spectatorJoined;
+    const spectatorJoined = nextMessage(spectator, "JOINED");
+    spectator.send(JSON.stringify({ type: "JOIN", roomId: "room-a", name: "watch", role: "spectator" }));
+    await spectatorJoined;
     const signal = nextMessage(guest, "SIGNAL");
-    let leaked = false; spectator.on("message", (raw) => { if ((JSON.parse(String(raw)) as { type?: string }).type === "SIGNAL") leaked = true; });
+    let leaked = false;
+    spectator.on("message", (raw) => {
+      if ((JSON.parse(String(raw)) as { type?: string }).type === "SIGNAL") leaked = true;
+    });
     host.send(JSON.stringify({ type: "SIGNAL", roomId: "room-a", to: guestInfo.peerId, signal: { sdp: "offer" } }));
     const delivered = await signal;
-    expect(delivered.from).toBe(hostInfo.peerId); expect(delivered.signal).toEqual({ sdp: "offer" });
-    await wait(30); expect(leaked).toBe(false);
-    host.close(); guest.close(); spectator.close();
+    expect(delivered.from).toBe(hostInfo.peerId);
+    expect(delivered.signal).toEqual({ sdp: "offer" });
+    await wait(30);
+    expect(leaked).toBe(false);
+    host.close();
+    guest.close();
+    spectator.close();
   });
 
   it("rejects malformed and foreign signals", async () => {
     relay = await createRelayServer({ port: 0, heartbeatMs: 10_000 });
     const socket = await connect();
-    const badJoin = nextMessage(socket, "ERROR"); socket.send(JSON.stringify({ type: "JOIN", roomId: "bad room", name: "x", role: "guest" }));
+    const badJoin = nextMessage(socket, "ERROR");
+    socket.send(JSON.stringify({ type: "JOIN", roomId: "bad room", name: "x", role: "guest" }));
     expect((await badJoin).message).toBe("BAD_JOIN");
     socket.close();
   });

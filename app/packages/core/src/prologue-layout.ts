@@ -135,7 +135,15 @@ export function createLayoutMatch(
     const pos = compiled.markers[entry.marker]?.[0];
     if (!pos) continue;
     const tile = tileAt(compiled.grid, pos.x, pos.y);
-    const spawned = spawnUnitState(id++, entry.config, entry.owner, pos.x, pos.y, tile?.z ?? 1, entry.owner === PLAYER_OWNER ? 1 : 3);
+    const spawned = spawnUnitState(
+      id++,
+      entry.config,
+      entry.owner,
+      pos.x,
+      pos.y,
+      tile?.z ?? 1,
+      entry.owner === PLAYER_OWNER ? 1 : 3,
+    );
     if (entry.marker === "V" && layout.legend?.bog) {
       spawned.immobileTurns = 99;
     }

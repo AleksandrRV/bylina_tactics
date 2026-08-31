@@ -71,13 +71,7 @@ export interface CampaignHintsContext {
  * Показываются только непоказанные; при showHints = false список пуст —
  * прохождение кампании от подсказок не зависит (0.20.0).
  */
-export {
-  createHintsManagerState,
-  enqueueHint,
-  currentHint,
-  dismissHint,
-  allowedPanel,
-} from "@bylina/core";
+export { createHintsManagerState, enqueueHint, currentHint, dismissHint, allowedPanel } from "@bylina/core";
 export type { HintRecord, HintsManagerState } from "@bylina/core";
 
 export function pendingCampaignHints(context: CampaignHintsContext): CampaignHintId[] {

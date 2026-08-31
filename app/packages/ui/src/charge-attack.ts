@@ -128,14 +128,7 @@ export interface ChargeOptions {
  * достижим. Возвращает `null`, если подойти нечем — например, удар съедает
  * последнее очко действия или цель отрезана укрытиями.
  */
-export function planCharge({
-  snapshot,
-  actor,
-  target,
-  strike,
-  reachable,
-  pathOf,
-}: ChargeOptions): ChargePlan | null {
+export function planCharge({ snapshot, actor, target, strike, reachable, pathOf }: ChargeOptions): ChargePlan | null {
   if (actor.dead || target.dead || actor.id === target.id) return null;
   // Удар уже достижим — рывок не нужен: боец бьёт с места.
   if (strikeAvailable(snapshot, actor, target, strike, { x: actor.x, y: actor.y, z: actor.z })) return null;
@@ -168,8 +161,7 @@ export function planCharge({
       (candidate.mpCost === best.mpCost &&
         candidate.apCost === best.apCost &&
         candidate.path.length === best.path.length &&
-        (candidate.step.y < best.step.y ||
-          (candidate.step.y === best.step.y && candidate.step.x < best.step.x)))
+        (candidate.step.y < best.step.y || (candidate.step.y === best.step.y && candidate.step.x < best.step.x)))
     ) {
       best = candidate;
     }

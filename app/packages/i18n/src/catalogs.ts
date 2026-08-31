@@ -33,9 +33,7 @@ export function loadBundledCatalogs(): Record<string, Catalog> {
 }
 
 /** Собрать каталоги из glob вида locales/<code>/<file>.json. Новый язык — папка и запись манифеста. */
-export function collectCatalogsFromModules(
-  modules: Record<string, unknown>,
-): Record<string, Catalog> {
+export function collectCatalogsFromModules(modules: Record<string, unknown>): Record<string, Catalog> {
   const grouped: Record<string, Catalog[]> = {};
   for (const [path, value] of Object.entries(modules)) {
     const match = path.replace(/\\/g, "/").match(/locales\/([^/]+)\/[^/]+\.json$/);

@@ -60,7 +60,9 @@ describe("QA flow: campaign end-to-end (0.13.0)", () => {
     const played: string[] = [];
     let darkness = 0;
     for (let step = 0; step < 12; step += 1) {
-      const open = camp.getState().missions.find((mission) => mission.status === "open" && !played.includes(mission.id));
+      const open = camp
+        .getState()
+        .missions.find((mission) => mission.status === "open" && !played.includes(mission.id));
       if (!open) break;
       const mission = camp.getMission(open.id);
       if (!mission) throw new Error(`mission ${open.id} is missing`);
@@ -72,15 +74,18 @@ describe("QA flow: campaign end-to-end (0.13.0)", () => {
       const match = createMissionMatch({
         units,
         map: mission.map,
-        playerSlots: deploy.map((id) => ({ unitId: camp.getState().fighters.find((fighter) => fighter.id === id)!.unitId })),
+        playerSlots: deploy.map((id) => ({
+          unitId: camp.getState().fighters.find((fighter) => fighter.id === id)!.unitId,
+        })),
         enemies: mission.enemies,
-        objective: mission.type === "destroy"
-          ? { kind: "destroy", unitId: mission.objectiveUnitId! }
-          : mission.type === "rescue"
-            ? { kind: "rescue", unitId: mission.escorteeUnitId! }
-            : mission.type === "recon"
-              ? { kind: "recon" }
-              : undefined,
+        objective:
+          mission.type === "destroy"
+            ? { kind: "destroy", unitId: mission.objectiveUnitId! }
+            : mission.type === "rescue"
+              ? { kind: "rescue", unitId: mission.escorteeUnitId! }
+              : mission.type === "recon"
+                ? { kind: "recon" }
+                : undefined,
         seed: 5 + step,
       });
       const kernel = createTacticsKernel({ initial: match, weapons: wStats, skills: sStats, units, seed: 5 + step });
@@ -92,8 +97,8 @@ describe("QA flow: campaign end-to-end (0.13.0)", () => {
       // Учёт участников как в BattleScreen: метка высадки либо запись эвакуации.
       const snap = kernel.getSnapshot();
       const participants = deploy.map((fighterId, index) => {
-        const entity = snap.entities.find((candidate) =>
-          candidate.owner === 1 && candidate.coverType === 0 && candidate.rosterIndex === index,
+        const entity = snap.entities.find(
+          (candidate) => candidate.owner === 1 && candidate.coverType === 0 && candidate.rosterIndex === index,
         );
         if (entity) return { fighterId, survived: !entity.dead, hp: entity.hp };
         const extracted = (snap.extracted ?? []).find((entry) => entry.rosterIndex === index);

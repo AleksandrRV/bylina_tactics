@@ -34,7 +34,8 @@ function fakeChannelPair(): { make: (initiator: boolean) => DataChannel } {
           if (target) {
             // Имитация доставки конверта через «сеть».
             queueMicrotask(() => {
-              for (const listener of (target as unknown as { listeners: Set<(m: Envelope) => void> }).listeners ?? []) listener(message);
+              for (const listener of (target as unknown as { listeners: Set<(m: Envelope) => void> }).listeners ?? [])
+                listener(message);
             });
           }
         },
@@ -69,7 +70,13 @@ describe("signaling relay client (0.17.0)", () => {
     const signals: string[] = [];
     const pair = fakeChannelPair();
     const host = createSignalingSession({ url, roomId: "qa-1", role: "host", name: "host", channelFactory: pair.make });
-    const guest = createSignalingSession({ url, roomId: "qa-1", role: "guest", name: "guest", channelFactory: pair.make });
+    const guest = createSignalingSession({
+      url,
+      roomId: "qa-1",
+      role: "guest",
+      name: "guest",
+      channelFactory: pair.make,
+    });
 
     // Перехват сигналов на уровне ретранслятора: клиенты шлют SIGNAL с оффером/ответом.
     const originalSend = relay.wss.clients;
@@ -92,7 +99,13 @@ describe("signaling relay client (0.17.0)", () => {
   it("rejects a join beyond the room capacity with an error", async () => {
     const url = `ws://127.0.0.1:${relay.port}`;
     const sessions = Array.from({ length: 5 }, (_, i) =>
-      createSignalingSession({ url, roomId: "full-room", role: i === 0 ? "host" : "guest", name: `p${i}`, channelFactory: fakeChannelPair().make }),
+      createSignalingSession({
+        url,
+        roomId: "full-room",
+        role: i === 0 ? "host" : "guest",
+        name: `p${i}`,
+        channelFactory: fakeChannelPair().make,
+      }),
     );
     const errors: string[] = [];
     for (const session of sessions) session.onError((message) => errors.push(message));
@@ -108,7 +121,10 @@ it("reconnects the signaling socket after an unexpected close", async () => {
   const states: string[] = [];
   const session = createSignalingSession({
     url: `ws://127.0.0.1:${localRelay.port}`,
-    roomId: "reconnect", role: "guest", name: "retry", reconnectDelayMs: 10,
+    roomId: "reconnect",
+    role: "guest",
+    name: "retry",
+    reconnectDelayMs: 10,
     channelFactory: fakeChannelPair().make,
   });
   session.onStateChange((state) => states.push(state));
@@ -118,5 +134,6 @@ it("reconnects the signaling socket after an unexpected close", async () => {
   expect(states).toContain("reconnecting");
   expect(states).toContain("signaling-connected");
   session.close();
-  localRelay.wss.close(); localRelay.server.close();
+  localRelay.wss.close();
+  localRelay.server.close();
 });

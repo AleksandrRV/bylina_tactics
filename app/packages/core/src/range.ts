@@ -23,13 +23,6 @@ export function inRangedReach(
   return distH(ax, ay, bx, by) <= effectiveRange(az, bz, base);
 }
 
-export function inMeleeReach(
-  ax: number,
-  ay: number,
-  az: number,
-  bx: number,
-  by: number,
-  bz: number,
-): boolean {
+export function inMeleeReach(ax: number, ay: number, az: number, bx: number, by: number, bz: number): boolean {
   return distH(ax, ay, bx, by) <= 1 && Math.abs(az - bz) <= 1;
 }

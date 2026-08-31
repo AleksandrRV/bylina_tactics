@@ -13,11 +13,7 @@ export function selectableActions(entity: EntityState): SelectableAction[] {
   ];
 }
 
-export function shortcutForAction(
-  entity: EntityState,
-  type: SelectableAction["type"],
-  id: string,
-): string | undefined {
+export function shortcutForAction(entity: EntityState, type: SelectableAction["type"], id: string): string | undefined {
   const index = selectableActions(entity).findIndex((action) => action.type === type && action.id === id);
   return index >= 0 ? ACTION_SHORTCUTS[index] : undefined;
 }

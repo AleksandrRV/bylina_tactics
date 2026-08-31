@@ -12,16 +12,19 @@ import { createRoot } from "react-dom/client";
 
 // Полифилы, которые браузер даёт из коробки, а jsdom — нет.
 beforeEach(() => {
-  window.matchMedia = window.matchMedia ?? ((query: string) => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: () => undefined,
-    removeListener: () => undefined,
-    addEventListener: () => undefined,
-    removeEventListener: () => undefined,
-    dispatchEvent: () => false,
-  }) as unknown as MediaQueryList);
+  window.matchMedia =
+    window.matchMedia ??
+    ((query: string) =>
+      ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        dispatchEvent: () => false,
+      }) as unknown as MediaQueryList);
   window.scrollTo = window.scrollTo ?? (() => undefined);
 });
 

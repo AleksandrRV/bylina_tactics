@@ -11,13 +11,7 @@ import type { EntityState, Grid, MatchState } from "./types.js";
  *
  * Ориентация обзор не ограничивает.
  */
-function isCellObservedByUnit(
-  grid: Grid,
-  unit: EntityState,
-  tileX: number,
-  tileY: number,
-  tileZ: number,
-): boolean {
+function isCellObservedByUnit(grid: Grid, unit: EntityState, tileX: number, tileY: number, tileZ: number): boolean {
   if (unit.dead || unit.coverType > 0) return false;
   // Собственная клетка наблюдается всегда: DistH = 0 ≤ effectiveRange для любой
   // дальности обзора, включая vision = 0 (§8.1 math: InRange(U, T, vision)).
@@ -40,9 +34,7 @@ export function computeVisibleCells(state: MatchState, owner: number): Set<strin
   const visible = new Set<string>();
   // Фильтр не исключает юнитов с vision = 0: собственная клетка наблюдается
   // при любой дальности обзора (§8.1), остальные клетки отсеет isCellObservedByUnit.
-  const observers = state.entities.filter(
-    (entity) => !entity.dead && entity.coverType === 0 && entity.owner === owner,
-  );
+  const observers = state.entities.filter((entity) => !entity.dead && entity.coverType === 0 && entity.owner === owner);
   if (observers.length === 0) return visible;
 
   for (const tile of state.grid.tiles) {

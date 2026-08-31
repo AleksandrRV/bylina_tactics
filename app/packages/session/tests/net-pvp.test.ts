@@ -10,16 +10,48 @@ import { createSession } from "../src/index.js";
  */
 
 const SWORD: WeaponStats = {
-  id: "sword", category: "melee", apCost: 1, endsTurn: true, range: 1,
-  requiresLOS: false, aimMod: 0, minDmg: 5, maxDmg: 5, crit: 0, critBonus: 0, envDmg: 0,
+  id: "sword",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 5,
+  maxDmg: 5,
+  crit: 0,
+  critBonus: 0,
+  envDmg: 0,
 };
 
 function unit(id: number, owner: number, x: number, y: number): import("@bylina/core").EntityState {
   return {
-    id, configId: "bogatyr", owner, x, y, z: 1, dir: owner === 1 ? 1 : 3, ap: 2, maxAp: 2, mobility: 5,
-    hp: 12, maxHp: 12, aim: 100, defense: 0, will: 40, vision: 12,
-    weaponId: "sword", weaponIds: ["sword"], skillIds: [], obstacle: true, dead: false, flying: false,
-    coverType: 0, overwatch: false, defending: false, movementSpent: 0,
+    id,
+    configId: "bogatyr",
+    owner,
+    x,
+    y,
+    z: 1,
+    dir: owner === 1 ? 1 : 3,
+    ap: 2,
+    maxAp: 2,
+    mobility: 5,
+    hp: 12,
+    maxHp: 12,
+    aim: 100,
+    defense: 0,
+    will: 40,
+    vision: 12,
+    weaponId: "sword",
+    weaponIds: ["sword"],
+    skillIds: [],
+    obstacle: true,
+    dead: false,
+    flying: false,
+    coverType: 0,
+    overwatch: false,
+    defending: false,
+    movementSpent: 0,
   };
 }
 
@@ -27,7 +59,17 @@ function matchState(): MatchState {
   return {
     turnNumber: 1,
     activeOwner: 1,
-    grid: { width: 8, height: 6, tiles: Array.from({ length: 48 }, (_, i) => ({ x: i % 8, y: Math.floor(i / 8), z: 1, pit: false, blockLOS: false })) },
+    grid: {
+      width: 8,
+      height: 6,
+      tiles: Array.from({ length: 48 }, (_, i) => ({
+        x: i % 8,
+        y: Math.floor(i / 8),
+        z: 1,
+        pit: false,
+        blockLOS: false,
+      })),
+    },
     entities: [unit(1, 1, 1, 2), unit(11, 2, 6, 2)],
   };
 }
@@ -194,7 +236,12 @@ describe("QA replay recording (0.17.0)", () => {
     const target = state.entities.find((entity) => entity.id === 11)!;
     target.x = attacker.x + 1;
     target.y = attacker.y;
-    const kernel = createTacticsKernel({ initial: state, weapons: { sword: { ...SWORD, minDmg: 20, maxDmg: 20 } }, skills: {}, seed: 5 });
+    const kernel = createTacticsKernel({
+      initial: state,
+      weapons: { sword: { ...SWORD, minDmg: 20, maxDmg: 20 } },
+      skills: {},
+      seed: 5,
+    });
     session.bindTacticsHost(kernel);
     const applied = kernel.apply({ type: "ATTACK", actorId: 1, targetId: 11, weaponId: "sword" });
     expect(applied.ok).toBe(true);

@@ -298,7 +298,12 @@ export function generateBattlefield(
     const generated = attempt();
     const spawnOk = [...players, ...enemies].every((point) => {
       const tile = tileAt(generated.grid, point.x, point.y);
-      return tile && !tile.pit && !tile.blockLOS && !generated.covers.some((cover) => cover.x === point.x && cover.y === point.y);
+      return (
+        tile &&
+        !tile.pit &&
+        !tile.blockLOS &&
+        !generated.covers.some((cover) => cover.x === point.x && cover.y === point.y)
+      );
     });
     if (!spawnOk) continue;
     const ok = players.every((from) => enemies.every((to) => connected(generated.grid, generated.covers, from, to)));
@@ -320,7 +325,31 @@ export function generateBattlefield(
       if (reserved.has(key(x, y))) continue;
       const tile = tileAt(fallback, x, y);
       if (!tile) continue;
-      covers.push({ id: 900 + covers.length, configId: "cover", owner: 0, x, y, z: tile.z, dir: 0, ap: 0, maxAp: 0, mobility: 0, hp: 2, maxHp: 2, aim: 0, defense: 0, vision: 0, weaponId: "", obstacle: true, dead: false, flying: false, coverType: 2, overwatch: false, defending: false, movementSpent: 0 });
+      covers.push({
+        id: 900 + covers.length,
+        configId: "cover",
+        owner: 0,
+        x,
+        y,
+        z: tile.z,
+        dir: 0,
+        ap: 0,
+        maxAp: 0,
+        mobility: 0,
+        hp: 2,
+        maxHp: 2,
+        aim: 0,
+        defense: 0,
+        vision: 0,
+        weaponId: "",
+        obstacle: true,
+        dead: false,
+        flying: false,
+        coverType: 2,
+        overwatch: false,
+        defending: false,
+        movementSpent: 0,
+      });
     }
   }
   return { grid: fallback, covers };
