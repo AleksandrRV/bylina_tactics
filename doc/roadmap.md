@@ -118,10 +118,23 @@
   `doc/debug-mode.md`. UI-тесты: подтверждение просмотра при других
   правилах, отказ+удаление неподдерживаемого формата, будущий формат
   (3 проверки).
-- [ ] **День 7 — границы модулей в CI (P1-5, часть 1).**
-  `.dependency-cruiser.cjs`: чистота ядра (`core`/`campaign` без внешних
-  runtime-зависимостей и DOM-глобалей), направление слоёв по
-  `architecture.md` §2, запрет циклов; скрипт `check:boundaries`.
+- [x] **День 7 — границы модулей в CI (P1-5, часть 1).**
+  `app/.dependency-cruiser.cjs` переносит направление зависимостей
+  `architecture.md` §2 в машиночитаемые правила: `no-cycles` (ацикличный
+  граф), `layers-point-down` (пять слоёв: 1 — content/i18n/settings,
+  2 — core/campaign/replay, 3 — storage/net/signaling, 4 — session,
+  5 — ui/render; импорт допустим только в нижележащий либо свой слой) и
+  `core-remains-pure` (`core`/`campaign` не импортируют React/PixiJS и
+  модули связи, хранения, сессии, отображения и интерфейса; DOM-глобали
+  остаются за ESLint). Кросс-пакетные импорты `@bylina/*` в
+  pnpm-монорепозитории матчатся по спецификатору импорта (симлинки лежат
+  в node_modules каждого пакета). Скрипт `pnpm check:boundaries` встроен в
+  `pnpm lint` и отдельным шагом «Check module boundaries» в задаче lint CI.
+  На текущем графе — 0 нарушений (260 модулей, 728 зависимостей);
+  искусственные нарушения (импорт `@bylina/ui` и `react` в `core`, импорт
+  вверх по слоям из content/net/session, `campaign → storage`) роняют
+  проверку с ненулевым кодом — критерий «импорт `@bylina/ui` в `core/src`
+  роняет CI» выполнен.
 - [ ] **День 8 — типизированный линтинг (P1-5, часть 2).**
   `recommendedTypeChecked` + `projectService`, `no-floating-promises` и
   `no-misused-promises` в режиме warn (фаза 1); список предупреждений
