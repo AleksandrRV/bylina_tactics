@@ -283,8 +283,17 @@ type WorkerResponse = { id: number; serialized?: string; error?: string };
 /**
  * Creates the asynchronous serializer used by autosave. The synchronous fallback
  * is retained for SSR and test runners which do not provide Web Workers.
+ *
+ * 0.21.3 (P0-3): рабочий поток может умереть после одной ошибки либо
+ * перестать отвечать. Раньше `onerror` отклонял ожидавшие промисы, но не
+ * помечал поток мёртвым — каждый следующий `serialize()` клал промис в карту,
+ * который уже никогда не разрешался: автосохранение молчало вечно, а карта
+ * росла. Теперь после ошибки или тайм-аутa молчания сериализация выполняется
+ * синхронно в главном потоке (кадровый провал предпочтительнее тихой потери
+ * сохранения), а промис не висит дольше `timeoutMs`.
  */
-export function createSaveSerializer(): SaveSerializer {
+export function createSaveSerializer(options: { timeoutMs?: number } = {}): SaveSerializer {
+  const timeoutMs = options.timeoutMs ?? 4000;
   if (typeof Worker === "undefined") {
     return {
       serialize: async (data) => serializeSaveDraft(data),
@@ -295,28 +304,72 @@ export function createSaveSerializer(): SaveSerializer {
   try {
     const worker = new Worker(new URL("./save-worker.ts", import.meta.url), { type: "module" });
     let nextId = 1;
-    const pending = new Map<number, { resolve: (value: string) => void; reject: (reason: Error) => void }>();
+    let workerAlive = true;
+    const pending = new Map<
+      number,
+      { resolve: (value: string) => void; reject: (reason: Error) => void; timer: ReturnType<typeof setTimeout> }
+    >();
+    /**
+     * Откат на синхронную сериализацию в главном потоке. Поток JSON — единицы
+     * микросекунд на снимках этой игры, поэтому цена отката — возможный
+     * кадровый провал, а не потеря хода.
+     */
+    const fallback = (data: SaveDraft): string => {
+      console.warn("[save] рабочий поток сериализации недоступен — откат на главный поток");
+      return serializeSaveDraft(data);
+    };
     worker.onmessage = ({ data }: MessageEvent<WorkerResponse>) => {
       const request = pending.get(data.id);
       if (!request) return;
       pending.delete(data.id);
+      clearTimeout(request.timer);
       if (data.serialized !== undefined) request.resolve(data.serialized);
       else request.reject(new Error(data.error ?? "Save worker serialization failed"));
     };
     worker.onerror = () => {
-      for (const request of pending.values()) request.reject(new Error("Save worker failed"));
+      // Поток потерян немедленно: помечаем мёртвым, чтобы дальнейшие
+      // сериализации шли синхронно, а не висели вечно.
+      workerAlive = false;
+      for (const request of pending.values()) {
+        clearTimeout(request.timer);
+        request.reject(new Error("Save worker failed"));
+      }
       pending.clear();
     };
     return {
-      serialize: (data) =>
-        new Promise<string>((resolve, reject) => {
+      serialize: (data) => {
+        // Мёртвый поток: не кладём промис в карту — сериализуем сразу.
+        if (!workerAlive) return Promise.resolve(fallback(data));
+        return new Promise<string>((resolve, reject) => {
           const id = nextId++;
-          pending.set(id, { resolve, reject });
+          const timer = setTimeout(() => {
+            // Молчание потока дольше timeoutMs — он фактически неработоспособен
+            // (сериализация снимка занимает микросекунды). Переключаемся на
+            // главный поток, чтобы автосохранение не зависело от потока.
+            workerAlive = false;
+            pending.delete(id);
+            resolve(fallback(data));
+          }, timeoutMs);
+          pending.set(id, {
+            resolve: (value) => {
+              clearTimeout(timer);
+              resolve(value);
+            },
+            reject: (reason) => {
+              clearTimeout(timer);
+              reject(reason);
+            },
+            timer,
+          });
           worker.postMessage({ id, data } satisfies WorkerRequest);
-        }),
+        });
+      },
       dispose: () => {
         worker.terminate();
-        for (const request of pending.values()) request.reject(new Error("Save worker disposed"));
+        for (const request of pending.values()) {
+          clearTimeout(request.timer);
+          request.reject(new Error("Save worker disposed"));
+        }
         pending.clear();
       },
     };
