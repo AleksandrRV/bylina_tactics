@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererStub, installDomTestEnv, renderMock } from "./harness.js";
-import { createRoot, type Root } from "react-dom/client";
+import { createRendererStub, installDomTestEnv, mountApp, renderMock, type Mounted } from "./harness.js";
 
 // Рендер поля подменён заглушкой (PixiJS не работает в jsdom): тестам
 // продолжения нужны смонтированные экраны боя кампании (0.20.17).
@@ -44,30 +43,18 @@ afterEach(() => {
   standalone = false;
 });
 
-async function vi_resetModules(): Promise<void> {
-  const { vi } = await import("vitest");
-  vi.resetModules();
-}
-
 /** Интерактивное приложение: корень живёт, тест щёлкает по кнопкам. */
-async function mountInteractiveApp(): Promise<{ root: Root; host: HTMLElement; errors: unknown[] }> {
+async function mountInteractiveApp(): Promise<{ mounted: Mounted; errors: unknown[] }> {
   const errors: unknown[] = [];
   const onError = (event: ErrorEvent): void => {
     errors.push(event.error ?? event.message);
   };
   window.addEventListener("error", onError);
-  await vi_resetModules();
-  const { App } = await import("../../../apps/game-pwa/src/App.js");
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(<App />);
-  });
+  const mounted = await mountApp();
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
   });
-  return { root, host, errors };
+  return { mounted, errors };
 }
 
 /** Ждать условия (монтаж экранов боя асинхронен: ядро + эффекты). */
@@ -198,7 +185,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors, `unhandled errors: ${String(app.errors[0])}`).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -220,7 +207,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -265,7 +252,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -290,7 +277,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -309,7 +296,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -330,7 +317,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -370,7 +357,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -426,7 +413,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -472,7 +459,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -512,7 +499,7 @@ describe("app boot with a player save (0.20.15)", () => {
       expect(app.errors).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   });
@@ -523,7 +510,7 @@ describe("app boot with a player save (0.20.15)", () => {
     expect(document.querySelector(".menu-screen")).not.toBeNull();
     expect(app.errors).toEqual([]);
     await act(async () => {
-      app.root.unmount();
+      await app.mounted.unmount();
     });
   });
 });

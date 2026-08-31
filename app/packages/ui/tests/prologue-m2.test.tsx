@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererJournal, createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
-import { createRoot, type Root } from "react-dom/client";
+import {
+  createRendererJournal,
+  createRendererStub,
+  installDomTestEnv,
+  mountView,
+  renderMock,
+  tick,
+  waitFor,
+  type Mounted,
+} from "./harness.js";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
 import { createSession } from "@bylina/session";
@@ -57,7 +65,7 @@ afterEach(() => {
   journal.reset();
 });
 
-async function mountShell(): Promise<{ root: Root; services: AppServices }> {
+async function mountShell(): Promise<{ mounted: Mounted; services: AppServices }> {
   const parsed = parseContent(dataTree());
   if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
   const content = parsed.data;
@@ -73,20 +81,15 @@ async function mountShell(): Promise<{ root: Root; services: AppServices }> {
     install: { canInstall: false, installed: false, prompt: async () => undefined },
     debug: false,
   };
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(
-      <ServicesProvider value={services}>
-        <Shell />
-      </ServicesProvider>,
-    );
-  });
+  const mounted = await mountView(
+    <ServicesProvider value={services}>
+      <Shell />
+    </ServicesProvider>,
+  );
   await act(async () => {
     await tick(20);
   });
-  return { root, services };
+  return { mounted, services };
 }
 
 /** Сыгранные сцены в порядке вызова. */
@@ -102,7 +105,7 @@ const scenePlan = (id: string): CinematicPlan | undefined =>
   )?.args[0] as CinematicPlan | undefined;
 
 /** Начать М2: экран боя, вступительная карточка закрыта. */
-async function startM2(root: Root, session: AppServices["session"]): Promise<void> {
+async function startM2(session: AppServices["session"]): Promise<void> {
   await act(async () => {
     session.startPrologue("prologue_cry", true);
   });
@@ -122,9 +125,9 @@ describe("prologue M2 beat (0.20.45)", () => {
   it(
     "keeps the stranded Fedot out of the roster until he is freed",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
-      await startM2(root, session);
+      await startM2(session);
 
       // В дружине один боец: Федот увяз и управлению не подлежит.
       expect(document.querySelectorAll(".roster-card")).toHaveLength(1);
@@ -147,7 +150,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(session.getBattleSnapshot(1).grid.tiles.filter((tile) => tile.extract)).toHaveLength(0);
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 60000 },
@@ -156,9 +159,9 @@ describe("prologue M2 beat (0.20.45)", () => {
   it(
     "stops the hero after the first AP: the dash breaks off and the stance owns the turn",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
-      await startM2(root, session);
+      await startM2(session);
 
       const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const endTurn = (): HTMLButtonElement | null => document.querySelector<HTMLButtonElement>(".end-turn");
@@ -228,7 +231,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(journal.calls.some((entry) => entry.name === "setHiddenEntities")).toBe(true);
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 90000 },
@@ -237,9 +240,9 @@ describe("prologue M2 beat (0.20.45)", () => {
   it(
     "выводит обеих крыс засады той же сценой, а не после неё (0.20.52)",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
-      await startM2(root, session);
+      await startM2(session);
 
       const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const rats = () =>
@@ -283,7 +286,7 @@ describe("prologue M2 beat (0.20.45)", () => {
         expect(spawned.has(id), `крыса ${id} вышла на поле`).toBe(true);
       }
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 90000 },
@@ -292,9 +295,9 @@ describe("prologue M2 beat (0.20.45)", () => {
   it(
     "сообщение засады показывается окном, а не строкой над кнопками (0.20.52)",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
-      await startM2(root, session);
+      await startM2(session);
 
       const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const clickCell = async (x: number, y: number): Promise<void> => {
@@ -337,7 +340,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       });
       expect(document.querySelector(".story-note-card"), "окно закрыто").toBeNull();
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 90000 },
@@ -346,9 +349,9 @@ describe("prologue M2 beat (0.20.45)", () => {
   it(
     "lights the exit only after the swarm has run out",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
-      await startM2(root, session);
+      await startM2(session);
 
       const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
       const rats = () =>
@@ -446,7 +449,7 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(hero().skillIds ?? []).toContain("evacuate");
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 180000 },
