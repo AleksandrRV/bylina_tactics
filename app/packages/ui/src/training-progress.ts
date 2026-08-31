@@ -93,3 +93,36 @@ export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
   if (!conditions.isNetGuest && !conditions.outcomeOngoing && !conditions.isTraining) return false;
   return true;
 }
+
+/**
+ * Исход миссии обучения (0.19.0; строгий сценарий 0.20.13).
+ *
+ * Путей к победе два, и они не взаимозаменяемы:
+ * - миссия без противников («Первые шаги») по правилам ядра выиграна с
+ *   самого начала, поэтому её исход неприменим — победа наступает
+ *   выполнением всех шагов подсказки;
+ * - миссия с противниками («Бой», «Умения и состояния») играется до победы
+ *   ядра: последний шаг сценария (`repeatUntil: victory`) ведёт игрока
+ *   указаниями до самой победы, поэтому реактивные плашки (яд, воскрешение)
+ *   успевают сработать.
+ *
+ * Поражение — всегда по ядру: Навь в обучении действует, гибель дружины
+ * заканчивает урок независимо от номера шага.
+ */
+export interface TrainingOutcomeConditions {
+  /** Исход партии по правилам ядра. */
+  outcome: "ongoing" | "victory" | "defeat";
+  /** Есть ли в миссии противники (от этого зависит путь к победе). */
+  missionHasEnemies: boolean;
+  /** Выполнены ли все шаги подсказки. */
+  trainingDone: boolean;
+}
+
+/** Итог урока: `null` — урок продолжается. */
+export type TrainingOutcome = "victory" | "defeat";
+
+export function trainingOutcome(conditions: TrainingOutcomeConditions): TrainingOutcome | null {
+  const complete = conditions.missionHasEnemies ? conditions.outcome === "victory" : conditions.trainingDone;
+  if (complete) return "victory";
+  return conditions.outcome === "defeat" ? "defeat" : null;
+}

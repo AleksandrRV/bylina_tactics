@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 import type { TrainingHintConfig } from "@bylina/content";
 import type { GameEvent } from "@bylina/core";
-import { hintCompletedByEvents, shouldAutoEndTurn, trainingHintsSorted } from "../src/training-progress.js";
+import {
+  hintCompletedByEvents,
+  shouldAutoEndTurn,
+  trainingHintsSorted,
+  trainingOutcome,
+} from "../src/training-progress.js";
 
 /**
  * Чистая логика продвижения подсказок (0.19.2/0.20.13): шаг завершается
@@ -120,5 +125,40 @@ describe("shouldAutoEndTurn in training (0.20.13)", () => {
     expect(conditions({ activeHint: null, busy: true })).toBe(false);
     expect(conditions({ activeHint: null, enemyPhase: true })).toBe(false);
     expect(conditions({ activeHint: null, isTraining: false, outcomeOngoing: false })).toBe(false);
+  });
+});
+
+describe("training outcome (0.20.61)", () => {
+  /** Условия итога: по умолчанию — мирная миссия, бой продолжается. */
+  const conditions = (over: Partial<Parameters<typeof trainingOutcome>[0]> = {}) => ({
+    outcome: "ongoing" as const,
+    missionHasEnemies: false,
+    trainingDone: false,
+    ...over,
+  });
+
+  it("completes a peaceful mission by the hints, not by the kernel outcome", () => {
+    // Без противников партия «выиграна» ядром с самого начала (0.20.13),
+    // поэтому исход ядра неприменим: победа наступает по шагам подсказки.
+    expect(trainingOutcome(conditions({ outcome: "victory" }))).toBeNull();
+    expect(trainingOutcome(conditions({ trainingDone: true }))).toBe("victory");
+  });
+
+  it("completes a mission with enemies by the kernel outcome", () => {
+    // Шаги подсказки сами по себе не дают победы: последний шаг ведёт к ней
+    // указаниями, а итог ставит ядро.
+    expect(trainingOutcome(conditions({ missionHasEnemies: true, trainingDone: true }))).toBeNull();
+    expect(trainingOutcome(conditions({ missionHasEnemies: true, outcome: "victory" }))).toBe("victory");
+  });
+
+  it("loses by the kernel outcome whatever the hints are", () => {
+    // Навь в обучении действует: гибель дружины заканчивает урок.
+    expect(trainingOutcome(conditions({ outcome: "defeat" }))).toBe("defeat");
+    expect(trainingOutcome(conditions({ missionHasEnemies: true, outcome: "defeat" }))).toBe("defeat");
+    // Тонкость порядка сохранена из прежнего кода: в мирной миссии пройденные
+    // шаги завершают урок победой, даже если ядро сообщает поражение. Ветка
+    // недостижима — в миссии без противников дружине неоткуда погибнуть, — и
+    // правка правила была бы изменением игры, а не переноcом кода.
+    expect(trainingOutcome(conditions({ outcome: "defeat", trainingDone: true }))).toBe("victory");
   });
 });
