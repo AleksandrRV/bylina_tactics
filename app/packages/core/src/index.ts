@@ -1,4 +1,5 @@
 export { CORE_VERSION, createTacticsKernel } from "./kernel.js";
+export { APP_VERSION } from "./version.js";
 export type { KernelOptions, TacticsKernel } from "./kernel.js";
 export {
   createDebugMatch,

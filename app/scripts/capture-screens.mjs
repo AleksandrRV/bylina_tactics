@@ -68,8 +68,9 @@ async function capture() {
     process.exitCode = 1;
     return;
   }
-  const { APP_VERSION } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
-  const outDir = path.join(outRoot, APP_VERSION);
+  // Версия — из единственного источника: корневой манифест (0.20.54).
+  const { version } = JSON.parse(await readFile(path.join(root, "package.json"), "utf8"));
+  const outDir = path.join(outRoot, version);
   await mkdir(outDir, { recursive: true });
   const browser = await chromium.launch();
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
@@ -91,7 +92,8 @@ async function capture() {
 }
 
 async function compare() {
-  const currentDir = path.join(outRoot, JSON.parse(await readFile(path.join(root, "package.json"), "utf8")).APP_VERSION);
+  // Тот же единый источник: каталог снимков называется версией приложения.
+  const currentDir = path.join(outRoot, JSON.parse(await readFile(path.join(root, "package.json"), "utf8")).version);
   const baselineDir = process.env.BASELINE_DIR ? path.resolve(process.env.BASELINE_DIR) : await latestOtherVersion(currentDir);
   if (!baselineDir) {
     console.warn("Нет эталонного набора снимков — сравнивать не с чем (первый запуск?).");

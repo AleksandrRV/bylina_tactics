@@ -13,6 +13,7 @@ import {
   tileAt,
   type EntityState,
 } from "../src/index.js";
+import manifest from "../../../package.json";
 
 /** Восемь смещений соседних клеток — эталонный перебор в тестах. */
 const NEIGHBOR_STEPS: readonly (readonly [number, number])[] = [
@@ -245,9 +246,9 @@ describe("movement allowance (0.20.43)", () => {
 });
 
 describe("createTacticsKernel", () => {
-  it("reports 0.20.53 and does not touch the document object", () => {
+  it("reports the version of the root manifest and does not touch the document object", () => {
     const kernel = createTacticsKernel();
-    expect(kernel.version).toBe("0.20.53");
+    expect(kernel.version).toBe(manifest.version);
     expect(typeof globalThis.document).toBe("undefined");
   });
 

@@ -21,8 +21,11 @@ import type {
   ReachableCell,
 } from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
+import { APP_VERSION } from "./version.js";
 
-export const CORE_VERSION = "0.20.53";
+// Версия ядра следует версии приложения: номер объявлен один раз
+// в корневом манифесте и читается через packages/core/src/version.ts.
+export const CORE_VERSION = APP_VERSION;
 
 export interface KernelOptions {
   initial?: MatchState;

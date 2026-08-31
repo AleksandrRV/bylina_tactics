@@ -7,6 +7,7 @@ import {
 import { createCampaign } from "@bylina/campaign";
 import type { CampaignConfig } from "@bylina/content";
 import { APP_VERSION, createSession } from "../src/index.js";
+import manifest from "../../../package.json";
 
 const MAP = {
   width: 12,
@@ -74,8 +75,8 @@ describe("createSession", () => {
     expect(createSession().get().screen).toBe("boot");
   });
 
-  it("reports version 0.20.53", () => {
-    expect(APP_VERSION).toBe("0.20.53");
+  it("reports the version of the root manifest", () => {
+    expect(APP_VERSION).toBe(manifest.version);
   });
 
   it("moves between menu and settings", () => {
