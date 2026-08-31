@@ -72,11 +72,12 @@
 | `app/packages/ui/src/action-art.ts` | Образы действий и умений, карта файлов `public/actions` (0.20.46) |
 | `app/packages/ui/src/action-info.ts` | Содержимое окна информации: числа из боевых данных, текст из словарей (0.20.46) |
 | `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
+| `app/packages/ui/src/battle-keyboard.ts` | Карта клавиш боевого экрана: чистый разбор нажатия по состоянию, без React (0.20.59) |
 | `app/packages/ui/src/charge-attack.ts` | Рывок к цели ближнего боя: клетка подхода, маршрут, стоимость (0.20.50) |
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
 | `app/scripts/check-version-consistency.mjs` | Единый источник версии: манифест, константы, документация, отсутствие литералов в исходниках (0.20.54) |
 | `app/scripts/set-version.mjs` | Установка версии приложения одной командой `pnpm version:set` (0.20.54) |
-| `app/packages/ui/tests/harness.tsx` | Общая обвязка DOM-тестов: заглушка поля боя, журнал обращений, монтирование и снятие экрана, жесты (0.20.56, монтирование — 0.20.58) |
+| `app/packages/ui/tests/harness.tsx` | Общая обвязка DOM-тестов: заглушка поля боя, журнал обращений, монтирование и снятие экрана, жесты (0.20.56, монтирование — 0.20.58, монтирование боя — 0.20.59) |
 | `app/packages/content/src/schemas/` | Проверки содержимого по областям: `combat`, `world`, `campaign`, `modes`, `training`, `scripting`, `prologue`; точка входа — `schemas.ts` (0.20.57) |
 | `app/eslint.config.mjs` | Правила ESLint: базовый набор, typescript-eslint, react-hooks; форматирование отдано Prettier (0.20.55) |
 | `app/.prettierrc.json` | Единое форматирование исходников (0.20.55) |

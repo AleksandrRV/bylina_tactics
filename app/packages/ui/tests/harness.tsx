@@ -15,7 +15,14 @@
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { vi } from "vitest";
+import { parseContent } from "@bylina/content";
+import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
+import { createSession } from "@bylina/session";
+import { createSettings } from "@bylina/settings";
 import type { FieldRenderer } from "@bylina/render";
+import { ServicesProvider, Shell } from "../src/index.js";
+import type { AppServices } from "../src/context.js";
+import { dataTree } from "./training-sim.js";
 
 /** Одно обращение к средству отображения. */
 export interface RendererCall {
@@ -177,6 +184,51 @@ export async function mountApp(): Promise<Mounted> {
   vi.resetModules();
   const { App } = await import("../../../apps/game-pwa/src/App.js");
   return mountView(<App />);
+}
+
+/** Оболочка со своим набором сервисов. */
+export interface BattleShell {
+  mounted: Mounted;
+  services: AppServices;
+}
+
+/**
+ * Смонтировать оболочку интерфейса на своих сервисах (0.20.59): тест
+ * получает и экран, и `session`, по которому удобно искать данные боя —
+ * раскладка быстрого матча случайна, поэтому состав дружины читается из
+ * сессии, а не задаётся числами. Путь «меню → бой» проходит настоящими
+ * экранами: `session.selectDifficulty` открывает быстрый матч.
+ *
+ * Поле боя подменяется самим тестом (`vi.mock("@bylina/render", …)`),
+ * иначе PixiJS не переживёт jsdom.
+ */
+export async function mountBattleShell(): Promise<BattleShell> {
+  const parsed = parseContent(dataTree());
+  if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
+  const i18n = createI18n({ manifest, catalogs: loadBundledCatalogs(), initialLanguage: "ru" });
+  const settings = createSettings({
+    storage: null,
+    allowedLanguages: manifest.languages.map((item) => item.code),
+  });
+  const session = createSession("menu");
+  const services: AppServices = {
+    i18n,
+    settings,
+    session,
+    content: parsed.data,
+    version: "test",
+    install: { canInstall: false, installed: false, prompt: async () => undefined },
+    debug: false,
+  };
+  const mounted = await mountView(
+    <ServicesProvider value={services}>
+      <Shell />
+    </ServicesProvider>,
+  );
+  await act(async () => {
+    await tick(20);
+  });
+  return { mounted, services };
 }
 
 /** Кнопка или элемент с таким текстом. */

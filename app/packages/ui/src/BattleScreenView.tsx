@@ -29,6 +29,7 @@ import {
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
+import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
 import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted } from "./training-progress.js";
 import {
@@ -2109,131 +2110,88 @@ export function BattleScreenView() {
     return () => query.removeEventListener("change", apply);
   }, []);
 
+  // Снятие прицеливания с клавиатуры (0.20.59): прежде эти четыре сброса
+  // повторялись в каждом ответвлении обработчика клавиш.
+  const cancelKeyboardAim = (): void => {
+    setAction(null);
+    setSkillTargetPos(null);
+    setAimId(null);
+    setPreview(null);
+  };
+
+  // Клавиатура: решения — в модуле battle-keyboard, здесь только проводка к
+  // состоянию экрана (0.20.59). Прежде карта клавиш жила внутри эффекта и
+  // занимала сто тридцать строк посреди компонента.
+  //
+  // Контекст и действия складываются в ссылку и обновляются после каждого
+  // кадра. Замыкания команд (applyCommand, applySelfSkill) пересоздаются
+  // каждый рендер; будь они в зависимостях, окно переподписывалось бы на
+  // каждом кадре, а без них в обработчике осталась бы устаревшая команда.
+  // Ссылка даёт свежие замыкания при одной подписке на время экрана.
+  const keyboardRef = useRef<{ ctx: BattleKeyContext; actions: BattleKeyActions } | null>(null);
   useEffect(() => {
-    const onKey = (event: KeyboardEvent): void => {
-      // Пропуск сцены — раньше прочих обработчиков (campaign.md §1.8):
-      // во время сцены ввод игрока закрыт, но кадр всегда можно отпустить.
-      if (cutscenePlaying && (event.key === "Escape" || event.key === " " || event.key === "Enter")) {
-        event.preventDefault();
-        skipCutscene();
-        return;
-      }
-      if (event.key === "Escape") {
-        session.setPaused(!paused);
-        return;
-      }
-      if (paused || busy || outcomePending) return;
-      if (event.key === "Tab") {
-        event.preventDefault();
-        // Обучение: перебор бойцов запрещён — действует исполнитель указания.
-        if (isTraining && trainingActorId !== null) return;
-        const living = snapshot.entities.filter(isOwn);
-        if (living.length === 0) return;
-        const withAp = living.filter((entity) => entity.ap > 0);
-        const pool = withAp.length > 0 ? withAp : living;
-        const index = pool.findIndex((entity) => entity.id === selectedId);
-        const next = pool[(index + 1) % pool.length];
-        if (next) {
-          setSelectedId(next.id);
+    keyboardRef.current = {
+      ctx: {
+        paused,
+        busy,
+        outcomePending,
+        cutscenePlaying,
+        isTraining,
+        trainingActorId,
+        trainingDirective,
+        trainingAllows,
+        selectedId,
+        selected: selected ?? null,
+        action,
+        skills,
+        snapshot,
+        viewOwner,
+        isOwn,
+      },
+      actions: {
+        skipCutscene,
+        togglePause: () => session.setPaused(!paused),
+        select: (id) => {
+          setSelectedId(id);
+          // Обзор клетки не снимаем: перебор бойцов клавишей не отменяет
+          // подсветку уже осмотренной клетки.
           setAction(null);
           setSkillTargetPos(null);
           setAimId(null);
-        }
-        return;
-      }
-      if (
-        event.key === "9" &&
-        selectedId !== null &&
-        selected &&
-        selected.ap > 0 &&
-        snapshot.activeOwner === viewOwner &&
-        trainingAllows("defend") &&
-        (!isTraining || trainingActorId === selectedId)
-      ) {
-        applyCommand({ type: "DEFEND", actorId: selectedId });
-        setAction(null);
-        setSkillTargetPos(null);
-        setAimId(null);
-        setPreview(null);
-        return;
-      }
-      if (
-        event.key === "0" &&
-        selectedId !== null &&
-        selected &&
-        selected.ap > 0 &&
-        snapshot.activeOwner === viewOwner &&
-        trainingAllows("overwatch") &&
-        (!isTraining || trainingActorId === selectedId)
-      ) {
-        applyCommand({ type: "OVERWATCH", actorId: selectedId });
-        setAction(null);
-        setSkillTargetPos(null);
-        setAimId(null);
-        setPreview(null);
-        return;
-      }
-      if (ACTION_SHORTCUTS.includes(event.key as (typeof ACTION_SHORTCUTS)[number]) && selected) {
-        const index = Number(event.key) - 1;
-        const chosen = selectableActions(selected)[index];
-        // Обучение: клавиша допустима, только если её действие предписано
-        // указанием — точное совпадение оружия/умения (строгий сценарий).
-        if (isTraining) {
-          const directive = trainingDirective;
-          const allowed =
-            directive !== null &&
-            ((chosen?.type === "weapon" &&
-              directive.kind === "attack" &&
-              directive.actorId === selectedId &&
-              directive.weaponId === chosen.id) ||
-              (chosen?.type === "skill" &&
-                directive.kind === "skill" &&
-                directive.actorId === selectedId &&
-                directive.skillId === chosen.id));
-          if (!allowed) return;
-        }
-        if (!chosen) return;
-        if (chosen.type === "skill") {
-          const skill = skills[chosen.id];
-          const cooldown = selected.skillCooldowns?.[chosen.id] ?? 0;
-          const uses = selected.skillUses?.[chosen.id] ?? 0;
-          if (cooldown > 0 || (skill?.maxUsesPerBattle !== undefined && uses >= skill.maxUsesPerBattle)) return;
-        }
-        if (chosen.type === "skill" && skills[chosen.id]?.category === "self") {
-          // Этап-правка: self-умение с областью (круговой взмах) на хоткей
-          // работает как кнопка — первый тап подсвечивает, второй применяет.
-          const hotkeySkill = skills[chosen.id]!;
-          if ((hotkeySkill.radius ?? 0) > 0 && action?.type === "skill" && action.id === chosen.id) {
-            applySelfSkill(chosen.id);
-          } else if ((hotkeySkill.radius ?? 0) > 0) {
-            setAction({ type: "skill", id: chosen.id });
-            setSkillTargetPos(null);
-            setAimId(null);
-            setPreview(null);
-          } else {
-            applySelfSkill(chosen.id);
-          }
-        } else {
-          const active = action?.type === chosen.type && action.id === chosen.id;
-          setAction(active ? null : chosen);
-          setSkillTargetPos(null);
-          setAimId(null);
-          setPreview(null);
-        }
-        return;
-      }
-      const step = 28;
-      if (event.key === "ArrowLeft" || event.key === "a" || event.key === "A") rendererRef.current?.pan(step, 0);
-      if (event.key === "ArrowRight" || event.key === "d" || event.key === "D") rendererRef.current?.pan(-step, 0);
-      if (event.key === "ArrowUp" || event.key === "w" || event.key === "W") rendererRef.current?.pan(0, step);
-      if (event.key === "ArrowDown" || event.key === "s" || event.key === "S") rendererRef.current?.pan(0, -step);
+        },
+        defend: () => {
+          if (selectedId === null) return;
+          applyCommand({ type: "DEFEND", actorId: selectedId });
+          cancelKeyboardAim();
+        },
+        overwatch: () => {
+          if (selectedId === null) return;
+          applyCommand({ type: "OVERWATCH", actorId: selectedId });
+          cancelKeyboardAim();
+        },
+        applySelfSkill,
+        armSkill: (entry) => {
+          setAction(entry);
+          cancelKeyboardAim();
+        },
+        toggleAction: (entry) => {
+          const active = action?.type === entry.type && action.id === entry.id;
+          setAction(active ? null : entry);
+          cancelKeyboardAim();
+        },
+        cancel: cancelKeyboardAim,
+        pan: (dx, dy) => rendererRef.current?.pan(dx, dy),
+      },
+    };
+  });
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent): void => {
+      const runtime = keyboardRef.current;
+      if (runtime) handleBattleKey(event, runtime.ctx, runtime.actions);
     };
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
-      setAction(null);
-      setSkillTargetPos(null);
-      setAimId(null);
-      setPreview(null);
+      keyboardRef.current?.actions.cancel();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("contextmenu", onContext);
@@ -2241,7 +2199,7 @@ export function BattleScreenView() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-  }, [paused, busy, cutscenePlaying, snapshot, selectedId, aimId, hit, action, skills, session, viewOwner]);
+  }, []);
 
   // В дружине — только бойцы (0.20.45). Увязший в трясине Федот выходит
   // из списка: пока он immobile (maxAp 0), управлять им нельзя, и пустая
