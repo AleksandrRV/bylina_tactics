@@ -16,4 +16,8 @@ export function createRelayServer(options?: {
   heartbeatMs?: number;
   /** Значение `Access-Control-Allow-Origin` HTTP-эндпоинтов (по умолчанию `*`). */
   corsOrigin?: string;
+  /** Предел числа одновременных комнат (по умолчанию 200, env `RELAY_MAX_ROOMS`). */
+  maxRooms?: number;
+  /** Предел числа одновременных соединений (по умолчанию 400, env `RELAY_MAX_SOCKETS`). */
+  maxSockets?: number;
 }): Promise<RelayServerHandle>;
