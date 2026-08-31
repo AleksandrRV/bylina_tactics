@@ -224,6 +224,14 @@ export interface SessionApi {
   getBattleOutcome(): "ongoing" | "victory" | "defeat";
   /** Полный снимок ведущего для сохранения партии (0.13.0). */
   getBattleFullSnapshot(): MatchState | null;
+  /**
+   * Монотонный номер боевого состояния (0.21.10, P1-1): отражает ревизию
+   * ведущего ядра и растёт только при зафиксированных изменениях боя. Предпросмотр
+   * ревизию не двигает. Вне активного боя — 0. Представление использует номер,
+   * чтобы подписаться на «состояние изменилось», а не клонировать снимок на
+   * каждый рендер.
+   */
+  getBattleRevision(): number;
   /** Полный туман войны всех сторон для сохранения партии (0.13.0). */
   getBattleFog(): FogState | null;
   /** Открыть комнату сбора поочерёдной игры (0.14.0). */
@@ -1251,6 +1259,7 @@ export function createSession(
     },
     getBattleSnapshot: (owner) => requireTacticsHost().getSnapshotFor(owner),
     getBattleFullSnapshot: () => (tacticsHost ? tacticsHost.getSnapshot() : null),
+    getBattleRevision: () => (tacticsHost ? tacticsHost.getRevision() : 0),
     getBattleFog: () => (tacticsHost ? tacticsHost.getFog() : null),
     getBattleReachable: (actorId) => requireTacticsHost().getReachable(actorId),
     getBattlePath: (actorId, to) => requireTacticsHost().getPath(actorId, to),
