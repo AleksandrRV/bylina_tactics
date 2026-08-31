@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { createPvpMatch, createTacticsKernel, type PvpMatchOptions } from "@bylina/core";
-import { REPLAY_VERSION, createReplayRecorder, isReplayJournal } from "../src/index.js";
+import {
+  REPLAY_FORMAT_VERSION,
+  RULES_VERSION,
+  createReplayRecorder,
+  isReplayJournal,
+  replayCompatibility,
+} from "../src/index.js";
 import manifest from "../../../package.json";
 
 const OPTIONS: PvpMatchOptions = {
@@ -34,9 +40,14 @@ const OPTIONS: PvpMatchOptions = {
   seed: 99,
 };
 
-describe("replay journal (0.20.19)", () => {
-  it("uses the version of the root manifest", () => {
-    expect(REPLAY_VERSION).toBe(manifest.version);
+describe("replay journal (0.21.4)", () => {
+  it("stamps the format/rules versions and the app version for diagnostics", () => {
+    const recorder = createReplayRecorder(OPTIONS, "QA");
+    const journal = recorder.finish(null, "QA");
+    expect(journal.formatVersion).toBe(REPLAY_FORMAT_VERSION);
+    expect(journal.rulesVersion).toBe(RULES_VERSION);
+    // appVersion — только диагностика: текущий номер манифеста.
+    expect(journal.appVersion).toBe(manifest.version);
   });
 
   it("records commands and serializes to a plain object", () => {
@@ -48,7 +59,29 @@ describe("replay journal (0.20.19)", () => {
     expect(journal.winner).toBe(2);
     const copy = JSON.parse(JSON.stringify(journal));
     expect(isReplayJournal(copy)).toBe(true);
-    expect(isReplayJournal({ version: "x" })).toBe(false);
+  });
+
+  it("rejects journals of the previous string-version format", () => {
+    // Журналы, записанные прежним форматом (поле version: string, без
+    // formatVersion/rulesVersion), не распознаются — не воспроизводятся молча.
+    expect(isReplayJournal({ version: "0.20.68" })).toBe(false);
+    expect(isReplayJournal({ version: "0.20.68", createdAt: 1, commands: [], winner: null, title: "t" })).toBe(false);
+    expect(isReplayJournal({ formatVersion: 1 })).toBe(false);
+    expect(isReplayJournal(null)).toBe(false);
+    expect(isReplayJournal({})).toBe(false);
+  });
+
+  it("classifies compatibility by format and rules version", () => {
+    const recorder = createReplayRecorder(OPTIONS, "ok");
+    const current = recorder.finish(null, "ok");
+    expect(replayCompatibility(current)).toBe("ok");
+
+    // Тот же формат, но другие правила: воспроизводимо с предупреждением.
+    expect(replayCompatibility({ ...current, rulesVersion: RULES_VERSION + 99 })).toBe("otherRules");
+
+    // Неподдерживаемый (будущий/старый) формат: воспроизводить нельзя.
+    expect(replayCompatibility({ ...current, formatVersion: REPLAY_FORMAT_VERSION + 99 })).toBe("unsupported");
+    expect(replayCompatibility({ ...current, formatVersion: 0 })).toBe("unsupported");
   });
 
   it("reproduces the same battle from the journal", () => {
