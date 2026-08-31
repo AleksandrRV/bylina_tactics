@@ -31,7 +31,7 @@ export interface TrainingScenarioDeps {
   skills: Record<string, SkillStats>;
 }
 
-type TrainingDirective =
+export type TrainingDirective =
   | { kind: "noop" }
   | { kind: "move"; reason: "move" | "dash" | "approach"; actorId: number; actorUnitId: string; cell: CellPos }
   | { kind: "attack"; actorId: number; actorUnitId: string; targetId: number; targetUnitId: string; weaponId: string }

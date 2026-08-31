@@ -4,21 +4,13 @@ import { act } from "react";
 import {
   createRendererStub,
   installDomTestEnv,
-  mountView,
+  mountBattleShell,
   renderMock,
   tick,
   waitFor,
-  type Mounted,
 } from "./harness.js";
-import { parseContent } from "@bylina/content";
-import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
-import { createSession } from "@bylina/session";
-import { createSettings } from "@bylina/settings";
 import type { CinematicPlan, FieldRenderer } from "@bylina/render";
-import { ServicesProvider, Shell } from "../src/index.js";
-import type { AppServices } from "../src/context.js";
 import { meleeStrikeOf, planCharge } from "../src/charge-attack.js";
-import { dataTree } from "./training-sim.js";
 
 /**
  * Рывок к цели ближнего боя в живом экране (0.20.50): нажатие по
@@ -62,32 +54,6 @@ async function waitUntil(condition: () => boolean, timeoutMs = 8000): Promise<bo
   return condition();
 }
 
-async function mountShell(): Promise<{ mounted: Mounted; services: AppServices }> {
-  const parsed = parseContent(dataTree());
-  if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
-  const i18n = createI18n({ manifest, catalogs: loadBundledCatalogs(), initialLanguage: "ru" });
-  const settings = createSettings({ storage: null, allowedLanguages: manifest.languages.map((item) => item.code) });
-  const session = createSession("menu");
-  const services: AppServices = {
-    i18n,
-    settings,
-    session,
-    content: parsed.data,
-    version: "test",
-    install: { canInstall: false, installed: false, prompt: async () => undefined },
-    debug: false,
-  };
-  const mounted = await mountView(
-    <ServicesProvider value={services}>
-      <Shell />
-    </ServicesProvider>,
-  );
-  await act(async () => {
-    await tick(20);
-  });
-  return { mounted, services };
-}
-
 const logText = (): string => document.querySelector(".battle-log")?.textContent ?? "";
 
 function buttonByText(part: string): HTMLButtonElement | undefined {
@@ -98,7 +64,7 @@ function buttonByText(part: string): HTMLButtonElement | undefined {
 
 describe("рывок к цели в экране боя (0.20.50)", () => {
   it("показывает подход первым нажатием и бьёт вторым", async () => {
-    const { mounted, services } = await mountShell();
+    const { mounted, services } = await mountBattleShell();
     const { session, content } = services;
     await act(async () => {
       session.selectDifficulty("normal");
