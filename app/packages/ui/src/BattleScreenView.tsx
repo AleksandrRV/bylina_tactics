@@ -8,13 +8,10 @@ import {
   createTacticsKernel,
   defaultTrainingWeapons,
   pickEnemyCommand,
-  pickCutscene,
   pickScriptedEnemyCommand,
-  withCutsceneDefaults,
   weaponStatsFromRecord,
   type CellPos,
   type Command,
-  type CutsceneEvent,
   type EntityState,
   type GameEvent,
   type HitPreview,
@@ -35,6 +32,7 @@ import { prologueAftermath, routeCommand } from "./battle-command.js";
 import { enemyPhaseActive, enemyPhaseContinues, type EnemyPhaseState } from "./battle-enemy-phase.js";
 import { firstFighterId } from "./battle-selection.js";
 import { cellKey } from "./cell-interaction.js";
+import type { LayoutMarkers } from "./prologue-cutscene.js";
 import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
 import {
   directiveAllowsAction,
@@ -58,14 +56,8 @@ import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "./enemy-strip.js";
 import { unitPortrait } from "./portraits.js";
-import {
-  buildCinematicPlan,
-  splitAtHandOff,
-  splitSpawnEvents,
-  stagedEntityIds,
-  type LayoutMarkers,
-} from "./prologue-cutscene.js";
 import { createOutcomeGate, type OutcomeGate } from "./outcome-gate.js";
+import { usePrologueDirector } from "./prologue-director.js";
 import { useBattleNetwork } from "./useBattleNetwork.js";
 import { useBattleInput } from "./useBattleInput.js";
 import { useReplayControls } from "./useReplayControls.js";
@@ -75,12 +67,9 @@ import {
   createPrologueRunState,
   gatePrologueCommand,
   clampPrologueCommand,
-  revealPrologueExtract,
   initPrologueMatch,
   prologueUnits,
-  takePrologueSpawnEvents,
   tickPrologueEnemyTurn,
-  tickProloguePlayerTurn,
   createTelemetryLog,
   recordTelemetry,
   type PrologueRunState,
@@ -1014,146 +1003,6 @@ export function BattleScreenView() {
    * боя — крыса М1 кусает Микулу сразу после вбегания, а не когда игрок
    * догадается нажать «Конец хода».
    */
-  const runPrologueCutscene = async (event: CutsceneEvent, revealIds: readonly number[] = []): Promise<void> => {
-    if (!prologueMission?.cutscenes || !kernel) return;
-    const fired = [...firedCutscenesRef.current];
-    const config = pickCutscene(prologueMission.cutscenes, event, fired);
-    if (!config) return;
-    // Помечаем до проигрывания: вторая крыса того же пакета уже не
-    // заказывает свою копию сцены (0.20.45).
-    if (config.once) firedCutscenesRef.current.add(config.id);
-    const { before, after } = splitAtHandOff(config);
-    // Игровой масштаб запоминаем до первой половины: она удерживает
-    // приближение (чтобы укус игрался крупным планом), и вторая половина
-    // обязана вернуться к игровому кадру, а не к удвоенному приближению.
-    const baseScale = rendererRef.current?.getCameraScale?.() ?? null;
-    setCutscenePlaying(true);
-    setBusy(true);
-    try {
-      // Приближение держим до конца первой половины: укус крысы играется
-      // крупным планом, а не между двумя переездами камеры (0.20.41).
-      const skipped = await playCinematicPlan(
-        buildCinematicPlan(withCutsceneDefaults(before), prologueMarkers, { holdZoom: after !== null, revealIds }),
-      );
-      if (skipped) {
-        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
-          type: "skip_cutscene",
-          missionId: prologueMission.id,
-        });
-      }
-      if (!after) return;
-      await handOffTurnToEnemy();
-      // Вторая половина сцены ничего не выводит: стая уже выбежала.
-      await playCinematicPlan(buildCinematicPlan(withCutsceneDefaults(after), prologueMarkers, { baseScale }));
-    } finally {
-      setCutscenePlaying(false);
-      setBusy(false);
-    }
-  };
-
-  /** Отдать план средству отображения; «true» — сцену пропустили. */
-  const playCinematicPlan = async (plan: ReturnType<typeof buildCinematicPlan>): Promise<boolean> => {
-    if (plan.steps.length === 0) return false;
-    return (await rendererRef.current?.playCinematic?.(plan)) ?? false;
-  };
-
-  /**
-   * Скрыть сущности, чьё появление ставит сцена (0.20.39). Ядро создаёт их
-   * сразу же — в тот же момент, когда срабатывает триггер, — а увидеть их
-   * нужно только вбегающими в кадр. Вызывается до проигрывания событий
-   * хода: иначе противник успевает показаться в клетке спавна.
-   */
-  const hideStagedSpawns = (events: readonly GameEvent[]): void => {
-    if (!prologueMission) return;
-    const ids = stagedEntityIds(events, prologueMission.cutscenes, [...firedCutscenesRef.current]);
-    if (ids.length > 0) rendererRef.current?.setHiddenEntities?.(ids);
-  };
-
-  /**
-   * Появления противника, накопленные внутри `afterPrologueApply`: событие
-   * рождается ядром не в `apply`, поэтому без этого канала крыса возникала
-   * бы на поле без всякой анимации. Появление, за которое отвечает сцена,
-   * проигрывается ею; остальные идут обычным порядком событий.
-   */
-  const runPrologueSpawnBeats = async (events: readonly GameEvent[]): Promise<void> => {
-    if (!prologueMission || events.length === 0) return;
-    const { staged, generic } = splitSpawnEvents(events, prologueMission.cutscenes, [...firedCutscenesRef.current]);
-    if (generic.length > 0) await (rendererRef.current?.play(generic) ?? Promise.resolve());
-    if (staged.length === 0) return;
-    // Стая выбегает разом (0.20.45): одна сцена на пакет появлений, а не
-    // сцена на каждую крысу — иначе шесть выходов игрались бы по очереди.
-    // Сцена одна на весь пакет появлений (0.20.45), и выводит она всех,
-    // кого скрыла: в засаде М2 обе крысы выбегают вместе (0.20.52).
-    await runPrologueCutscene(
-      staged[0]!.event,
-      staged.map((entry) => entry.entityId),
-    );
-    // Сцена открыла своих героев: больше ничего не скрыто.
-    rendererRef.current?.setHiddenEntities?.([]);
-  };
-
-  /**
-   * Открыть зону эвакуации после сцены стаи (0.20.45).
-   *
-   * М2: зона загорается не в момент освобождения Федота, а когда стая уже
-   * выбежала на поле и отыграла своё появление — сначала крысы, потом пан
-   * камеры к точкам выхода. Цель миссии обновляется без пояснительного
-   * текста: свет на западе виден сам.
-   */
-  const revealExtractBeat = async (): Promise<void> => {
-    if (!isPrologue || !kernel || !prologueMission) return;
-    if (!prologueRunRef.current?.extractPending) return;
-    const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
-    prologueRunRef.current = revealPrologueExtract(kernel, prologueRunRef.current, ctx);
-    setPrologueObjectiveKey("prologue.objective.evacuate");
-    await runPrologueCutscene({ type: "flag", flag: "extractRevealed" });
-  };
-
-  /**
-   * Откат сцены к контрольной точке (§1.5): плавное затемнение, восстановление
-   * снимка, кадр на герое, проявление. Затемнение и проезд идут через
-   * проигрыватель поля, поэтому уважают настройку «уменьшить движение» и
-   * множитель скорости боя.
-   */
-  const restorePrologueScene = async (): Promise<void> => {
-    const renderer = rendererRef.current;
-    // Откат снимает с героя принудительную стойку (0.20.45): сцена
-    // разыгрывается заново, и держать кнопки закрытыми было бы нечем.
-    setPrologueStanceLock(false);
-    setBusy(true);
-    showStoryNote(t("prologue.scene.revive"));
-    try {
-      await (renderer?.fadeScreen?.("out", 600) ?? Promise.resolve());
-      session.restoreBattleCheckpoint();
-      setSelectedId(null);
-      setAction(null);
-      clearAim();
-      // Клетку героя берём из свежего снимка: состояние `view` обновится
-      // только после перерисовки, и опора на него дала бы гонку.
-      const heroId = prologueMission?.playerSlots[0];
-      const hero = heroId
-        ? session.getBattleFullSnapshot()?.entities.find((entity) => entity.configId === heroId && !entity.dead)
-        : undefined;
-      if (hero) {
-        await (renderer?.playCinematic?.({
-          id: "checkpoint_focus",
-          lockInput: false,
-          // Кадр возврата: приближение не нужно — сцена играет под затемнением.
-          zoom: 1,
-          steps: [{ kind: "focus", target: { cell: { x: hero.x, y: hero.y } } }],
-        }) ?? Promise.resolve());
-      }
-      await (renderer?.fadeScreen?.("in", 500) ?? Promise.resolve());
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  /** Пропуск текущей сцены кнопкой или клавишей (§1.8). */
-  const skipCutscene = (): void => {
-    rendererRef.current?.skipCinematic?.();
-  };
-
   /** Отладочная автопобеда: мгновенно уничтожает всех противников и открывает итог победы.
    *  Доступна только в отладочном режиме (?debug=1) и не действует в повторе (0.20.1).
    *  В обучении победа определяется шагами подсказки — автопобеда довершает
@@ -1258,7 +1107,7 @@ export function BattleScreenView() {
             type: "death_by",
             cause: "checkpoint",
           });
-          prologueAfter = () => void restorePrologueScene();
+          prologueAfter = () => void director.restoreScene();
           break;
         case "defeat":
           prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
@@ -1271,9 +1120,9 @@ export function BattleScreenView() {
           // Сущность уже создана ядром, но на поле её не показываем до
           // вбегания по сцене (0.20.39): иначе она возникает в клетке,
           // пропадает и выбегает заново.
-          hideStagedSpawns(aftermath.events);
+          director.hideSpawns(aftermath.events);
           // Сначала стая выбегает, потом загорается выход (0.20.45).
-          prologueAfter = () => void runPrologueSpawnBeats(aftermath.events).then(() => revealExtractBeat());
+          prologueAfter = () => void director.runSpawnBeats(aftermath.events).then(() => director.revealExtractBeat());
           break;
         case "none":
           break;
@@ -1561,7 +1410,7 @@ export function BattleScreenView() {
                 cause: "checkpoint",
               });
               // Затемнение и откат — после того, как ход Нави доигран.
-              enemyAfter = () => void restorePrologueScene();
+              enemyAfter = () => void director.restoreScene();
               break;
             case "defeat":
               prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
@@ -1572,8 +1421,8 @@ export function BattleScreenView() {
               break;
             case "spawnBeats":
               // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
-              hideStagedSpawns(aftermath.events);
-              enemyAfter = () => void runPrologueSpawnBeats(aftermath.events);
+              director.hideSpawns(aftermath.events);
+              enemyAfter = () => void director.runSpawnBeats(aftermath.events);
               break;
             case "none":
               break;
@@ -1587,41 +1436,12 @@ export function BattleScreenView() {
         await sleep(190);
       }
       if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
-        await runProloguePlayerScript();
+        await director.runPlayerScript();
       }
       if (enemyAfter) await enemyAfter();
     } finally {
       outcomeGate.playbackEnd();
       setEnemyPhase(false);
-    }
-  };
-
-  const runProloguePlayerScript = async (): Promise<void> => {
-    if (!kernel || !prologueMission || !prologueRunRef.current) return;
-    const ctx = buildPrologueContext(prologueMission, content, hintSettings.showHints);
-    for (let guard = 0; guard < 8; guard += 1) {
-      if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== PLAYER_OWNER) break;
-      if (battleOutcome() !== "ongoing") break;
-      const decision = tickProloguePlayerTurn(kernel, prologueRunRef.current, ctx);
-      prologueRunRef.current = decision.state;
-      if (!decision.command) break;
-      const applied = session.applyBattleCommand(decision.command);
-      if (!applied.ok) break;
-      await (rendererRef.current?.play(applied.events) ?? Promise.resolve());
-      announce(applied.events);
-      const next = afterPrologueApply(kernel, decision.command, applied.events, prologueRunRef.current, ctx);
-      prologueRunRef.current = next;
-      setPrologueObjectiveKey(next.objectiveKey);
-      const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
-      setPrologueHintKey(hint);
-      const taken = takePrologueSpawnEvents(next);
-      prologueRunRef.current = taken.state;
-      if (taken.events.length > 0) {
-        // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
-        hideStagedSpawns(taken.events);
-        await runPrologueSpawnBeats(taken.events);
-      }
-      if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
     }
   };
 
@@ -1671,7 +1491,7 @@ export function BattleScreenView() {
       if (battleOutcome() === "ongoing" && session.getBattleSnapshot(PLAYER_OWNER).activeOwner === ENEMY_OWNER) {
         await runEnemyPhase();
       } else if (isPrologue && battleOutcome() === "ongoing") {
-        await runProloguePlayerScript();
+        await director.runPlayerScript();
       }
     } finally {
       outcomeGate.playbackEnd();
@@ -1721,6 +1541,40 @@ export function BattleScreenView() {
     if (session.getBattleSnapshot(viewOwner).activeOwner !== viewOwner) return;
     await runEndTurnSequence();
   };
+
+  // Режиссёр сцен пролога (0.20.67): восемь постановщиков, деливших общие
+  // ссылки состояния, собраны отдельно. Зависимости читаются из ссылки,
+  // поэтому постановщики стабильны, а замыкания в них — свежие.
+  const director = usePrologueDirector({
+    session,
+    content,
+    hintSettings,
+    isPrologue,
+    mission: prologueMission ?? null,
+    markers: prologueMarkers,
+    kernel,
+    runRef: prologueRunRef,
+    telemetryRef: prologueTelemetryRef,
+    firedRef: firedCutscenesRef,
+    renderer: () => rendererRef.current,
+    handOffTurn: () => handOffTurnToEnemy(),
+    showStoryNote,
+    translate: t,
+    setCutscenePlaying,
+    setBusy,
+    setPrologueStanceLock,
+    setPrologueObjectiveKey,
+    setPrologueHintKey,
+    resetSelection: () => {
+      setSelectedId(null);
+      setAction(null);
+      clearAim();
+    },
+    announce,
+    battleOutcome,
+    outcomeGate,
+    setPrologueCard,
+  });
 
   // Конец хода стороны наступает сам, когда ни один боец стороны не имеет
   // допустимых действий (math §16.7): при нулевых запасах ОД всех живых
@@ -2179,7 +2033,7 @@ export function BattleScreenView() {
         case "none":
           return;
         case "skipCutscene":
-          skipCutscene();
+          director.skip();
           return;
         case "togglePause":
           session.setPaused(!paused);
@@ -3072,7 +2926,7 @@ export function BattleScreenView() {
                   setPrologueCard(null);
                   // Дальше кадром управляет сцена миссии: герой → цель → герой,
                   // и только после этого игрок получает управление (§13.4).
-                  void runPrologueCutscene({ type: "missionStart" });
+                  void director.runCutscene({ type: "missionStart" });
                   return;
                 }
                 const nextId = prologueMission.nextMissionId ?? null;
@@ -3128,7 +2982,7 @@ export function BattleScreenView() {
       ) : null}
 
       {cutscenePlaying ? (
-        <button type="button" className="cutscene-skip" onClick={skipCutscene}>
+        <button type="button" className="cutscene-skip" onClick={director.skip}>
           {t("battle.cutscene.skip")}
         </button>
       ) : null}
