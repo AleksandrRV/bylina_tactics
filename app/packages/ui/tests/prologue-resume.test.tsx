@@ -1,31 +1,13 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererStub, installDomTestEnv, renderMock, waitFor } from "./harness.js";
 import { createRoot, type Root } from "react-dom/client";
 
 // Рендер поля подменён заглушкой: PixiJS в jsdom не работает.
-vi.mock("@bylina/render", () => {
-  const stub = {
-    mount: async () => undefined,
-    update: () => undefined,
-    play: async () => undefined,
-    pan: () => undefined,
-    destroy: () => undefined,
-    setOnActivate: () => undefined,
-    setOnHover: () => undefined,
-    setReducedMotion: () => undefined,
-    setSpeed: () => undefined,
-    playCinematic: async () => false,
-    skipCinematic: () => undefined,
-    isCinematicPlaying: () => false,
-    fadeScreen: async () => undefined,
-    setInputLocked: () => undefined,
-    setHiddenEntities: () => undefined,
-    focusEntity: () => undefined,
-    getCameraScale: () => 1.25,
-  };
-  return { createFieldRenderer: () => stub, applyPaletteCssVariables: () => undefined };
-});
+const rendererStub = createRendererStub();
+
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 /**
  * Выход из сюжетной миссии пролога (0.20.51).
@@ -38,21 +20,7 @@ vi.mock("@bylina/render", () => {
  */
 
 beforeEach(() => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
 });
 
 afterEach(() => {
@@ -79,17 +47,6 @@ async function mountApp(): Promise<{ root: Root; errors: unknown[] }> {
     await new Promise((resolve) => setTimeout(resolve, 300));
   });
   return { root, errors };
-}
-
-async function waitFor(predicate: () => boolean, timeoutMs = 4000): Promise<boolean> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (predicate()) return true;
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
-  }
-  return predicate();
 }
 
 const buttonByText = (part: string): HTMLButtonElement => {

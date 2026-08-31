@@ -1,11 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRoot } from "react-dom/client";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { FieldRenderer } from "@bylina/render";
+import {
+  byText,
+  createRendererStub,
+  installDomTestEnv,
+  mountApp,
+  pointerEvent,
+  press,
+  renderMock,
+  tick,
+  waitFor,
+} from "./harness.js";
 
 /**
  * Панель действий (0.20.46): кнопка-миниатюра с образом и мелким названием
@@ -15,38 +24,12 @@ import type { FieldRenderer } from "@bylina/render";
  * jsdom не работает.
  */
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
-  update: vi.fn(),
-  play: vi.fn(async () => undefined),
-  pan: vi.fn(),
-  destroy: vi.fn(),
-  setOnActivate: vi.fn(),
-  setOnHover: vi.fn(),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
-};
+const rendererStub = createRendererStub();
 
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 beforeEach(() => {
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
   window.localStorage.clear();
 });
 
@@ -54,8 +37,6 @@ afterEach(() => {
   document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
-
-const tick = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Кнопка панели действий по названию. */
 function slot(part: string): HTMLButtonElement {
@@ -69,47 +50,17 @@ function slot(part: string): HTMLButtonElement {
   return found;
 }
 
-function pointerEvent(type: string): MouseEvent {
-  // jsdom не знает PointerEvent: React слушает по имени события, поэтому
-  // подходит мышиное событие с координатами.
-  return new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 12, clientY: 12 });
-}
-
 const cssText = readFileSync(join(dirname(fileURLToPath(import.meta.url)), "../src/battle.css"), "utf8");
 
 async function mountQuickMatch(): Promise<void> {
-  vi.resetModules();
-  const { App } = await import("../../../apps/game-pwa/src/App.js");
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(<App />);
-  });
+  await mountApp();
   await act(async () => {
     await tick(1400);
   });
-  const byText = (part: string): HTMLElement => {
-    const found = [...document.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes(part));
-    if (!found) throw new Error(`button not found: ${part}`);
-    return found as HTMLElement;
-  };
-  await act(async () => {
-    byText("Быстрый матч").click();
-  });
-  await act(async () => {
-    await tick(80);
-  });
+  await press(byText("Быстрый матч"));
   // Быстрый матч начинается с выбора трудности.
-  await act(async () => {
-    byText("Обычный").click();
-  });
-  for (let i = 0; i < 40 && !document.querySelector(".battle-screen"); i += 1) {
-    await act(async () => {
-      await tick(60);
-    });
-  }
-  expect(document.querySelector(".battle-screen"), "battle screen mounted").not.toBeNull();
+  await press(byText("Обычный"));
+  await waitFor(() => document.querySelector(".battle-screen") !== null);
 }
 
 describe("action panel (0.20.46)", () => {

@@ -1,15 +1,24 @@
 // @vitest-environment jsdom
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRoot, type Root } from "react-dom/client";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
 import { createSession } from "@bylina/session";
 import { createSettings } from "@bylina/settings";
-import type { FieldRenderer } from "@bylina/render";
 import { ServicesProvider, Shell } from "../src/index.js";
 import type { AppServices } from "../src/context.js";
 import { dataTree } from "./training-sim.js";
+import {
+  createRendererStub,
+  hold,
+  installDomTestEnv,
+  mountView,
+  pointerEvent,
+  renderMock,
+  tick,
+  waitFor,
+  type Mounted,
+} from "./harness.js";
 
 /**
  * Портреты верхней панели (0.20.53): удержание открывает окно информации
@@ -18,71 +27,15 @@ import { dataTree } from "./training-sim.js";
  * подменено заглушкой @bylina/render: PixiJS в jsdom не работает.
  */
 
-const calls: { name: string; args: unknown[] }[] = [];
+const rendererStub = createRendererStub();
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
-  update: vi.fn(),
-  play: vi.fn(async () => undefined),
-  pan: vi.fn(),
-  destroy: vi.fn(),
-  setOnActivate: vi.fn(),
-  setOnHover: vi.fn(),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
-  playCinematic: vi.fn(async () => false),
-  skipCinematic: vi.fn(),
-  isCinematicPlaying: vi.fn(() => false),
-  getCameraScale: vi.fn(() => 1.25),
-  fadeScreen: vi.fn(async () => undefined),
-  setInputLocked: vi.fn(),
-  setHiddenEntities: vi.fn(),
-  focusEntity: vi.fn((...args: unknown[]) => {
-    calls.push({ name: "focusEntity", args });
-  }),
-};
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
-
-const tick = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
-
-/** Дождаться условия: ленивая загрузка экрана, ход Нави. */
-async function waitFor(condition: () => boolean, timeoutMs = 10000): Promise<void> {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    if (condition()) return;
-    await act(async () => {
-      await tick(40);
-    });
-  }
-  throw new Error("condition was not met in time");
-}
-
-let root: Root;
+let mounted: Mounted;
 let services: AppServices;
 
 beforeAll(async () => {
-  (globalThis as unknown as { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  window.matchMedia =
-    window.matchMedia ??
-    ((query: string) =>
-      ({
-        matches: false,
-        media: query,
-        onchange: null,
-        addListener: () => undefined,
-        removeListener: () => undefined,
-        addEventListener: () => undefined,
-        removeEventListener: () => undefined,
-        dispatchEvent: () => false,
-      }) as unknown as MediaQueryList);
-  window.scrollTo = window.scrollTo ?? (() => undefined);
+  installDomTestEnv();
   window.localStorage.clear();
 
   const parsed = parseContent(dataTree());
@@ -99,16 +52,11 @@ beforeAll(async () => {
     install: { canInstall: false, installed: false, prompt: async () => undefined },
     debug: false,
   };
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  root = createRoot(host);
-  await act(async () => {
-    root.render(
-      <ServicesProvider value={services}>
-        <Shell />
-      </ServicesProvider>,
-    );
-  });
+  mounted = await mountView(
+    <ServicesProvider value={services}>
+      <Shell />
+    </ServicesProvider>,
+  );
   await act(async () => {
     await tick(20);
   });
@@ -121,33 +69,14 @@ beforeAll(async () => {
   await waitFor(() => document.querySelector(".roster .roster-card") !== null);
 }, 60000);
 
-afterAll(() => {
-  document.body.innerHTML = "";
+afterAll(async () => {
+  await mounted.unmount();
 });
-
-function pointerEvent(type: string): MouseEvent {
-  // jsdom не знает PointerEvent: React слушает по имени события, поэтому
-  // подходит мышиное событие с координатами.
-  return new MouseEvent(type, { bubbles: true, cancelable: true, clientX: 12, clientY: 12 });
-}
 
 function face(selector: string): HTMLButtonElement {
   const found = document.querySelector<HTMLButtonElement>(selector);
   if (!found) throw new Error(`portrait not found: ${selector}`);
   return found;
-}
-
-/** Удержание дольше порога: жест открывает окно информации. */
-async function hold(button: HTMLButtonElement): Promise<void> {
-  await act(async () => {
-    button.dispatchEvent(pointerEvent("pointerdown"));
-  });
-  await act(async () => {
-    await tick(520);
-  });
-  await act(async () => {
-    button.dispatchEvent(pointerEvent("pointerup"));
-  });
 }
 
 function dialog(): HTMLElement {

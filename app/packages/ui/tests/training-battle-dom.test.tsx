@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
+import { createRendererStub, installDomTestEnv, renderMock, tick } from "./harness.js";
 import { createRoot } from "react-dom/client";
 import type { FieldRenderer } from "@bylina/render";
 import { makeRig, refreshDeps } from "./training-sim.js";
@@ -19,28 +20,19 @@ const updates: unknown[] = [];
 let activate: ((x: number, y: number) => void) | null = null;
 let hover: ((x: number, y: number) => void) | null = null;
 
-const rendererStub: FieldRenderer = {
-  mount: vi.fn(async () => undefined),
+const rendererStub = createRendererStub({
   update: vi.fn((view: unknown) => {
     updates.push(view);
   }),
-  play: vi.fn(async () => undefined),
-  pan: vi.fn(),
-  destroy: vi.fn(),
   setOnActivate: vi.fn((handler: (x: number, y: number) => void) => {
     activate = handler;
   }),
   setOnHover: vi.fn((handler: (x: number, y: number) => void) => {
     hover = handler;
   }),
-  setReducedMotion: vi.fn(),
-  setSpeed: vi.fn(),
-};
+});
 
-vi.mock("@bylina/render", () => ({
-  createFieldRenderer: (): FieldRenderer => rendererStub,
-  applyPaletteCssVariables: () => undefined,
-}));
+vi.mock("@bylina/render", () => renderMock(rendererStub));
 
 beforeEach(() => {
   window.matchMedia =
@@ -63,11 +55,6 @@ afterEach(() => {
   document.body.innerHTML = "";
   vi.restoreAllMocks();
 });
-
-const tick = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    setTimeout(resolve, ms);
-  });
 
 describe("training battle DOM (0.20.13)", () => {
   it(

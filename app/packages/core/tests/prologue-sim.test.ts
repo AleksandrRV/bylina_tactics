@@ -324,7 +324,7 @@ describe("prologue script waits for its actor (0.20.45)", () => {
         { kind: "endTurn" as const },
       ],
     };
-    let state = { index: 0 };
+    const state = { index: 0 };
     // Пустой ход Нави: крысы на поле нет, очередь обязана остаться на месте.
     const idle = pickScriptedCommand(kernel, script, state, { activeOwner: 2 });
     expect(idle.command).toBeNull();

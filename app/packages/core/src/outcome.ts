@@ -1,4 +1,4 @@
-import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
+import { PLAYER_OWNER } from "./debug-map.js";
 import type { EntityState, MatchState } from "./types.js";
 
 export type MatchOutcome = "ongoing" | "victory" | "defeat";
@@ -9,10 +9,6 @@ export function isCombatant(entity: EntityState): boolean {
 
 export function livingOf(state: MatchState, owner: number): EntityState[] {
   return state.entities.filter((entity) => isCombatant(entity) && entity.owner === owner);
-}
-
-function eliminationLivingOf(state: MatchState, owner: number): EntityState[] {
-  return livingOf(state, owner).filter((entity) => entity.countsForElimination !== false);
 }
 
 /** Успех — уничтожены все противники. Поражение — гибель всех основных бойцов игрока; временные призывы не заменяют дружину. */

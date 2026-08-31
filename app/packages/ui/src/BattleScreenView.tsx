@@ -26,7 +26,6 @@ import {
   type TrainingEnemyScriptState,
   type WeaponStats,
 } from "@bylina/core";
-import type { TrainingMissionConfig } from "@bylina/content";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, selectableActions, shortcutForAction } from "./action-shortcuts.js";
@@ -216,7 +215,7 @@ export function BattleScreenView() {
   // Сетевой ведомый (0.15.0) не исполняет правила: ядро у ведущего,
   // снимок и предпросмотр приходят по каналу.
   const network = useBattleNetwork(session, battleKind);
-  const { netRole, isNetGuest, isSpectator } = network;
+  const { isNetGuest, isSpectator } = network;
   const isReplay = battleKind === "replay";
   const replayJournal = session.get().replayJournal;
   const isTraining = battleKind === "training";
@@ -2825,7 +2824,6 @@ export function BattleScreenView() {
                       !trainingWeaponAllowed(weaponId) ||
                       prologueStanceLock
                     }
-                    info={info}
                     onInspect={info ? () => setActionInfo(info) : undefined}
                     onPress={() => {
                       setAction(active ? null : { type: "weapon", id: weaponId });
@@ -2877,7 +2875,6 @@ export function BattleScreenView() {
                       !trainingSkillAllowed(skillId) ||
                       prologueStanceLock
                     }
-                    info={info}
                     onInspect={info ? () => setActionInfo(info) : undefined}
                     onPress={() => {
                       // Рывок считался под прежнее действие: снимаем (0.20.50).
@@ -2923,7 +2920,6 @@ export function BattleScreenView() {
                   !trainingAllows("defend")
                 }
                 title={t("battle.defendHint")}
-                info={stanceActionInfo("defend", t)}
                 onInspect={() => setActionInfo(stanceActionInfo("defend", t))}
                 onPress={() => {
                   if (selectedId === null) return;
@@ -2953,7 +2949,6 @@ export function BattleScreenView() {
                   prologueStanceLock
                 }
                 title={t("battle.overwatchHint")}
-                info={stanceActionInfo("overwatch", t)}
                 onInspect={() => setActionInfo(stanceActionInfo("overwatch", t))}
                 onPress={() => {
                   if (selectedId === null) return;

@@ -10,7 +10,7 @@ const MAX_ROOM_ID = 64;
 const MAX_NAME = 48;
 const MAX_SIGNAL_BYTES = 64 * 1024;
 const HEARTBEAT_MS = 30_000;
-const ROOM_ID = /^[A-Za-z0-9_-]{1,64}$/;
+const ROOM_ID = new RegExp(`^[A-Za-z0-9_-]{1,${MAX_ROOM_ID}}$`);
 /**
  * Значение `Access-Control-Allow-Origin` для HTTP-эндпоинтов (`/rooms`,
  * `/health`): клиент комнаты лежит на другом источнике (порт/домен),

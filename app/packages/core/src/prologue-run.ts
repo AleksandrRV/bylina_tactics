@@ -477,8 +477,6 @@ export function afterPrologueApply(
     }
     for (const event of events) {
       if (event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED") {
-        const gone = match.entities.find((entity) => entity.id === event.entityId);
-        const id = gone?.configId ?? kernel.getSnapshot().entities.find(() => false)?.configId;
         const snapBefore = match;
         const config = snapBefore.entities.find((entity) => entity.id === event.entityId)?.configId;
         if (config && !next.extracted.includes(config)) next.extracted.push(config);
@@ -594,7 +592,7 @@ export function tickPrologueEnemyTurn(
   state: PrologueRunState,
   ctx: PrologueRunContext,
 ): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
-  let next = { ...state, reinforcements: { ...state.reinforcements } };
+  const next = { ...state, reinforcements: { ...state.reinforcements } };
   if (ctx.missionId === "prologue_cry" && next.waveArmed && ctx.reinforcements) {
     const tick = tickReinforcements(kernel.getSnapshot(), ctx.reinforcements, next.reinforcements);
     next.reinforcements = tick.state;

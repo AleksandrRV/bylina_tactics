@@ -1,5 +1,4 @@
 import { readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
 
 const root = new URL("../locales/", import.meta.url);
 const manifest = JSON.parse(readFileSync(new URL("manifest.json", root), "utf8"));

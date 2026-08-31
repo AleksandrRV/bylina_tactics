@@ -38,7 +38,6 @@ export interface ActionSlotProps {
   usesLeft?: number;
   title?: string | undefined;
   /** Содержимое окна информации; без него долгое нажатие ничего не открывает. */
-  info?: ActionInfo | null;
   /** Открыть окно информации (долгое нажатие, правый клик). */
   onInspect?: () => void;
   onPress: () => void;
@@ -56,7 +55,6 @@ export function ActionSlot({
   cooldown = 0,
   usesLeft,
   title,
-  info,
   onInspect,
   onPress,
 }: ActionSlotProps) {

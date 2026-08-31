@@ -112,7 +112,7 @@ export function tickReinforcements(
   const cap = config.maxConcurrentEnemies;
   const mode = config.mode ?? "threshold";
   const delay = config.delayTurns ?? 1;
-  let next: ReinforcementsState = { ...state, telegraph: [] };
+  const next: ReinforcementsState = { ...state, telegraph: [] };
 
   if (mode === "onKill") {
     const extra =

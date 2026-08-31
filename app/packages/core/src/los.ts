@@ -87,16 +87,6 @@ function rayZ(x0: number, y0: number, z0: number, x1: number, y1: number, z1: nu
   return z0 + t * (z1 - z0);
 }
 
-function isAnyCover(entity: EntityState): boolean {
-  return entity.coverType > 0;
-}
-
-function sgnDir(value: number): number {
-  if (value > 0) return 1;
-  if (value < 0) return -1;
-  return 0;
-}
-
 export interface ObstacleResult {
   blocked: boolean;
   obstaclePenalty: number;

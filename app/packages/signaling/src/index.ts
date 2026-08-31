@@ -53,7 +53,6 @@ export function createSignalingSession(options: {
   let closed = false;
   let state: SignalingState = "connecting";
   let role: PeerRole = options.role;
-  let selfId: string | null = null;
   let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   let reconnectAttempt = 0;
 
@@ -131,7 +130,6 @@ export function createSignalingSession(options: {
       return;
     }
     if (message.type === "JOINED" && typeof message.peerId === "string" && validRole(message.role)) {
-      selfId = message.peerId;
       role = message.role;
       peers.clear();
       for (const value of Array.isArray(message.peers) ? message.peers : [])

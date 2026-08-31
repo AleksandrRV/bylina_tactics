@@ -2,7 +2,7 @@ import { previewAttack, resolveAttack, type AttackOptions, type ForceOutcome, ty
 import { isCoverCandidate, isCoverOnFireLine } from "./cover.js";
 import { createDebugMatch, ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import type { SpawnUnitConfig } from "./defaults.js";
-import { computeVisibleCells, createFogState, refreshFog, type FogState } from "./fog.js";
+import { createFogState, refreshFog, type FogState } from "./fog.js";
 import { distH, facingAfterStep, isCardinal, tileAt } from "./grid.js";
 import { effectiveCoverTier, hasLineOfSight } from "./los.js";
 import { edgeCost, edgeCoverBetween } from "./occupancy.js";

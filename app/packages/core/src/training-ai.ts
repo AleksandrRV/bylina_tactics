@@ -73,7 +73,7 @@ function deadByConfigId(
   return snap.entities.find((entity) => entity.configId === configId && entity.dead && entity.owner === owner);
 }
 
-function conditionHolds(kernel: TacticsKernel, action: TrainingEnemyAction, actor: EntityState | undefined): boolean {
+function conditionHolds(kernel: TacticsKernel, action: TrainingEnemyAction, _actor: EntityState | undefined): boolean {
   if (!action.onlyIf) return true;
   const snap = kernel.getSnapshot();
   if (action.onlyIf === "corpseExists") {
