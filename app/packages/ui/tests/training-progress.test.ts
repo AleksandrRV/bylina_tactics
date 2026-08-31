@@ -155,10 +155,9 @@ describe("training outcome (0.20.61)", () => {
     // Навь в обучении действует: гибель дружины заканчивает урок.
     expect(trainingOutcome(conditions({ outcome: "defeat" }))).toBe("defeat");
     expect(trainingOutcome(conditions({ missionHasEnemies: true, outcome: "defeat" }))).toBe("defeat");
-    // Тонкость порядка сохранена из прежнего кода: в мирной миссии пройденные
-    // шаги завершают урок победой, даже если ядро сообщает поражение. Ветка
-    // недостижима — в миссии без противников дружине неоткуда погибнуть, — и
-    // правка правила была бы изменением игры, а не переноcом кода.
-    expect(trainingOutcome(conditions({ outcome: "defeat", trainingDone: true }))).toBe("victory");
+    // Поражение сильнее пройденных шагов (0.20.62): в мирной миссии дружине
+    // неоткуда погибнуть, но правило обязано быть верным и для будущей миссии
+    // с ловушками без противников.
+    expect(trainingOutcome(conditions({ outcome: "defeat", trainingDone: true }))).toBe("defeat");
   });
 });
