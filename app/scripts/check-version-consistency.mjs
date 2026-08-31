@@ -38,7 +38,7 @@ async function walk(directory, accept) {
   for (const entry of entries) {
     if (entry.name === "node_modules" || entry.name === "dist" || entry.name.startsWith(".")) continue;
     const full = path.join(directory, entry.name);
-    if (entry.isDirectory()) found.push(...await walk(full, accept));
+    if (entry.isDirectory()) found.push(...(await walk(full, accept)));
     else if (accept(entry.name)) found.push(full);
   }
   return found;
@@ -59,7 +59,9 @@ for (const file of await walk(root, (name) => name === "package.json")) {
   if (file === rootManifestPath) continue;
   const manifest = JSON.parse(await readFile(file, "utf8"));
   if (manifest.version !== undefined) {
-    failures.push(`${relative(file)}: лишняя версия ${manifest.version} — версия объявляется только в корневом манифесте`);
+    failures.push(
+      `${relative(file)}: лишняя версия ${manifest.version} — версия объявляется только в корневом манифесте`,
+    );
   }
 }
 
@@ -84,13 +86,15 @@ async function sourceRoots() {
 
 const sourceFiles = [];
 for (const sourceRoot of await sourceRoots()) {
-  sourceFiles.push(...await walk(sourceRoot, (name) => /\.tsx?$/.test(name)));
+  sourceFiles.push(...(await walk(sourceRoot, (name) => /\.tsx?$/.test(name))));
 }
 for (const file of sourceFiles) {
   const text = await readFile(file, "utf8");
   const match = text.match(/["'`](\d+\.\d+\.\d+)["'`]/);
   if (match) {
-    failures.push(`${relative(file)}: литерал версии «${match[1]}» — номер читается из манифеста, а не прописывается в коде`);
+    failures.push(
+      `${relative(file)}: литерал версии «${match[1]}» — номер читается из манифеста, а не прописывается в коде`,
+    );
   }
 }
 
