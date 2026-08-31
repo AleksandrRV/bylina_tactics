@@ -29,7 +29,7 @@ import {
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
-import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
+import { resolveBattleKey, type BattleKeyContext, type BattleKeyIntent } from "./battle-keyboard.js";
 import { resolveCellClick } from "./battle-cell-click.js";
 import { prologueAftermath, routeCommand } from "./battle-command.js";
 import { firstFighterId } from "./battle-selection.js";
@@ -2137,7 +2137,7 @@ export function BattleScreenView() {
   // каждый рендер; будь они в зависимостях, окно переподписывалось бы на
   // каждом кадре, а без них в обработчике осталась бы устаревшая команда.
   // Ссылка даёт свежие замыкания при одной подписке на время экрана.
-  const keyboard = useLatest<{ ctx: BattleKeyContext; actions: BattleKeyActions }>({
+  const keyboard = useLatest<{ ctx: BattleKeyContext; apply: (intent: BattleKeyIntent) => void }>({
     ctx: {
       paused,
       busy,
@@ -2155,49 +2155,59 @@ export function BattleScreenView() {
       viewOwner,
       side,
     },
-    actions: {
-      skipCutscene,
-      togglePause: () => session.setPaused(!paused),
-      select: (id) => {
-        setSelectedId(id);
-        // Обзор клетки не снимаем: перебор бойцов клавишей не отменяет
-        // подсветку уже осмотренной клетки.
-        setAction(null);
-        setSkillTargetPos(null);
-        setAimId(null);
-      },
-      defend: () => {
-        if (selectedId === null) return;
-        applyCommand({ type: "DEFEND", actorId: selectedId });
-        cancelKeyboardAim();
-      },
-      overwatch: () => {
-        if (selectedId === null) return;
-        applyCommand({ type: "OVERWATCH", actorId: selectedId });
-        cancelKeyboardAim();
-      },
-      applySelfSkill,
-      armSkill: (entry) => {
-        setAction(entry);
-        cancelKeyboardAim();
-      },
-      toggleAction: (entry) => {
-        const active = action?.type === entry.type && action.id === entry.id;
-        setAction(active ? null : entry);
-        cancelKeyboardAim();
-      },
-      cancel: cancelKeyboardAim,
-      pan: (dx, dy) => rendererRef.current?.pan(dx, dy),
+    apply: (intent) => {
+      switch (intent.kind) {
+        case "none":
+          return;
+        case "skipCutscene":
+          skipCutscene();
+          return;
+        case "togglePause":
+          session.setPaused(!paused);
+          return;
+        case "select":
+          setSelectedId(intent.id);
+          // Обзор клетки не снимаем: перебор бойцов клавишами не отменяет
+          // подсветку уже осмотренной клетки.
+          setAction(null);
+          setSkillTargetPos(null);
+          setAimId(null);
+          return;
+        case "defend":
+          applyCommand({ type: "DEFEND", actorId: intent.actorId });
+          cancelKeyboardAim();
+          return;
+        case "overwatch":
+          applyCommand({ type: "OVERWATCH", actorId: intent.actorId });
+          cancelKeyboardAim();
+          return;
+        case "applySelfSkill":
+          applySelfSkill(intent.skillId);
+          return;
+        case "armSkill":
+          setAction(intent.entry);
+          cancelKeyboardAim();
+          return;
+        case "toggleAction":
+          setAction(action?.type === intent.entry.type && action.id === intent.entry.id ? null : intent.entry);
+          cancelKeyboardAim();
+          return;
+        case "pan":
+          rendererRef.current?.pan(intent.dx, intent.dy);
+          return;
+      }
     },
   });
   // Подписка одна на время экрана: состояние читается из ссылки.
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
-      handleBattleKey(event, keyboard.current.ctx, keyboard.current.actions);
+      // Решение принимает battle-keyboard, исполнение — экран: замыкания
+      // команд свежие, потому что исполнитель обновляется каждый кадр.
+      keyboard.current.apply(resolveBattleKey(event, keyboard.current.ctx));
     };
     const onContext = (event: MouseEvent): void => {
       event.preventDefault();
-      keyboard.current.actions.cancel();
+      cancelKeyboardAim();
     };
     window.addEventListener("keydown", onKey);
     window.addEventListener("contextmenu", onContext);
