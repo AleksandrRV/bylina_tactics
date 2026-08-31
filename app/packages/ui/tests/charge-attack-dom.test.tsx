@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
-import { createRoot, type Root } from "react-dom/client";
+import {
+  createRendererStub,
+  installDomTestEnv,
+  mountView,
+  renderMock,
+  tick,
+  waitFor,
+  type Mounted,
+} from "./harness.js";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
 import { createSession } from "@bylina/session";
@@ -55,7 +62,7 @@ async function waitUntil(condition: () => boolean, timeoutMs = 8000): Promise<bo
   return condition();
 }
 
-async function mountShell(): Promise<{ root: Root; services: AppServices }> {
+async function mountShell(): Promise<{ mounted: Mounted; services: AppServices }> {
   const parsed = parseContent(dataTree());
   if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
   const i18n = createI18n({ manifest, catalogs: loadBundledCatalogs(), initialLanguage: "ru" });
@@ -70,20 +77,15 @@ async function mountShell(): Promise<{ root: Root; services: AppServices }> {
     install: { canInstall: false, installed: false, prompt: async () => undefined },
     debug: false,
   };
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(
-      <ServicesProvider value={services}>
-        <Shell />
-      </ServicesProvider>,
-    );
-  });
+  const mounted = await mountView(
+    <ServicesProvider value={services}>
+      <Shell />
+    </ServicesProvider>,
+  );
   await act(async () => {
     await tick(20);
   });
-  return { root, services };
+  return { mounted, services };
 }
 
 const logText = (): string => document.querySelector(".battle-log")?.textContent ?? "";
@@ -96,7 +98,7 @@ function buttonByText(part: string): HTMLButtonElement | undefined {
 
 describe("рывок к цели в экране боя (0.20.50)", () => {
   it("показывает подход первым нажатием и бьёт вторым", async () => {
-    const { root, services } = await mountShell();
+    const { mounted, services } = await mountShell();
     const { session, content } = services;
     await act(async () => {
       session.selectDifficulty("normal");
@@ -229,7 +231,7 @@ describe("рывок к цели в экране боя (0.20.50)", () => {
     const damaged = !struck || struck.hp < target.hp;
     expect(damaged || /Попадание|Промах|Крит|пал|Погиб/.test(logText()), "удар состоялся").toBe(true);
     await act(async () => {
-      root.unmount();
+      await mounted.unmount();
     });
   }, 90000);
 });

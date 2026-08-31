@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererStub, installDomTestEnv, renderMock, tick } from "./harness.js";
-import { createRoot } from "react-dom/client";
+import { byText, createRendererStub, installDomTestEnv, mountApp, renderMock, tick } from "./harness.js";
 import type { FieldRenderer } from "@bylina/render";
 import { makeRig, refreshDeps } from "./training-sim.js";
 import { resolveTrainingDirective } from "../src/training-scenario.js";
@@ -68,24 +67,12 @@ describe("training battle DOM (0.20.13)", () => {
       window.localStorage.clear();
       updates.length = 0;
 
-      vi.resetModules();
-      const { App } = await import("../../../apps/game-pwa/src/App.js");
-      const host = document.createElement("div");
-      document.body.appendChild(host);
-      const root = createRoot(host);
-      await act(async () => {
-        root.render(<App />);
-      });
+      const mounted = await mountApp();
       await act(async () => {
         await tick(1400);
       });
 
       // Меню → экран обучения.
-      const byText = (part: string): HTMLElement => {
-        const found = [...document.querySelectorAll("button")].find((b) => (b.textContent ?? "").includes(part));
-        if (!found) throw new Error(`button not found: ${part}`);
-        return found as HTMLElement;
-      };
       await act(async () => {
         byText("Обучение").click();
       });
@@ -170,7 +157,7 @@ describe("training battle DOM (0.20.13)", () => {
       expect(endTurn2?.classList.contains("hint-pulse")).toBe(true);
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
       window.removeEventListener("error", onError);
       expect(errors, `unhandled errors: ${String(errors[0])}`).toEqual([]);

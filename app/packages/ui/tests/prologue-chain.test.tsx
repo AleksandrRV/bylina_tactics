@@ -1,8 +1,16 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererJournal, createRendererStub, installDomTestEnv, renderMock, tick, waitFor } from "./harness.js";
-import { createRoot, type Root } from "react-dom/client";
+import {
+  createRendererJournal,
+  createRendererStub,
+  installDomTestEnv,
+  mountView,
+  renderMock,
+  tick,
+  waitFor,
+  type Mounted,
+} from "./harness.js";
 import { parseContent } from "@bylina/content";
 import { createI18n, loadBundledCatalogs, manifest } from "@bylina/i18n";
 import { createSession } from "@bylina/session";
@@ -115,7 +123,7 @@ const cardText = (): string => document.querySelector(".training-over-card")?.te
 const cardButton = (): HTMLButtonElement | null =>
   document.querySelector<HTMLButtonElement>(".training-over-card button");
 
-async function mountShell(): Promise<{ root: Root; services: AppServices }> {
+async function mountShell(): Promise<{ mounted: Mounted; services: AppServices }> {
   const parsed = parseContent(dataTree());
   if (!parsed.ok) throw new Error(`content parse failed: ${JSON.stringify(parsed.issues)}`);
   const content = parsed.data;
@@ -131,27 +139,22 @@ async function mountShell(): Promise<{ root: Root; services: AppServices }> {
     install: { canInstall: false, installed: false, prompt: async () => undefined },
     debug: false,
   };
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(
-      <ServicesProvider value={services}>
-        <Shell />
-      </ServicesProvider>,
-    );
-  });
+  const mounted = await mountView(
+    <ServicesProvider value={services}>
+      <Shell />
+    </ServicesProvider>,
+  );
   await act(async () => {
     await tick(20);
   });
-  return { root, services };
+  return { mounted, services };
 }
 
 describe("battle screen remount between prologue missions (0.20.38)", () => {
   it(
     "starts mission M2 after the outro of M1 instead of skipping it",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
 
       // М1: вступление.
@@ -269,7 +272,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       expect(cardText(), "no M2 spoiler").not.toContain("Федот спасён");
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 60000 },
@@ -278,7 +281,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
   it(
     "zooms the camera for the scene and hides the rat until it runs in",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
 
       await act(async () => {
@@ -329,7 +332,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       );
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 60000 },
@@ -338,7 +341,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
   it(
     "makes the rat bite the hero right after the run-in and hands the turn back (0.20.40)",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
 
       await act(async () => {
@@ -462,7 +465,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       expect(clubButton(), "the accent is gone with the rat").toBeNull();
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 90000 },
@@ -471,7 +474,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
   it(
     "sends the camera to a fighter from the top panel portraits (0.20.42)",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
 
       await act(async () => {
@@ -521,7 +524,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       ).toEqual([rat!.id]);
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 60000 },
@@ -530,7 +533,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
   it(
     "restarts the same mission from scratch without leaving the battle screen",
     async () => {
-      const { root, services } = await mountShell();
+      const { mounted, services } = await mountShell();
       const { session } = services;
 
       await act(async () => {
@@ -582,7 +585,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       ).toBe(true);
 
       await act(async () => {
-        root.unmount();
+        await mounted.unmount();
       });
     },
     { timeout: 30000 },

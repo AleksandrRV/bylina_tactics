@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import { createRendererStub, installDomTestEnv, renderMock, waitFor } from "./harness.js";
-import { createRoot, type Root } from "react-dom/client";
+import { createRendererStub, installDomTestEnv, mountApp, renderMock, waitFor, type Mounted } from "./harness.js";
 
 // Рендер поля подменён заглушкой: PixiJS в jsdom не работает.
 const rendererStub = createRendererStub();
@@ -29,24 +28,17 @@ afterEach(() => {
 });
 
 /** Интерактивное приложение: корень живёт, тест щёлкает по кнопкам. */
-async function mountApp(): Promise<{ root: Root; errors: unknown[] }> {
+async function mountInteractiveApp(): Promise<{ mounted: Mounted; errors: unknown[] }> {
   const errors: unknown[] = [];
   const onError = (event: ErrorEvent): void => {
     errors.push(event.error ?? event.message);
   };
   window.addEventListener("error", onError);
-  await vi.resetModules();
-  const { App } = await import("../../../apps/game-pwa/src/App.js");
-  const host = document.createElement("div");
-  document.body.appendChild(host);
-  const root = createRoot(host);
-  await act(async () => {
-    root.render(<App />);
-  });
+  const mounted = await mountApp();
   await act(async () => {
     await new Promise((resolve) => setTimeout(resolve, 300));
   });
-  return { root, errors };
+  return { mounted, errors };
 }
 
 const buttonByText = (part: string): HTMLButtonElement => {
@@ -96,7 +88,7 @@ async function exitToMenu(): Promise<void> {
 
 describe("выход из сюжетной миссии пролога (0.20.51)", () => {
   it("меню предлагает продолжить былину, а не только начать заново", async () => {
-    const app = await mountApp();
+    const app = await mountInteractiveApp();
     try {
       await startBylina();
       expect(document.querySelector(".battle-screen"), "бой пролога начат").not.toBeNull();
@@ -111,13 +103,13 @@ describe("выход из сюжетной миссии пролога (0.20.51)
       expect(app.errors, `необработанные ошибки: ${String(app.errors[0])}`).toEqual([]);
     } finally {
       await act(async () => {
-        app.root.unmount();
+        await app.mounted.unmount();
       });
     }
   }, 120000);
 
   it("бой сюжетной миссии не теряется, если обозреватель закрыли в бою", async () => {
-    const first = await mountApp();
+    const first = await mountInteractiveApp();
     try {
       await startBylina();
       // Закрытие вкладки: выхода в меню не было, бой продолжался.
@@ -126,11 +118,11 @@ describe("выход из сюжетной миссии пролога (0.20.51)
       });
     } finally {
       await act(async () => {
-        first.root.unmount();
+        await first.mounted.unmount();
       });
     }
     document.body.innerHTML = "";
-    const second = await mountApp();
+    const second = await mountInteractiveApp();
     try {
       expect(menuContinue(), "«Продолжить» после закрытия в бою").toBe(true);
       await act(async () => {
@@ -141,24 +133,24 @@ describe("выход из сюжетной миссии пролога (0.20.51)
       expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
     } finally {
       await act(async () => {
-        second.root.unmount();
+        await second.mounted.unmount();
       });
     }
   }, 120000);
 
   it("после перезапуска былина продолжается тем же боем", async () => {
-    const first = await mountApp();
+    const first = await mountInteractiveApp();
     try {
       await startBylina();
       await exitToMenu();
     } finally {
       await act(async () => {
-        first.root.unmount();
+        await first.mounted.unmount();
       });
     }
     // Тот же носитель сохранения: приложение открывается заново.
     document.body.innerHTML = "";
-    const second = await mountApp();
+    const second = await mountInteractiveApp();
     try {
       expect(menuContinue(), "«Продолжить» после перезапуска").toBe(true);
       await act(async () => {
@@ -169,7 +161,7 @@ describe("выход из сюжетной миссии пролога (0.20.51)
       expect(second.errors, `необработанные ошибки: ${String(second.errors[0])}`).toEqual([]);
     } finally {
       await act(async () => {
-        second.root.unmount();
+        await second.mounted.unmount();
       });
     }
   }, 120000);
