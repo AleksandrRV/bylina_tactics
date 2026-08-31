@@ -1,4 +1,4 @@
-import { matchOutcome } from "@bylina/core";
+import { APP_VERSION, matchOutcome } from "@bylina/core";
 import type {
   ApplyResult,
   CellPos,
@@ -17,7 +17,13 @@ import { eventsVisibleTo } from "@bylina/core";
 import type { Command as ReplayCommand } from "@bylina/core";
 import type { ReplayJournal } from "@bylina/replay";
 
-export const APP_VERSION = "0.20.53";
+/**
+ * Версия приложения: единственный источник — корневой манифест
+ * `app/package.json` (см. packages/core/src/version.ts). Константа
+ * переэкспортирована, чтобы приложение и хранилище по-прежнему
+ * получали её из сессии.
+ */
+export { APP_VERSION };
 
 export type AppScreen =
   | "boot"

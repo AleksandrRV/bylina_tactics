@@ -1,4 +1,4 @@
-import type { Command, PvpMatchOptions } from "@bylina/core";
+import { APP_VERSION, type Command, type PvpMatchOptions } from "@bylina/core";
 
 /**
  * Журнал повтора партии (roadmap 0.17.0, debug-mode §3.3).
@@ -9,7 +9,11 @@ import type { Command, PvpMatchOptions } from "@bylina/core";
  * либо обрыве соединения.
  */
 
-export const REPLAY_VERSION = "0.20.53";
+/**
+ * Версия формата журнала равна версии приложения (политика выпуска):
+ * номер объявлен один раз — в корневом манифесте.
+ */
+export const REPLAY_VERSION = APP_VERSION;
 
 export interface ReplayJournal {
   version: string;

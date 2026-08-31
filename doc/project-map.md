@@ -48,6 +48,7 @@
     │   └── settings/            язык, громкость, debugMode
     └── scripts/
         ├── check-version-consistency.mjs
+        ├── set-version.mjs                  единственная точка правки номера версии (0.20.54)
         ├── visual-audit.mjs
         └── resize-action-art.mjs         приведение образов действий к 512×512 (0.20.48)
 ```
@@ -71,7 +72,8 @@
 | `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
 | `app/packages/ui/src/charge-attack.ts` | Рывок к цели ближнего боя: клетка подхода, маршрут, стоимость (0.20.50) |
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |
-| `app/scripts/check-version-consistency.mjs` | Единая версия пакетов и констант |
+| `app/scripts/check-version-consistency.mjs` | Единый источник версии: манифест, константы, документация, отсутствие литералов в исходниках (0.20.54) |
+| `app/scripts/set-version.mjs` | Установка версии приложения одной командой `pnpm version:set` (0.20.54) |
 | `app/scripts/resize-action-art.mjs` | Кадр 512×512 для образов действий (0.20.48) |
 
 ## 3. Владелец темы

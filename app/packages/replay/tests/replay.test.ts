@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createPvpMatch, createTacticsKernel, type PvpMatchOptions } from "@bylina/core";
 import { REPLAY_VERSION, createReplayRecorder, isReplayJournal } from "../src/index.js";
+import manifest from "../../../package.json";
 
 const OPTIONS: PvpMatchOptions = {
   units: [
@@ -14,8 +15,8 @@ const OPTIONS: PvpMatchOptions = {
 };
 
 describe("replay journal (0.20.19)", () => {
-  it("uses the current replay format version", () => {
-    expect(REPLAY_VERSION).toBe("0.20.53");
+  it("uses the version of the root manifest", () => {
+    expect(REPLAY_VERSION).toBe(manifest.version);
   });
 
   it("records commands and serializes to a plain object", () => {

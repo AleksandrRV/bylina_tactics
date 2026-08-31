@@ -1,11 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { CORE_VERSION, createTacticsKernel, makeGrid } from "../src/index.js";
+import { APP_VERSION, CORE_VERSION, createTacticsKernel, makeGrid } from "../src/index.js";
 import type { EntityState, MatchState } from "../src/types.js";
 import type { WeaponStats } from "../src/weapons.js";
+import manifest from "../../../package.json";
 
 describe("package version", () => {
-  it("is 0.20.53", () => {
-    expect(CORE_VERSION).toBe("0.20.53");
+  // Номер объявлен один раз в корневом манифесте и читается через
+  // packages/core/src/version.ts: тест проверяет саму связь, поэтому
+  // при выпуске новой версии править его не нужно (0.20.54).
+  it("comes from the root manifest and is shared by every constant", () => {
+    expect(APP_VERSION).toBe(manifest.version);
+    expect(CORE_VERSION).toBe(manifest.version);
+    expect(manifest.version).toMatch(/^\d+\.\d+\.\d+$/);
   });
 });
 
