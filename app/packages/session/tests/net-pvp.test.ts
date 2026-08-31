@@ -153,6 +153,42 @@ describe("network pvp: two app instances (0.15.0)", () => {
   });
 });
 
+describe("replay draft keeps only applied commands (0.21.2, Major-3)", () => {
+  it("a rejected guest command is not recorded in the host journal", async () => {
+    const { host, guest } = setupPair();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await guest.waitForNetSync();
+
+    // Черновик журнала переживает открытие боя (0.21.2): раньше openBattle
+    // с ...idle затирал его в null.
+    const draftBefore = host.getReplayDraft();
+    expect(draftBefore).not.toBeNull();
+    expect(draftBefore?.commands).toHaveLength(0);
+
+    // Активна сторона ведущего (1). Ведомый (сторона 2) пытается завершить
+    // чужой ход — команда отклонена (NOT_YOUR_TURN) и в журнал не попадает.
+    guest.sendNetCommand({ type: "END_TURN", playerId: "1" });
+    guest.sendNetCommand({ type: "END_TURN", playerId: "1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(host.getReplayDraft()?.commands).toHaveLength(0);
+
+    // Легитимный ход самого ведущего (его собственный END_TURN) — записан.
+    host.applyBattleCommand({ type: "END_TURN", playerId: "1" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const draftAfterHostMove = host.getReplayDraft();
+    expect(draftAfterHostMove?.commands).toHaveLength(1);
+    expect(draftAfterHostMove?.commands[0]).toEqual({ type: "END_TURN", playerId: "1" });
+
+    // После перехода хода ведомый делает свой легитимный END_TURN — тоже
+    // записан (команда прошла и применилась у ведущего).
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    guest.sendNetCommand({ type: "END_TURN", playerId: "2" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(host.getReplayDraft()?.commands).toHaveLength(2);
+  });
+});
+
 describe("QA net edge cases (0.15.0)", () => {
   it("waitForNetSync resolves false after timeout without a browser", async () => {
     const { b } = createChannelPair();

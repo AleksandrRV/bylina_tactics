@@ -9,14 +9,15 @@
     "test": "vitest run",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
+  "dependencies": {
+    "@bylina/core": "workspace:*",
+    "lz-string": "^1.5.0",
+    "qrcode": "^1.5.4",
+    "jsqr": "^1.4.0"
+  },
   "devDependencies": {
     "typescript": "^5.6.3",
     "vitest": "^3.2.6",
     "@types/qrcode": "^1.5.5"
-  },
-  "dependencies": {
-    "lz-string": "^1.5.0",
-    "qrcode": "^1.5.4",
-    "jsqr": "^1.4.0"
   }
 }
