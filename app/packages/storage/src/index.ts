@@ -126,23 +126,100 @@ export function deserializeFog(fog: FogSave | undefined): FogState | undefined {
   return result;
 }
 
+/**
+ * Проверка снимка партии внутри сохранения (0.21.9, Major-5). Прежде
+ * `match` не валидировался вовсе: испорченная/частично записанная запись
+ * отдавалась ядру как `initial` и роняла его глубоко внутри (обращение к
+ * полю сущности, парсинг состояния ГПСЧ). Граница хранения обязана
+ * принять только структурно целый снимок; мусор отклоняется чисто, и
+ * автосохранение не оставляет игру с битыми данными.
+ *
+ * Проверка намеренно структурная, а не схема Zod: `MatchState` определён в
+ * ядре, а зеркалить всю форму в Zod значило бы дублировать контракт и
+ * рассинхронизироваться при его изменении. Zod уже стережёт границу
+ * контента (`@bylina/content`), где схема — это и формат внешних файлов;
+ * здесь же форма — внутренний тип ядра, и достаточно проверить форму
+ * вложенных структур, к которым обращается ядро при загрузке.
+ */
+export function isMatchSnapshot(value: unknown): value is MatchState {
+  if (typeof value !== "object" || value === null) return false;
+  const match = value as Partial<MatchState>;
+  if (typeof match.turnNumber !== "number" || typeof match.activeOwner !== "number") return false;
+  // Сетка: размеры и массив клеток с координатами. Значение приходит извне,
+  // поэтому типы структурных полей проверяем фактическими проверками ниже.
+  const grid = match.grid as { width?: unknown; height?: unknown; tiles?: unknown } | undefined;
+  if (
+    typeof grid !== "object" ||
+    grid === null ||
+    typeof grid.width !== "number" ||
+    typeof grid.height !== "number" ||
+    !Array.isArray(grid.tiles)
+  ) {
+    return false;
+  }
+  const tiles = grid.tiles as unknown[];
+  const tileOk = tiles.every((raw) => {
+    if (typeof raw !== "object" || raw === null) return false;
+    const tile = raw as Record<string, unknown>;
+    return (
+      typeof tile.x === "number" &&
+      typeof tile.y === "number" &&
+      typeof tile.z === "number" &&
+      typeof tile.pit === "boolean" &&
+      typeof tile.blockLOS === "boolean"
+    );
+  });
+  if (!tileOk) return false;
+  // Сущности: числовые поля, к которым ядро обращается без проверки.
+  if (!Array.isArray(match.entities)) return false;
+  const entities = match.entities as unknown[];
+  const entitiesOk = entities.every((raw) => {
+    if (typeof raw !== "object" || raw === null) return false;
+    const entity = raw as Record<string, unknown>;
+    return (
+      typeof entity.id === "number" &&
+      typeof entity.configId === "string" &&
+      typeof entity.owner === "number" &&
+      typeof entity.x === "number" &&
+      typeof entity.y === "number" &&
+      typeof entity.z === "number" &&
+      typeof entity.hp === "number" &&
+      typeof entity.ap === "number" &&
+      typeof entity.weaponId === "string"
+    );
+  });
+  if (!entitiesOk) return false;
+  // Состояние ГПСЧ ядро парсит как число — битая строка уронила бы загрузку.
+  if (match.rngState !== undefined) {
+    if (typeof match.rngState !== "string" || !/^\d+$/.test(match.rngState)) return false;
+  }
+  if (match.rngSeed !== undefined && typeof match.rngSeed !== "string") return false;
+  return true;
+}
+
 /** Минимальная проверка структуры записи: без неё сохранение не загружается. */
 export function isSaveData(value: unknown): value is SaveData {
   if (typeof value !== "object" || value === null) return false;
   const candidate = value as Partial<SaveData>;
-  return (
-    typeof candidate.formatVersion === "number" &&
-    candidate.formatVersion === SAVE_FORMAT_VERSION &&
-    typeof candidate.version === "string" &&
-    typeof candidate.savedAt === "number" &&
-    typeof candidate.campaign === "object" &&
-    candidate.campaign !== null &&
-    Array.isArray(candidate.campaign.fighters) &&
-    Array.isArray(candidate.campaign.missions) &&
-    typeof candidate.session === "object" &&
-    candidate.session !== null &&
-    Array.isArray(candidate.session.deployment)
-  );
+  if (
+    typeof candidate.formatVersion !== "number" ||
+    candidate.formatVersion !== SAVE_FORMAT_VERSION ||
+    typeof candidate.version !== "string" ||
+    typeof candidate.savedAt !== "number" ||
+    typeof candidate.campaign !== "object" ||
+    candidate.campaign === null ||
+    !Array.isArray(candidate.campaign.fighters) ||
+    !Array.isArray(candidate.campaign.missions) ||
+    typeof candidate.session !== "object" ||
+    candidate.session === null ||
+    !Array.isArray(candidate.session.deployment)
+  ) {
+    return false;
+  }
+  // Снимок партии, если он есть, обязан быть структурно целым (Major-5):
+  // иначе ядро получает мусор как initial и падает внутри.
+  if (candidate.match !== undefined && !isMatchSnapshot(candidate.match)) return false;
+  return true;
 }
 
 /**
