@@ -72,6 +72,8 @@
 | `app/packages/ui/src/action-art.ts` | Образы действий и умений, карта файлов `public/actions` (0.20.46) |
 | `app/packages/ui/src/action-info.ts` | Содержимое окна информации: числа из боевых данных, текст из словарей (0.20.46) |
 | `app/packages/ui/src/action-panel.tsx` | Кнопка-миниатюра действия, долгое нажатие, окно информации (0.20.46) |
+| `app/packages/ui/src/battle-selection.ts` | Кого экран боя считает своим бойцом: выбор на начало хода, перебор по Tab, правила стороны (0.20.60) |
+| `app/packages/ui/src/hooks.ts` | Общие хуки экранов: подписки на сервисы и `useLatest` — ссылка на последнее значение (0.20.60) |
 | `app/packages/ui/src/battle-keyboard.ts` | Карта клавиш боевого экрана: чистый разбор нажатия по состоянию, без React (0.20.59) |
 | `app/packages/ui/src/charge-attack.ts` | Рывок к цели ближнего боя: клетка подхода, маршрут, стоимость (0.20.50) |
 | `app/apps/game-pwa/public/actions/` | Иконки действий и умений, 512×512 (0.20.46) |

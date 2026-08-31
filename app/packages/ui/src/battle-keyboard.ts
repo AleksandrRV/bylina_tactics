@@ -11,6 +11,7 @@
 
 import type { EntityState, MatchState, SkillStats } from "@bylina/core";
 import { ACTION_SHORTCUTS, selectableActions, type SelectableAction } from "./action-shortcuts.js";
+import { nextFighterId, type BattleSide } from "./battle-selection.js";
 import type { TrainingActionKind, TrainingDirective } from "./training-scenario.js";
 
 /** Состояние боя, нужное карте клавиш. */
@@ -32,7 +33,8 @@ export interface BattleKeyContext {
   skills: Record<string, SkillStats>;
   snapshot: MatchState;
   viewOwner: number;
-  isOwn: (entity: EntityState) => boolean;
+  /** С чьей стороны смотрит экран: по ней считаются свои бойцы. */
+  side: BattleSide;
 }
 
 /** Что карта клавиш может сделать с экраном боя. */
@@ -87,14 +89,10 @@ export function handleBattleKey(event: KeyboardEvent, ctx: BattleKeyContext, act
     event.preventDefault();
     // Обучение: перебор бойцов запрещён — действует исполнитель указания.
     if (ctx.isTraining && ctx.trainingActorId !== null) return true;
-    const living = ctx.snapshot.entities.filter(ctx.isOwn);
-    if (living.length === 0) return true;
-    // Сначала бойцы с очками действия, затем все остальные.
-    const withAp = living.filter((entity) => entity.ap > 0);
-    const pool = withAp.length > 0 ? withAp : living;
-    const index = pool.findIndex((entity) => entity.id === ctx.selectedId);
-    const next = pool[(index + 1) % pool.length];
-    if (next) actions.select(next.id);
+    // Порядок перебора — в battle-selection: сначала бойцы с очками
+    // действия, затем остальные свои.
+    const next = nextFighterId(ctx.snapshot.entities, ctx.side, ctx.selectedId);
+    if (next !== null) actions.select(next);
     return true;
   }
 

@@ -1,14 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act } from "react";
-import {
-  createRendererStub,
-  installDomTestEnv,
-  mountBattleShell,
-  renderMock,
-  tick,
-  waitFor,
-} from "./harness.js";
+import { createRendererStub, installDomTestEnv, mountBattleShell, renderMock, tick, waitFor } from "./harness.js";
 import type { CinematicPlan, FieldRenderer } from "@bylina/render";
 import { meleeStrikeOf, planCharge } from "../src/charge-attack.js";
 
