@@ -2,10 +2,6 @@ import {
   ENEMY_OWNER,
   PLAYER_OWNER,
   compilePrologueLayout,
-  createMissionMatch,
-  createPvpMatch,
-  createQuickMatch,
-  createTacticsKernel,
   defaultTrainingWeapons,
   pickEnemyCommand,
   pickScriptedEnemyCommand,
@@ -17,7 +13,6 @@ import {
   type HitPreview,
   type MatchState,
   type ReachableCell,
-  type RosterMods,
   type SkillStats,
   type TacticsKernel,
   type TrainingEnemyScriptState,
@@ -30,6 +25,7 @@ import { resolveBattleKey, type BattleKeyContext, type BattleKeyIntent } from ".
 import { resolveCellClick } from "./battle-cell-click.js";
 import { prologueAftermath, routeCommand } from "./battle-command.js";
 import { enemyPhaseActive, enemyPhaseContinues, type EnemyPhaseState } from "./battle-enemy-phase.js";
+import { createBattleKernel } from "./battle-match.js";
 import { firstFighterId } from "./battle-selection.js";
 import { cellKey } from "./cell-interaction.js";
 import type { LayoutMarkers } from "./prologue-cutscene.js";
@@ -67,8 +63,6 @@ import {
   createPrologueRunState,
   gatePrologueCommand,
   clampPrologueCommand,
-  initPrologueMatch,
-  prologueUnits,
   tickPrologueEnemyTurn,
   createTelemetryLog,
   recordTelemetry,
@@ -221,141 +215,26 @@ export function BattleScreenView() {
     if (!prologueMission?.map.layout) return null;
     return compilePrologueLayout(prologueMission.map.layout).markers;
   }, [prologueMission]);
+  // Ядро боя создаётся один раз на монтаж экрана: вид боя сам решает, откуда
+  // взять партию — из сохранения, журнала повтора, миссии или быстрого матча
+  // (0.20.68). Привязка к сессии осталась здесь: решатель только читает.
   const [kernel] = useState<TacticsKernel | null>(() => {
-    if (isPrologue && prologueMission) {
-      const host = createTacticsKernel({
-        initial: session.get().restoredMatch ?? initPrologueMatch(prologueMission, content, matchSeed || 701),
-        weapons,
-        skills,
-        units: prologueUnits(content),
-        seed: matchSeed || 701,
-        fog: session.get().restoredFog,
-        fogDisabled: prologueMission.fog === false,
-      });
-      session.bindTacticsHost(host);
-      return host;
-    }
-    if (isTraining && trainingMission) {
-      const host = createTacticsKernel({
-        initial: createMissionMatch({
-          units: content.units,
-          map: trainingMission.map,
-          playerSlots: trainingMission.playerSlots,
-          enemies: trainingMission.enemies,
-          seed: matchSeed || 1,
-        }),
-        weapons,
-        skills,
-        units: content.units,
-        seed: matchSeed || 1,
-      });
-      session.bindTacticsHost(host);
-      return host;
-    }
-    if (isReplay && replayJournal) {
-      const host = createTacticsKernel({
-        initial: createPvpMatch({
-          units: replayJournal.options.units,
-          map: replayJournal.options.map,
-          side1: replayJournal.options.side1,
-          side2: replayJournal.options.side2,
-          objective: replayJournal.options.objective,
-          seed: replayJournal.options.seed,
-        }),
-        weapons,
-        skills,
-        units: content.units,
-        seed: replayJournal.options.seed,
-      });
-      session.bindTacticsHost(host);
-      return host;
-    }
-    if (isNetGuest) return null;
-    // Ядро боя создаётся один раз на монтаж экрана. При восстановлении партии
-    // (сохранение 0.13.0) используется снимок из состояния сессии; инициализатор
-    // может вызываться повторно (StrictMode) — чтение состояния идемпотентно.
-    const restored = session.get().restoredMatch;
-    if (restored) {
-      const host = createTacticsKernel({
-        initial: restored,
-        weapons,
-        skills,
-        units: content.units,
-        fog: session.get().restoredFog,
-      });
-      session.bindTacticsHost(host);
-      return host;
-    }
-    // Поочерёдная игра: составы сторон из комнаты сбора, поле режима (0.14.0);
-    // сетевой ведущий строит ту же партию локально (0.15.0).
-    let initial: MatchState;
-    if (battleKind === "pvp" || battleKind === "pvpNet") {
-      const sides = session.getPvpSides();
-      if (!sides) throw new Error("PvP sides are missing");
-      initial = createPvpMatch({
-        units: content.units,
-        map: content.pvp.map ?? content.quickMatch.map,
-        side1: sides.side1,
-        side2: sides.side2,
-        objective: session.get().pvpObjective ?? "elimination",
-        seed: matchSeed || 1,
-      });
-    } else if (battleKind === "campaign" && activeMissionId) {
-      const mission = session.getCampaign().getMission(activeMissionId);
-      if (!mission) throw new Error(`Unknown campaign mission: ${activeMissionId}`);
-      const penalty = content.campaign.woundPenalty;
-      const fighters = session.getCampaign().getState().fighters;
-      const items = session.getCampaign().getItems();
-      const playerSlots = deployment.map((fighterId) => {
-        const fighter = fighters.find((candidate) => candidate.id === fighterId);
-        if (!fighter || !fighter.alive) throw new Error(`Unknown fighter in deployment: ${fighterId}`);
-        const mods: RosterMods = fighter.wounded
-          ? { aimMod: penalty.aim, defenseMod: penalty.defense, mobilityMod: penalty.mobility }
-          : {};
-        // Снаряжение: оружие и модификаторы предмета добавляются к высадке.
-        const item = fighter.equippedItemId ? items.find((entry) => entry.id === fighter.equippedItemId) : undefined;
-        if (item) {
-          mods.aimMod = (mods.aimMod ?? 0) + (item.aimMod ?? 0);
-          mods.defenseMod = (mods.defenseMod ?? 0) + (item.defenseMod ?? 0);
-          mods.mobilityMod = (mods.mobilityMod ?? 0) + (item.mobilityMod ?? 0);
-          if (item.maxHpMod) mods.maxHpMod = (mods.maxHpMod ?? 0) + item.maxHpMod;
-          if (item.weaponId) mods.extraWeaponIds = [item.weaponId];
-        }
-        return { unitId: fighter.unitId, hp: fighter.hp, ...mods };
-      });
-      initial = createMissionMatch({
-        units: content.units,
-        map: mission.map,
-        playerSlots,
-        enemies: mission.enemies,
-        generals: mission.generals,
-        excludedGenerals: session.getCampaign().getState().deadGenerals,
-        objective:
-          mission.type === "destroy"
-            ? { kind: "destroy", unitId: mission.objectiveUnitId! }
-            : mission.type === "rescue"
-              ? { kind: "rescue", unitId: mission.escorteeUnitId! }
-              : mission.type === "recon"
-                ? { kind: "recon" }
-                : undefined,
-        seed: matchSeed || 1,
-      });
-    } else {
-      const count =
-        content.quickMatch.difficulties.find((item) => item.id === difficulty)?.enemyCount ??
-        content.quickMatch.difficulties[0]?.enemyCount ??
-        3;
-      initial = createQuickMatch({
-        units: content.units,
-        map: content.quickMatch.map,
-        playerSlots: content.quickMatch.playerSlots,
-        enemyPool: content.quickMatch.enemyPool,
-        enemyCount: count,
-        seed: matchSeed || 1,
-      });
-    }
-    const host = createTacticsKernel({ initial, weapons, skills, units: content.units });
-    session.bindTacticsHost(host);
+    const host = createBattleKernel({
+      battleKind,
+      content,
+      session,
+      weapons,
+      skills,
+      matchSeed,
+      difficulty,
+      activeMissionId,
+      deployment,
+      isNetGuest,
+      prologueMission: prologueMission ?? null,
+      trainingMission: trainingMission ?? null,
+      replayJournal: replayJournal ?? null,
+    });
+    if (host) session.bindTacticsHost(host);
     return host;
   });
 
