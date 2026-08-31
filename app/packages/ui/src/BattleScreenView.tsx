@@ -31,6 +31,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
 import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
 import { resolveCellClick } from "./battle-cell-click.js";
+import { prologueAftermath, routeCommand } from "./battle-command.js";
 import { firstFighterId } from "./battle-selection.js";
 import { cellKey } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
@@ -1174,37 +1175,49 @@ export function BattleScreenView() {
    * (0.14.0/0.15.0). `after` вызывается, когда события команды уже
    * отыграны полем: рывок к цели исполняет удар именно так (0.20.50).
    */
+  /**
+   * Единый канал команд (0.20.64): маршрут — куда уходит команда и пропускают
+   * ли её сценарии — решает battle-command, здесь исполнение и последствия.
+   */
   const applyCommand = (command: Command, after?: () => void): void => {
-    if (isSpectator || isReplay) return;
-    // Исход известен, но ещё не показан (0.20.40): поле доигрывает бой,
-    // команды игрока в этот кадр не принадлежат.
-    if (outcomePending) return;
-    if (battleKind === "pvp") {
-      session.sendPvpCommand(command);
-      return;
+    const route = routeCommand(command, {
+      isSpectator,
+      isReplay,
+      outcomePending,
+      isPvp: battleKind === "pvp",
+      isNetGuest,
+      isTraining,
+      trainingAllows: (issued) => trainingCommandAllowed(directiveView, issued),
+      trainingDenial: trainingActionKindOfCommand,
+      isPrologue,
+      // Сцена М2 обрывает рывок на полпути (0.20.45): пока засада впереди,
+      // герою оставляют одно ОД на защитную стойку.
+      clampPrologue:
+        isPrologue && kernel && prologueRunRef.current
+          ? (issued) => clampPrologueCommand(kernel, prologueRunRef.current!, issued, prologueMission?.playerSlots)
+          : null,
+      prologueAllows:
+        isPrologue && prologueRunRef.current ? (issued) => gatePrologueCommand(prologueRunRef.current!, issued) : null,
+    });
+    switch (route.kind) {
+      case "drop":
+        return;
+      case "sendPvp":
+        session.sendPvpCommand(command);
+        return;
+      case "sendNet":
+        session.sendNetCommand(command);
+        return;
+      case "denyTraining":
+        trainingDeny(route.action);
+        return;
+      case "denyPrologue":
+        showStoryNote(t("prologue.hint.m2.noise"));
+        return;
+      case "apply":
+        break;
     }
-    if (isNetGuest) {
-      session.sendNetCommand(command);
-      return;
-    }
-    // Обучение: финальная проверка строгого сценария (0.20.13) — команда
-    // обязана совпадать с активным указанием; жестовые проверки кнопок и
-    // кликов выше дают удобство, эта точка гарантирует полноту запрета.
-    if (isTraining && !trainingCommandAllowed(directiveView, command)) {
-      trainingDeny(trainingActionKindOfCommand(command));
-      return;
-    }
-    // Сцена М2 обрывает рывок на полпути (0.20.45): пока засада впереди,
-    // герою оставляют одно ОД на защитную стойку — иначе второе ОД уходило
-    // бы на бег, и стойку стало бы нечем оплатить.
-    let issued = command;
-    if (isPrologue && kernel && prologueRunRef.current) {
-      issued = clampPrologueCommand(kernel, prologueRunRef.current, command, prologueMission?.playerSlots);
-    }
-    if (isPrologue && prologueRunRef.current && !gatePrologueCommand(prologueRunRef.current, issued)) {
-      showStoryNote(t("prologue.hint.m2.noise"));
-      return;
-    }
+    const issued = route.command;
     const result = session.applyBattleCommand(issued);
     if (!result.ok) {
       // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
@@ -1230,30 +1243,40 @@ export function BattleScreenView() {
       if (armed && !session.hasBattleCheckpoint()) {
         session.saveBattleCheckpoint();
       }
-      if (shouldRestoreCheckpoint(next, result.events, kernel.getSnapshot())) {
-        prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
-          type: "death_by",
-          cause: "checkpoint",
-        });
-        if (session.hasBattleCheckpoint()) {
-          prologueRunRef.current = next;
+      // Что делать с итогами команды — решает battle-command: откат к
+      // контрольной точке, честное поражение или выход стаи сценой.
+      const aftermath = prologueAftermath({
+        next,
+        events: result.events,
+        snapshot: kernel.getSnapshot(),
+        hasCheckpoint: session.hasBattleCheckpoint(),
+      });
+      prologueRunRef.current = aftermath.state;
+      switch (aftermath.kind) {
+        case "restore":
+          prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+            type: "death_by",
+            cause: "checkpoint",
+          });
           prologueAfter = () => void restorePrologueScene();
-        } else {
-          // Контрольной точки нет — честное поражение, а не «живой» труп на поле.
-          prologueRunRef.current = { ...next, outcome: "defeat" };
+          break;
+        case "defeat":
+          prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {
+            type: "death_by",
+            cause: "checkpoint",
+          });
           prologueFinished = true;
-        }
-      } else {
-        const taken = takePrologueSpawnEvents(next);
-        prologueRunRef.current = taken.state;
-        if (taken.events.length > 0) {
+          break;
+        case "spawnBeats":
           // Сущность уже создана ядром, но на поле её не показываем до
           // вбегания по сцене (0.20.39): иначе она возникает в клетке,
           // пропадает и выбегает заново.
-          hideStagedSpawns(taken.events);
+          hideStagedSpawns(aftermath.events);
           // Сначала стая выбегает, потом загорается выход (0.20.45).
-          prologueAfter = () => void runPrologueSpawnBeats(taken.events).then(() => revealExtractBeat());
-        }
+          prologueAfter = () => void runPrologueSpawnBeats(aftermath.events).then(() => revealExtractBeat());
+          break;
+        case "none":
+          break;
       }
       const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
       if (hint && hint !== prologueHintKey) {
