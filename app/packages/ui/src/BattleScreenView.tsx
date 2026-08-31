@@ -30,8 +30,9 @@ import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
 import { handleBattleKey, type BattleKeyActions, type BattleKeyContext } from "./battle-keyboard.js";
+import { resolveCellClick } from "./battle-cell-click.js";
 import { firstFighterId } from "./battle-selection.js";
-import { interactiveEntityAt, primaryAttackForEnemy } from "./cell-interaction.js";
+import { cellKey } from "./cell-interaction.js";
 import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
 import {
   directiveAllowsAction,
@@ -85,10 +86,6 @@ import {
   type TelemetryLog,
 } from "./prologue-battle.js";
 import "./battle.css";
-
-function cellKey(x: number, y: number): string {
-  return `${x},${y}`;
-}
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => {
@@ -1730,141 +1727,97 @@ export function BattleScreenView() {
     hintSettings.autoEndTurn,
   ]);
 
+  /**
+   * Нажатие по полю (0.20.63): что оно значит, решает battle-cell-click,
+   * здесь только исполнение намерения состоянием и командами.
+   */
   const onCell = (x: number, y: number): void => {
-    if (paused || busy || outcomePending || snapshot.activeOwner !== viewOwner) return;
-    // Ознакомительный шаг обучения (until "noop", 0.20.1): действие не
-    // предполагается — шаг завершается кликом в любое место поля, сам клик
-    // не выполняет перемещения/атаки (иначе подсказка «застревала» бы до
-    // первого действия, а игроку нужно просто подтвердить понимание).
-    if (isTraining && activeHint?.until === "noop") {
-      setHintStep((value) => value + 1);
-      return;
-    }
-    const reach = byReach.get(cellKey(x, y));
-    const targeting = action !== null;
-    const selectedSkill = action?.type === "skill" ? skills[action.id] : undefined;
-    const positionOnlySkill = selectedSkill?.effects.some((effect) => effect.type === "spawn");
-    const allyTargeting = Boolean(
-      selectedSkill && !positionOnlySkill && (selectedSkill.filter === "allies" || selectedSkill.filter === "all"),
-    );
-    // Этап 2.6 (правка): умение «на себя» с областью (круговой взмах) не
-    // требует цели — пока выбрано, клик по любой клетке применяет его,
-    // а область уже подсвечена областным прицелом.
-    const selfAreaTargeting = Boolean(selectedSkill?.category === "self" && (selectedSkill.radius ?? 0) > 0);
-    if (selfAreaTargeting && action?.type === "skill") {
-      applySelfSkill(action.id);
-      return;
-    }
-    const entity = interactiveEntityAt(snapshot.entities, x, y, Boolean(reach) && !targeting);
-    if (entity?.owner === viewOwner && entity.coverType === 0 && entity.maxAp > 0 && !allyTargeting) {
-      // Обучение: выбор иного бойца запрещён — действует только исполнитель
-      // текущего указания (строгий сценарий, 0.20.13).
-      if (isTraining && trainingActorId !== null && entity.id !== trainingActorId) {
+    const intent = resolveCellClick(x, y, {
+      paused,
+      busy,
+      outcomePending,
+      ownTurn: snapshot.activeOwner === viewOwner,
+      isTraining,
+      trainingNoopStep: activeHint?.until === "noop",
+      trainingActorId,
+      trainingDirective,
+      selectedId,
+      selected: selected ?? null,
+      action,
+      skills,
+      entities: snapshot.entities,
+      tiles: snapshot.grid.tiles,
+      viewOwner,
+      reach: byReach.get(cellKey(x, y)),
+      aimId,
+      hitAvailable: Boolean(hit?.available),
+      charge,
+      chargeArmed,
+      preview,
+      coarse: window.matchMedia("(pointer: coarse)").matches,
+    });
+    switch (intent.kind) {
+      case "ignore":
+        return;
+      case "advanceNoopStep":
+        setHintStep((value) => value + 1);
+        return;
+      case "selfArea":
+        applySelfSkill(intent.skillId);
+        return;
+      case "select":
+        setSelectedId(intent.id);
+        setAction(null);
+        setSkillTargetPos(null);
+        setAimId(null);
+        setPreview(null);
+        return;
+      case "denyActor":
         setLog(t("training.locked.actor"));
         return;
-      }
-      setSelectedId(entity.id);
-      setAction(null);
-      setSkillTargetPos(null);
-      setAimId(null);
-      setPreview(null);
-      return;
-    }
-
-    const automaticAttack = primaryAttackForEnemy(selected, entity, viewOwner, targeting);
-    // Обучение: авто-включение оружия по врагу допустимо, только когда враг —
-    // цель текущего указания, а основное оружие — предписанное.
-    if (automaticAttack) {
-      if (!isTraining) {
-        setAction(automaticAttack);
-        setAimId(entity?.id ?? null);
+      case "armAttack":
+        setAction(intent.entry);
+        setAimId(intent.targetId);
+        setPreview(null);
+        return;
+      case "denyTarget":
+        trainingDeny(intent.action);
+        return;
+      case "aim": {
+        const target = snapshot.entities.find((entity) => entity.id === intent.id);
+        // Рывок показывается сразу: первое нажатие вооружает подход, второе
+        // по той же цели его исполняет (0.20.50).
+        const plan = target ? chargeFor(target) : null;
+        setAimId(intent.id);
+        setCharge(plan);
+        setChargeArmed(plan !== null);
+        if (plan) setLog(t("battle.chargeHint"));
+        const skill = action?.type === "skill" ? skills[action.id] : undefined;
+        if (!skill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
         setPreview(null);
         return;
       }
-      const directive = trainingDirective;
-      if (
-        directive?.kind === "attack" &&
-        entity?.id === directive.targetId &&
-        automaticAttack.id === directive.weaponId
-      ) {
-        setAction(automaticAttack);
-        setAimId(entity?.id ?? null);
-        setPreview(null);
+      case "attack":
+        tryAttack(intent.id);
         return;
-      }
-      trainingDeny("attack");
-      return;
-    }
-
-    if (entity && selectedId !== null && targeting) {
-      // Обучение: прицеливание допустимо только по цели текущего указания.
-      if (isTraining) {
-        const directive = trainingDirective;
-        const isWeapon = action.type === "weapon";
-        const allowed =
-          directive !== null &&
-          ((isWeapon && directive.kind === "attack" && directive.targetId === entity.id) ||
-            (!isWeapon && directive.kind === "skill" && directive.targetId === entity.id));
-        if (!allowed) {
-          trainingDeny(isWeapon ? "attack" : "skill");
-          return;
-        }
-      }
-      if (aimId === entity.id && hit?.available) {
-        tryAttack(entity.id);
+      case "charge":
+        if (charge) executeCharge(charge);
         return;
-      }
-      // Рывок к цели ближнего боя (0.20.50): первое нажатие показывает
-      // подход и линию удара, повторное по той же цели — подходит и бьёт.
-      if (aimId === entity.id && charge && charge.targetId === entity.id && chargeArmed) {
-        executeCharge(charge);
+      case "positionSkill":
+        tryPositionSkill(intent.cell);
         return;
-      }
-      const plan = chargeFor(entity);
-      setAimId(entity.id);
-      setCharge(plan);
-      setChargeArmed(plan !== null);
-      if (plan) setLog(t("battle.chargeHint"));
-      if (!selectedSkill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
-      setPreview(null);
-      return;
-    }
-
-    const needsPosition = selectedSkill?.effects.some(
-      (effect) => effect.type === "spawn" || effect.type === "displace",
-    );
-    if (needsPosition && action?.type === "skill") {
-      const tile = snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
-      if (tile) tryPositionSkill({ x, y, z: tile.z });
-      return;
-    }
-
-    // В режиме перемещения проходимая клетка всегда означает движение.
-    // Граневое укрытие в ней не перехватывает выбор как цель атаки.
-    if (reach && !targeting) {
-      const id = cellKey(x, y);
-      // Обучение: шаг принимает только подсвеченную клетку указания —
-      // точную проверку выполняет tryMove (строгий сценарий, 0.20.13).
-      const coarse = window.matchMedia("(pointer: coarse)").matches;
-      if (coarse && preview !== id) {
-        const directive = trainingDirective;
-        if (
-          isTraining &&
-          (!directive || directive.kind !== "move" || directive.cell.x !== x || directive.cell.y !== y)
-        ) {
-          trainingDeny("move");
-          return;
-        }
-        setPreview(id);
+      case "previewMove":
+        setPreview(intent.key);
         setAimId(null);
         return;
-      }
-      tryMove({ x, y, z: reach.z });
-      return;
+      case "move":
+        tryMove(intent.cell);
+        return;
+      case "cancel":
+        setPreview(null);
+        setAimId(null);
+        return;
     }
-
-    setPreview(null);
-    setAimId(null);
   };
 
   const onHover = (x: number, y: number): void => {
