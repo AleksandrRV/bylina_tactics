@@ -100,5 +100,11 @@ jobs:
       - name: Test
         run: pnpm test
 
+      # Проверка зависимостей на известные уязвимости (0.21.0): high и
+      # critical роняют сборку, moderate — нет. Dev-серверные находки
+      # (vitest UI / vite / esbuild в этом проекте) в аудит попадают.
+      - name: Audit dependencies
+        run: pnpm audit --audit-level=high
+
       - name: Build
         run: pnpm build
