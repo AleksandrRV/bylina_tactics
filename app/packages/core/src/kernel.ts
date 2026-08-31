@@ -44,6 +44,15 @@ export interface KernelOptions {
 
 export interface TacticsKernel {
   readonly version: string;
+  /**
+   * Монотонный номер состояния (0.21.10, P1-1): растёт на единицу при каждом
+   * зафиксированном изменении боя (успешный `apply`, появление, восстановление
+   * снимка, автопобеда) — то есть на каждом вызове, который уведомляет
+   * подписчиков. Запросы предпросмотра состояние не меняют и ревизию не
+   * двигают (architecture §3.7). Нужен, чтобы представление подписывалось на
+   * «состояние изменилось», а не клонировало снимок на каждый рендер.
+   */
+  getRevision(): number;
   /** Полный снимок ведущего. Не передавать представлению стороны. */
   getSnapshot(): MatchState;
   /** Сокращённый по видимости снимок стороны. */
@@ -210,6 +219,14 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   state.rngState = String(rng.getState());
   const listeners = new Set<() => void>();
   /**
+   * Монотонный номер состояния (P1-1). Стартует с нуля; `emit()` — единственная
+   * точка, фиксирующая изменение и уведомляющая подписчиков, поэтому ревизию
+   * поднимаем ровно там. Внутренние `refresh()` посреди разбора команды
+   * (толчок/падение/пошаговое перемещение) сами по себе ревизию не двигают:
+   * для наблюдателя состояние меняется один раз — на исходе приёма команды.
+   */
+  let revision = 0;
+  /**
    * Стороны, присутствующие на поле прямо сейчас. Множество пересчитывается
    * на каждом обновлении, а не фиксируется при создании ядра: в прологе
    * противник появляется скриптово уже после старта партии (крыса М1, волны
@@ -294,6 +311,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   };
   const emit = (): void => {
     refresh();
+    revision += 1;
     for (const listener of listeners) listener();
   };
 
@@ -1272,6 +1290,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
 
   const kernel: TacticsKernel = {
     version: CORE_VERSION,
+    getRevision: () => revision,
     getSnapshot: () => cloneState(state),
     getSnapshotFor: (owner) => {
       const snapshot = cloneState(state);
