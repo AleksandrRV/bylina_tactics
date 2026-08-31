@@ -106,8 +106,10 @@ export function shouldAutoEndTurn(conditions: AutoEndTurnConditions): boolean {
  *   указаниями до самой победы, поэтому реактивные плашки (яд, воскрешение)
  *   успевают сработать.
  *
- * Поражение — всегда по ядру: Навь в обучении действует, гибель дружины
- * заканчивает урок независимо от номера шага.
+ * Поражение — всегда по ядру и всегда раньше победы: Навь в обучении
+ * действует, и гибель дружины заканчивает урок независимо от того, сколько
+ * шагов подсказки пройдено (0.20.62). Мёртвый отряд не доучивается, даже
+ * если сценарий формально выполнен.
  */
 export interface TrainingOutcomeConditions {
   /** Исход партии по правилам ядра. */
@@ -122,7 +124,8 @@ export interface TrainingOutcomeConditions {
 export type TrainingOutcome = "victory" | "defeat";
 
 export function trainingOutcome(conditions: TrainingOutcomeConditions): TrainingOutcome | null {
+  // Поражение проверяется первым: оно сильнее любого признака победы.
+  if (conditions.outcome === "defeat") return "defeat";
   const complete = conditions.missionHasEnemies ? conditions.outcome === "victory" : conditions.trainingDone;
-  if (complete) return "victory";
-  return conditions.outcome === "defeat" ? "defeat" : null;
+  return complete ? "victory" : null;
 }
