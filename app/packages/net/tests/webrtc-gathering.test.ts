@@ -15,24 +15,15 @@ import { createWebRtcChannel } from "../src/webrtc.js";
 type Listener = (event?: unknown) => void;
 
 /** Канал данных: заглушка с набором слушателей, открытие не имитируется. */
-class FakeDataChannel {
-  readyState = "connecting";
-  sent: string[] = [];
-  private readonly listeners = new Map<string, Set<Listener>>();
-
-  addEventListener(type: string, listener: Listener): void {
-    const set = this.listeners.get(type) ?? new Set<Listener>();
-    set.add(listener);
-    this.listeners.set(type, set);
-  }
-
-  send(message: string): void {
-    this.sent.push(message);
-  }
-
-  dispatch(type: string, event?: unknown): void {
-    for (const listener of this.listeners.get(type) ?? []) listener(event);
-  }
+function createFakeDataChannel(): { addEventListener(type: string, listener: Listener): void } {
+  const listeners = new Map<string, Set<Listener>>();
+  return {
+    addEventListener(type: string, listener: Listener): void {
+      const set = listeners.get(type) ?? new Set<Listener>();
+      set.add(listener);
+      listeners.set(type, set);
+    },
+  };
 }
 
 /** Подмена `RTCPeerConnection`: сбором кандидатов управляет тест. */
@@ -41,10 +32,9 @@ class FakePeerConnection {
   iceGatheringState = "new";
   localDescription: { type: string; sdp: string } | null = null;
   connectionState = "new";
-  readonly dataChannels: FakeDataChannel[] = [];
   private readonly listeners = new Map<string, Set<Listener>>();
 
-  constructor(readonly config?: unknown) {
+  constructor() {
     FakePeerConnection.instances.push(this);
   }
 
@@ -54,10 +44,8 @@ class FakePeerConnection {
     this.listeners.set(type, set);
   }
 
-  createDataChannel(): FakeDataChannel {
-    const channel = new FakeDataChannel();
-    this.dataChannels.push(channel);
-    return channel;
+  createDataChannel(): { addEventListener(type: string, listener: Listener): void } {
+    return createFakeDataChannel();
   }
 
   createOffer(): Promise<{ type: string; sdp: string }> {
