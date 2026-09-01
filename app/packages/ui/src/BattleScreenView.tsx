@@ -3,6 +3,7 @@ import {
   PLAYER_OWNER,
   compilePrologueLayout,
   defaultTrainingWeapons,
+  dismissPrologueHint,
   pickEnemyCommand,
   pickScriptedEnemyCommand,
   weaponStatsFromRecord,
@@ -339,6 +340,14 @@ export function BattleScreenView() {
    */
   const [storyNote, setStoryNote] = useState<string | null>(null);
   /**
+   * Ключ подсказки пролога, которую показывает открытое окно `storyNote`
+   * (0.21.21). `null`, если окно открыто обычной репликой сцены («Соберись
+   * с силами»). Закрытие окна, показывающего подсказку, снимает одноразовую
+   * реплику с очереди — следующая откроется своим окном, — а принудительную
+   * (стойка М2) оставляет жить до действия сцены.
+   */
+  const [storyNoteHintKey, setStoryNoteHintKey] = useState<string | null>(null);
+  /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
    * действия закрыты — включая «Конец хода». Единственное принуждение
@@ -606,10 +615,90 @@ export function BattleScreenView() {
    * Показать сюжетное сообщение окном (0.20.52): строка журнала гасится,
    * чтобы короткая реплика боя не соседствовала с карточкой.
    */
-  const showStoryNote = (text: string): void => {
+  const showStoryNote = useCallback((text: string): void => {
     setLog(null);
+    setStoryNoteHintKey(null);
     setStoryNote(text);
-  };
+  }, []);
+
+  /** Ключ текущей подсказки пролога: принуждённая либо первая в очереди. */
+  const currentPrologueHintKey = useCallback((): string | null => {
+    const hints = prologueRunRef.current?.hints;
+    if (!hints) return null;
+    return hints.forcedKey ?? hints.queue[0] ?? null;
+  }, []);
+
+  /**
+   * Показать сюжетную подсказку пролога отдельным окном (0.21.21).
+   *
+   * Раньше такие реплики ложились плашкой `.training-note` у нижнего края —
+   * она вставала поверх кнопки защитной стойки и мешала нажать действие.
+   * Теперь реплика читается в том же окне, что вступление и итог миссии,
+   * а кнопка стойки остаётся свободной после закрытия.
+   */
+  const showPrologueHint = useCallback(
+    (key: string): void => {
+      const textKey = content.prologueHints.hints.find((hint) => hint.key === key)?.textKey ?? key;
+      setLog(null);
+      setStoryNoteHintKey(key);
+      setStoryNote(t(textKey));
+    },
+    [content, t],
+  );
+
+  /**
+   * Закрыть окно сообщения. Окно подсказки пролога отличается от обычной
+   * реплики: одноразовая реплика снимается с очереди, чтобы следующая
+   * показалась своим окном; принуждённая (стойка М2) остаётся до действия
+   * сцены — закрытие только прячет текст, а кнопка стойки по-прежнему
+   * единственно доступна, и иное действие вновь откроет сообщение.
+   */
+  const closeStoryNote = useCallback((): void => {
+    const key = storyNoteHintKey;
+    setStoryNote(null);
+    setStoryNoteHintKey(null);
+    if (!key || !isPrologue || !prologueRunRef.current) return;
+    // Принуждённая подсказка живёт, пока сцена не отпустит ход: её закрытие
+    // не снимает замок действий.
+    if (prologueRunRef.current.hints.forcedKey === key) return;
+    const next = dismissPrologueHint(prologueRunRef.current, key);
+    prologueRunRef.current = next;
+    const nextKey = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
+    if (nextKey !== prologueHintKey) setPrologueHintKey(nextKey);
+  }, [isPrologue, prologueHintKey, storyNoteHintKey]);
+
+  /**
+   * Показ подсказки пролога отдельным окном (0.21.21): как только сцена
+   * назначает реплику (`prologueHintKey`), она открывается тем же окном,
+   * что вступление и итог миссии. Принуждённая стойка закрывается, когда
+   * ход отпущен, — текст больше не висит над кнопкой.
+   */
+  const seenPrologueHintRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isPrologue || prologueCard) {
+      seenPrologueHintRef.current = null;
+      // Вступительная карточка либо итог миссии открыты — окно реплики
+      // уступает им экран (0.21.21).
+      if (storyNoteHintKey) {
+        setStoryNote(null);
+        setStoryNoteHintKey(null);
+      }
+      return;
+    }
+    if (!prologueHintKey) {
+      seenPrologueHintRef.current = null;
+      // Ход отпущен (стойка принята) — окно реплики закрыть, если оно
+      // показывало подсказку, а не обычное сообщение сцены.
+      if (storyNoteHintKey) {
+        setStoryNote(null);
+        setStoryNoteHintKey(null);
+      }
+      return;
+    }
+    if (seenPrologueHintRef.current === prologueHintKey) return;
+    seenPrologueHintRef.current = prologueHintKey;
+    showPrologueHint(prologueHintKey);
+  }, [isPrologue, prologueCard, prologueHintKey, storyNoteHintKey, showPrologueHint]);
 
   /** Снять прицеливание, маршрут пути и рывок (0.20.50); боец остаётся выбранным. */
   const clearAim = (): void => {
@@ -958,7 +1047,10 @@ export function BattleScreenView() {
         trainingDeny(route.action);
         return;
       case "denyPrologue":
-        showStoryNote(t("prologue.hint.m2.noise"));
+        // Иное действие, кроме стойки, вновь открывает реплику засады
+        // (0.21.21): сообщение остаётся доступным, пока игрок не примет
+        // стойку по условию сцены.
+        showPrologueHint(currentPrologueHintKey() ?? "m2.noise");
         return;
       case "apply":
         break;
@@ -1419,7 +1511,9 @@ export function BattleScreenView() {
       prologueRunRef.current &&
       !gatePrologueCommand(prologueRunRef.current, { type: "END_TURN", playerId: String(viewOwner) })
     ) {
-      showStoryNote(t("prologue.hint.m2.noise"));
+      // «Конец хода» — тоже действие: при стойке оно закрыто и повторно
+      // открывает реплику засады (0.21.21).
+      showPrologueHint(currentPrologueHintKey() ?? "m2.noise");
       return;
     }
     void runEndTurnSequence();
@@ -2838,7 +2932,10 @@ export function BattleScreenView() {
       {storyNote ? (
         // Сюжетное сообщение (0.20.52): окно поверх поля, закрывается
         // кнопкой либо щелчком по фону; кнопки панели оно не задевает.
-        <div className="pause-root story-note-root" role="presentation" onClick={() => setStoryNote(null)}>
+        // С 0.21.21 здесь же читаются сюжетные подсказки пролога — плашка
+        // `.training-note` под ними убрана, чтобы не ложиться на кнопку
+        // защитной стойки.
+        <div className="pause-root story-note-root" role="presentation" onClick={closeStoryNote}>
           <div
             className="pause-card story-note-card"
             role="dialog"
@@ -2850,16 +2947,10 @@ export function BattleScreenView() {
             <p id="story-note-text" className="story-note-text">
               {storyNote}
             </p>
-            <button type="button" className="hud-btn hud-btn-primary" onClick={() => setStoryNote(null)}>
+            <button type="button" className="hud-btn hud-btn-primary" onClick={closeStoryNote}>
               {t("common.ok")}
             </button>
           </div>
-        </div>
-      ) : null}
-
-      {isPrologue && !prologueCard && prologueHintKey ? (
-        <div className="training-note" role="status">
-          {t(content.prologueHints.hints.find((hint) => hint.key === prologueHintKey)?.textKey ?? prologueHintKey)}
         </div>
       ) : null}
 

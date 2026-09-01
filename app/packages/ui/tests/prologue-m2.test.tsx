@@ -261,8 +261,10 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(`${moved.x},${moved.y}`, "рывок оборван, а не отменён").not.toBe(`${start.x},${start.y}`);
       expect(`${moved.x},${moved.y}`, "рывок не дошёл до цели").not.toBe(`${dash.x},${dash.y}`);
 
-      // Подсказка называет причину, кнопка стойки пульсирует.
-      expect(document.querySelector(".training-note")?.textContent ?? "").toContain("шум в кустах");
+      // Подсказка называет причину отдельным окном, кнопка стойки пульсирует.
+      // (0.21.21): реплика засады больше не плашка над кнопками, а окно, как
+      // вступление и итог миссии.
+      expect(document.querySelector(".story-note-card")?.textContent ?? "").toContain("шум в кустах");
       expect(stanceButton()?.className, "кнопка стойки пульсирует").toContain("hint-pulse");
       expect(stanceButton()?.disabled, "стойка доступна").toBe(false);
       // Всё прочее закрыто, включая «Конец хода».
