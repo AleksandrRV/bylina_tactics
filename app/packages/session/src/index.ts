@@ -394,7 +394,16 @@ export function createSession(
   } | null = null;
   /** Подписчики боевых обновлений (ядро у ведущего, кэш у ведомого). */
   const battleListeners = new Set<() => void>();
-  const notifyBattle = (): void => {
+  /**
+   * Монотонный номер боевого состояния на стороне сессии (0.21.11, P1-1).
+   * Для локального ведущего источник истины — ревизия ядра; для сетевого
+   * ведомого/наблюдателя ядра нет, а снимки приходят по каналу, поэтому счёт
+   * ведёт сама сессия (растёт только на приходе сетевого снимка). Это даёт
+   * представлению единый признак «бой изменился» через getBattleRevision.
+   */
+  let netBattleRevision = 0;
+  const notifyBattle = (remote: boolean): void => {
+    if (remote) netBattleRevision += 1;
     for (const listener of battleListeners) listener();
   };
   const listeners = new Set<(state: SessionState) => void>();
@@ -541,7 +550,9 @@ export function createSession(
     } else if (result.type === "HIT" && result.preview && result.targetId !== undefined) {
       netGuest.hit.set(`${result.actorId}:${result.targetId}:${result.weaponId ?? ""}`, result.preview);
     }
-    notifyBattle();
+    // Ответ предпросмотра кэширует вычисления ведущего, но не меняет
+    // отображаемый снимок: ревизию не двигаем (architecture §3.7).
+    notifyBattle(false);
   };
 
   return {
@@ -1004,7 +1015,7 @@ export function createSession(
           netGuest.snapshot = payload.match;
           netGuest.visible = new Set(payload.visible ?? []);
           netGuest.explored = new Set(payload.explored ?? []);
-          notifyBattle();
+          notifyBattle(true);
         } else if (message.type === "QUERY_RESULT") {
           applyGuestQueryResult(message.payload);
         }
@@ -1091,7 +1102,7 @@ export function createSession(
           netGuest.snapshot = payload.match;
           netGuest.visible = new Set(payload.visible ?? []);
           netGuest.explored = new Set(payload.explored ?? []);
-          notifyBattle();
+          notifyBattle(true);
         }
       });
       transport.send({
@@ -1213,7 +1224,9 @@ export function createSession(
     restoreBattleCheckpoint: () => {
       if (!tacticsHost || !battleCheckpoint) return false;
       tacticsHost.restoreMatch(battleCheckpoint.match, battleCheckpoint.fog);
-      notifyBattle();
+      // Восстановление чекпоинта меняет ядро: ревизию отдаёт само ядро
+      // (restoreMatch → emit), локальный счётчик не двигаем.
+      notifyBattle(false);
       return true;
     },
     hasBattleCheckpoint: () => battleCheckpoint !== null,
@@ -1259,7 +1272,9 @@ export function createSession(
     },
     getBattleSnapshot: (owner) => requireTacticsHost().getSnapshotFor(owner),
     getBattleFullSnapshot: () => (tacticsHost ? tacticsHost.getSnapshot() : null),
-    getBattleRevision: () => (tacticsHost ? tacticsHost.getRevision() : 0),
+    // Локальный ведущий: ревизия ядра. Сетевой ведомый/наблюдатель: счётчик
+    // приходящих снимков (ядра нет). Просмотр/предпросмотр ревизию не двигает.
+    getBattleRevision: () => (tacticsHost ? tacticsHost.getRevision() : netBattleRevision),
     getBattleFog: () => (tacticsHost ? tacticsHost.getFog() : null),
     getBattleReachable: (actorId) => requireTacticsHost().getReachable(actorId),
     getBattlePath: (actorId, to) => requireTacticsHost().getPath(actorId, to),
