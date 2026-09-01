@@ -32,6 +32,8 @@ const ACTION_FILES: Record<string, string> = {
   /* Действия без записи в бестиарии: стойка и дозор. */
   defend: "defend.jpg",
   overwatch: "overwatch.jpg",
+  // Освобождение (INTERACT): образ эвакуации — спасение и вывод к свету.
+  free: "evacuate.jpg",
   /* Умения */
   aimed_eye: "aimed_eye.jpg",
   breach: "breach.jpg",

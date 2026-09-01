@@ -19,13 +19,35 @@ import {
   type SpawnCause,
   type StatusId,
 } from "./skills.js";
-import type { ApplyResult, CellPos, Command, EntityState, GameEvent, MatchState, ReachableCell } from "./types.js";
+import type {
+  ApplyResult,
+  CellPos,
+  Command,
+  EntityState,
+  GameEvent,
+  MatchState,
+  MissionObjective,
+  ReachableCell,
+} from "./types.js";
 import { defaultWeapons, type WeaponStats } from "./weapons.js";
 import { APP_VERSION } from "./version.js";
 
 // Версия ядра следует версии приложения: номер объявлен один раз
 // в корневом манифесте и читается через packages/core/src/version.ts.
 export const CORE_VERSION = APP_VERSION;
+
+/**
+ * Захваченное лицо: обездвижено и не действует (immobile, maxAp 0), либо это
+ * лицо, которое должно быть спасено по цели миссии. Им нельзя управлять, но
+ * рядом с ним доступно действие «освобождение» (§7.2, действие INTERACT).
+ */
+export function isCaptive(entity: EntityState, objective?: MissionObjective): boolean {
+  // Захваченный — обездвижен и не действует; после освобождения (maxAp
+  // возвращён, immobile снят) лицо больше не считается захваченным.
+  const bound = entity.immobileTurns !== undefined && entity.maxAp === 0;
+  if (bound) return true;
+  return objective?.kind === "rescue" && objective.unitId === entity.configId && entity.maxAp === 0;
+}
 
 export interface KernelOptions {
   initial?: MatchState;
@@ -1776,6 +1798,32 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
               : Math.max(0, skill.maxUsesPerBattle - (actor.skillUses[skill.id] ?? 0)),
         });
         spendAction(actor, skill.apCost, skill.endsTurn, events);
+        appendOutcome(events);
+        emit();
+        return { ok: true, events };
+      }
+
+      if (command.type === "INTERACT") {
+        // Освобождение: особое действие, доступное только рядом с захваченным
+        // (immobile, maxAp 0) лицом. Стоит одно ОД и не завершает ход; после
+        // него пленник присоединяется к отряду с полным запасом ОД.
+        if (actor.owner !== PLAYER_OWNER) return { ok: false, reason: "ILLEGAL" };
+        const target = actorOf(command.targetId);
+        if (!target) return { ok: false, reason: "NOT_FOUND" };
+        if (target.dead || !isCaptive(target, state.objective)) return { ok: false, reason: "ILLEGAL" };
+        if (distH(actor.x, actor.y, target.x, target.y) > 1) return { ok: false, reason: "OUT_OF_RANGE" };
+        if (actor.ap < 1) return { ok: false, reason: "NO_AP" };
+        const events: GameEvent[] = [];
+        const baseMaxAp = units.get(target.configId)?.maxAP ?? 2;
+        target.immobileTurns = undefined;
+        target.owner = PLAYER_OWNER;
+        target.maxAp = baseMaxAp;
+        target.ap = baseMaxAp;
+        if (!(target.skillIds ?? []).includes("evacuate")) target.skillIds = [...(target.skillIds ?? []), "evacuate"];
+        events.push({ type: "STATUS_CHANGED", entityId: target.id, status: "IMMOBILE", applied: false });
+        events.push({ type: "STAT_CHANGED", entityId: target.id, stat: "AP", newValue: target.ap, delta: baseMaxAp });
+        events.push({ type: "UNIT_FREED", entityId: target.id, configId: target.configId });
+        spendAction(actor, 1, false, events);
         appendOutcome(events);
         emit();
         return { ok: true, events };

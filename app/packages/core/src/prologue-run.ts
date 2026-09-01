@@ -134,16 +134,10 @@ const M1_TRIGGERS: MissionTrigger[] = [
   { id: "pickup_stick", kind: "OnPickup", itemId: "stick", once: true, flag: "stick" },
 ];
 
-const M2_TRIGGERS: MissionTrigger[] = [
-  {
-    id: "free_fedot",
-    kind: "OnUnitAdjacent",
-    unitId: "mikula_peasant",
-    otherUnitId: "fedot_stranded",
-    once: true,
-    flag: "fedotFreed",
-  },
-];
+const M2_TRIGGERS: MissionTrigger[] = [];
+// Освобождение Федота — не триггер соседства, а особое действие INTERACT
+// (одно ОД, доступно только рядом с захваченным). Смена флага fedotFreed
+// происходит в `afterPrologueApply` по событию UNIT_FREED.
 
 const M3_TRIGGERS: MissionTrigger[] = [
   { id: "first_upyr_dead", kind: "OnUnitDied", unitId: "upyr", once: true, flag: "firstWave" },
@@ -271,16 +265,6 @@ function revealExtract(kernel: TacticsKernel, cells?: readonly { x: number; y: n
         entity.skillIds = [...skills];
       }
     }
-  });
-}
-
-function freeFedot(kernel: TacticsKernel): void {
-  restorePatch(kernel, (match) => {
-    const fedot = match.entities.find((entity) => entity.configId === "fedot_stranded" && !entity.dead);
-    if (!fedot) return;
-    fedot.immobileTurns = undefined;
-    fedot.maxAp = 2;
-    fedot.ap = 2;
   });
 }
 
@@ -463,9 +447,13 @@ export function afterPrologueApply(
     if (events.some((event) => event.type === "COMBAT_RESOLVED" && event.result !== "MISS")) {
       enqueue(next, ctx, "m2.stanceWorks");
     }
-    if (evaluated.fired.some((item) => item.flag === "fedotFreed") && !next.fedotFreed) {
+    // Освобождение Федота — само действие INTERACT (0.21.23): ядро уже сняло
+    // immobile и вернуло пленника в отряд, здесь — последствия сценария.
+    if (
+      events.some((event) => event.type === "UNIT_FREED" && event.configId === "fedot_stranded") &&
+      !next.fedotFreed
+    ) {
       next.fedotFreed = true;
-      freeFedot(kernel);
       // Зона эвакуации загорается позже — когда стая вышла на поле
       // (0.20.45): сначала крысы и их сцена, потом пан камеры к выходу.
       next.extractPending = true;

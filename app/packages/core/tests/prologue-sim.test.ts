@@ -392,17 +392,14 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     const { kernel, ctx, state } = m2Setup({ adjacent: true });
     const mikula = heroOf(kernel);
     const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-    // Шаг — в клетку рядом с Федотом: триггер освобождения читает позиции.
-    const step = kernel
-      .getReachable(mikula.id)
-      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
-    const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
-    expect(applied.ok).toBe(true);
-    if (!applied.ok) return;
+    // Освобождение: особое действие, доступное только рядом с захваченным.
+    const freed = kernel.apply({ type: "INTERACT", actorId: mikula.id, targetId: fedot.id });
+    expect(freed.ok).toBe(true);
+    if (!freed.ok) return;
     const next = afterPrologueApply(
       kernel,
-      { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
-      applied.events,
+      { type: "INTERACT", actorId: mikula.id, targetId: fedot.id },
+      freed.events,
       state,
       ctx,
     );
@@ -436,20 +433,18 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     const { kernel, ctx, state } = m2Setup({ adjacent: true });
     const mikula = heroOf(kernel);
     const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-    // Шаг — в клетку рядом с Федотом: триггер освобождения читает позиции.
-    const step = kernel
-      .getReachable(mikula.id)
-      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
-    const first = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
-    if (!first.ok) throw new Error("шаг не принят");
+    // Освобождение: особое действие, доступное только рядом с захваченным.
+    const first = kernel.apply({ type: "INTERACT", actorId: mikula.id, targetId: fedot.id });
+    if (!first.ok) throw new Error("освобождение не принято");
     const pending = afterPrologueApply(
       kernel,
-      { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
+      { type: "INTERACT", actorId: mikula.id, targetId: fedot.id },
       first.events,
       state,
       ctx,
     );
     expect(pending.extractPending).toBe(true);
+    const step = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
     const elsewhere = kernel
       .getReachable(mikula.id)
       .filter((cell) => `${cell.x},${cell.y}` !== `${step.x},${step.y}` && cell.apCost === 1)[0]!;
@@ -565,26 +560,28 @@ function m2SwarmSetup() {
   return { kernel, ctx: { ...ctx, script: M2_SCRIPT, reinforcements: M2_CRY_WAVE }, state };
 }
 
-/** Освободить Федота шагом в соседнюю клетку: стая выходит на поле. */
+/** Освободить Федота действием INTERACT: стая выходит на поле. */
 function freeFedot(
   kernel: ReturnType<typeof m2Setup>["kernel"],
   ctx: ReturnType<typeof m2Setup>["ctx"],
   state: ReturnType<typeof createPrologueRunState>,
 ) {
   const mikula = heroOf(kernel);
-  const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-  const step = kernel
-    .getReachable(mikula.id)
-    .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
-  const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
-  if (!applied.ok) throw new Error("шаг к Федоту не принят");
-  return afterPrologueApply(
-    kernel,
-    { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
-    applied.events,
-    state,
-    ctx,
-  );
+  let fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
+  // Встать вплотную, если герой ещё не рядом с увязшим Федотом.
+  if (Math.abs(mikula.x - fedot.x) + Math.abs(mikula.y - fedot.y) > 1) {
+    const step = kernel
+      .getReachable(mikula.id)
+      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
+    const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
+    if (!applied.ok) throw new Error("шаг к Федоту не принят");
+  }
+  // Освобождение: одно ОД, только рядом с захваченным.
+  fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
+  const command = { type: "INTERACT" as const, actorId: mikula.id, targetId: fedot.id };
+  const applied = kernel.apply(command);
+  if (!applied.ok) throw new Error(`освобождение не принято: ${applied.reason}`);
+  return afterPrologueApply(kernel, command, applied.events, state, ctx);
 }
 
 /**

@@ -44,6 +44,8 @@ export function eventsVisibleTo(
         return [event.entityId];
       case "ENTITY_SPAWNED":
         return [event.entity.id];
+      case "UNIT_FREED":
+        return [event.entityId];
       case "ENTITY_DIED":
         return [event.entityId];
       case "ENTITY_REMOVED":

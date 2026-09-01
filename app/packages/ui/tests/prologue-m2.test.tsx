@@ -132,7 +132,16 @@ async function freeTheFedot(session: AppServices["session"], drive: MissionDrive
       await drive.clickCell(adjacent.x, adjacent.y);
       continue;
     }
-    if (Math.abs(me.x - fedot.x) + Math.abs(me.y - fedot.y) <= 1) return true;
+    if (Math.abs(me.x - fedot.x) + Math.abs(me.y - fedot.y) <= 1) {
+      // Особое действие «освобождение»: доступно только рядом с захваченным.
+      if (me.ap < 1) {
+        await drive.clickButton("Завершить ход");
+        continue;
+      }
+      if (await drive.clickButton("Освобождение")) return true;
+      await drive.clickButton("Завершить ход");
+      continue;
+    }
     if (me.ap === 0) {
       await drive.clickButton("Завершить ход");
       continue;
@@ -149,11 +158,6 @@ async function freeTheFedot(session: AppServices["session"], drive: MissionDrive
       continue;
     }
     await drive.clickCell(best.x, best.y);
-    if (
-      session.getBattleSnapshot(1).entities.some((entity) => entity.configId === "fedot_stranded" && entity.maxAp > 0)
-    ) {
-      return true;
-    }
   }
   return false;
 }

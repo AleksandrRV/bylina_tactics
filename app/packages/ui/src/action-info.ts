@@ -207,3 +207,16 @@ export function stanceActionInfo(kind: "defend" | "overwatch", t: Translate): Ac
     rows,
   };
 }
+
+/** Окно информации об освобождении: особое действие рядом с захваченным. */
+export function liberateActionInfo(t: Translate): ActionInfo {
+  const rows: ActionInfoRow[] = [{ label: t("action.info.kind"), value: t("action.info.kindSpecial") }];
+  pushCost(rows, 1, false, t);
+  return {
+    id: "free",
+    name: t("battle.free"),
+    art: actionArt("free"),
+    flavor: lookup(t, "battle.freeFlavor"),
+    rows,
+  };
+}

@@ -4,6 +4,8 @@ import {
   compilePrologueLayout,
   defaultTrainingWeapons,
   dismissPrologueHint,
+  distH,
+  isCaptive,
   pickEnemyCommand,
   pickScriptedEnemyCommand,
   weaponStatsFromRecord,
@@ -47,7 +49,7 @@ import { EnemyFace, RosterCard, UnitInfoDialog } from "./unit-card.js";
 import { buildUnitInfo, type UnitInfo } from "./unit-info.js";
 import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./charge-attack.js";
 import { actionArt } from "./action-art.js";
-import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
+import { liberateActionInfo, skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
 import { useServices, useT } from "./context.js";
 import { useBattleRevision, useI18nTick, useLatest, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -817,6 +819,21 @@ export function BattleScreenView() {
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
 
+  // Захваченное лицо рядом с выбранным бойцом: рядом с ним доступно особое
+  // действие «освобождение» (§7.2). Захват — объект миссии rescue либо
+  // обездвиженное лицо (immobile, maxAp 0).
+  const liberatable = useMemo(() => {
+    if (!selected || selected.dead || selected.owner !== viewOwner) return null;
+    const captive = snapshot.entities.find(
+      (entity) =>
+        !entity.dead &&
+        entity.id !== selected.id &&
+        isCaptive(entity, snapshot.objective) &&
+        distH(selected.x, selected.y, entity.x, entity.y) <= 1,
+    );
+    return captive ?? null;
+  }, [snapshot, selected, viewOwner]);
+
   const reachable = useMemo(() => {
     void battleRevision;
     if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
@@ -1283,6 +1300,22 @@ export function BattleScreenView() {
       }
     }
     applyCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
+  };
+
+  // «Освобождение»: особое действие рядом с захваченным лицом — одно ОД,
+  // ход не завершает. Доступно только игроку в его ход и вне стойки (§7.2).
+  const applyLiberate = (): void => {
+    if (
+      selectedId === null ||
+      !liberatable ||
+      paused ||
+      busy ||
+      snapshot.activeOwner !== viewOwner ||
+      prologueStanceLock
+    )
+      return;
+    applyCommand({ type: "INTERACT", actorId: selectedId, targetId: liberatable.id });
+    setIntent({ type: "cancel" });
   };
 
   const tryPositionSkill = (pos: CellPos): void => {
@@ -2735,6 +2768,24 @@ export function BattleScreenView() {
                   />
                 );
               })}
+              {liberatable ? (
+                <ActionSlot
+                  id="free"
+                  name={t("battle.free")}
+                  art={actionArt("free")}
+                  active={false}
+                  disabled={
+                    !selected ||
+                    selected.ap < 1 ||
+                    busy ||
+                    snapshot.activeOwner !== viewOwner ||
+                    prologueStanceLock
+                  }
+                  title={t("battle.freeHint")}
+                  onInspect={() => setActionInfo(liberateActionInfo(t))}
+                  onPress={applyLiberate}
+                />
+              ) : null}
               <ActionSlot
                 id="defend"
                 name={t("battle.defend")}

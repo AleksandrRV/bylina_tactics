@@ -137,6 +137,7 @@ export type Command =
   | { type: "OVERWATCH"; actorId: number }
   | { type: "DEFEND"; actorId: number }
   | { type: "USE_SKILL"; actorId: number; skillId: string; targetId?: number; targetPos?: CellPos }
+  | { type: "INTERACT"; actorId: number; targetId: number }
   | { type: "END_TURN"; playerId: string };
 
 export type GameEvent =
@@ -187,6 +188,7 @@ export type GameEvent =
       sourceId?: number;
     }
   | { type: "ENTITY_SPAWNED"; entity: EntityState; cause: "SUMMON" | "ILLUSION" | "RESURRECTION" }
+  | { type: "UNIT_FREED"; entityId: number; configId: string }
   | { type: "COVER_DESTROYED"; gridPos: CellPos; newStatus: "HALF" | "NONE" }
   | { type: "ENTITY_DIED"; entityId: number; causeOfDeath: "DAMAGE" | "FALL_INTO_PIT" | "POISON" }
   | { type: "ENTITY_REMOVED"; entityId: number; reason: "FLED" | "EXPIRED" | "EXTRACTED" }

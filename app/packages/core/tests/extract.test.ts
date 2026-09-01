@@ -401,14 +401,40 @@ describe("mission objectives (0.13.0)", () => {
 
   it("rescue: victory by OBJECTIVE when the escortee extracts from the zone", () => {
     const kernel = objectiveKernel({ kind: "rescue", unitId: "captive" });
-    const captive = kernel.getSnapshot().entities.find((entity) => entity.configId === "captive")!;
+    const snap = kernel.getSnapshot();
+    const captive = snap.entities.find((entity) => entity.configId === "captive")!;
+    const bogatyr = snap.entities.find((entity) => entity.configId === "bogatyr")!;
+    // Пленник захвачен: им нельзя управлять, пока рядом не освободят.
     expect(captive.owner).toBe(PLAYER_OWNER);
-    const reachable = kernel.getReachable(captive.id);
-    const zoneCell = reachable.find((cell) => cell.x === 0);
+    expect(captive.maxAp).toBe(0);
+    expect(captive.immobileTurns).toBeGreaterThan(0);
+    expect(kernel.getReachable(captive.id)).toHaveLength(0);
+    // Богатырь подходит вплотную и применяет действие «освобождение» (INTERACT).
+    const besideX = captive.x > 0 ? captive.x - 1 : captive.x + 1;
+    const besideY = captive.y;
+    for (const entity of snap.entities) {
+      if (entity.x === besideX && entity.y === besideY && entity.id !== bogatyr.id) entity.x += 3;
+    }
+    const tile = snap.grid.tiles.find((candidate) => candidate.x === besideX && candidate.y === besideY)!;
+    tile.pit = false;
+    tile.blockLOS = false;
+    bogatyr.x = besideX;
+    bogatyr.y = besideY;
+    bogatyr.z = tile.z;
+    kernel.restoreMatch(snap, kernel.getFog());
+    const freed = kernel.apply({ type: "INTERACT", actorId: bogatyr.id, targetId: captive.id });
+    expect(freed.ok).toBe(true);
+    if (!freed.ok) return;
+    const after = kernel.getSnapshot().entities.find((entity) => entity.configId === "captive")!;
+    expect(after.maxAp).toBe(2);
+    expect(after.ap).toBe(2);
+    expect(after.immobileTurns).toBeUndefined();
+    // Княжна сама выходит в зону эвакуации.
+    const zoneCell = kernel.getReachable(after.id).find((cell) => cell.x === 0);
     expect(zoneCell).toBeDefined();
     if (!zoneCell) return;
-    expect(kernel.apply({ type: "MOVE", actorId: captive.id, to: zoneCell }).ok).toBe(true);
-    const result = kernel.apply({ type: "USE_SKILL", actorId: captive.id, skillId: EVACUATE.id });
+    expect(kernel.apply({ type: "MOVE", actorId: after.id, to: zoneCell }).ok).toBe(true);
+    const result = kernel.apply({ type: "USE_SKILL", actorId: after.id, skillId: EVACUATE.id });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.events).toContainEqual({

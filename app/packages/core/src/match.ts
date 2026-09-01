@@ -270,6 +270,11 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     const escortee = spawnUnitState(1001, config, PLAYER_OWNER, point.x, point.y, z, 1);
     escortee.countsForElimination = false;
+    // Спасаемое лицо начинает захваченным (0.14.0): им нельзя управлять,
+    // пока рядом кто-то из дружины не освободит его действием INTERACT.
+    escortee.immobileTurns = 99;
+    escortee.maxAp = 0;
+    escortee.ap = 0;
     state.entities.push(escortee);
   }
   state.rngState = String(rng.getState());
