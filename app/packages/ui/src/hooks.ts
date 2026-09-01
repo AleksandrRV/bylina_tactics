@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import type { SessionApi } from "@bylina/session";
 import { useServices } from "./context.js";
 
 export function useI18nTick(): void {
@@ -19,6 +20,23 @@ export function useSettingsState() {
   const [state, setState] = useState(settings.get());
   useEffect(() => settings.subscribe(setState), [settings]);
   return state;
+}
+
+/**
+ * Монотонный номер боевого состояния (0.21.11, P1-1 часть 2). Подписка на
+ * изменения боя через `useSyncExternalStore`: представление перерисовывается
+ * один раз на зафиксированное изменение (ревизия ядра у локального хоста,
+ * синхронизация снимка у сетевого ведомого), а не клонирует снимок на каждый
+ * рендер. Возвращаемый номер служит признаком устаревания для `useMemo` —
+ * раньше эти места глушили `exhaustive-deps` и пересчитывались по полям
+ * снимка.
+ */
+export function useBattleRevision(session: SessionApi): number {
+  return useSyncExternalStore(
+    (onChange) => session.subscribeBattle(onChange),
+    () => session.getBattleRevision(),
+    () => 0,
+  );
 }
 
 /**

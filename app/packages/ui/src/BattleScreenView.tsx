@@ -47,7 +47,7 @@ import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./
 import { actionArt } from "./action-art.js";
 import { skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
 import { useServices, useT } from "./context.js";
-import { useI18nTick, useLatest, useSessionState, useSettingsState } from "./hooks.js";
+import { useBattleRevision, useI18nTick, useLatest, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "./enemy-strip.js";
@@ -158,6 +158,18 @@ function ExitIcon() {
   );
 }
 
+/**
+ * Постоянный пустой снимок для случая, когда сетевой снимок ещё не пришёл
+ * (0.21.11): модульная константа, чтобы useMemo не зависел от создаваемого на
+ * каждом рендере объекта-пустышки.
+ */
+const EMPTY_SNAPSHOT: MatchState = {
+  turnNumber: 1,
+  activeOwner: PLAYER_OWNER,
+  grid: { width: 8, height: 6, tiles: [] },
+  entities: [],
+};
+
 export function BattleScreenView() {
   useI18nTick();
   const t = useT();
@@ -238,7 +250,11 @@ export function BattleScreenView() {
     return host;
   });
 
-  const [, setTick] = useState(0);
+  // Ревизия боя (0.21.11, P1-1 часть 2): единственный признак устаревания
+  // снимка. Меняется один раз на зафиксированное изменение боя — у локального
+  // хоста это ревизия ядра, у сетевого ведомого/наблюдателя — счётчик
+  // приходящих снимков. Запросы предпросмотра ревизию не двигают.
+  const battleRevision = useBattleRevision(session);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
   const [aimId, setAimId] = useState<number | null>(null);
@@ -247,6 +263,9 @@ export function BattleScreenView() {
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [enemyPhase, setEnemyPhase] = useState(false);
+  // Готовность средства отображения: перерисовка после асинхронного монтажа,
+  // чтобы эффекты увидели rendererRef. Не связано с ревизией боя.
+  const [rendererReady, setRendererReady] = useState(false);
   // Кинематографическая сцена (0.20.37): пока идёт, ввод игрока закрыт и на
   // экране доступна кнопка пропуска (campaign.md §1.8).
   const [cutscenePlaying, setCutscenePlaying] = useState(false);
@@ -257,14 +276,6 @@ export function BattleScreenView() {
    * принадлежит проигрыванию боя.
    */
   const [outcomePending, setOutcomePending] = useState(false);
-
-  useEffect(
-    () =>
-      session.subscribeBattle(() => {
-        setTick((value) => value + 1);
-      }),
-    [kernel, session],
-  );
 
   // Режим обучения (0.19.0): активный шаг подсказки; отслеживание событий
   // для перехода к следующему шагу. Шаги выполняются по порядку поля step
@@ -433,17 +444,21 @@ export function BattleScreenView() {
   const viewOwner = pvpActive ?? PLAYER_OWNER;
   const enemyOwner = viewOwner === ENEMY_OWNER ? PLAYER_OWNER : ENEMY_OWNER;
 
-  const EMPTY_SNAPSHOT: MatchState = {
-    turnNumber: 1,
-    activeOwner: viewOwner,
-    grid: { width: 8, height: 6, tiles: [] },
-    entities: [],
-  };
   // Наблюдатель, как и гость, не исполняет правила: снимок приходит от ведущего.
   const usesNetSnapshot = isNetGuest || isSpectator;
-  const snapshot = usesNetSnapshot
-    ? (session.getNetSnapshot() ?? EMPTY_SNAPSHOT)
-    : session.getBattleSnapshot(viewOwner);
+  // Снимок вычисляется один раз на изменение боя (ревизия), а не на каждый
+  // рендер: getBattleSnapshot отдаёт глубокую копию состояния (P1-1, 0.21.11).
+  // Пустой снимок-объект постоянный (EMPTY_SNAPSHOT), чтобы useMemo не видел
+  // меняющуюся на каждом рендере ссылку-пустышку.
+  const snapshot = useMemo<MatchState>(() => {
+    // Ревизия — намеренный триггер пересчёта снимка: память возвращает
+    // свежий снимок один раз на зафиксированное изменение боя (0.21.11).
+    void battleRevision;
+    if (usesNetSnapshot) return session.getNetSnapshot() ?? EMPTY_SNAPSHOT;
+    return session.getBattleSnapshot(viewOwner);
+    // viewOwner/usesNetSnapshot зависят от активного владельца, который сам
+    // меняется только вместе с боем; ревизия — основной признак устаревания.
+  }, [battleRevision, viewOwner, usesNetSnapshot, session]);
 
   // Завершение миссии обучения: итоговая плашка вместо мгновенного возврата
   // (ui-design §3: «…→ итог → экран обучения»). Пройденной считается только
@@ -454,6 +469,9 @@ export function BattleScreenView() {
   // (клетка, оружие, умение, цель, исполнитель). Всё остальное интерфейс не
   // исполняет; подсветка указания — единственный яркий элемент поля.
   const directiveView = useMemo<TrainingDirectiveView | null>(() => {
+    // Ревизия боя — намеренный триггер пересчёта указания (зависит от
+    // достижимости, предпросмотров и состояния цели).
+    void battleRevision;
     if (!isTraining || !activeHint || trainingOver) return null;
     const full = session.getBattleFullSnapshot();
     if (!full) return null;
@@ -464,11 +482,10 @@ export function BattleScreenView() {
       skillPreview: (actorId, skillId, targetId, pos) => session.getBattleSkillPreview(actorId, skillId, targetId, pos),
       skills,
     });
-    // Пересчёт на каждое изменение боя: указание зависит от достижимости,
-    // предпросмотров и состояния цели. Полный снимок ведущего обязателен:
-    // сокращённый снимок стороны скрывает чужие сущности в тумане.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isTraining, activeHint, trainingOver, skills, snapshot, session]);
+    // Пересчёт на каждое изменение боя (ревизия): указание зависит от
+    // достижимости, предпросмотров и состояния цели. Полный снимок ведущего
+    // читается внутри. Тело ссылается только на сервисы/неизменные аргументы.
+  }, [isTraining, activeHint, trainingOver, skills, battleRevision, session]);
 
   // Указание, оказавшееся невыполнимым (исполнитель погиб, цель уже мертва,
   // умение исчерпано), пропускается — сценарий самовосстанавливается.
@@ -541,19 +558,25 @@ export function BattleScreenView() {
     return !isTraining || (trainingDirective?.kind === "skill" && trainingDirective.skillId === skillId);
   };
 
+  // Видимость/разведка поля зависят от боя, а не от кадра: ревизия —
+  // намеренный триггер пересчёта (тело читает сервис), поэтому она
+  // упоминается в теле, чтобы отношение «зависимость → пересчёт» было явным.
   const visibleCells = useMemo(
-    () => (usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner)),
-    // Ядро и части снимка — признак устаревания (0.20.61): память обязана
-    // пересчитываться на каждое изменение поля, хотя тело читает только
-    // сервис. У соседних памятей правило то же.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot, session],
+    () => {
+      void battleRevision;
+      return usesNetSnapshot ? session.getNetVisible() : session.getBattleVisible(viewOwner);
+    },
+    // Признак устаревания — ревизия боя (0.21.11): память пересчитывается
+    // один раз на зафиксированное изменение поля. Тело читает только сервис.
+    [battleRevision, viewOwner, usesNetSnapshot, session],
   );
   const exploredCells = useMemo(
-    () => (usesNetSnapshot ? session.getNetExplored() : session.getBattleExplored(viewOwner)),
-    // Тот же признак устаревания, что у видимости поля (0.20.61).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [kernel, snapshot.turnNumber, snapshot.entities, viewOwner, usesNetSnapshot, session],
+    () => {
+      void battleRevision;
+      return usesNetSnapshot ? session.getNetExplored() : session.getBattleExplored(viewOwner);
+    },
+    // Тот же признак устаревания, что у видимости поля.
+    [battleRevision, viewOwner, usesNetSnapshot, session],
   );
 
   // Сторона экрана: по ней модуль battle-selection отбирает своих бойцов
@@ -1645,7 +1668,10 @@ export function BattleScreenView() {
         return;
       }
       rendererRef.current = renderer;
-      setTick((value) => value + 1);
+      // Средство отображения смонтировано: один перерендер, чтобы эффекты,
+      // читающие rendererRef, увидели готовый рендер. К ревизии боя не
+      // относится — это событие монтирования представления.
+      setRendererReady(true);
     });
     return () => {
       gone = true;
@@ -1817,7 +1843,11 @@ export function BattleScreenView() {
       trainingHighlight,
       trainingFocus,
     });
+    // rendererReady: после асинхронного монтажа средства отображения эффект
+    // обязан отработать ещё раз и отправить первый кадр (раньше это делал
+    // setTick). snapshot/visibleCells обновляются по ревизии боя.
   }, [
+    rendererReady,
     matchSeed,
     snapshot,
     selectedId,
