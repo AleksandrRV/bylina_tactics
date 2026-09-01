@@ -69,6 +69,18 @@ describe("nextIntent: инвариант «прицел без выбранно�
 });
 
 describe("nextIntent: прицеливание и действие", () => {
+  it("armAction без цели вооружает действие с targetId null", () => {
+    const selected = nextIntent(IDLE_INTENT, { type: "select", actorId: 1 });
+    expect(nextIntent(selected, { type: "armAction", action: weapon, targetId: null })).toEqual({
+      kind: "aiming",
+      actorId: 1,
+      action: weapon,
+      targetId: null,
+      targetPos: null,
+      preview: null,
+    });
+  });
+
   it("armAction из selected вооружает действие и запоминает цель", () => {
     const selected = nextIntent(IDLE_INTENT, { type: "select", actorId: 1 });
     expect(nextIntent(selected, { type: "armAction", action: weapon, targetId: 2 })).toEqual({

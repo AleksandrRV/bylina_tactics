@@ -79,8 +79,11 @@ export type IntentEvent =
   | { type: "select"; actorId: number }
   /** Снять выбор (гибель выбранного, смена хода без выбора). */
   | { type: "clearSelection" }
-  /** Вооружиться действием по цели-бойцу (авто-оружие по врагу). */
-  | { type: "armAction"; action: SelectableAction; targetId: number }
+  /**
+   * Вооружиться действием (авто-оружие по врагу): цель может быть уже
+   * названа, а может прийти позже событием aim — тогда `targetId: null`.
+   */
+  | { type: "armAction"; action: SelectableAction; targetId: number | null }
   /** Включить или выключить действие без цели (панель оружия/умений/стойки). */
   | { type: "toggleAction"; actorId: number; action: SelectableAction | null }
   /**
