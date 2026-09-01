@@ -1488,11 +1488,16 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const upcoming = nextOwner(state, endingOwner);
         state.activeOwner = upcoming;
 
-        // §16.1: poison before every other beginning-of-turn system.
-        for (const entity of [...state.entities]
-          .filter((candidate) => candidate.owner === upcoming && !candidate.dead)
-          .sort((a, b) => a.id - b.id)) {
-          if (!entity.poison) continue;
+        // Системы начала хода стороны `upcoming` (0.21.13, день 14: сведены в
+        // один проход по id-сортированному списку — порядок фаз и событий
+        // сохранён, его прикрывает property-based тест детерминизма):
+        const upcomingEntities = [...state.entities]
+          .filter((candidate) => candidate.owner === upcoming)
+          .sort((a, b) => a.id - b.id);
+
+        // §16.1: яд раньше всех остальных систем начала хода.
+        for (const entity of upcomingEntities) {
+          if (entity.dead || !entity.poison) continue;
           const poison = entity.poison;
           applyDamage(entity, poison.damagePerTurn, events, "POISON");
           if (entity.dead || !state.entities.some((candidate) => candidate.id === entity.id)) continue;
@@ -1503,11 +1508,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           }
         }
 
-        // §16.2: limited life expires before AP refill.
-        for (const entity of [...state.entities]
-          .filter((candidate) => candidate.owner === upcoming && !candidate.dead)
-          .sort((a, b) => a.id - b.id)) {
-          if (entity.timedLife === undefined) continue;
+        // §16.2: ограниченное время жизни истекает до пополнения ОД.
+        for (const entity of upcomingEntities) {
+          if (entity.dead || entity.timedLife === undefined) continue;
           entity.timedLife -= 1;
           if (entity.timedLife <= 0) {
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "TIMED", applied: false });
@@ -1515,9 +1518,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           }
         }
 
-        // Cooldowns tick once at the beginning of the owning side's turn.
-        for (const entity of state.entities.filter((candidate) => candidate.owner === upcoming && !candidate.dead)) {
-          if (!entity.skillCooldowns) continue;
+        // Перезарядки тикают один раз в начале хода владеющей стороны.
+        for (const entity of upcomingEntities) {
+          if (entity.dead || !entity.skillCooldowns) continue;
           for (const [skillId, value] of Object.entries(entity.skillCooldowns)) {
             if (value <= 0) continue;
             const cooldown = Math.max(0, value - 1);
@@ -1535,9 +1538,8 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           }
         }
 
-        // §16.3–4: clear defensive orders and refill AP.
-        for (const entity of state.entities) {
-          if (entity.owner !== upcoming) continue;
+        // §16.3–4: снимаем оборонительные приказы и пополняем ОД.
+        for (const entity of upcomingEntities) {
           if (entity.overwatch) {
             entity.overwatch = false;
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "OVERWATCH", applied: false });
@@ -1554,10 +1556,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             events.push({ type: "STAT_CHANGED", entityId: entity.id, stat: "AP", newValue: entity.ap, delta });
         }
 
-        // §16.5: panic performs its forced one-AP flight after refill.
-        for (const entity of [...state.entities]
-          .filter((candidate) => candidate.owner === upcoming && candidate.panic)
-          .sort((a, b) => a.id - b.id)) {
+        // §16.5: паника совершает принудительный отлёт на одно ОД после пополнения.
+        for (const entity of upcomingEntities) {
+          if (!entity.panic) continue;
           processPanic(entity, events);
         }
 

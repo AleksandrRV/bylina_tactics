@@ -400,12 +400,17 @@ export function BattleScreenView() {
   );
 
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
+  // 0.21.13 (P1-3): курсор повтора живёт в ref, поэтому интервал создаётся один
+  // раз на журнал — темп ровный, deps полны, подавление exhaustive-deps не
+  // нужно (раньше интервал пересоздавался после каждой команды из-за
+  // replayIndex в зависимостях, что давало дрейф темпа и глушило линт).
   const { replayIndex, setReplayIndex, replayDone, setReplayDone } = useReplayControls();
+  const replayIndexRef = useRef(0);
   useEffect(() => {
     if (!isReplay || !replayJournal || !kernel || replayDone) return;
     const commands = replayJournal.commands;
     const timer = window.setInterval(() => {
-      const index = replayIndex;
+      const index = replayIndexRef.current;
       if (index >= commands.length) {
         window.clearInterval(timer);
         setReplayDone(true);
@@ -413,14 +418,11 @@ export function BattleScreenView() {
       }
       const command = commands[index];
       if (command) kernel.apply(command);
+      replayIndexRef.current = index + 1;
       setReplayIndex(index + 1);
     }, 480);
     return () => window.clearInterval(timer);
-    // setReplayIndex/setReplayDone — стабильные сеттеры из useState (можно не
-    // перечислять); интервал намеренно пересоздаётся на каждом replayIndex,
-    // поэтому замыкание читает свежий индекс через зависимость, а не ref.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
+  }, [isReplay, replayJournal, kernel, replayDone, setReplayIndex, setReplayDone]);
 
   // Обрыв канала состязательного боя (0.17.0): отсчёт 30 секунд.
   const netDisconnected = session.get().netDisconnected === true;
