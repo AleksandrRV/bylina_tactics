@@ -646,6 +646,8 @@
     "guest": "Join",
     "hostHint": "Create a match: the guest joins by code or image.",
     "create": "Create match",
+    "creating": "Preparing the code…",
+    "creatingHint": "Collecting local network addresses — the code appears in a moment.",
     "hostWait": "Show the code or image to the opponent, then enter their answer.",
     "peerCode": "Opponent code",
     "peerCodePlaceholder": "Paste the opponent's answer code",

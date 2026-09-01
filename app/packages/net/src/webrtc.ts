@@ -10,6 +10,8 @@ export interface WebRtcChannelOptions {
   onConnect?: () => void;
   onClose?: () => void;
   onError?: (error: Error) => void;
+  /** Предел ожидания сбора кандидатов в миллисекундах (по умолчанию 2000). */
+  gatheringTimeoutMs?: number;
 }
 
 /** Описание сессии, передаваемое изображением быстрого считывания либо короткой строкой. */
@@ -24,6 +26,19 @@ interface WebRtcSignal {
  * соединения в неочевидных сетевых конфигурациях.
  */
 const ICE_SERVERS: RTCIceServer[] = [{ urls: "stun:stun.l.google.com:19302" }];
+
+/**
+ * Предел ожидания сбора кандидатов (0.21.18).
+ *
+ * Описание готовится целиком — «капающих» кандидатов при офлайн-обмене нет,
+ * — но ждать событие завершения сбора без предела нельзя: в локальной сети
+ * без выхода в интернет внешний сервер недостижим, сбор тянется десятки
+ * секунд, и ведущий, нажавший «Создать партию», не получает кода вовсе.
+ * По истечении предела описание уходит с адресами, собранными к этому
+ * моменту: прямые адреса локальной сети появляются в первые миллисекунды,
+ * а внешний сервер нужен лишь конфигурациям, где прямые адреса закрыты.
+ */
+const GATHERING_TIMEOUT_MS = 2_000;
 
 function isWebRtcSignal(value: unknown): value is WebRtcSignal {
   const candidate = value as Partial<WebRtcSignal> | null;
@@ -42,7 +57,9 @@ function isWebRtcSignal(value: unknown): value is WebRtcSignal {
  * как ESM и не требует полифилов `process`/`buffer`. Обмен описаниями
  * сессии выполняется офлайн — изображением быстрого считывания либо
  * короткой строкой (roadmap 0.15.0), поэтому описание отдаётся наружу
- * только после завершения сбора кандидатов (аналог `trickle: false`).
+ * целиком (аналог `trickle: false`): после завершения сбора кандидатов
+ * либо — если сбор не завершился — по истечении предела ожидания
+ * (`gatheringTimeoutMs`, 0.21.18).
  */
 export function createWebRtcChannel(
   options: WebRtcChannelOptions,
@@ -53,6 +70,7 @@ export function createWebRtcChannel(
     throw new Error("WebRTC is not available in this environment");
   }
 
+  const gatheringTimeoutMs = options.gatheringTimeoutMs ?? GATHERING_TIMEOUT_MS;
   const peer = new RTCPeerConnection({ iceServers: ICE_SERVERS });
   const listeners = new Set<(message: Envelope) => void>();
   // Конверты, отправленные до открытия канала данных, ждут в очереди.
@@ -60,18 +78,47 @@ export function createWebRtcChannel(
   let dataChannel: RTCDataChannel | null = null;
   let signalSent = false;
   let closed = false;
+  let gatheringTimer: ReturnType<typeof setTimeout> | null = null;
 
   const reportError = (error: unknown): void => {
     options.onError?.(error instanceof Error ? error : new Error(String(error)));
   };
 
-  // Описание отдаётся один раз и только после полного сбора кандидатов:
-  // дополнительного сигнального канала для «капающих» кандидатов нет.
+  const stopGatheringWait = (): void => {
+    if (gatheringTimer === null) return;
+    clearTimeout(gatheringTimer);
+    gatheringTimer = null;
+  };
+
+  // Описание отдаётся один раз: по завершении сбора кандидатов либо по
+  // истечении предела ожидания — дополнительного сигнального канала для
+  // «капающих» кандидатов нет, поэтому второе описание не отдаётся.
   const emitLocalSignal = (): void => {
-    if (signalSent || closed) return;
-    if (peer.iceGatheringState !== "complete" || !peer.localDescription) return;
+    if (signalSent || closed || !peer.localDescription) return;
+    if (peer.iceGatheringState !== "complete") return;
+    stopGatheringWait();
     signalSent = true;
     options.onSignal?.({ type: peer.localDescription.type, sdp: peer.localDescription.sdp });
+  };
+
+  /**
+   * Страховка от сбора, который не завершается: внешний сервер недостижим,
+   * и событие пришло бы слишком поздно либо не пришло бы вовсе (0.21.18).
+   */
+  const armGatheringWait = (): void => {
+    if (signalSent || closed || gatheringTimer !== null) return;
+    gatheringTimer = setTimeout(() => {
+      gatheringTimer = null;
+      if (signalSent || closed || !peer.localDescription) return;
+      signalSent = true;
+      options.onSignal?.({ type: peer.localDescription.type, sdp: peer.localDescription.sdp });
+    }, gatheringTimeoutMs);
+  };
+
+  /** Описание положено — ждём завершения сбора, но не дольше предела. */
+  const localDescriptionReady = (): void => {
+    emitLocalSignal();
+    armGatheringWait();
   };
   peer.addEventListener("icegatheringstatechange", emitLocalSignal);
 
@@ -108,7 +155,7 @@ export function createWebRtcChannel(
       try {
         const offer = await peer.createOffer();
         await peer.setLocalDescription(offer);
-        emitLocalSignal();
+        localDescriptionReady();
       } catch (error) {
         reportError(error);
       }
@@ -137,8 +184,9 @@ export function createWebRtcChannel(
         if (signal.type === "offer" && !peer.localDescription) {
           const answer = await peer.createAnswer();
           await peer.setLocalDescription(answer);
-          // Сбор кандидатов мог завершиться синхронно (например, без сети).
-          emitLocalSignal();
+          // Сбор кандидатов мог завершиться сразу (например, без сети),
+          // а мог и не завершиться вовсе — тогда описание уйдёт по пределу.
+          localDescriptionReady();
         }
       } catch (error) {
         reportError(error);
@@ -150,6 +198,7 @@ export function createWebRtcChannel(
   const close = (): void => {
     if (closed) return;
     closed = true;
+    stopGatheringWait();
     peer.close();
   };
 

@@ -387,6 +387,10 @@ function NetworkSetup({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  // Описание сессии готовится не мгновенно: пока собираются адреса, кнопка
+  // показывает подготовку, а не молчит (0.21.18 — «Создать партию» не
+  // отвечала на нажатие, когда сбор кандидатов не завершался).
+  const [pending, setPending] = useState(false);
   const transportRef = useMemo(
     () => ({ current: null as (Transport & { receiveSignal(data: unknown): void; close?(): void }) | null }),
     [],
@@ -404,6 +408,7 @@ function NetworkSetup({
     setPeerCode("");
     setConnected(false);
     setError(null);
+    setPending(false);
   };
 
   const createChannel = (initiator: boolean): Transport | null => {
@@ -414,18 +419,23 @@ function NetworkSetup({
         onSignal: (signal) => {
           const next = encodeSessionCode(signal);
           setCode(next);
+          setPending(false);
           void createQrDataUrl(next)
             .then(setQr)
             .catch(() => setQr(null));
         },
         receiveSignal: () => undefined,
         onConnect: () => setConnected(true),
-        onError: (err) => setError(err.message),
+        onError: (err) => {
+          setError(err.message);
+          setPending(false);
+        },
       });
       transportRef.current = channel;
       return channel;
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+      setPending(false);
       return null;
     }
   };
@@ -524,14 +534,17 @@ function NetworkSetup({
             <button
               type="button"
               className="btn btn-primary"
+              disabled={pending}
               onClick={() => {
                 setError(null);
+                setPending(true);
                 createChannel(true);
               }}
             >
-              {t("net.create")}
+              {pending ? t("net.creating") : t("net.create")}
             </button>
           ) : null}
+          {pending && !code ? <p className="muted">{t("net.creatingHint")}</p> : null}
           {code ? (
             <div className="net-code-box">
               {qr ? <img className="net-qr" src={qr} alt={t("net.qrAlt")} draggable={false} /> : null}
@@ -620,12 +633,17 @@ function NetworkSetup({
           <button
             type="button"
             className="btn btn-primary"
+            disabled={!peerCode.trim() || pending}
             onClick={() => {
               setError(null);
+              setPending(true);
               try {
                 const signal = decodeSessionCode(peerCode);
                 const channel = createChannel(false);
-                if (!channel) return;
+                if (!channel) {
+                  setPending(false);
+                  return;
+                }
                 (channel as Transport & { receiveSignal(data: unknown): void }).receiveSignal(signal);
                 // Ведомый ждёт партию ведущего; роль выбирает сам участник:
                 // соперник управляет стороной 2, наблюдатель команд не шлёт.
@@ -636,12 +654,13 @@ function NetworkSetup({
                 }
               } catch {
                 setError(t("net.badCode"));
+                setPending(false);
               }
             }}
-            disabled={!peerCode.trim()}
           >
-            {t("net.connect")}
+            {pending ? t("net.creating") : t("net.connect")}
           </button>
+          {pending && !code ? <p className="muted">{t("net.creatingHint")}</p> : null}
           {/* Ответ ведомого (описание сессии) отдаётся ведущему тем же
               офлайн-способом: код и изображение показываются ведомому,
               ведущий вводит их на своей стороне. */}
