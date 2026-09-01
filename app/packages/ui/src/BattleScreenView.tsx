@@ -416,6 +416,9 @@ export function BattleScreenView() {
       setReplayIndex(index + 1);
     }, 480);
     return () => window.clearInterval(timer);
+    // setReplayIndex/setReplayDone — стабильные сеттеры из useState (можно не
+    // перечислять); интервал намеренно пересоздаётся на каждом replayIndex,
+    // поэтому замыкание читает свежий индекс через зависимость, а не ref.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isReplay, replayJournal, kernel, replayIndex, replayDone]);
 
@@ -613,7 +616,10 @@ export function BattleScreenView() {
       playThen(events);
     });
     return unlisten;
-    // Подписка создаётся на время жизни экрана.
+    // Подписка на транспорт живёт весь экран: announce/clearAim/playThen —
+    // функции компонента, читающие свежее состояние через замыкание каждого
+    // рендера, но добавлять их в зависимости нельзя (пересоздавались бы на
+    // каждом рендере и рвали подписку). kernel/session/battleKind стабильны.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel, battleKind, session]);
 
@@ -660,6 +666,10 @@ export function BattleScreenView() {
       }
       return next;
     });
+    // Реагируем на смену набора показываемых подсказок (ключ-идентификатор), а
+    // не на новый массив battleWantedHints каждый рендер; setBattleHintQueue —
+    // стабильный сеттер. kernel в зависимостях не нужен телу, но оставлен как
+    // якорь времени жизни экрана.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [battleWantedHints.join(","), kernel]);
   const activeBattleHint = hintSettings.showHints
@@ -706,29 +716,17 @@ export function BattleScreenView() {
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
 
   const reachable = useMemo(() => {
+    void battleRevision;
     if (selectedId === null || action !== null || paused || busy) return [] as ReachableCell[];
     // Гость запрашивает достижимость у ведущего; наблюдатель и повтор не
     // вычисляют её вовсе (нет ядра / просмотр).
     if (isNetGuest) return session.requestNetReachable(selectedId);
     if (usesNetSnapshot || isReplay) return [] as ReachableCell[];
     return session.getBattleReachable(selectedId);
-    // Ядро, номер хода и положение бойца — признак устаревания (0.20.61).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    kernel,
-    selectedId,
-    action,
-    snapshot.turnNumber,
-    selected?.x,
-    selected?.y,
-    selected?.ap,
-    paused,
-    busy,
-    isNetGuest,
-    usesNetSnapshot,
-    isReplay,
-    session,
-  ]);
+    // Достижимость меняется только с боем: ревизия — намеренный триггер
+    // пересчёта (тело читает сервис; 0.21.11). Положение/ап бойца и номер
+    // хода меняются вместе с ревизией, отдельные зависимости не нужны.
+  }, [battleRevision, selectedId, action, paused, busy, isNetGuest, usesNetSnapshot, isReplay, session]);
 
   const byReach = useMemo(() => {
     const map = new Map<string, ReachableCell>();
@@ -750,6 +748,7 @@ export function BattleScreenView() {
   const hintPanelKey = directiveView?.panelKey ?? (prologueStanceLock ? "defend" : null);
 
   const previewPath = useMemo(() => {
+    void battleRevision;
     if (!preview || selectedId === null) return [] as CellPos[];
     // Гость и наблюдатель не исполняют правила: маршрут им не вычисляется
     // (иначе requireTacticsHost бросит исключение).
@@ -757,11 +756,12 @@ export function BattleScreenView() {
     const [xs, ys] = preview.split(",");
     const path = session.getBattlePath(selectedId, { x: Number(xs), y: Number(ys), z: 0 });
     return path?.path ?? [];
-    // Ядро и номер хода — признак устаревания маршрута (0.20.61).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [preview, selectedId, kernel, snapshot.turnNumber, usesNetSnapshot, session]);
+    // Маршрут зависит от положения бойца, которое меняется только с боем —
+    // ревизия служит триггером пересчёта (0.21.11).
+  }, [battleRevision, preview, selectedId, usesNetSnapshot, session]);
 
   const hit: HitPreview | null = useMemo(() => {
+    void battleRevision;
     if (selectedId === null || !action) return null;
     if (action.type === "weapon") {
       if (aimId === null) return null;
@@ -789,25 +789,10 @@ export function BattleScreenView() {
       flanked: result.flanked,
       areaCells: result.areaCells,
     };
-    // Ядро и состояние цели — признак устаревания предпросмотра (0.20.61).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [
-    kernel,
-    selectedId,
-    aimId,
-    skillTargetPos,
-    action,
-    selected?.x,
-    selected?.y,
-    selected?.ap,
-    aimed?.x,
-    aimed?.y,
-    aimed?.hp,
-    isNetGuest,
-    usesNetSnapshot,
-    isReplay,
-    session,
-  ]);
+    // Состояние исполнителя и цели меняется только с боем — ревизия служит
+    // триггером пересчёта предпросмотра (0.21.11); координаты наведения
+    // (aimId/skillTargetPos) остаются явными зависимостями.
+  }, [battleRevision, selectedId, aimId, skillTargetPos, action, isNetGuest, usesNetSnapshot, isReplay, session]);
 
   const announce = (events: GameEvent[]): void => {
     const combat = events.find((event) => event.type === "COMBAT_RESOLVED");
@@ -1355,7 +1340,11 @@ export function BattleScreenView() {
     if (battleOutcome() !== "ongoing") return;
     if (session.getBattleSnapshot(PLAYER_OWNER).activeOwner !== ENEMY_OWNER) return;
     void runEnemyPhase();
-    // Только при создании ядра (монтаж экрана, включая восстановление).
+    // Намеренно срабатывает один раз при создании ядра (монтаж экрана,
+    // включая восстановление партии в ход Нави): последующие смены хода
+    // обрабатывает конвейер событий, а повторный запуск на каждом рендере
+    // удвоил бы ход противника. runEnemyPhase читает свежее состояние через
+    // замыкание монтирования; это осознанное исключение.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kernel]);
 
@@ -1485,6 +1474,9 @@ export function BattleScreenView() {
   // шаг учит нажимать кнопку. Повторы и наблюдатель ход не завершают.
   // Условие — чистая функция (training-progress.ts), покрыта тестами.
   // Этап 1.5: вне обучения автозавершение включается настройкой игры.
+  // Состав живых бойцов и активный владелец меняются только с боем: ревизия
+  // служит триггером проверки авто-завершения хода (0.21.11); endTurn и
+  // battleOutcome читают свежее состояние через замыкание обработчиков экрана.
   useEffect(() => {
     if (isPrologue && prologueRunRef.current?.forceDefend) return;
     if (!isTraining && !hintSettings.autoEndTurn) return;
@@ -1509,10 +1501,13 @@ export function BattleScreenView() {
     )
       return;
     endTurn();
+    // endTurn/battleOutcome — функции обработчика экрана: читают свежее
+    // состояние через замыкание, но их перечисление пересоздавало бы эффект
+    // каждый рендер; isPrologue стабилен за время экрана. Проверка
+    // срабатывает на смену боя (ревизия/снимок) и явные флаги ниже.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
-    snapshot.turnNumber,
-    snapshot.entities,
+    battleRevision,
     viewOwner,
     paused,
     busy,
@@ -1523,6 +1518,7 @@ export function BattleScreenView() {
     isTraining,
     activeHint,
     hintSettings.autoEndTurn,
+    snapshot,
   ]);
 
   /**
@@ -1737,6 +1733,7 @@ export function BattleScreenView() {
   // боевым экраном, поэтому renderer не может расхождениями Math.hypot
   // потерять диагональные клетки.
   const areaPreview = useMemo(() => {
+    void battleRevision;
     if (action?.type !== "skill" || selectedId === null || paused || busy) return null;
     const skill = skills[action.id];
     if (!skill) return null;
@@ -1767,9 +1764,10 @@ export function BattleScreenView() {
       // допускает friendly fire; лечение/призыв с filter="all" не опасны.
       warnFriendly: skill.resolution === "attack" && (skill.filter === "all" || skill.filter === "allies"),
     };
-    // Ядро и номер хода — признак устаревания, как у видимости поля (0.20.61).
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Область предпросмотра зависит от состояния боя — ревизия служит
+    // триггером пересчёта (0.21.11); выбор/наведение остаются явными.
   }, [
+    battleRevision,
     action,
     selectedId,
     selected,
@@ -1780,8 +1778,6 @@ export function BattleScreenView() {
     usesNetSnapshot,
     session,
     hit,
-    kernel,
-    snapshot.turnNumber,
   ]);
 
   // Этап 4.8: карточка прицеливания подтягивается к цели (доли экрана).
