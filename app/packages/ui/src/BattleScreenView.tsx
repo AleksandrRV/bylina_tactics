@@ -19,7 +19,7 @@ import {
   type WeaponStats,
 } from "@bylina/core";
 import { createFieldRenderer, type FieldRenderer } from "@bylina/render";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ACTION_SHORTCUTS, shortcutForAction } from "./action-shortcuts.js";
 import { resolveBattleKey, type BattleKeyContext, type BattleKeyIntent } from "./battle-keyboard.js";
 import { resolveCellClick } from "./battle-cell-click.js";
@@ -27,6 +27,7 @@ import { prologueAftermath, routeCommand } from "./battle-command.js";
 import { enemyPhaseActive, enemyPhaseContinues, type EnemyPhaseState } from "./battle-enemy-phase.js";
 import { createBattleKernel } from "./battle-match.js";
 import { firstFighterId } from "./battle-selection.js";
+import { IDLE_INTENT, nextIntent, type Intent, type IntentEvent } from "./battle-intent.js";
 import { cellKey } from "./cell-interaction.js";
 import type { LayoutMarkers } from "./prologue-cutscene.js";
 import { shouldAutoEndTurn, trainingHintsSorted, trainingOutcome } from "./training-progress.js";
@@ -255,11 +256,23 @@ export function BattleScreenView() {
   // хоста это ревизия ядра, у сетевого ведомого/наблюдателя — счётчик
   // приходящих снимков. Запросы предпросмотра ревизию не двигают.
   const battleRevision = useBattleRevision(session);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [action, setAction] = useState<{ type: "weapon" | "skill"; id: string } | null>(null);
-  const [aimId, setAimId] = useState<number | null>(null);
-  const [skillTargetPos, setSkillTargetPos] = useState<CellPos | null>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  // Намерение игрока — один объект вместо семи состояний (0.21.16, день 17,
+  // P1-2 часть 2). Прежние имена остаются производными значениями: читатели
+  // и JSX не меняются, переписаны только места записи (они шлют событие в
+  // чистую nextIntent). Замена семи useState на одно — следующий шаг.
+  const [intent, setIntentState] = useState<Intent>(IDLE_INTENT);
+  // Стабильный диспетчер: внутри только функциональная обновляющая форма
+  // поверх чистой nextIntent, поэтому ссылка не меняется между кадрами.
+  const setIntent = useCallback((event: IntentEvent): void => {
+    setIntentState((current) => nextIntent(current, event));
+  }, []);
+  const selectedId = intent.kind === "idle" ? null : intent.actorId;
+  const action = intent.kind === "aiming" || intent.kind === "charging" ? intent.action : null;
+  const aimId = intent.kind === "aiming" || intent.kind === "charging" ? intent.targetId : null;
+  const skillTargetPos = intent.kind === "aiming" ? intent.targetPos : null;
+  const preview = intent.kind === "aiming" ? intent.preview : intent.kind === "placing" ? intent.preview : null;
+  const charge = intent.kind === "charging" ? intent.plan : null;
+  const chargeArmed = intent.kind === "charging" ? intent.armed : false;
   const [log, setLog] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [enemyPhase, setEnemyPhase] = useState(false);
@@ -323,8 +336,7 @@ export function BattleScreenView() {
    * вступление и итог миссии.
    */
   const [storyNote, setStoryNote] = useState<string | null>(null);
-  const [charge, setCharge] = useState<ChargePlan | null>(null);
-  const [chargeArmed, setChargeArmed] = useState(false);
+  // charge/chargeArmed — производные намерения (см. блок Intent выше).
   /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
@@ -598,13 +610,9 @@ export function BattleScreenView() {
     setStoryNote(text);
   };
 
-  /** Снять прицеливание, маршрут пути и рывок (0.20.50). */
+  /** Снять прицеливание, маршрут пути и рывок (0.20.50); боец остаётся выбранным. */
   const clearAim = (): void => {
-    setAimId(null);
-    setSkillTargetPos(null);
-    setPreview(null);
-    setCharge(null);
-    setChargeArmed(false);
+    setIntent({ type: "cancel" });
   };
 
   // События поочерёдного боя приходят через транспорт (0.14.0/0.15.0):
@@ -613,7 +621,6 @@ export function BattleScreenView() {
     if (battleKind !== "pvp" && battleKind !== "pvpNet") return;
     const unlisten = session.subscribePvpEvents((events) => {
       announce(events);
-      setAction(null);
       clearAim();
       playThen(events);
     });
@@ -709,10 +716,13 @@ export function BattleScreenView() {
   useEffect(() => {
     // Кого выбрать — решает battle-selection: в обучении исполнитель
     // указания (строгий сценарий, 0.20.13), иначе первый свой боец.
-    setSelectedId(firstFighterId(entitiesRef.current, { ...side, isTraining, trainingActorId }));
-    setAction(null);
-    clearAim();
-  }, [snapshot.turnNumber, side, isTraining, trainingActorId, entitiesRef]);
+    const fighterId = firstFighterId(entitiesRef.current, { ...side, isTraining, trainingActorId });
+    if (fighterId === null) {
+      setIntent({ type: "clearSelection" });
+    } else {
+      setIntent({ type: "select", actorId: fighterId });
+    }
+  }, [snapshot.turnNumber, side, isTraining, trainingActorId, entitiesRef, setIntent]);
 
   const selected = snapshot.entities.find((entity) => entity.id === selectedId);
   const aimed = snapshot.entities.find((entity) => entity.id === aimId);
@@ -901,10 +911,7 @@ export function BattleScreenView() {
     const result = session.debugAutoWinBattle();
     if (!result.ok) return;
     if (isTraining) setHintStep(trainingHints.length);
-    setPreview(null);
-    setAimId(null);
-    setSkillTargetPos(null);
-    setAction(null);
+    setIntent({ type: "cancel" });
     playThen(result.events);
   };
 
@@ -1028,7 +1035,6 @@ export function BattleScreenView() {
     // реактивные плашки (яд, воскрешение, призыв) показываются любыми событиями (0.20.1).
     advanceTraining(result.events);
     showTrainingNote(result.events);
-    setAction(null);
     clearAim();
     // Рывок: удар подаётся после того, как боец дошёл (0.20.50).
     playThen(
@@ -1141,10 +1147,7 @@ export function BattleScreenView() {
     if (!strike) return;
     const actorId = selectedId;
     const targetId = plan.targetId;
-    setCharge(null);
-    setChargeArmed(false);
-    setAimId(null);
-    setPreview(null);
+    setIntent({ type: "cancel" });
     applyCommand({ type: "MOVE", actorId, to: plan.step, path: plan.path }, () => {
       const fresh = session.getBattleSnapshot(viewOwner);
       const actor = fresh.entities.find((entity) => entity.id === actorId);
@@ -1210,8 +1213,7 @@ export function BattleScreenView() {
     }
     const same = skillTargetPos?.x === pos.x && skillTargetPos.y === pos.y && skillTargetPos.z === pos.z;
     if (!same) {
-      setSkillTargetPos(pos);
-      setPreview(null);
+      setIntent({ type: "positionSkill", pos });
       return;
     }
     applyCommand({
@@ -1401,8 +1403,7 @@ export function BattleScreenView() {
       trainingDeny("endTurn");
       return;
     }
-    setPreview(null);
-    setAimId(null);
+    setIntent({ type: "cancel" });
     setLog(null);
     if (battleKind === "pvp") {
       session.sendPvpCommand({ type: "END_TURN", playerId: String(viewOwner) });
@@ -1459,9 +1460,7 @@ export function BattleScreenView() {
     setPrologueObjectiveKey,
     setPrologueHintKey,
     resetSelection: () => {
-      setSelectedId(null);
-      setAction(null);
-      clearAim();
+      setIntent({ type: "clearSelection" });
     },
     announce,
     battleOutcome,
@@ -1562,19 +1561,13 @@ export function BattleScreenView() {
         applySelfSkill(intent.skillId);
         return;
       case "select":
-        setSelectedId(intent.id);
-        setAction(null);
-        setSkillTargetPos(null);
-        setAimId(null);
-        setPreview(null);
+        setIntent({ type: "select", actorId: intent.id });
         return;
       case "denyActor":
         setLog(t("training.locked.actor"));
         return;
       case "armAttack":
-        setAction(intent.entry);
-        setAimId(intent.targetId);
-        setPreview(null);
+        setIntent({ type: "armAction", action: intent.entry, targetId: intent.targetId });
         return;
       case "denyTarget":
         trainingDeny(intent.action);
@@ -1584,13 +1577,11 @@ export function BattleScreenView() {
         // Рывок показывается сразу: первое нажатие вооружает подход, второе
         // по той же цели его исполняет (0.20.50).
         const plan = target ? chargeFor(target) : null;
-        setAimId(intent.id);
-        setCharge(plan);
-        setChargeArmed(plan !== null);
         if (plan) setLog(t("battle.chargeHint"));
         const skill = action?.type === "skill" ? skills[action.id] : undefined;
-        if (!skill?.effects.some((effect) => effect.type === "displace")) setSkillTargetPos(null);
-        setPreview(null);
+        // Клетка постановки сохраняется только у умения с переносом.
+        const targetPos = skill?.effects.some((effect) => effect.type === "displace") ? skillTargetPos : null;
+        setIntent({ type: "aim", targetId: intent.id, chargePlan: plan, armed: plan !== null, targetPos });
         return;
       }
       case "attack":
@@ -1603,15 +1594,13 @@ export function BattleScreenView() {
         tryPositionSkill(intent.cell);
         return;
       case "previewMove":
-        setPreview(intent.key);
-        setAimId(null);
+        setIntent({ type: "previewMove", key: intent.key });
         return;
       case "move":
         tryMove(intent.cell);
         return;
       case "cancel":
-        setPreview(null);
-        setAimId(null);
+        setIntent({ type: "cancel" });
         return;
     }
   };
@@ -1623,7 +1612,7 @@ export function BattleScreenView() {
     hoverRef.current = id;
     const coarse = window.matchMedia("(pointer: coarse)").matches;
     if (byReach.has(id) && !coarse) {
-      setPreview(id);
+      setIntent({ type: "previewMove", key: id });
     }
     // Рывок (0.20.50): наведение мышью показывает подход и линию удара
     // до нажатия. Сенсорный экран наведения не имеет — там тот же
@@ -1632,23 +1621,18 @@ export function BattleScreenView() {
     const hovered = snapshot.entities.find(
       (candidate) => !candidate.dead && candidate.coverType === 0 && candidate.x === x && candidate.y === y,
     );
-    // Цель, выбранную нажатием, наведение не отнимает: снимается только
-    // неподтверждённый рывок, показанный самим наведением.
-    const dropPreview = (): void => {
-      if (charge && !chargeArmed) setCharge(null);
-    };
+    // Цель, выбранную нажатием, наведение не отнимает: увод мыши снимает
+    // только неподтверждённый рывок, показанный самим наведением.
     if (!hovered || hovered.owner === viewOwner) {
-      dropPreview();
+      setIntent({ type: "hoverLeave" });
       return;
     }
     const plan = chargeFor(hovered);
     if (!plan) {
-      dropPreview();
+      setIntent({ type: "hoverLeave" });
       return;
     }
-    setAimId(hovered.id);
-    setCharge(plan);
-    setChargeArmed(false);
+    setIntent({ type: "aim", targetId: hovered.id, chargePlan: plan, armed: false, targetPos: null });
   };
 
   inputRef.current = { onCell, onHover };
@@ -1899,14 +1883,11 @@ export function BattleScreenView() {
     return () => query.removeEventListener("change", apply);
   }, []);
 
-  // Снятие прицеливания с клавиатуры (0.20.59): прежде эти четыре сброса
-  // повторялись в каждом ответвлении обработчика клавиш.
-  const cancelKeyboardAim = (): void => {
-    setAction(null);
-    setSkillTargetPos(null);
-    setAimId(null);
-    setPreview(null);
-  };
+  // Снятие прицеливания с клавиатуры (0.20.59): прицел и предпросмотр
+  // сбрасываются событием cancel, выбранный боец остаётся.
+  const cancelKeyboardAim = useCallback((): void => {
+    setIntent({ type: "cancel" });
+  }, [setIntent]);
 
   // Клавиатура: решения — в модуле battle-keyboard, здесь только проводка к
   // состоянию экрана (0.20.59). Прежде карта клавиш жила внутри эффекта и
@@ -1946,12 +1927,9 @@ export function BattleScreenView() {
           session.setPaused(!paused);
           return;
         case "select":
-          setSelectedId(intent.id);
           // Обзор клетки не снимаем: перебор бойцов клавишами не отменяет
-          // подсветку уже осмотренной клетки.
-          setAction(null);
-          setSkillTargetPos(null);
-          setAimId(null);
+          // подсветку уже осмотренной клетки (select сохраняет placing).
+          setIntent({ type: "select", actorId: intent.id });
           return;
         case "defend":
           applyCommand({ type: "DEFEND", actorId: intent.actorId });
@@ -1965,12 +1943,14 @@ export function BattleScreenView() {
           applySelfSkill(intent.skillId);
           return;
         case "armSkill":
-          setAction(intent.entry);
-          cancelKeyboardAim();
+          if (selectedId !== null) setIntent({ type: "toggleAction", actorId: selectedId, action: intent.entry });
           return;
         case "toggleAction":
-          setAction(action?.type === intent.entry.type && action.id === intent.entry.id ? null : intent.entry);
-          cancelKeyboardAim();
+          setIntent({
+            type: "toggleAction",
+            actorId: selectedId ?? 0,
+            action: action?.type === intent.entry.type && action.id === intent.entry.id ? null : intent.entry,
+          });
           return;
         case "pan":
           rendererRef.current?.pan(intent.dx, intent.dy);
@@ -1995,8 +1975,9 @@ export function BattleScreenView() {
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("contextmenu", onContext);
     };
-    // Ссылка неизменна, поэтому подписка одна на время экрана.
-  }, [keyboard]);
+    // Ссылка неизменна, поэтому подписка одна на время экрана;
+    // cancelKeyboardAim стабилен (useCallback поверх стабильного setIntent).
+  }, [keyboard, cancelKeyboardAim]);
 
   // В дружине — только бойцы (0.20.45). Увязший в трясине Федот выходит
   // из списка: пока он immobile (maxAp 0), управлять им нельзя, и пустая
@@ -2343,10 +2324,7 @@ export function BattleScreenView() {
                     setLog(t("training.locked.actor"));
                     return;
                   }
-                  setSelectedId(entity.id);
-                  setAction(null);
-                  setSkillTargetPos(null);
-                  setAimId(null);
+                  setIntent({ type: "select", actorId: entity.id });
                   // Камера плавно приходит к выбранному бойцу (0.20.42):
                   // поле крупнее окна, и боец мог стоять за кадром.
                   rendererRef.current?.focusEntity?.(entity.id);
@@ -2581,13 +2559,15 @@ export function BattleScreenView() {
                     }
                     onInspect={info ? () => setActionInfo(info) : undefined}
                     onPress={() => {
-                      setAction(active ? null : { type: "weapon", id: weaponId });
-                      // Рывок считался под прежнее оружие: снимаем (0.20.50).
-                      setCharge(null);
-                      setChargeArmed(false);
-                      setSkillTargetPos(null);
-                      setAimId(null);
-                      setPreview(null);
+                      // Рывок считался под прежнее оружие: при переключении
+                      // действия снимается — toggleAction возвращает к
+                      // выбранному бойцу либо вооружает новое действие (0.20.50).
+                      if (selectedId !== null)
+                        setIntent({
+                          type: "toggleAction",
+                          actorId: selectedId,
+                          action: active ? null : { type: "weapon", id: weaponId },
+                        });
                     }}
                   />
                 );
@@ -2632,29 +2612,29 @@ export function BattleScreenView() {
                     }
                     onInspect={info ? () => setActionInfo(info) : undefined}
                     onPress={() => {
-                      // Рывок считался под прежнее действие: снимаем (0.20.50).
-                      setCharge(null);
-                      setChargeArmed(false);
+                      // Рывок считался под прежнее действие: переключение
+                      // действия его снимает (0.20.50, через toggleAction).
                       // Этап-правка: умение «на себя» с областью (круговой взмах)
                       // подтверждается вторым тапом — первый показывает область.
                       if (skill?.category === "self") {
                         if ((skill.radius ?? 0) > 0) {
                           const alreadyArmed = action?.type === "skill" && action.id === skillId;
                           if (alreadyArmed) applySelfSkill(skillId);
-                          else {
-                            setAction({ type: "skill", id: skillId });
-                            setSkillTargetPos(null);
-                            setAimId(null);
-                            setPreview(null);
-                          }
+                          else if (selectedId !== null)
+                            setIntent({
+                              type: "toggleAction",
+                              actorId: selectedId,
+                              action: { type: "skill", id: skillId },
+                            });
                         } else {
                           applySelfSkill(skillId);
                         }
-                      } else {
-                        setAction(active ? null : { type: "skill", id: skillId });
-                        setSkillTargetPos(null);
-                        setAimId(null);
-                        setPreview(null);
+                      } else if (selectedId !== null) {
+                        setIntent({
+                          type: "toggleAction",
+                          actorId: selectedId,
+                          action: active ? null : { type: "skill", id: skillId },
+                        });
                       }
                     }}
                   />
@@ -2682,10 +2662,7 @@ export function BattleScreenView() {
                   // applyCommand (транспорт в состязательном режиме, анимация
                   // и продвижение подсказки в обучении).
                   applyCommand({ type: "DEFEND", actorId: selectedId });
-                  setAction(null);
-                  setSkillTargetPos(null);
-                  setAimId(null);
-                  setPreview(null);
+                  setIntent({ type: "cancel" });
                 }}
               />
               <ActionSlot
@@ -2711,10 +2688,7 @@ export function BattleScreenView() {
                   // applyCommand (транспорт в состязательном режиме, анимация
                   // и продвижение подсказки в обучении).
                   applyCommand({ type: "OVERWATCH", actorId: selectedId });
-                  setAction(null);
-                  setSkillTargetPos(null);
-                  setAimId(null);
-                  setPreview(null);
+                  setIntent({ type: "cancel" });
                 }}
               />
             </div>
