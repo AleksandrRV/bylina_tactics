@@ -256,10 +256,12 @@ export function BattleScreenView() {
   // хоста это ревизия ядра, у сетевого ведомого/наблюдателя — счётчик
   // приходящих снимков. Запросы предпросмотра ревизию не двигают.
   const battleRevision = useBattleRevision(session);
-  // Намерение игрока — один объект вместо семи состояний (0.21.16, день 17,
-  // P1-2 часть 2). Прежние имена остаются производными значениями: читатели
-  // и JSX не меняются, переписаны только места записи (они шлют событие в
-  // чистую nextIntent). Замена семи useState на одно — следующий шаг.
+  // Намерение игрока — один объект вместо семи состояний (0.21.16–0.21.17,
+  // дни 17–18, P1-2): семь прежних useState (selectedId, action, aimId,
+  // skillTargetPos, preview, charge, chargeArmed) заменены одним этим, а
+  // прежние имена остаются производными значениями ниже. Запись идёт только
+  // событием в чистую nextIntent (battle-intent.ts) — запрещённые сочетания
+  // («прицел без бойца», «рывок без плана») невыразимы в типах.
   const [intent, setIntentState] = useState<Intent>(IDLE_INTENT);
   // Стабильный диспетчер: внутри только функциональная обновляющая форма
   // поверх чистой nextIntent, поэтому ссылка не меняется между кадрами.
@@ -270,7 +272,7 @@ export function BattleScreenView() {
   const action = intent.kind === "aiming" || intent.kind === "charging" ? intent.action : null;
   const aimId = intent.kind === "aiming" || intent.kind === "charging" ? intent.targetId : null;
   const skillTargetPos = intent.kind === "aiming" ? intent.targetPos : null;
-  const preview = intent.kind === "aiming" ? intent.preview : intent.kind === "placing" ? intent.preview : null;
+  const preview = intent.kind === "aiming" || intent.kind === "placing" ? intent.preview : null;
   const charge = intent.kind === "charging" ? intent.plan : null;
   const chargeArmed = intent.kind === "charging" ? intent.armed : false;
   const [log, setLog] = useState<string | null>(null);
@@ -336,7 +338,6 @@ export function BattleScreenView() {
    * вступление и итог миссии.
    */
   const [storyNote, setStoryNote] = useState<string | null>(null);
-  // charge/chargeArmed — производные намерения (см. блок Intent выше).
   /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД ход
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
