@@ -355,8 +355,8 @@ describe("layout compiler", () => {
 });
 
 describe("reinforcements", () => {
-  const base = (): MatchState => ({
-    turnNumber: 1,
+  const base = (turnNumber = 1): MatchState => ({
+    turnNumber,
     activeOwner: 2,
     grid: makeGrid(8, 6, 1),
     entities: [
@@ -377,11 +377,42 @@ describe("reinforcements", () => {
       maxConcurrentEnemies: 8,
       spawnEdge: "north" as const,
     };
-    const first = tickReinforcements(base(), config, createReinforcementsState());
+    const first = tickReinforcements(base(1), config, createReinforcementsState());
     expect(first.telegraph.length).toBeGreaterThan(0);
     expect(first.spawns).toHaveLength(0);
-    const second = tickReinforcements(base(), config, first.state);
+    // Отсрочка отсчитывается ходами Нави, а не командами: второй вызов в
+    // том же ходу ничего не приносит (0.21.19).
+    const sameTurn = tickReinforcements(base(1), config, first.state);
+    expect(sameTurn.spawns, "повторный тик в том же ходу").toHaveLength(0);
+    expect(sameTurn.telegraph, "телеграф держится до следующего хода").toEqual(first.telegraph);
+    const second = tickReinforcements(base(2), config, sameTurn.state);
     expect(second.spawns.length).toBe(2);
+  });
+
+  it("counts the swarm that does not count for elimination (0.21.19)", () => {
+    // Стая М2 выходит с `countsForElimination: false`: миссия выигрывается
+    // эвакуацией, а не истреблением (campaign.md §7.2). Для потолка
+    // подкреплений это по-прежнему восемь живых противников на поле.
+    const config = {
+      mode: "onKill" as const,
+      pool: ["rat"],
+      delayTurns: 0,
+      maxConcurrentEnemies: 8,
+      perKill: 2,
+      perTurnNoKill: 1,
+      spawnEdge: "east" as const,
+    };
+    const crowded = {
+      ...base(1),
+      entities: Array.from({ length: 8 }, (_, index) =>
+        fighter(10 + index, 2, index % 8, Math.floor(index / 8), {
+          configId: "rat",
+          countsForElimination: false,
+        }),
+      ),
+    } as MatchState;
+    const tick = tickReinforcements(crowded, config, createReinforcementsState());
+    expect(tick.spawns, "потолок достигнут — пополнения нет").toHaveLength(0);
   });
 
   it("onKill +2 / no kill +1 with ceiling", () => {

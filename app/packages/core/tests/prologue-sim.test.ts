@@ -9,8 +9,10 @@ import {
   gatePrologueCommand,
   revealPrologueExtract,
   matchOutcome,
+  noteEnemyKill,
   pickScriptedCommand,
   shouldRestoreCheckpoint,
+  tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   weaponStatsFromRecord,
   type GameEvent,
@@ -506,6 +508,166 @@ const ZNAHARKA: SpawnUnitConfig = {
   vision: 10,
   weapons: [],
 };
+
+/**
+ * Подкрепления М2 (0.21.19).
+ *
+ * Потолок «восемь живых крыс» и приход +1/+2 **за ход Нави** (campaign.md
+ * §7.2 п. 10, §12.1). Прежде тик сервиса вызывался перед каждой командой
+ * Нави, а счётчик живых противников не видел стаю: стая выходит с
+ * `countsForElimination: false`, потому что миссия выигрывается эвакуацией,
+ * а не истреблением. Второй и следующие ходы Нави не кончались вовсе —
+ * каждая команда приводила новую крысу, а у новой крысы полные ОД, — и ход
+ * игроку не возвращался, пока не исчерпывался предохранитель цикла.
+ */
+
+/** Профиль подкреплений М2 из `reinforcements.json5`. */
+const M2_CRY_WAVE = {
+  enabled: true,
+  mode: "onKill" as const,
+  delayTurns: 0,
+  pool: ["forest_rat"],
+  perKill: 2,
+  perTurnNoKill: 1,
+  maxConcurrentEnemies: 8,
+};
+
+/** Сценарий хода Нави М2 из `prologue_missions.json5`. */
+const M2_SCRIPT = {
+  priority: [],
+  actions: [
+    {
+      unitId: "forest_rat",
+      side: "enemy" as const,
+      kind: "attack" as const,
+      targetUnitId: "mikula_peasant",
+      weaponId: "teeth",
+      forceOutcome: "miss" as const,
+    },
+    {
+      unitId: "forest_rat",
+      side: "enemy" as const,
+      kind: "attack" as const,
+      targetUnitId: "mikula_peasant",
+      weaponId: "teeth",
+      forceOutcome: "hit" as const,
+    },
+    { kind: "endTurn" as const },
+  ],
+};
+
+/** Состояние М2 со сценарием и подкреплениями. */
+function m2SwarmSetup() {
+  const { kernel, ctx, state } = m2Setup({ adjacent: true });
+  return { kernel, ctx: { ...ctx, script: M2_SCRIPT, reinforcements: M2_CRY_WAVE }, state };
+}
+
+/** Освободить Федота шагом в соседнюю клетку: стая выходит на поле. */
+function freeFedot(
+  kernel: ReturnType<typeof m2Setup>["kernel"],
+  ctx: ReturnType<typeof m2Setup>["ctx"],
+  state: ReturnType<typeof createPrologueRunState>,
+) {
+  const mikula = heroOf(kernel);
+  const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
+  const step = kernel
+    .getReachable(mikula.id)
+    .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
+  const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
+  if (!applied.ok) throw new Error("шаг к Федоту не принят");
+  return afterPrologueApply(
+    kernel,
+    { type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } },
+    applied.events,
+    state,
+    ctx,
+  );
+}
+
+/**
+ * Один ход Нави тем же порядком, что и экран боя: тик подкреплений, команда,
+ * применение, итог пролога. Предохранитель — 96 команд, как на экране.
+ */
+function runNavTurn(
+  kernel: ReturnType<typeof m2Setup>["kernel"],
+  ctx: ReturnType<typeof m2Setup>["ctx"],
+  state: ReturnType<typeof createPrologueRunState>,
+) {
+  let current = state;
+  let commands = 0;
+  let ended = false;
+  for (let guard = 0; guard < 96; guard += 1) {
+    const decision = tickPrologueEnemyTurn(kernel, current, ctx);
+    current = decision.state;
+    const applied = decision.command
+      ? kernel.apply(decision.command)
+      : kernel.apply({ type: "END_TURN", playerId: "2" });
+    if (!decision.command) {
+      ended = true;
+      break;
+    }
+    commands += 1;
+    if (!applied.ok) break;
+    current = afterPrologueApply(kernel, decision.command, applied.events, current, ctx);
+  }
+  return { state: current, commands, ended };
+}
+
+const ratsOf = (kernel: ReturnType<typeof m2Setup>["kernel"]): number =>
+  kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length;
+
+describe("prologue M2 reinforcements (0.21.19)", () => {
+  it("прибавляет одну крысу за ход Нави, а не за каждую команду", () => {
+    const { kernel, ctx, state } = m2SwarmSetup();
+    const freed = freeFedot(kernel, ctx, state);
+    expect(freed.waveArmed).toBe(true);
+    expect(ratsOf(kernel), "стая вышла").toBe(6);
+
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    const turn = runNavTurn(kernel, ctx, freed);
+
+    // Шесть крыс стаи и одна новая за ход: прежде за этот же ход выходило
+    // до девяноста — по крысе на каждую команду Нави.
+    expect(ratsOf(kernel), "одна крыса за ход").toBe(7);
+    expect(turn.commands, "ход Нави конечен").toBeLessThan(96);
+    expect(turn.ended, "ход Нави завершён командой, а не предохранителем").toBe(true);
+    expect(kernel.getSnapshot().activeOwner, "ход вернулся игроку").toBe(1);
+  });
+
+  it("убитая крыса приносит двух за ход Нави", () => {
+    const { kernel, ctx, state } = m2SwarmSetup();
+    const freed = freeFedot(kernel, ctx, state);
+    // Счётчик убийств ведёт итог команды игрока (§7.2 п. 10).
+    const killed = { ...freed, reinforcements: noteEnemyKill(freed.reinforcements) };
+
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    runNavTurn(kernel, ctx, killed);
+    expect(ratsOf(kernel), "две крысы за убитую").toBe(8);
+  });
+
+  it("держит потолок восемь крыс на поле и не крадёт ход игрока", () => {
+    const { kernel, ctx, state } = m2SwarmSetup();
+    let current = freeFedot(kernel, ctx, state);
+    // Герой стоит под стаей и не убегает: здоровье поднято, чтобы считать
+    // подкрепления, а не то, сколько ходов он продержится без боя.
+    const sturdy = kernel.getSnapshot();
+    for (const entity of sturdy.entities) {
+      if (entity.owner === 1) {
+        entity.maxHp = 60;
+        entity.hp = 60;
+      }
+    }
+    kernel.restoreMatch(sturdy, kernel.getFog());
+    for (let round = 0; round < 4; round += 1) {
+      kernel.apply({ type: "END_TURN", playerId: "1" });
+      const turn = runNavTurn(kernel, ctx, current);
+      current = turn.state;
+      expect(ratsOf(kernel), `потолок стаи в ходу ${round}`).toBeLessThanOrEqual(8);
+      expect(turn.ended, `ход Нави ${round} завершён`).toBe(true);
+      expect(kernel.getSnapshot().activeOwner, `ход ${round} вернулся игроку`).toBe(1);
+    }
+  });
+});
 
 describe("prologue M3 wave", () => {
   it("spawns the second wave and strelets after the first upyr dies", () => {

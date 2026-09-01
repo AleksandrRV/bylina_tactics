@@ -593,6 +593,9 @@ export function tickPrologueEnemyTurn(
   ctx: PrologueRunContext,
 ): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
   const next = { ...state, reinforcements: { ...state.reinforcements } };
+  // Тик вызывается перед каждой командой Нави, но прибавляет подкрепление
+  // один раз за ход: сервис сам помнит ход, в котором уже отработал
+  // (campaign.md §12.1, §7.2 п. 10; 0.21.19).
   if (ctx.missionId === "prologue_cry" && next.waveArmed && ctx.reinforcements) {
     const tick = tickReinforcements(kernel.getSnapshot(), ctx.reinforcements, next.reinforcements);
     next.reinforcements = tick.state;

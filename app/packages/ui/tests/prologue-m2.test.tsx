@@ -92,6 +92,72 @@ async function mountShell(): Promise<{ mounted: Mounted; services: AppServices }
   return { mounted, services };
 }
 
+/** Управление экраном боя, нужное прокладчику миссии. */
+interface MissionDrive {
+  clickCell: (x: number, y: number) => Promise<void>;
+  clickButton: (label: string) => Promise<boolean>;
+  waitPlayerTurn: () => Promise<void>;
+}
+
+/**
+ * Пройти М2 до освобождения Федота: стойка, дорога к трясине, удар по
+ * крысе, подвернувшейся под руку (0.21.19). Прежде этот обход жил внутри
+ * одной проверки; теперь он нужен и проверке подкреплений.
+ */
+async function freeTheFedot(session: AppServices["session"], drive: MissionDrive): Promise<boolean> {
+  const hero = () => session.getBattleSnapshot(1).entities.find((entity) => entity.configId === "mikula_peasant")!;
+  const rats = () =>
+    session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead);
+
+  // Первый шаг и стойка: засада позади.
+  const start = hero();
+  const step = session.getBattleReachable(start.id).filter((cell) => cell.apCost === 1)[0]!;
+  await drive.clickCell(step.x, step.y);
+  await drive.clickButton("Защитная стойка");
+  await waitFor(() => rats().length >= 2);
+  await drive.waitPlayerTurn();
+
+  // Дальше — дорога к Федоту: бьём крыс, если они под рукой, иначе идём.
+  for (let guard = 0; guard < 60; guard += 1) {
+    await drive.waitPlayerTurn();
+    const me = hero();
+    const fedot = session
+      .getBattleSnapshot(1)
+      .entities.find((entity) => entity.configId === "fedot_stranded" && !entity.dead);
+    if (!me || !fedot) break;
+    const adjacent = rats().find((rat) => Math.abs(rat.x - me.x) + Math.abs(rat.y - me.y) <= 1);
+    if (adjacent && me.ap > 0) {
+      // Клик по врагу включает оружие, повторный — удар.
+      await drive.clickCell(adjacent.x, adjacent.y);
+      await drive.clickCell(adjacent.x, adjacent.y);
+      continue;
+    }
+    if (Math.abs(me.x - fedot.x) + Math.abs(me.y - fedot.y) <= 1) return true;
+    if (me.ap === 0) {
+      await drive.clickButton("Завершить ход");
+      continue;
+    }
+    const reachable = session.getBattleReachable(me.id);
+    const distance = (x: number, y: number): number => Math.abs(x - fedot.x) + Math.abs(y - fedot.y);
+    let best: { x: number; y: number; d: number } | null = null;
+    for (const cell of reachable) {
+      const d = distance(cell.x, cell.y);
+      if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
+    }
+    if (!best) {
+      await drive.clickButton("Завершить ход");
+      continue;
+    }
+    await drive.clickCell(best.x, best.y);
+    if (
+      session.getBattleSnapshot(1).entities.some((entity) => entity.configId === "fedot_stranded" && entity.maxAp > 0)
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Сыгранные сцены в порядке вызова. */
 const playedScenes = (): string[] =>
   journal.calls
@@ -385,56 +451,8 @@ describe("prologue M2 beat (0.20.45)", () => {
         }, 15000);
       };
 
-      // Первый шаг и стойка: засада позади.
-      const start = hero();
-      const step = session.getBattleReachable(start.id).filter((cell) => cell.apCost === 1)[0]!;
-      await clickCell(step.x, step.y);
-      await clickButton("Защитная стойка");
-      await waitFor(() => rats().length >= 2);
-      await waitPlayerTurn();
-
-      // Дальше — дорога к Федоту: бьём крыс, если они под рукой, иначе идём.
-      let freed = false;
-      for (let guard = 0; guard < 60 && !freed; guard += 1) {
-        await waitPlayerTurn();
-        const me = hero();
-        const fedot = session
-          .getBattleSnapshot(1)
-          .entities.find((entity) => entity.configId === "fedot_stranded" && !entity.dead);
-        if (!me || !fedot) break;
-        const adjacent = rats().find((rat) => Math.abs(rat.x - me.x) + Math.abs(rat.y - me.y) <= 1);
-        if (adjacent && me.ap > 0) {
-          // Клик по врагу включает оружие, повторный — удар.
-          await clickCell(adjacent.x, adjacent.y);
-          await clickCell(adjacent.x, adjacent.y);
-          continue;
-        }
-        if (Math.abs(me.x - fedot.x) + Math.abs(me.y - fedot.y) <= 1) {
-          freed = true;
-          break;
-        }
-        if (me.ap === 0) {
-          await clickButton("Завершить ход");
-          continue;
-        }
-        const reachable = session.getBattleReachable(me.id);
-        const distance = (x: number, y: number): number => Math.abs(x - fedot.x) + Math.abs(y - fedot.y);
-        let best: { x: number; y: number; d: number } | null = null;
-        for (const cell of reachable) {
-          const d = distance(cell.x, cell.y);
-          if (!best || d < best.d) best = { x: cell.x, y: cell.y, d };
-        }
-        if (!best) {
-          await clickButton("Завершить ход");
-          continue;
-        }
-        await clickCell(best.x, best.y);
-        freed = session
-          .getBattleSnapshot(1)
-          .entities.some((entity) => entity.configId === "fedot_stranded" && entity.maxAp > 0);
-      }
-
       // Федот освобождён: он боец и входит в дружину.
+      const freed = await freeTheFedot(session, { clickCell, clickButton, waitPlayerTurn });
       expect(freed, "Федот освобождён").toBe(true);
       await waitPlayerTurn();
       expect(document.querySelectorAll(".roster-card")).toHaveLength(2);
@@ -447,6 +465,65 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(session.getBattleSnapshot(1).grid.tiles.filter((tile) => tile.extract)).toHaveLength(6);
       // Умение эвакуации приходит вместе с зоной.
       expect(hero().skillIds ?? []).toContain("evacuate");
+
+      await act(async () => {
+        await mounted.unmount();
+      });
+    },
+    { timeout: 180000 },
+  );
+
+  it(
+    "отдаёт ход игроку: стая прибывает по крысе за ход, а не за команду (0.21.19)",
+    async () => {
+      const { mounted, services } = await mountShell();
+      const { session } = services;
+      await startM2(session);
+
+      const rats = (): number =>
+        session.getBattleSnapshot(1).entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead)
+          .length;
+      const clickCell = async (x: number, y: number): Promise<void> => {
+        await act(async () => {
+          activate?.(x, y);
+        });
+        await act(async () => {
+          await tick(60);
+        });
+      };
+      const clickButton = async (label: string): Promise<boolean> => {
+        const button = [...document.querySelectorAll<HTMLButtonElement>("button")].find((candidate) =>
+          (candidate.textContent ?? "").includes(label),
+        );
+        if (!button || button.disabled) return false;
+        await act(async () => {
+          button.click();
+        });
+        await act(async () => {
+          await tick(120);
+        });
+        return true;
+      };
+      /** Дождаться своего хода: пока идёт проигрывание, ввод закрыт. */
+      const waitPlayerTurn = async (): Promise<void> => {
+        await waitFor(() => {
+          const end = document.querySelector<HTMLButtonElement>(".end-turn");
+          return session.getBattleSnapshot(1).activeOwner === 1 && end !== null && !end.disabled;
+        }, 20000);
+      };
+
+      const freed = await freeTheFedot(session, { clickCell, clickButton, waitPlayerTurn });
+      expect(freed, "Федот освобождён").toBe(true);
+      const swarm = rats();
+      expect(swarm, "стая вышла на поле").toBeGreaterThanOrEqual(6);
+
+      // Ход Нави после освобождения: прежде он не кончался вовсе — каждая
+      // команда приводила новую крысу с полными ОД, и ход игроку не
+      // возвращался, пока не исчерпывался предохранитель цикла экрана.
+      await clickButton("Завершить ход");
+      await waitPlayerTurn();
+      expect(rats(), "потолок стаи — восемь").toBeLessThanOrEqual(8);
+      expect(rats(), "стая пополнилась, а не умножилась").toBeLessThanOrEqual(swarm + 2);
 
       await act(async () => {
         await mounted.unmount();

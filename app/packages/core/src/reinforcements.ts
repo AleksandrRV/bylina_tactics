@@ -25,6 +25,15 @@ export interface ReinforcementsState {
   telegraph: CellPos[];
   pendingCount: number;
   killsThisNavTurn: number;
+  /**
+   * Номер хода, в котором сервис уже отработал (0.21.19).
+   *
+   * Сервис вызывается перед каждой командой хода Нави, а подкрепление
+   * приходит один раз за ход (campaign.md §12.1, §7.2 п. 10). Без этой
+   * метки каждый вызов добавлял свою порцию: в М2 за один ход Нави
+   * выходило до девяноста крыс вместо одной-двух.
+   */
+  tickedTurn: number | null;
 }
 
 interface ReinforcementTick {
@@ -33,10 +42,19 @@ interface ReinforcementTick {
   spawns: { unitId: string; at: CellPos }[];
 }
 
+/**
+ * Живые противники, которых держит потолок подкреплений (campaign.md §12.1).
+ *
+ * Считается всякий живой боец Нави, кроме ложных целей: идол и иллюзии не
+ * противники. Пометка «в счёт истребления» здесь роли не играет — это
+ * признак условия победы, а не численности. В М2 вся стая выходит с
+ * `countsForElimination: false` (миссия выигрывается эвакуацией, а не
+ * истреблением, §7.2), и прежний счёт по этой пометке видел на поле ноль
+ * противников: потолок восемь не наступал никогда, и стая росла без конца.
+ */
 function livingEnemies(match: MatchState): EntityState[] {
   return match.entities.filter(
-    (entity) =>
-      !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && entity.countsForElimination !== false,
+    (entity) => !entity.dead && entity.owner === ENEMY_OWNER && entity.coverType === 0 && !entity.decoy,
   );
 }
 
@@ -89,7 +107,7 @@ function candidateCells(match: MatchState, config: ReinforcementsConfig, fog?: F
 }
 
 export function createReinforcementsState(): ReinforcementsState {
-  return { timer: null, telegraph: [], pendingCount: 0, killsThisNavTurn: 0 };
+  return { timer: null, telegraph: [], pendingCount: 0, killsThisNavTurn: 0, tickedTurn: null };
 }
 
 export function noteEnemyKill(state: ReinforcementsState): ReinforcementsState {
@@ -108,11 +126,17 @@ export function tickReinforcements(
   if (config.enabled === false) {
     return { state, telegraph: [], spawns: [] };
   }
+  // Один тик на ход (0.21.19): сервис вызывается перед каждой командой
+  // Нави, а подкрепление приходит один раз за ход. Повторный вызов в том же
+  // ходу ничего не меняет, но и не гасит телеграф, уже показанный игроку.
+  if (state.tickedTurn === match.turnNumber) {
+    return { state, telegraph: state.telegraph, spawns: [] };
+  }
   const living = livingEnemies(match).length;
   const cap = config.maxConcurrentEnemies;
   const mode = config.mode ?? "threshold";
   const delay = config.delayTurns ?? 1;
-  const next: ReinforcementsState = { ...state, telegraph: [] };
+  const next: ReinforcementsState = { ...state, tickedTurn: match.turnNumber, telegraph: [] };
 
   if (mode === "onKill") {
     const extra =
