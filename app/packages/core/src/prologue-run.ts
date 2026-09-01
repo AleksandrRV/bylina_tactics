@@ -28,6 +28,13 @@ import type { CellPos, Command, GameEvent, MatchState } from "./types.js";
 
 type PrologueMissionId = "prologue_brushwood" | "prologue_cry" | string;
 
+/**
+ * Потолок стаи М2 после освобождения Федота (0.21.22). Совпадает с
+ * `maxConcurrentEnemies` профиля подкреплений `m2_cry_wave`: на поле может
+ * стоять не больше четырёх крыс разом, а убитых восполняет подкрепление.
+ */
+const M2_WAVE_MAX = 4;
+
 export interface PrologueRunContext {
   missionId: PrologueMissionId;
   script?: PrologueScript;
@@ -462,14 +469,24 @@ export function afterPrologueApply(
       // Зона эвакуации загорается позже — когда стая вышла на поле
       // (0.20.45): сначала крысы и их сцена, потом пан камеры к выходу.
       next.extractPending = true;
-      const wave = ctx.fedotWaveSpawns ?? [
+      // Стая М2 (0.21.22): потолок после освобождения Федота — четыре крысы,
+      // как и у подкреплений (§7.2 п. 10). Стая досыпает до потолка, а не
+      // выбегает вся: если пара засады ещё жива, выходят лишь столько,
+      // сколько не хватает до четырёх, — иначе сразу после освобождения
+      // количество превышало бы новый потолок, и подкрепления не могли бы
+      // ни восполнить, ни держать его.
+      const livingRats = kernel
+        .getSnapshot()
+        .entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length;
+      const waveRoom = Math.max(0, M2_WAVE_MAX - livingRats);
+      const wave = (ctx.fedotWaveSpawns ?? [
         { x: 11, y: 1 },
         { x: 11, y: 2 },
         { x: 11, y: 3 },
         { x: 11, y: 4 },
         { x: 11, y: 5 },
         { x: 11, y: 6 },
-      ];
+      ]).slice(0, waveRoom);
       spawnRats(kernel, wave, false);
       next.waveArmed = true;
       enqueue(next, ctx, "m2.wave");

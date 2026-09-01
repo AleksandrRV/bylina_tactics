@@ -1,4 +1,4 @@
-// Сервис подкреплений (§12.1). default — задел М6–М8; m2_cry_wave — М2 (+2/+1, потолок 8).
+// Сервис подкреплений (§12.1). default — задел М6–М8; m2_cry_wave — М2 (+2/+1, потолок 4).
 {
   default: {
     enabled: true,
@@ -18,7 +18,7 @@
       pool: ["forest_rat"],
       perKill: 2,
       perTurnNoKill: 1,
-      maxConcurrentEnemies: 8,
+      maxConcurrentEnemies: 4,
     },
   },
 }

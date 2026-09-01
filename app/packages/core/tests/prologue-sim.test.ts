@@ -409,10 +409,11 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     // Федот освобождён и волен ходить.
     expect(next.fedotFreed).toBe(true);
     expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")?.maxAp).toBe(2);
-    // Стая вышла — шесть крыс из чащи, а не ноль, как было бы без маркеров.
+    // Стая вышла — до четырёх крыс из чащи, а не ноль, как было бы без
+    // маркеров (0.21.22: потолок после освобождения — четыре).
     expect(
       kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length,
-    ).toBe(6);
+    ).toBe(4);
     // Выход ещё тёмен: его покажет сцена, а не само освобождение.
     expect(next.extractPending).toBe(true);
     expect(kernel.getSnapshot().grid.tiles.filter((tile) => tile.extract).length).toBe(0);
@@ -510,15 +511,17 @@ const ZNAHARKA: SpawnUnitConfig = {
 };
 
 /**
- * Подкрепления М2 (0.21.19).
+ * Подкрепления М2 (0.21.19, потолок — 0.21.22).
  *
- * Потолок «восемь живых крыс» и приход +1/+2 **за ход Нави** (campaign.md
- * §7.2 п. 10, §12.1). Прежде тик сервиса вызывался перед каждой командой
- * Нави, а счётчик живых противников не видел стаю: стая выходит с
- * `countsForElimination: false`, потому что миссия выигрывается эвакуацией,
- * а не истреблением. Второй и следующие ходы Нави не кончались вовсе —
- * каждая команда приводила новую крысу, а у новой крысы полные ОД, — и ход
- * игроку не возвращался, пока не исчерпывался предохранитель цикла.
+ * Потолок «четыре живых крысы» после освобождения Федота и восполнение до
+ * него **за ход Нави** (campaign.md §7.2 п. 10, §12.1). Прежде тик сервиса
+ * вызывался перед каждой командой Нави, а счётчик живых противников не видел
+ * стаю: стая выходит с `countsForElimination: false`, потому что миссия
+ * выигрывается эвакуацией, а не истреблением. Второй и следующие ходы Нави
+ * не кончались вовсе — каждая команда приводила новую крысу, а у новой
+ * крысы полные ОД, — и ход игроку не возвращался, пока не исчерпывался
+ * предохранитель цикла. С 0.21.22 стая досыпает до четырёх, а не выбегает
+ * шестью, и подкрепление восполняет убитых до того же потолка.
  */
 
 /** Профиль подкреплений М2 из `reinforcements.json5`. */
@@ -529,7 +532,7 @@ const M2_CRY_WAVE = {
   pool: ["forest_rat"],
   perKill: 2,
   perTurnNoKill: 1,
-  maxConcurrentEnemies: 8,
+  maxConcurrentEnemies: 4,
 };
 
 /** Сценарий хода Нави М2 из `prologue_missions.json5`. */
@@ -617,35 +620,42 @@ const ratsOf = (kernel: ReturnType<typeof m2Setup>["kernel"]): number =>
   kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length;
 
 describe("prologue M2 reinforcements (0.21.19)", () => {
-  it("прибавляет одну крысу за ход Нави, а не за каждую команду", () => {
+  it("не прибавляет сверх потолка за ход Нави, а не за каждую команду", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     const freed = freeFedot(kernel, ctx, state);
     expect(freed.waveArmed).toBe(true);
-    expect(ratsOf(kernel), "стая вышла").toBe(6);
+    expect(ratsOf(kernel), "стая досыпала до потолка").toBe(4);
 
     kernel.apply({ type: "END_TURN", playerId: "1" });
     const turn = runNavTurn(kernel, ctx, freed);
 
-    // Шесть крыс стаи и одна новая за ход: прежде за этот же ход выходило
-    // до девяноста — по крысе на каждую команду Нави.
-    expect(ratsOf(kernel), "одна крыса за ход").toBe(7);
+    // Четыре крысы стаи стоят у потолка: за ход ничего не прибавилось —
+    // прежде за этот же ход выходило до девяноста, по крысе на команду Нави.
+    expect(ratsOf(kernel), "потолок держится").toBe(4);
     expect(turn.commands, "ход Нави конечен").toBeLessThan(96);
     expect(turn.ended, "ход Нави завершён командой, а не предохранителем").toBe(true);
     expect(kernel.getSnapshot().activeOwner, "ход вернулся игроку").toBe(1);
   });
 
-  it("убитая крыса приносит двух за ход Нави", () => {
+  it("убитая крыса восполняется до четырёх за ход Нави", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     const freed = freeFedot(kernel, ctx, state);
-    // Счётчик убийств ведёт итог команды игрока (§7.2 п. 10).
+    // Одна крыса пала: на поле осталось трое, а счётчик убийств ведёт итог
+    // команды игрока (§7.2 п. 10).
+    const snapshot = kernel.getSnapshot();
+    const rat = snapshot.entities.find((entity) => entity.configId === "forest_rat" && !entity.dead)!;
+    rat.dead = true;
+    kernel.restoreMatch(snapshot, kernel.getFog());
     const killed = { ...freed, reinforcements: noteEnemyKill(freed.reinforcements) };
 
     kernel.apply({ type: "END_TURN", playerId: "1" });
     runNavTurn(kernel, ctx, killed);
-    expect(ratsOf(kernel), "две крысы за убитую").toBe(8);
+    // Осталось трое живых: подкрепление восполняет убитую до потолка
+    // четырёх, а не добавляет две сверх него.
+    expect(ratsOf(kernel), "потолок заполнен заново").toBe(4);
   });
 
-  it("держит потолок восемь крыс на поле и не крадёт ход игрока", () => {
+  it("держит потолок четыре крысы на поле и не крадёт ход игрока", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     let current = freeFedot(kernel, ctx, state);
     // Герой стоит под стаей и не убегает: здоровье поднято, чтобы считать
@@ -662,7 +672,7 @@ describe("prologue M2 reinforcements (0.21.19)", () => {
       kernel.apply({ type: "END_TURN", playerId: "1" });
       const turn = runNavTurn(kernel, ctx, current);
       current = turn.state;
-      expect(ratsOf(kernel), `потолок стаи в ходу ${round}`).toBeLessThanOrEqual(8);
+      expect(ratsOf(kernel), `потолок стаи в ходу ${round}`).toBeLessThanOrEqual(4);
       expect(turn.ended, `ход Нави ${round} завершён`).toBe(true);
       expect(kernel.getSnapshot().activeOwner, `ход ${round} вернулся игроку`).toBe(1);
     }

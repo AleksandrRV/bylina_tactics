@@ -458,8 +458,9 @@ describe("prologue M2 beat (0.20.45)", () => {
       expect(freed, "Федот освобождён").toBe(true);
       await waitPlayerTurn();
       expect(document.querySelectorAll(".roster-card")).toHaveLength(2);
-      // Стая вышла — шесть крыс из чащи, а не ноль.
-      expect(rats().length, "стая на поле").toBeGreaterThanOrEqual(6);
+      // Стая вышла — до четырёх крыс из чащи (0.21.22: потолок после
+      // освобождения — четыре).
+      expect(rats().length, "стая на поле").toBe(4);
       expect(playedScenes(), "сцена стаи").toContain("m2_swarm");
       // Сцена стаи уже сыграна, зона открыта ею, а не самим освобождением.
       await waitFor(() => session.getBattleSnapshot(1).grid.tiles.some((tile) => tile.extract), 15000);
@@ -517,14 +518,14 @@ describe("prologue M2 beat (0.20.45)", () => {
       const freed = await freeTheFedot(session, { clickCell, clickButton, waitPlayerTurn });
       expect(freed, "Федот освобождён").toBe(true);
       const swarm = rats();
-      expect(swarm, "стая вышла на поле").toBeGreaterThanOrEqual(6);
+      expect(swarm, "стая вышла на поле").toBe(4);
 
       // Ход Нави после освобождения: прежде он не кончался вовсе — каждая
       // команда приводила новую крысу с полными ОД, и ход игроку не
       // возвращался, пока не исчерпывался предохранитель цикла экрана.
       await clickButton("Завершить ход");
       await waitPlayerTurn();
-      expect(rats(), "потолок стаи — восемь").toBeLessThanOrEqual(8);
+      expect(rats(), "потолок стаи — четыре").toBeLessThanOrEqual(4);
       expect(rats(), "стая пополнилась, а не умножилась").toBeLessThanOrEqual(swarm + 2);
 
       await act(async () => {
