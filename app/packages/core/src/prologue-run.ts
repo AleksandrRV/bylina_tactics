@@ -481,14 +481,16 @@ export function afterPrologueApply(
         .getSnapshot()
         .entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length;
       const waveRoom = Math.max(0, M2_WAVE_MAX - livingRats);
-      const wave = (ctx.fedotWaveSpawns ?? [
-        { x: 11, y: 1 },
-        { x: 11, y: 2 },
-        { x: 11, y: 3 },
-        { x: 11, y: 4 },
-        { x: 11, y: 5 },
-        { x: 11, y: 6 },
-      ]).slice(0, waveRoom);
+      const wave = (
+        ctx.fedotWaveSpawns ?? [
+          { x: 11, y: 1 },
+          { x: 11, y: 2 },
+          { x: 11, y: 3 },
+          { x: 11, y: 4 },
+          { x: 11, y: 5 },
+          { x: 11, y: 6 },
+        ]
+      ).slice(0, waveRoom);
       spawnRats(kernel, wave, false);
       next.waveArmed = true;
       enqueue(next, ctx, "m2.wave");

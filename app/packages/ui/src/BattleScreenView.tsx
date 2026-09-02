@@ -49,7 +49,13 @@ import { EnemyFace, RosterCard, UnitInfoDialog } from "./unit-card.js";
 import { buildUnitInfo, type UnitInfo } from "./unit-info.js";
 import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "./charge-attack.js";
 import { actionArt } from "./action-art.js";
-import { liberateActionInfo, skillActionInfo, stanceActionInfo, weaponActionInfo, type ActionInfo } from "./action-info.js";
+import {
+  liberateActionInfo,
+  skillActionInfo,
+  stanceActionInfo,
+  weaponActionInfo,
+  type ActionInfo,
+} from "./action-info.js";
 import { useServices, useT } from "./context.js";
 import { useBattleRevision, useI18nTick, useLatest, useSessionState, useSettingsState } from "./hooks.js";
 import { CampaignHint } from "./CampaignHint.js";
@@ -2776,11 +2782,7 @@ export function BattleScreenView() {
                   art={actionArt("free")}
                   active={false}
                   disabled={
-                    !selected ||
-                    selected.ap < 1 ||
-                    busy ||
-                    snapshot.activeOwner !== viewOwner ||
-                    prologueStanceLock
+                    !selected || selected.ap < 1 || busy || snapshot.activeOwner !== viewOwner || prologueStanceLock
                   }
                   title={t("battle.freeHint")}
                   onInspect={() => setActionInfo(liberateActionInfo(t))}
