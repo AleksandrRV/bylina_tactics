@@ -16,97 +16,28 @@ import {
   tickProloguePlayerTurn,
   weaponStatsFromRecord,
   type GameEvent,
-  type SpawnUnitConfig,
 } from "../src/index.js";
-
-const MIKULA: SpawnUnitConfig = {
-  id: "mikula_peasant",
-  maxHealth: 8,
-  maxAP: 2,
-  mobility: 5,
-  aim: 60,
-  defense: 0,
-  vision: 10,
-  weapons: [],
-};
-const RAT: SpawnUnitConfig = {
-  id: "forest_rat",
-  maxHealth: 4,
-  maxAP: 2,
-  mobility: 6,
-  aim: 50,
-  defense: 0,
-  vision: 10,
-  weapons: ["teeth"],
-};
-const FEDOT: SpawnUnitConfig = {
-  id: "fedot_stranded",
-  maxHealth: 5,
-  maxAP: 2,
-  mobility: 4,
-  aim: 40,
-  defense: 0,
-  vision: 8,
-  weapons: [],
-  skills: ["evacuate"],
-};
-
-const CLUB = weaponStatsFromRecord({
-  id: "club",
-  category: "melee",
-  apCost: 1,
-  endsTurn: true,
-  range: 1,
-  requiresLOS: false,
-  aimMod: 0,
-  minDmg: 3,
-  maxDmg: 5,
-  crit: 10,
-  critBonus: 1,
-  envDmg: 0,
-});
-const TEETH = weaponStatsFromRecord({
-  id: "teeth",
-  category: "melee",
-  apCost: 1,
-  endsTurn: true,
-  range: 1,
-  requiresLOS: false,
-  aimMod: 0,
-  minDmg: 2,
-  maxDmg: 3,
-  crit: 10,
-  critBonus: 1,
-  envDmg: 0,
-});
-
-// Раскладка М1 «Хворост» (синхронна с prologue_missions.json5, 0.20.37).
-const M1_LAYOUT = {
-  rows: [
-    ".t..W....t....W...t.",
-    "..t.....t...t....t..",
-    "..................F.",
-    ".M..t.......t..t...S",
-    "..t.....t.......t...",
-    ".t..W....t....W..t..",
-  ],
-  heights: [
-    "11122221111111122111",
-    "11122211111111112211",
-    "11111211111111111111",
-    "11111111111111111111",
-    "11000011111000111111",
-    "10000011100000011111",
-  ],
-  legend: {
-    ".": { kind: "ground" },
-    t: { kind: "decor", decor: "bush" },
-    W: { kind: "wall" },
-    M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
-    S: { kind: "pickup", itemId: "stick", weaponId: "club" },
-    F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
-  },
-};
+import {
+  BOGATYR,
+  CLUB,
+  FEDOT,
+  M1_LAYOUT,
+  M2_CRY_WAVE,
+  M2_LAYOUT,
+  M2_SCRIPT,
+  MIKULA,
+  RAT,
+  STRELETS,
+  TEETH,
+  UPYR,
+  ZNAHARKA,
+  freeFedot,
+  heroOf,
+  m2Setup,
+  m2SwarmSetup,
+  ratsOf,
+  runNavTurn,
+} from "./prologue-sim.setup.js";
 
 describe("prologue M1 sim", () => {
   it("has no enemies before pickup and dash cannot reach the stick", () => {
@@ -237,64 +168,14 @@ describe("prologue M2 gate", () => {
   });
 });
 
-// Раскладка М2 «Крик в чаще» (синхронна с prologue_missions.json5, 0.20.45).
-const M2_LAYOUT = {
-  rows: [
-    "Ett..c.StSWS",
-    "E...c..StS.S",
-    "E.M...t.....",
-    "..c..t..t...",
-    "........cF..",
-    ".c....t..t..",
-    "E...c....V..",
-    "E......t...c",
-    "Ett.....ttW.",
-  ],
-  legend: {
-    M: { kind: "spawn", side: "player", unitId: "mikula_peasant" },
-    V: { kind: "stranded", unitId: "fedot_stranded", state: "immobile" },
-    F: { kind: "spawn", side: "enemy", unitId: "forest_rat", scripted: true },
-  },
-};
-
-/** Состояние М2: ядро, контроллер пролога и контекст сценария. */
-function m2Setup(options: { adjacent?: boolean } = {}) {
-  const match = createPrologueMatch({ layout: M2_LAYOUT, units: [MIKULA, FEDOT, RAT], seed: 702, hideExtract: true });
-  if (options.adjacent) {
-    // Федот — в соседней клетке: триггер освобождения готов сработать.
-    const mikula = match.entities.find((entity) => entity.configId === "mikula_peasant")!;
-    const fedot = match.entities.find((entity) => entity.configId === "fedot_stranded")!;
-    fedot.x = mikula.x + 1;
-    fedot.y = mikula.y;
-  }
-  const kernel = createTacticsKernel({
-    initial: match,
-    units: [MIKULA, FEDOT, RAT],
-    weapons: { club: CLUB, teeth: TEETH },
-    seed: 702,
-    fogDisabled: true,
-  });
-  const compiled = compilePrologueLayout(M2_LAYOUT);
-  const ctx = {
-    missionId: "prologue_cry",
-    hints: [{ key: "m2.noise", textKey: "prologue.hint.m2.noise", once: true, forced: true, panelKey: "defend" }],
-    showHints: true,
-    ratMarker: compiled.markers.F?.[0],
-    fedotWaveSpawns: compiled.markers.S,
-    extractCells: compiled.extractCells,
-  };
-  return { kernel, ctx, state: createPrologueRunState("prologue_cry") };
-}
-
-const heroOf = (kernel: ReturnType<typeof m2Setup>["kernel"]) =>
-  kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
+// Р Р°СЃРєР»Р°РґРєР° Рњ2 В«РљСЂРёРє РІ С‡Р°С‰РµВ» (СЃРёРЅС…СЂРѕРЅРЅР° СЃ prologue_missions.json5, 0.20.45).
 
 describe("prologue script waits for its actor (0.20.45)", () => {
   it("keeps the queued bite until the rat has entered the field", () => {
-    // Крыса М1 выходит только после подбора палки, а герой идёт до неё
-    // несколько ходов: каждый пустой ход Нави пролистывал бы очередь,
-    // и обещанный сценой укус разыгрывался бы обычным алгоритмом — с
-    // обычным шансом промаха.
+    // РљСЂС‹СЃР° Рњ1 РІС‹С…РѕРґРёС‚ С‚РѕР»СЊРєРѕ РїРѕСЃР»Рµ РїРѕРґР±РѕСЂР° РїР°Р»РєРё, Р° РіРµСЂРѕР№ РёРґС‘С‚ РґРѕ РЅРµС‘
+    // РЅРµСЃРєРѕР»СЊРєРѕ С…РѕРґРѕРІ: РєР°Р¶РґС‹Р№ РїСѓСЃС‚РѕР№ С…РѕРґ РќР°РІРё РїСЂРѕР»РёСЃС‚С‹РІР°Р» Р±С‹ РѕС‡РµСЂРµРґСЊ,
+    // Рё РѕР±РµС‰Р°РЅРЅС‹Р№ СЃС†РµРЅРѕР№ СѓРєСѓСЃ СЂР°Р·С‹РіСЂС‹РІР°Р»СЃСЏ Р±С‹ РѕР±С‹С‡РЅС‹Рј Р°Р»РіРѕСЂРёС‚РјРѕРј вЂ” СЃ
+    // РѕР±С‹С‡РЅС‹Рј С€Р°РЅСЃРѕРј РїСЂРѕРјР°С…Р°.
     const layout = {
       rows: [".M......S.F.", "............"],
       legend: {
@@ -304,7 +185,7 @@ describe("prologue script waits for its actor (0.20.45)", () => {
       },
     };
     const match = createPrologueMatch({ layout, units: [MIKULA, RAT], seed: 701 });
-    // Ход Нави: сценарий выбирается именно для активной стороны.
+    // РҐРѕРґ РќР°РІРё: СЃС†РµРЅР°СЂРёР№ РІС‹Р±РёСЂР°РµС‚СЃСЏ РёРјРµРЅРЅРѕ РґР»СЏ Р°РєС‚РёРІРЅРѕР№ СЃС‚РѕСЂРѕРЅС‹.
     match.activeOwner = 2;
     const kernel = createTacticsKernel({
       initial: match,
@@ -327,14 +208,14 @@ describe("prologue script waits for its actor (0.20.45)", () => {
       ],
     };
     const state = { index: 0 };
-    // Пустой ход Нави: крысы на поле нет, очередь обязана остаться на месте.
+    // РџСѓСЃС‚РѕР№ С…РѕРґ РќР°РІРё: РєСЂС‹СЃС‹ РЅР° РїРѕР»Рµ РЅРµС‚, РѕС‡РµСЂРµРґСЊ РѕР±СЏР·Р°РЅР° РѕСЃС‚Р°С‚СЊСЃСЏ РЅР° РјРµСЃС‚Рµ.
     const idle = pickScriptedCommand(kernel, script, state, { activeOwner: 2 });
     expect(idle.command).toBeNull();
     expect(idle.state.index).toBe(0);
 
-    // Крыса вышла — обещанный укус на месте, с предписанным исходом.
+    // РљСЂС‹СЃР° РІС‹С€Р»Р° вЂ” РѕР±РµС‰Р°РЅРЅС‹Р№ СѓРєСѓСЃ РЅР° РјРµСЃС‚Рµ, СЃ РїСЂРµРґРїРёСЃР°РЅРЅС‹Рј РёСЃС…РѕРґРѕРј.
     const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
-    // Крыса выходит рядом с героем: укус доступен сразу.
+    // РљСЂС‹СЃР° РІС‹С…РѕРґРёС‚ СЂСЏРґРѕРј СЃ РіРµСЂРѕРµРј: СѓРєСѓСЃ РґРѕСЃС‚СѓРїРµРЅ СЃСЂР°Р·Сѓ.
     kernel.spawnScripted("forest_rat", 2, { x: mikula.x + 1, y: mikula.y, z: 1 });
     const decision = pickScriptedCommand(kernel, script, idle.state, { activeOwner: 2 });
     expect(decision.command?.type).toBe("ATTACK");
@@ -350,14 +231,14 @@ describe("prologue M2 ambush budget (0.20.45)", () => {
     const dash = cells.filter((cell) => cell.apCost === 2).sort((a, b) => b.x + b.y - (a.x + a.y))[0]!;
     const command = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
     const clamped = clampPrologueCommand(kernel, state, command, ["mikula_peasant"]);
-    if (clamped.type !== "MOVE") throw new Error("ожидалась команда перемещения");
-    // Цель не достигнута, но герой не стоит: рывок обрывается на полпути.
+    if (clamped.type !== "MOVE") throw new Error("РѕР¶РёРґР°Р»Р°СЃСЊ РєРѕРјР°РЅРґР° РїРµСЂРµРјРµС‰РµРЅРёСЏ");
+    // Р¦РµР»СЊ РЅРµ РґРѕСЃС‚РёРіРЅСѓС‚Р°, РЅРѕ РіРµСЂРѕР№ РЅРµ СЃС‚РѕРёС‚: СЂС‹РІРѕРє РѕР±СЂС‹РІР°РµС‚СЃСЏ РЅР° РїРѕР»РїСѓС‚Рё.
     expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${dash.x},${dash.y}`);
     expect(`${clamped.to.x},${clamped.to.y}`).not.toBe(`${mikula.x},${mikula.y}`);
     expect(
       kernel.getReachable(mikula.id).find((cell) => cell.x === clamped.to.x && cell.y === clamped.to.y)?.apCost,
     ).toBe(1);
-    // Остановка — на маршруте: она ближе к цели, чем клетка старта.
+    // РћСЃС‚Р°РЅРѕРІРєР° вЂ” РЅР° РјР°СЂС€СЂСѓС‚Рµ: РѕРЅР° Р±Р»РёР¶Рµ Рє С†РµР»Рё, С‡РµРј РєР»РµС‚РєР° СЃС‚Р°СЂС‚Р°.
     const toward = Math.abs(clamped.to.x - dash.x) + Math.abs(clamped.to.y - dash.y);
     const fromStart = Math.abs(mikula.x - dash.x) + Math.abs(mikula.y - dash.y);
     expect(toward).toBeLessThan(fromStart);
@@ -371,17 +252,17 @@ describe("prologue M2 ambush budget (0.20.45)", () => {
     const mikula = heroOf(kernel);
     const step = kernel.getReachable(mikula.id).filter((cell) => cell.apCost === 1)[0]!;
     const command = { type: "MOVE" as const, actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } };
-    // Обычный шаг в бюджете: команда не переписывается.
+    // РћР±С‹С‡РЅС‹Р№ С€Р°Рі РІ Р±СЋРґР¶РµС‚Рµ: РєРѕРјР°РЅРґР° РЅРµ РїРµСЂРµРїРёСЃС‹РІР°РµС‚СЃСЏ.
     expect(clampPrologueCommand(kernel, state, command, ["mikula_peasant"])).toEqual(command);
     const dash = kernel.getReachable(mikula.id).filter((cell) => cell.apCost === 2)[0]!;
     const dashCommand = { type: "MOVE" as const, actorId: mikula.id, to: { x: dash.x, y: dash.y, z: 1 } };
-    // Засада уже позади — бюджет больше не держит.
+    // Р—Р°СЃР°РґР° СѓР¶Рµ РїРѕР·Р°РґРё вЂ” Р±СЋРґР¶РµС‚ Р±РѕР»СЊС€Рµ РЅРµ РґРµСЂР¶РёС‚.
     expect(clampPrologueCommand(kernel, { ...state, ambushPending: false }, dashCommand, ["mikula_peasant"])).toEqual(
       dashCommand,
     );
-    // Чужой боец бюджетом не связан.
+    // Р§СѓР¶РѕР№ Р±РѕРµС† Р±СЋРґР¶РµС‚РѕРј РЅРµ СЃРІСЏР·Р°РЅ.
     expect(clampPrologueCommand(kernel, state, dashCommand, ["fedot_stranded"])).toEqual(dashCommand);
-    // Не перемещение — не наша забота.
+    // РќРµ РїРµСЂРµРјРµС‰РµРЅРёРµ вЂ” РЅРµ РЅР°С€Р° Р·Р°Р±РѕС‚Р°.
     const defend = { type: "DEFEND" as const, actorId: mikula.id };
     expect(clampPrologueCommand(kernel, state, defend, ["mikula_peasant"])).toEqual(defend);
   });
@@ -392,7 +273,7 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     const { kernel, ctx, state } = m2Setup({ adjacent: true });
     const mikula = heroOf(kernel);
     const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-    // Освобождение: особое действие, доступное только рядом с захваченным.
+    // РћСЃРІРѕР±РѕР¶РґРµРЅРёРµ: РѕСЃРѕР±РѕРµ РґРµР№СЃС‚РІРёРµ, РґРѕСЃС‚СѓРїРЅРѕРµ С‚РѕР»СЊРєРѕ СЂСЏРґРѕРј СЃ Р·Р°С…РІР°С‡РµРЅРЅС‹Рј.
     const freed = kernel.apply({ type: "INTERACT", actorId: mikula.id, targetId: fedot.id });
     expect(freed.ok).toBe(true);
     if (!freed.ok) return;
@@ -403,18 +284,18 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
       state,
       ctx,
     );
-    // Федот освобождён и волен ходить.
+    // Р¤РµРґРѕС‚ РѕСЃРІРѕР±РѕР¶РґС‘РЅ Рё РІРѕР»РµРЅ С…РѕРґРёС‚СЊ.
     expect(next.fedotFreed).toBe(true);
     expect(kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")?.maxAp).toBe(2);
-    // Стая вышла — до четырёх крыс из чащи, а не ноль, как было бы без
-    // маркеров (0.21.22: потолок после освобождения — четыре).
+    // РЎС‚Р°СЏ РІС‹С€Р»Р° вЂ” РґРѕ С‡РµС‚С‹СЂС‘С… РєСЂС‹СЃ РёР· С‡Р°С‰Рё, Р° РЅРµ РЅРѕР»СЊ, РєР°Рє Р±С‹Р»Рѕ Р±С‹ Р±РµР·
+    // РјР°СЂРєРµСЂРѕРІ (0.21.22: РїРѕС‚РѕР»РѕРє РїРѕСЃР»Рµ РѕСЃРІРѕР±РѕР¶РґРµРЅРёСЏ вЂ” С‡РµС‚С‹СЂРµ).
     expect(
       kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length,
     ).toBe(4);
-    // Выход ещё тёмен: его покажет сцена, а не само освобождение.
+    // Р’С‹С…РѕРґ РµС‰С‘ С‚С‘РјРµРЅ: РµРіРѕ РїРѕРєР°Р¶РµС‚ СЃС†РµРЅР°, Р° РЅРµ СЃР°РјРѕ РѕСЃРІРѕР±РѕР¶РґРµРЅРёРµ.
     expect(next.extractPending).toBe(true);
     expect(kernel.getSnapshot().grid.tiles.filter((tile) => tile.extract).length).toBe(0);
-    // Экран боя открывает зону после сцены стаи — и только её клетки.
+    // Р­РєСЂР°РЅ Р±РѕСЏ РѕС‚РєСЂС‹РІР°РµС‚ Р·РѕРЅСѓ РїРѕСЃР»Рµ СЃС†РµРЅС‹ СЃС‚Р°Рё вЂ” Рё С‚РѕР»СЊРєРѕ РµС‘ РєР»РµС‚РєРё.
     const revealed = revealPrologueExtract(kernel, next, ctx);
     expect(revealed.extractPending).toBe(false);
     expect(
@@ -433,9 +314,9 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
     const { kernel, ctx, state } = m2Setup({ adjacent: true });
     const mikula = heroOf(kernel);
     const fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-    // Освобождение: особое действие, доступное только рядом с захваченным.
+    // РћСЃРІРѕР±РѕР¶РґРµРЅРёРµ: РѕСЃРѕР±РѕРµ РґРµР№СЃС‚РІРёРµ, РґРѕСЃС‚СѓРїРЅРѕРµ С‚РѕР»СЊРєРѕ СЂСЏРґРѕРј СЃ Р·Р°С…РІР°С‡РµРЅРЅС‹Рј.
     const first = kernel.apply({ type: "INTERACT", actorId: mikula.id, targetId: fedot.id });
-    if (!first.ok) throw new Error("освобождение не принято");
+    if (!first.ok) throw new Error("РѕСЃРІРѕР±РѕР¶РґРµРЅРёРµ РЅРµ РїСЂРёРЅСЏС‚Рѕ");
     const pending = afterPrologueApply(
       kernel,
       { type: "INTERACT", actorId: mikula.id, targetId: fedot.id },
@@ -449,7 +330,7 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
       .getReachable(mikula.id)
       .filter((cell) => `${cell.x},${cell.y}` !== `${step.x},${step.y}` && cell.apCost === 1)[0]!;
     const second = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: elsewhere.x, y: elsewhere.y, z: 1 } });
-    if (!second.ok) throw new Error("второй шаг не принят");
+    if (!second.ok) throw new Error("РІС‚РѕСЂРѕР№ С€Р°Рі РЅРµ РїСЂРёРЅСЏС‚");
     const recovered = afterPrologueApply(
       kernel,
       { type: "MOVE", actorId: mikula.id, to: { x: elsewhere.x, y: elsewhere.y, z: 1 } },
@@ -457,188 +338,36 @@ describe("prologue M2 wave and exit (0.20.45)", () => {
       pending,
       ctx,
     );
-    // Без этой страховки зона осталась бы тёмной и миссию нельзя было бы
-    // завершить: ядро открывает её на следующем же применении команды.
+    // Р‘РµР· СЌС‚РѕР№ СЃС‚СЂР°С…РѕРІРєРё Р·РѕРЅР° РѕСЃС‚Р°Р»Р°СЃСЊ Р±С‹ С‚С‘РјРЅРѕР№ Рё РјРёСЃСЃРёСЋ РЅРµР»СЊР·СЏ Р±С‹Р»Рѕ Р±С‹
+    // Р·Р°РІРµСЂС€РёС‚СЊ: СЏРґСЂРѕ РѕС‚РєСЂС‹РІР°РµС‚ РµС‘ РЅР° СЃР»РµРґСѓСЋС‰РµРј Р¶Рµ РїСЂРёРјРµРЅРµРЅРёРё РєРѕРјР°РЅРґС‹.
     expect(recovered.extractPending).toBe(false);
     expect(kernel.getSnapshot().grid.tiles.some((tile) => tile.extract)).toBe(true);
   });
 });
 
-const BOGATYR: SpawnUnitConfig = {
-  id: "bogatyr",
-  maxHealth: 12,
-  maxAP: 2,
-  mobility: 4,
-  aim: 70,
-  defense: 10,
-  vision: 10,
-  weapons: ["sword"],
-};
-const UPYR: SpawnUnitConfig = {
-  id: "upyr",
-  maxHealth: 6,
-  maxAP: 2,
-  mobility: 4,
-  aim: 50,
-  defense: 0,
-  vision: 8,
-  weapons: ["claws"],
-};
-const STRELETS: SpawnUnitConfig = {
-  id: "strelets",
-  maxHealth: 8,
-  maxAP: 2,
-  mobility: 5,
-  aim: 70,
-  defense: 0,
-  vision: 12,
-  weapons: ["bow"],
-};
-const ZNAHARKA: SpawnUnitConfig = {
-  id: "znaharka",
-  maxHealth: 8,
-  maxAP: 2,
-  mobility: 4,
-  aim: 50,
-  defense: 0,
-  vision: 10,
-  weapons: [],
-};
-
-/**
- * Подкрепления М2 (0.21.19, потолок — 0.21.22).
- *
- * Потолок «четыре живых крысы» после освобождения Федота и восполнение до
- * него **за ход Нави** (campaign.md §7.2 п. 10, §12.1). Прежде тик сервиса
- * вызывался перед каждой командой Нави, а счётчик живых противников не видел
- * стаю: стая выходит с `countsForElimination: false`, потому что миссия
- * выигрывается эвакуацией, а не истреблением. Второй и следующие ходы Нави
- * не кончались вовсе — каждая команда приводила новую крысу, а у новой
- * крысы полные ОД, — и ход игроку не возвращался, пока не исчерпывался
- * предохранитель цикла. С 0.21.22 стая досыпает до четырёх, а не выбегает
- * шестью, и подкрепление восполняет убитых до того же потолка.
- */
-
-/** Профиль подкреплений М2 из `reinforcements.json5`. */
-const M2_CRY_WAVE = {
-  enabled: true,
-  mode: "onKill" as const,
-  delayTurns: 0,
-  pool: ["forest_rat"],
-  perKill: 2,
-  perTurnNoKill: 1,
-  maxConcurrentEnemies: 4,
-};
-
-/** Сценарий хода Нави М2 из `prologue_missions.json5`. */
-const M2_SCRIPT = {
-  priority: [],
-  actions: [
-    {
-      unitId: "forest_rat",
-      side: "enemy" as const,
-      kind: "attack" as const,
-      targetUnitId: "mikula_peasant",
-      weaponId: "teeth",
-      forceOutcome: "miss" as const,
-    },
-    {
-      unitId: "forest_rat",
-      side: "enemy" as const,
-      kind: "attack" as const,
-      targetUnitId: "mikula_peasant",
-      weaponId: "teeth",
-      forceOutcome: "hit" as const,
-    },
-    { kind: "endTurn" as const },
-  ],
-};
-
-/** Состояние М2 со сценарием и подкреплениями. */
-function m2SwarmSetup() {
-  const { kernel, ctx, state } = m2Setup({ adjacent: true });
-  return { kernel, ctx: { ...ctx, script: M2_SCRIPT, reinforcements: M2_CRY_WAVE }, state };
-}
-
-/** Освободить Федота действием INTERACT: стая выходит на поле. */
-function freeFedot(
-  kernel: ReturnType<typeof m2Setup>["kernel"],
-  ctx: ReturnType<typeof m2Setup>["ctx"],
-  state: ReturnType<typeof createPrologueRunState>,
-) {
-  const mikula = heroOf(kernel);
-  let fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-  // Встать вплотную, если герой ещё не рядом с увязшим Федотом.
-  if (Math.abs(mikula.x - fedot.x) + Math.abs(mikula.y - fedot.y) > 1) {
-    const step = kernel
-      .getReachable(mikula.id)
-      .filter((cell) => cell.apCost === 1 && Math.abs(cell.x - fedot.x) + Math.abs(cell.y - fedot.y) <= 1)[0]!;
-    const applied = kernel.apply({ type: "MOVE", actorId: mikula.id, to: { x: step.x, y: step.y, z: 1 } });
-    if (!applied.ok) throw new Error("шаг к Федоту не принят");
-  }
-  // Освобождение: одно ОД, только рядом с захваченным.
-  fedot = kernel.getSnapshot().entities.find((entity) => entity.configId === "fedot_stranded")!;
-  const command = { type: "INTERACT" as const, actorId: mikula.id, targetId: fedot.id };
-  const applied = kernel.apply(command);
-  if (!applied.ok) throw new Error(`освобождение не принято: ${applied.reason}`);
-  return afterPrologueApply(kernel, command, applied.events, state, ctx);
-}
-
-/**
- * Один ход Нави тем же порядком, что и экран боя: тик подкреплений, команда,
- * применение, итог пролога. Предохранитель — 96 команд, как на экране.
- */
-function runNavTurn(
-  kernel: ReturnType<typeof m2Setup>["kernel"],
-  ctx: ReturnType<typeof m2Setup>["ctx"],
-  state: ReturnType<typeof createPrologueRunState>,
-) {
-  let current = state;
-  let commands = 0;
-  let ended = false;
-  for (let guard = 0; guard < 96; guard += 1) {
-    const decision = tickPrologueEnemyTurn(kernel, current, ctx);
-    current = decision.state;
-    const applied = decision.command
-      ? kernel.apply(decision.command)
-      : kernel.apply({ type: "END_TURN", playerId: "2" });
-    if (!decision.command) {
-      ended = true;
-      break;
-    }
-    commands += 1;
-    if (!applied.ok) break;
-    current = afterPrologueApply(kernel, decision.command, applied.events, current, ctx);
-  }
-  return { state: current, commands, ended };
-}
-
-const ratsOf = (kernel: ReturnType<typeof m2Setup>["kernel"]): number =>
-  kernel.getSnapshot().entities.filter((entity) => entity.configId === "forest_rat" && !entity.dead).length;
-
 describe("prologue M2 reinforcements (0.21.19)", () => {
-  it("не прибавляет сверх потолка за ход Нави, а не за каждую команду", () => {
+  it("РЅРµ РїСЂРёР±Р°РІР»СЏРµС‚ СЃРІРµСЂС… РїРѕС‚РѕР»РєР° Р·Р° С…РѕРґ РќР°РІРё, Р° РЅРµ Р·Р° РєР°Р¶РґСѓСЋ РєРѕРјР°РЅРґСѓ", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     const freed = freeFedot(kernel, ctx, state);
     expect(freed.waveArmed).toBe(true);
-    expect(ratsOf(kernel), "стая досыпала до потолка").toBe(4);
+    expect(ratsOf(kernel), "СЃС‚Р°СЏ РґРѕСЃС‹РїР°Р»Р° РґРѕ РїРѕС‚РѕР»РєР°").toBe(4);
 
     kernel.apply({ type: "END_TURN", playerId: "1" });
     const turn = runNavTurn(kernel, ctx, freed);
 
-    // Четыре крысы стаи стоят у потолка: за ход ничего не прибавилось —
-    // прежде за этот же ход выходило до девяноста, по крысе на команду Нави.
-    expect(ratsOf(kernel), "потолок держится").toBe(4);
-    expect(turn.commands, "ход Нави конечен").toBeLessThan(96);
-    expect(turn.ended, "ход Нави завершён командой, а не предохранителем").toBe(true);
-    expect(kernel.getSnapshot().activeOwner, "ход вернулся игроку").toBe(1);
+    // Р§РµС‚С‹СЂРµ РєСЂС‹СЃС‹ СЃС‚Р°Рё СЃС‚РѕСЏС‚ Сѓ РїРѕС‚РѕР»РєР°: Р·Р° С…РѕРґ РЅРёС‡РµРіРѕ РЅРµ РїСЂРёР±Р°РІРёР»РѕСЃСЊ вЂ”
+    // РїСЂРµР¶РґРµ Р·Р° СЌС‚РѕС‚ Р¶Рµ С…РѕРґ РІС‹С…РѕРґРёР»Рѕ РґРѕ РґРµРІСЏРЅРѕСЃС‚Р°, РїРѕ РєСЂС‹СЃРµ РЅР° РєРѕРјР°РЅРґСѓ РќР°РІРё.
+    expect(ratsOf(kernel), "РїРѕС‚РѕР»РѕРє РґРµСЂР¶РёС‚СЃСЏ").toBe(4);
+    expect(turn.commands, "С…РѕРґ РќР°РІРё РєРѕРЅРµС‡РµРЅ").toBeLessThan(96);
+    expect(turn.ended, "С…РѕРґ РќР°РІРё Р·Р°РІРµСЂС€С‘РЅ РєРѕРјР°РЅРґРѕР№, Р° РЅРµ РїСЂРµРґРѕС…СЂР°РЅРёС‚РµР»РµРј").toBe(true);
+    expect(kernel.getSnapshot().activeOwner, "С…РѕРґ РІРµСЂРЅСѓР»СЃСЏ РёРіСЂРѕРєСѓ").toBe(1);
   });
 
-  it("убитая крыса восполняется до четырёх за ход Нави", () => {
+  it("СѓР±РёС‚Р°СЏ РєСЂС‹СЃР° РІРѕСЃРїРѕР»РЅСЏРµС‚СЃСЏ РґРѕ С‡РµС‚С‹СЂС‘С… Р·Р° С…РѕРґ РќР°РІРё", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     const freed = freeFedot(kernel, ctx, state);
-    // Одна крыса пала: на поле осталось трое, а счётчик убийств ведёт итог
-    // команды игрока (§7.2 п. 10).
+    // РћРґРЅР° РєСЂС‹СЃР° РїР°Р»Р°: РЅР° РїРѕР»Рµ РѕСЃС‚Р°Р»РѕСЃСЊ С‚СЂРѕРµ, Р° СЃС‡С‘С‚С‡РёРє СѓР±РёР№СЃС‚РІ РІРµРґС‘С‚ РёС‚РѕРі
+    // РєРѕРјР°РЅРґС‹ РёРіСЂРѕРєР° (В§7.2 Рї. 10).
     const snapshot = kernel.getSnapshot();
     const rat = snapshot.entities.find((entity) => entity.configId === "forest_rat" && !entity.dead)!;
     rat.dead = true;
@@ -647,16 +376,16 @@ describe("prologue M2 reinforcements (0.21.19)", () => {
 
     kernel.apply({ type: "END_TURN", playerId: "1" });
     runNavTurn(kernel, ctx, killed);
-    // Осталось трое живых: подкрепление восполняет убитую до потолка
-    // четырёх, а не добавляет две сверх него.
-    expect(ratsOf(kernel), "потолок заполнен заново").toBe(4);
+    // РћСЃС‚Р°Р»РѕСЃСЊ С‚СЂРѕРµ Р¶РёРІС‹С…: РїРѕРґРєСЂРµРїР»РµРЅРёРµ РІРѕСЃРїРѕР»РЅСЏРµС‚ СѓР±РёС‚СѓСЋ РґРѕ РїРѕС‚РѕР»РєР°
+    // С‡РµС‚С‹СЂС‘С…, Р° РЅРµ РґРѕР±Р°РІР»СЏРµС‚ РґРІРµ СЃРІРµСЂС… РЅРµРіРѕ.
+    expect(ratsOf(kernel), "РїРѕС‚РѕР»РѕРє Р·Р°РїРѕР»РЅРµРЅ Р·Р°РЅРѕРІРѕ").toBe(4);
   });
 
-  it("держит потолок четыре крысы на поле и не крадёт ход игрока", () => {
+  it("РґРµСЂР¶РёС‚ РїРѕС‚РѕР»РѕРє С‡РµС‚С‹СЂРµ РєСЂС‹СЃС‹ РЅР° РїРѕР»Рµ Рё РЅРµ РєСЂР°РґС‘С‚ С…РѕРґ РёРіСЂРѕРєР°", () => {
     const { kernel, ctx, state } = m2SwarmSetup();
     let current = freeFedot(kernel, ctx, state);
-    // Герой стоит под стаей и не убегает: здоровье поднято, чтобы считать
-    // подкрепления, а не то, сколько ходов он продержится без боя.
+    // Р“РµСЂРѕР№ СЃС‚РѕРёС‚ РїРѕРґ СЃС‚Р°РµР№ Рё РЅРµ СѓР±РµРіР°РµС‚: Р·РґРѕСЂРѕРІСЊРµ РїРѕРґРЅСЏС‚Рѕ, С‡С‚РѕР±С‹ СЃС‡РёС‚Р°С‚СЊ
+    // РїРѕРґРєСЂРµРїР»РµРЅРёСЏ, Р° РЅРµ С‚Рѕ, СЃРєРѕР»СЊРєРѕ С…РѕРґРѕРІ РѕРЅ РїСЂРѕРґРµСЂР¶РёС‚СЃСЏ Р±РµР· Р±РѕСЏ.
     const sturdy = kernel.getSnapshot();
     for (const entity of sturdy.entities) {
       if (entity.owner === 1) {
@@ -669,9 +398,9 @@ describe("prologue M2 reinforcements (0.21.19)", () => {
       kernel.apply({ type: "END_TURN", playerId: "1" });
       const turn = runNavTurn(kernel, ctx, current);
       current = turn.state;
-      expect(ratsOf(kernel), `потолок стаи в ходу ${round}`).toBeLessThanOrEqual(4);
-      expect(turn.ended, `ход Нави ${round} завершён`).toBe(true);
-      expect(kernel.getSnapshot().activeOwner, `ход ${round} вернулся игроку`).toBe(1);
+      expect(ratsOf(kernel), `РїРѕС‚РѕР»РѕРє СЃС‚Р°Рё РІ С…РѕРґСѓ ${round}`).toBeLessThanOrEqual(4);
+      expect(turn.ended, `С…РѕРґ РќР°РІРё ${round} Р·Р°РІРµСЂС€С‘РЅ`).toBe(true);
+      expect(kernel.getSnapshot().activeOwner, `С…РѕРґ ${round} РІРµСЂРЅСѓР»СЃСЏ РёРіСЂРѕРєСѓ`).toBe(1);
     }
   });
 });
@@ -913,7 +642,7 @@ describe("prologue player script", () => {
   });
 });
 
-/* ---------- M1: крыса как полноценный противник (0.20.37) ---------- */
+/* ---------- M1: РєСЂС‹СЃР° РєР°Рє РїРѕР»РЅРѕС†РµРЅРЅС‹Р№ РїСЂРѕС‚РёРІРЅРёРє (0.20.37) ---------- */
 
 const M1_FOG_OFF_LAYOUT = {
   rows: [
@@ -942,8 +671,8 @@ const M1_SCRIPT = {
       kind: "attack",
       targetUnitId: "mikula_peasant",
       weaponId: "teeth",
-      // Синхронно с prologue_missions.json5 (0.20.40): укус обязан
-      // состояться, но это минимальный урон зубов.
+      // РЎРёРЅС…СЂРѕРЅРЅРѕ СЃ prologue_missions.json5 (0.20.40): СѓРєСѓСЃ РѕР±СЏР·Р°РЅ
+      // СЃРѕСЃС‚РѕСЏС‚СЊСЃСЏ, РЅРѕ СЌС‚Рѕ РјРёРЅРёРјР°Р»СЊРЅС‹Р№ СѓСЂРѕРЅ Р·СѓР±РѕРІ.
       forceOutcome: "min",
       onlyIf: "targetAlive",
     },
@@ -951,7 +680,7 @@ const M1_SCRIPT = {
   ],
 };
 
-/** Дойти до палки и подобрать её: крыса появляется скриптово. */
+/** Р”РѕР№С‚Рё РґРѕ РїР°Р»РєРё Рё РїРѕРґРѕР±СЂР°С‚СЊ РµС‘: РєСЂС‹СЃР° РїРѕСЏРІР»СЏРµС‚СЃСЏ СЃРєСЂРёРїС‚РѕРІРѕ. */
 function armMikula(kernel: ReturnType<typeof createTacticsKernel>) {
   const compiled = compilePrologueLayout(M1_FOG_OFF_LAYOUT as never);
   const stick = compiled.markers.S![0]!;
@@ -1009,11 +738,11 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
 
   it("gives the scripted side its own fog of war once it enters the field", () => {
     const kernel = boot(701);
-    // Противника ещё нет: туман Нави отсутствует.
+    // РџСЂРѕС‚РёРІРЅРёРєР° РµС‰С‘ РЅРµС‚: С‚СѓРјР°РЅ РќР°РІРё РѕС‚СЃСѓС‚СЃС‚РІСѓРµС‚.
     expect(kernel.getVisibleCells(2).size).toBe(0);
     const compiled = compilePrologueLayout(M1_FOG_OFF_LAYOUT as never);
     kernel.spawnScripted("forest_rat", 2, { x: compiled.markers.F![0]!.x, y: compiled.markers.F![0]!.y, z: 1 });
-    // Сторона появилась — туман для неё создан и (при fogDisabled) раскрыт.
+    // РЎС‚РѕСЂРѕРЅР° РїРѕСЏРІРёР»Р°СЃСЊ вЂ” С‚СѓРјР°РЅ РґР»СЏ РЅРµС‘ СЃРѕР·РґР°РЅ Рё (РїСЂРё fogDisabled) СЂР°СЃРєСЂС‹С‚.
     expect(kernel.getVisibleCells(2).size).toBe(120);
   });
 
@@ -1030,7 +759,7 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
 
     for (let round = 0; round < 6; round += 1) {
       if (matchOutcome(kernel.getSnapshot()) !== "ongoing") break;
-      // Игрок ничего не делает — только завершает ход.
+      // РРіСЂРѕРє РЅРёС‡РµРіРѕ РЅРµ РґРµР»Р°РµС‚ вЂ” С‚РѕР»СЊРєРѕ Р·Р°РІРµСЂС€Р°РµС‚ С…РѕРґ.
       if (kernel.getSnapshot().activeOwner === 1) {
         const ended = kernel.apply({ type: "END_TURN", playerId: "1" });
         if (ended.ok) run = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, ended.events, run, ctx);
@@ -1051,21 +780,21 @@ describe("prologue M1 rat as a real enemy (0.20.37)", () => {
         }
         run = afterPrologueApply(kernel, command as never, applied.events, run, ctx);
         for (const event of applied.events) {
-          // Результат и урон: первый удар обязан быть минимальным (0.20.40).
+          // Р РµР·СѓР»СЊС‚Р°С‚ Рё СѓСЂРѕРЅ: РїРµСЂРІС‹Р№ СѓРґР°СЂ РѕР±СЏР·Р°РЅ Р±С‹С‚СЊ РјРёРЅРёРјР°Р»СЊРЅС‹Рј (0.20.40).
           if (event.type === "COMBAT_RESOLVED") outcomes.push(`${event.result}:${event.damageDealt}`);
         }
         if (!decision.command) break;
       }
     }
 
-    // Крыса бьёт каждый ход: алгоритм не выдаёт ни одной отвергнутой команды.
+    // РљСЂС‹СЃР° Р±СЊС‘С‚ РєР°Р¶РґС‹Р№ С…РѕРґ: Р°Р»РіРѕСЂРёС‚Рј РЅРµ РІС‹РґР°С‘С‚ РЅРё РѕРґРЅРѕР№ РѕС‚РІРµСЂРіРЅСѓС‚РѕР№ РєРѕРјР°РЅРґС‹.
     expect(rejections).toEqual([]);
     expect(overwatch).toBe(false);
     expect(outcomes.length).toBeGreaterThanOrEqual(2);
-    // Первый скриптовый удар — минимальный урон зубов (0.20.40): укус
-    // состоялся, но учебный бой не калечит героя случайным максимумом.
+    // РџРµСЂРІС‹Р№ СЃРєСЂРёРїС‚РѕРІС‹Р№ СѓРґР°СЂ вЂ” РјРёРЅРёРјР°Р»СЊРЅС‹Р№ СѓСЂРѕРЅ Р·СѓР±РѕРІ (0.20.40): СѓРєСѓСЃ
+    // СЃРѕСЃС‚РѕСЏР»СЃСЏ, РЅРѕ СѓС‡РµР±РЅС‹Р№ Р±РѕР№ РЅРµ РєР°Р»РµС‡РёС‚ РіРµСЂРѕСЏ СЃР»СѓС‡Р°Р№РЅС‹Рј РјР°РєСЃРёРјСѓРјРѕРј.
     expect(outcomes[0]).toBe("HIT:2");
-    // Дальше честные кости: за оставшиеся ходы Микула получает ещё урон.
+    // Р”Р°Р»СЊС€Рµ С‡РµСЃС‚РЅС‹Рµ РєРѕСЃС‚Рё: Р·Р° РѕСЃС‚Р°РІС€РёРµСЃСЏ С…РѕРґС‹ РњРёРєСѓР»Р° РїРѕР»СѓС‡Р°РµС‚ РµС‰С‘ СѓСЂРѕРЅ.
     const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
     expect(mikula.hp).toBeLessThan(mikula.maxHp);
   });
@@ -1104,16 +833,16 @@ describe("prologue M1 relief (0.20.37)", () => {
   it("applies per-cell heights from the parallel array", () => {
     const compiled = compilePrologueLayout(M1_LAYOUT as never);
     const at = (x: number, y: number) => compiled.grid.tiles.find((tile) => tile.x === x && tile.y === y)!;
-    // Северные всхолмления.
+    // РЎРµРІРµСЂРЅС‹Рµ РІСЃС…РѕР»РјР»РµРЅРёСЏ.
     expect(at(4, 0).z).toBe(2);
-    // Тропа Микулы и клетка палки — ровный ярус.
+    // РўСЂРѕРїР° РњРёРєСѓР»С‹ Рё РєР»РµС‚РєР° РїР°Р»РєРё вЂ” СЂРѕРІРЅС‹Р№ СЏСЂСѓСЃ.
     expect(at(1, 3).z).toBe(1);
     expect(at(19, 3).z).toBe(1);
-    // Точка выхода крысы — тот же ярус, что и клетка палки: без поправки к меткости.
+    // РўРѕС‡РєР° РІС‹С…РѕРґР° РєСЂС‹СЃС‹ вЂ” С‚РѕС‚ Р¶Рµ СЏСЂСѓСЃ, С‡С‚Рѕ Рё РєР»РµС‚РєР° РїР°Р»РєРё: Р±РµР· РїРѕРїСЂР°РІРєРё Рє РјРµС‚РєРѕСЃС‚Рё.
     expect(at(18, 2).z).toBe(at(19, 3).z);
-    // Низина сухого ручья на юге.
+    // РќРёР·РёРЅР° СЃСѓС…РѕРіРѕ СЂСѓС‡СЊСЏ РЅР° СЋРіРµ.
     expect(at(3, 5).z).toBe(0);
-    // Валуны блокируют обзор и проход.
+    // Р’Р°Р»СѓРЅС‹ Р±Р»РѕРєРёСЂСѓСЋС‚ РѕР±Р·РѕСЂ Рё РїСЂРѕС…РѕРґ.
     expect(at(4, 0).blockLOS).toBe(true);
     expect(at(14, 0).blockLOS).toBe(true);
   });
@@ -1133,10 +862,10 @@ describe("prologue M1 relief (0.20.37)", () => {
     });
     const mikula = kernel.getSnapshot().entities.find((entity) => entity.configId === "mikula_peasant")!;
     const stick = kernel.getSnapshot().entities.find((entity) => entity.configId === "stick")!;
-    // 18 клеток по прямой: полный рывок (до 10) не достаёт — второму ходу есть чему учить.
+    // 18 РєР»РµС‚РѕРє РїРѕ РїСЂСЏРјРѕР№: РїРѕР»РЅС‹Р№ СЂС‹РІРѕРє (РґРѕ 10) РЅРµ РґРѕСЃС‚Р°С‘С‚ вЂ” РІС‚РѕСЂРѕРјСѓ С…РѕРґСѓ РµСЃС‚СЊ С‡РµРјСѓ СѓС‡РёС‚СЊ.
     expect(Math.floor(Math.hypot(stick.x - mikula.x, stick.y - mikula.y))).toBeGreaterThanOrEqual(18);
     expect(kernel.getReachable(mikula.id).some((cell) => cell.x === stick.x && cell.y === stick.y)).toBe(false);
-    // Маршрут к палке существует: миссия проходима.
+    // РњР°СЂС€СЂСѓС‚ Рє РїР°Р»РєРµ СЃСѓС‰РµСЃС‚РІСѓРµС‚: РјРёСЃСЃРёСЏ РїСЂРѕС…РѕРґРёРјР°.
     expect(kernel.getReachable(mikula.id).length).toBeGreaterThan(0);
   });
 });
@@ -1181,9 +910,9 @@ describe("prologue M1 checkpoint (0.20.37)", () => {
     });
     const { state } = armMikula(kernel);
     const { events, match: dead } = deadMikulaSnapshot(kernel);
-    // Контрольная точка активна — гибель Микулы откатывает сцену.
+    // РљРѕРЅС‚СЂРѕР»СЊРЅР°СЏ С‚РѕС‡РєР° Р°РєС‚РёРІРЅР° вЂ” РіРёР±РµР»СЊ РњРёРєСѓР»С‹ РѕС‚РєР°С‚С‹РІР°РµС‚ СЃС†РµРЅСѓ.
     expect(shouldRestoreCheckpoint(state, events, dead)).toBe(true);
-    // До появления крысы контрольной точки нет: это честное поражение.
+    // Р”Рѕ РїРѕСЏРІР»РµРЅРёСЏ РєСЂС‹СЃС‹ РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё РЅРµС‚: СЌС‚Рѕ С‡РµСЃС‚РЅРѕРµ РїРѕСЂР°Р¶РµРЅРёРµ.
     const before = createPrologueRunState("prologue_brushwood");
     expect(shouldRestoreCheckpoint(before, events, dead)).toBe(false);
   });
@@ -1231,7 +960,7 @@ describe("prologue scripted spawns reach the screen (0.20.37)", () => {
     kernel.spawnScripted("forest_rat", 2, { x: cell.x, y: cell.y, z: 1 });
     const events = kernel.drainSpawnEvents();
     expect(events.some((event) => event.type === "ENTITY_SPAWNED")).toBe(true);
-    // Накопитель опустошён: одно и то же событие не проигрывается дважды.
+    // РќР°РєРѕРїРёС‚РµР»СЊ РѕРїСѓСЃС‚РѕС€С‘РЅ: РѕРґРЅРѕ Рё С‚Рѕ Р¶Рµ СЃРѕР±С‹С‚РёРµ РЅРµ РїСЂРѕРёРіСЂС‹РІР°РµС‚СЃСЏ РґРІР°Р¶РґС‹.
     expect(kernel.drainSpawnEvents()).toEqual([]);
   });
 

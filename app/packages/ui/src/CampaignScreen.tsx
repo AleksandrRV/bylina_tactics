@@ -1,23 +1,35 @@
-import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+﻿import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ItemConfig, MissionConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
 import { CampaignHint } from "./CampaignHint.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
+import {
+  AnvilIcon,
+  ChamberIcon,
+  CoinIcon,
+  CompassIcon,
+  CrossIcon,
+  GemIcon,
+  HammerIcon,
+  HerbIcon,
+  IdolIcon,
+  LevelPips,
+  MissionTypeIcon,
+  RadarIcon,
+  ReconIcon,
+  RecruitSilhouette,
+  RescueIcon,
+  ShieldIcon,
+  ShipIcon,
+  SwordsIcon,
+} from "./CampaignScreen.icons.js";
 
-/** Классы дружины, доступные для обучения рекрута. */
+/** РљР»Р°СЃСЃС‹ РґСЂСѓР¶РёРЅС‹, РґРѕСЃС‚СѓРїРЅС‹Рµ РґР»СЏ РѕР±СѓС‡РµРЅРёСЏ СЂРµРєСЂСѓС‚Р°. */
 const CLASS_IDS: readonly string[] = ["bogatyr", "strelets", "znaharka", "volkhv"];
 
 type CampTab = "map" | "roster" | "chamber" | "forge";
-
-/** Иконка типа миссии (0.20.x, этап 4.3): смысл точки читается без панели. */
-function MissionTypeIcon({ type }: { type: MissionConfig["type"] }) {
-  if (type === "destroy") return <IdolIcon />;
-  if (type === "rescue") return <RescueIcon />;
-  if (type === "recon") return <ReconIcon />;
-  return <SwordsIcon />;
-}
 
 type ShipFlight = {
   key: number;
@@ -26,8 +38,8 @@ type ShipFlight = {
 };
 
 /**
- * Этап 4.1 (правка по ревью): прямой путь корабля совпадает с линией
- * маршрута; путь отдаётся в SVG для следа.
+ * Р­С‚Р°Рї 4.1 (РїСЂР°РІРєР° РїРѕ СЂРµРІСЊСЋ): РїСЂСЏРјРѕР№ РїСѓС‚СЊ РєРѕСЂР°Р±Р»СЏ СЃРѕРІРїР°РґР°РµС‚ СЃ Р»РёРЅРёРµР№
+ * РјР°СЂС€СЂСѓС‚Р°; РїСѓС‚СЊ РѕС‚РґР°С‘С‚СЃСЏ РІ SVG РґР»СЏ СЃР»РµРґР°.
  */
 function flightArc(flight: ShipFlight): { path: string } {
   return {
@@ -43,9 +55,9 @@ function itemName(itemId: string): string {
   return `item.${itemId}.name`;
 }
 
-/* ---------- Экран -------------------------------------------------- */
+/* ---------- Р­РєСЂР°РЅ -------------------------------------------------- */
 
-/** Строка эффекта предмета для карточки Кузни и снаряжения. */
+/** РЎС‚СЂРѕРєР° СЌС„С„РµРєС‚Р° РїСЂРµРґРјРµС‚Р° РґР»СЏ РєР°СЂС‚РѕС‡РєРё РљСѓР·РЅРё Рё СЃРЅР°СЂСЏР¶РµРЅРёСЏ. */
 function itemEffectParts(
   item: ItemConfig,
   t: (key: string, vars?: Record<string, string | number>) => string,
@@ -59,325 +71,8 @@ function itemEffectParts(
   return parts;
 }
 
-/* ---------- Геометрические иконки (плоские, в стиле игры) ---------- */
-
-function CoinIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <circle cx="8" cy="8" r="6.2" />
-      <circle cx="8" cy="8" r="2.6" />
-      <path d="M8 1.8v2M8 12.2v2M1.8 8h2M12.2 8h2" />
-    </svg>
-  );
-}
-
-function HerbIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    >
-      <path d="M8 14V6" />
-      <path d="M8 7c-2.4 0-3.6-1.6-3.4-3.8 2.3-.2 3.7 1 3.4 3.8Z" />
-      <path d="M8 9.5c2.4 0 3.6-1.6 3.4-3.8-2.3-.2-3.7 1-3.4 3.8Z" />
-      <path d="M8 12c-1.9 0-2.8-1.2-2.6-2.9 1.7-.2 2.8.8 2.6 2.9Z" />
-    </svg>
-  );
-}
-
-function GemIcon() {
-  return (
-    <svg
-      width="14"
-      height="14"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinejoin="round"
-    >
-      <path d="M6 2.5h4l3 3.5-5 7.5L3 6l3-3.5Z" />
-      <path d="M3 6h10M8 13.5 6.6 6M8 13.5 9.4 6" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinejoin="round"
-    >
-      <path d="M10 2.5 16 5v5c0 3.6-2.4 6.2-6 7.5C6.4 16.2 4 13.6 4 10V5l6-2.5Z" />
-      <path d="M7 10h6" />
-    </svg>
-  );
-}
-
-function HammerIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M8.5 10.5 3 16l1.5 1.5 5.5-5.5" />
-      <path d="m10 9 4.6-4.6a2.4 2.4 0 0 1 3.4 3.4L13.4 12.4 10 9Z" />
-      <path d="M13 4.5 15.5 7" />
-    </svg>
-  );
-}
-
-function ChamberIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-    >
-      <path d="M4 4.5h12M4 15.5h12" />
-      <path d="M10 2v4M10 14v4" />
-      <path d="M7 10h6" />
-    </svg>
-  );
-}
-
-function SwordsIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3.5 3.5 8 8M3.5 3.5l2.6-1 3 3-1 2.6L3.5 3.5Z" />
-      <path d="M16.5 16.5 12 12M16.5 16.5l-2.6 1-3-3 1-2.6 4.6 4.6Z" />
-      <path d="M6 14 3.5 16.5 8 17l3-3" />
-    </svg>
-  );
-}
-
-function IdolIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M6 2.5h8" />
-      <path d="M7 2.5v3.5M13 2.5v3.5" />
-      <path d="M5.5 6h9l-.8 9.5h-7.4L5.5 6Z" />
-      <circle cx="10" cy="9.5" r="1.4" />
-      <path d="M8.6 12.5h2.8M10 12.5v1.8" />
-    </svg>
-  );
-}
-
-function RescueIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M10 2.5 15 4.5v4.6c0 3.4-2.2 6-5 7.4-2.8-1.4-5-4-5-7.4V4.5l5-2Z" />
-      <path d="M10 6.5v4M8 8.5h4" />
-    </svg>
-  );
-}
-
-function ReconIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M2.5 10c2-4.5 4.5-6.5 7.5-6.5s5.5 2 7.5 6.5c-2 4.5-4.5 6.5-7.5 6.5S4.5 14.5 2.5 10Z" />
-      <circle cx="10" cy="10" r="2.2" />
-      <path d="M10 7.8v-2M12.2 10h2M10 12.2v2M7.8 10h-2" />
-    </svg>
-  );
-}
-
-function ShipIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 13.5h14l-1.8 3H4.8L3 13.5Z" />
-      <path d="M10 3v10" />
-      <path d="M10 3.5c2.8.8 3.6 2.6 3.4 5H10V3.5Z" />
-      <path d="M6.5 9.5 5 6.8M13.5 9.5 15 6.8" />
-    </svg>
-  );
-}
-
-function CompassIcon() {
-  return (
-    <svg
-      width="22"
-      height="22"
-      viewBox="0 0 22 22"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-    >
-      <circle cx="11" cy="11" r="9" />
-      <path d="m14.8 7.2-1.7 5-5 1.7 1.7-5 5-1.7Z" />
-    </svg>
-  );
-}
-
-function CrossIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-    >
-      <path d="M8 2.5v11M2.5 8h11" />
-    </svg>
-  );
-}
-
-function RadarIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-    >
-      <circle cx="10" cy="10" r="8" strokeDasharray="4 2.6" />
-      <path d="M10 10 16 4" />
-      <circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-function AnvilIcon() {
-  return (
-    <svg
-      width="18"
-      height="18"
-      viewBox="0 0 20 20"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4 14h12" />
-      <path d="M5 14v-3a5 5 0 0 1 10 0v3" />
-      <path d="M3 11h14M10 6V4.2M7 4.2h6" />
-    </svg>
-  );
-}
-
-function RecruitSilhouette() {
-  return (
-    <svg
-      width="56"
-      height="56"
-      viewBox="0 0 64 64"
-      aria-hidden="true"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <circle cx="32" cy="22" r="9" />
-      <path d="M14 54c2-12 9-17 18-17s16 5 18 17" />
-    </svg>
-  );
-}
-
-function LevelPips({ level }: { level: number }) {
-  return (
-    <span className="level-pips" aria-hidden="true">
-      {Array.from({ length: Math.min(level, 5) }, (_, index) => (
-        <i key={index} className={index < level ? "on" : ""} />
-      ))}
-    </span>
-  );
-}
-
-/* ---------- Экран -------------------------------------------------- */
+/* ---------- Р“РµРѕРјРµС‚СЂРёС‡РµСЃРєРёРµ РёРєРѕРЅРєРё РІС‹РЅРµСЃРµРЅС‹ РІ CampaignScreen.icons.tsx ---------- */
+/* ---------- Р­РєСЂР°РЅ -------------------------------------------------- */
 
 export function CampaignScreen() {
   useI18nTick();
@@ -395,9 +90,9 @@ export function CampaignScreen() {
   const [trainingId, setTrainingId] = useState<number | null>(null);
   const [scanKey, setScanKey] = useState<number>(0);
   const [justOpened, setJustOpened] = useState<string[]>([]);
-  /** Пустое сканирование: в радиусе нет закрытых точек (0.19.2). */
+  /** РџСѓСЃС‚РѕРµ СЃРєР°РЅРёСЂРѕРІР°РЅРёРµ: РІ СЂР°РґРёСѓСЃРµ РЅРµС‚ Р·Р°РєСЂС‹С‚С‹С… С‚РѕС‡РµРє (0.19.2). */
   const [scanMissed, setScanMissed] = useState(false);
-  /** Очередь туториалов «первого раза» (0.20.0): показываются по одному. */
+  /** РћС‡РµСЂРµРґСЊ С‚СѓС‚РѕСЂРёР°Р»РѕРІ В«РїРµСЂРІРѕРіРѕ СЂР°Р·Р°В» (0.20.0): РїРѕРєР°Р·С‹РІР°СЋС‚СЃСЏ РїРѕ РѕРґРЅРѕРјСѓ. */
   const [hintQueue, setHintQueue] = useState<CampaignHintId[]>([]);
   const [, setTick] = useState(0);
 
@@ -426,8 +121,8 @@ export function CampaignScreen() {
   const lockedCount = state.missions.filter((point) => point.status === "locked").length;
 
   const shipPosition = state.shipPosition;
-  // Этап 4.1: перелёт корабля к новой точке запускается кнопкой «В бой»;
-  // marker двигается по прямой вместе с отдельным затухающим SVG-следом.
+  // Р­С‚Р°Рї 4.1: РїРµСЂРµР»С‘С‚ РєРѕСЂР°Р±Р»СЏ Рє РЅРѕРІРѕР№ С‚РѕС‡РєРµ Р·Р°РїСѓСЃРєР°РµС‚СЃСЏ РєРЅРѕРїРєРѕР№ В«Р’ Р±РѕР№В»;
+  // marker РґРІРёРіР°РµС‚СЃСЏ РїРѕ РїСЂСЏРјРѕР№ РІРјРµСЃС‚Рµ СЃ РѕС‚РґРµР»СЊРЅС‹Рј Р·Р°С‚СѓС…Р°СЋС‰РёРј SVG-СЃР»РµРґРѕРј.
   const [flight, setFlight] = useState<{
     from: { x: number; y: number };
     to: { x: number; y: number };
@@ -445,8 +140,8 @@ export function CampaignScreen() {
   const woundedFighters = state.fighters.filter((fighter) => fighter.alive && fighter.wounded);
   const training = trainingId !== null ? state.fighters.find((fighter) => fighter.id === trainingId) : undefined;
 
-  // Туториалы «первого раза» (0.20.0): желаемые по условиям экрана, ещё не
-  // показанные и при включённой настройке подсказок — добавляются в очередь.
+  // РўСѓС‚РѕСЂРёР°Р»С‹ В«РїРµСЂРІРѕРіРѕ СЂР°Р·Р°В» (0.20.0): Р¶РµР»Р°РµРјС‹Рµ РїРѕ СѓСЃР»РѕРІРёСЏРј СЌРєСЂР°РЅР°, РµС‰С‘ РЅРµ
+  // РїРѕРєР°Р·Р°РЅРЅС‹Рµ Рё РїСЂРё РІРєР»СЋС‡С‘РЅРЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРµ РїРѕРґСЃРєР°Р·РѕРє вЂ” РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ РІ РѕС‡РµСЂРµРґСЊ.
   const wantedHints = useMemo(
     () =>
       pendingCampaignHints({
@@ -472,13 +167,13 @@ export function CampaignScreen() {
       }
       return next;
     });
-    // `wantedHints` мемоизирован: личность массива меняется только с его
-    // содержимым, поэтому строковый ключ в зависимостях не нужен (0.20.55).
+    // `wantedHints` РјРµРјРѕРёР·РёСЂРѕРІР°РЅ: Р»РёС‡РЅРѕСЃС‚СЊ РјР°СЃСЃРёРІР° РјРµРЅСЏРµС‚СЃСЏ С‚РѕР»СЊРєРѕ СЃ РµРіРѕ
+    // СЃРѕРґРµСЂР¶РёРјС‹Рј, РїРѕСЌС‚РѕРјСѓ СЃС‚СЂРѕРєРѕРІС‹Р№ РєР»СЋС‡ РІ Р·Р°РІРёСЃРёРјРѕСЃС‚СЏС… РЅРµ РЅСѓР¶РµРЅ (0.20.55).
   }, [wantedHints]);
 
-  // Активный туториал: только при включённой настройке подсказок и только
-  // непоказанные (0.20.0). Проверка showHints защищает и от элементов,
-  // уже успевших попасть в очередь до выключения настройки.
+  // РђРєС‚РёРІРЅС‹Р№ С‚СѓС‚РѕСЂРёР°Р»: С‚РѕР»СЊРєРѕ РїСЂРё РІРєР»СЋС‡С‘РЅРЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРµ РїРѕРґСЃРєР°Р·РѕРє Рё С‚РѕР»СЊРєРѕ
+  // РЅРµРїРѕРєР°Р·Р°РЅРЅС‹Рµ (0.20.0). РџСЂРѕРІРµСЂРєР° showHints Р·Р°С‰РёС‰Р°РµС‚ Рё РѕС‚ СЌР»РµРјРµРЅС‚РѕРІ,
+  // СѓР¶Рµ СѓСЃРїРµРІС€РёС… РїРѕРїР°СЃС‚СЊ РІ РѕС‡РµСЂРµРґСЊ РґРѕ РІС‹РєР»СЋС‡РµРЅРёСЏ РЅР°СЃС‚СЂРѕР№РєРё.
   const activeHintId = settings.showHints ? (hintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null) : null;
   const closeHint = (): void => {
     if (!activeHintId) return;
@@ -495,8 +190,8 @@ export function CampaignScreen() {
       setScanMissed(false);
       return;
     }
-    // Пустое сканирование запасы не тратит (0.19.2): показываем плашку,
-    // что в радиусе нет закрытых точек.
+    // РџСѓСЃС‚РѕРµ СЃРєР°РЅРёСЂРѕРІР°РЅРёРµ Р·Р°РїР°СЃС‹ РЅРµ С‚СЂР°С‚РёС‚ (0.19.2): РїРѕРєР°Р·С‹РІР°РµРј РїР»Р°С€РєСѓ,
+    // С‡С‚Рѕ РІ СЂР°РґРёСѓСЃРµ РЅРµС‚ Р·Р°РєСЂС‹С‚С‹С… С‚РѕС‡РµРє.
     setScanMissed(true);
     window.setTimeout(() => setScanMissed(false), 1400);
   };
@@ -507,7 +202,7 @@ export function CampaignScreen() {
     return map;
   }, [items]);
 
-  // Иконка выхода из стратегического режима в главное меню (доработка).
+  // РРєРѕРЅРєР° РІС‹С…РѕРґР° РёР· СЃС‚СЂР°С‚РµРіРёС‡РµСЃРєРѕРіРѕ СЂРµР¶РёРјР° РІ РіР»Р°РІРЅРѕРµ РјРµРЅСЋ (РґРѕСЂР°Р±РѕС‚РєР°).
   function ExitToMenuIcon() {
     return (
       <svg
@@ -534,8 +229,8 @@ export function CampaignScreen() {
         <button
           type="button"
           className="campaign-exit-btn"
-          // Выход в меню сохраняет контекст начатой миссии (0.20.18):
-          // «Продолжить» возвращает в неё даже после захода на карту.
+          // Р’С‹С…РѕРґ РІ РјРµРЅСЋ СЃРѕС…СЂР°РЅСЏРµС‚ РєРѕРЅС‚РµРєСЃС‚ РЅР°С‡Р°С‚РѕР№ РјРёСЃСЃРёРё (0.20.18):
+          // В«РџСЂРѕРґРѕР»Р¶РёС‚СЊВ» РІРѕР·РІСЂР°С‰Р°РµС‚ РІ РЅРµС‘ РґР°Р¶Рµ РїРѕСЃР»Рµ Р·Р°С…РѕРґР° РЅР° РєР°СЂС‚Сѓ.
           onClick={() => session.campaignToMenu()}
           title={t("campaign.toMenu")}
           aria-label={t("campaign.toMenu")}
@@ -616,7 +311,7 @@ export function CampaignScreen() {
             aria-label={t("campaign.mapLabel")}
             style={{ "--ship-x": `${shipPosition.x}%`, "--ship-y": `${shipPosition.y}%` } as CSSProperties}
           >
-            {/* Декоративный рельеф: река, горы, леса, дорога между точками */}
+            {/* Р”РµРєРѕСЂР°С‚РёРІРЅС‹Р№ СЂРµР»СЊРµС„: СЂРµРєР°, РіРѕСЂС‹, Р»РµСЃР°, РґРѕСЂРѕРіР° РјРµР¶РґСѓ С‚РѕС‡РєР°РјРё */}
             <svg className="map-terrain" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
               <path
                 d="M-4 58 C 14 46 26 62 40 54 C 54 46 58 28 78 24 C 88 22 98 30 106 22"
@@ -640,8 +335,8 @@ export function CampaignScreen() {
               <path d="M13 74 19 86 7 86Z" fill="#223027" />
               <path d="M20 80 26 92 14 92Z" fill="#1e2a22" />
               <path d="M27 76 33 87 21 87Z" fill="#223027" />
-              {/* Этап 4.2: дорога проявляется штрихом только до участков,
-                  открытых сканированием; закрытые сегменты не показываются. */}
+              {/* Р­С‚Р°Рї 4.2: РґРѕСЂРѕРіР° РїСЂРѕСЏРІР»СЏРµС‚СЃСЏ С€С‚СЂРёС…РѕРј С‚РѕР»СЊРєРѕ РґРѕ СѓС‡Р°СЃС‚РєРѕРІ,
+                  РѕС‚РєСЂС‹С‚С‹С… СЃРєР°РЅРёСЂРѕРІР°РЅРёРµРј; Р·Р°РєСЂС‹С‚С‹Рµ СЃРµРіРјРµРЅС‚С‹ РЅРµ РїРѕРєР°Р·С‹РІР°СЋС‚СЃСЏ. */}
               <g className="map-road">
                 {missions.slice(0, -1).map((fromMission, index) => {
                   const toMission = missions[index + 1];
@@ -680,7 +375,7 @@ export function CampaignScreen() {
               </g>
             </svg>
             <div className="map-fog" aria-hidden="true" />
-            {/* Волна сканирования от корабля */}
+            {/* Р’РѕР»РЅР° СЃРєР°РЅРёСЂРѕРІР°РЅРёСЏ РѕС‚ РєРѕСЂР°Р±Р»СЏ */}
             {scanKey > 0 ? <div key={scanKey} className="scan-wave" aria-hidden="true" /> : null}
             {scanMissed ? (
               <p className="scan-toast" role="status">
@@ -705,8 +400,8 @@ export function CampaignScreen() {
                   }}
                 >
                   <span className="marker-medallion" aria-hidden="true">
-                    {/* Этап 4.3: иконка типа миссии вместо абстрактной руны. */}
-                    {status === "done" ? "✓" : status === "locked" ? "?" : <MissionTypeIcon type={mission.type} />}
+                    {/* Р­С‚Р°Рї 4.3: РёРєРѕРЅРєР° С‚РёРїР° РјРёСЃСЃРёРё РІРјРµСЃС‚Рѕ Р°Р±СЃС‚СЂР°РєС‚РЅРѕР№ СЂСѓРЅС‹. */}
+                    {status === "done" ? "вњ“" : status === "locked" ? "?" : <MissionTypeIcon type={mission.type} />}
                   </span>
                   <span className="marker-label" aria-hidden="true">
                     {mission.id.replace("clearing_", "C")}
@@ -715,8 +410,8 @@ export function CampaignScreen() {
               );
             })}
 
-            {/* Этап 4.1: прямой след остаётся отдельным SVG-слоем и
-                синхронен с движением самого marker. */}
+            {/* Р­С‚Р°Рї 4.1: РїСЂСЏРјРѕР№ СЃР»РµРґ РѕСЃС‚Р°С‘С‚СЃСЏ РѕС‚РґРµР»СЊРЅС‹Рј SVG-СЃР»РѕРµРј Рё
+                СЃРёРЅС…СЂРѕРЅРµРЅ СЃ РґРІРёР¶РµРЅРёРµРј СЃР°РјРѕРіРѕ marker. */}
             {flight ? (
               <svg className="ship-flight-layer" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
                 <path className="ship-flight-trail-glow" d={flightArc(flight).path} pathLength={100} />
@@ -724,10 +419,10 @@ export function CampaignScreen() {
               </svg>
             ) : null}
 
-            {/* Экспертская схема: анимируется настоящий ship-marker, а не
-                нулевая по размеру обёртка с абсолютно позиционированным телом.
-                Средняя точка лежит на прямом маршруте, поэтому корабль
-                совпадает с сохранённым прямым следом. */}
+            {/* Р­РєСЃРїРµСЂС‚СЃРєР°СЏ СЃС…РµРјР°: Р°РЅРёРјРёСЂСѓРµС‚СЃСЏ РЅР°СЃС‚РѕСЏС‰РёР№ ship-marker, Р° РЅРµ
+                РЅСѓР»РµРІР°СЏ РїРѕ СЂР°Р·РјРµСЂСѓ РѕР±С‘СЂС‚РєР° СЃ Р°Р±СЃРѕР»СЋС‚РЅРѕ РїРѕР·РёС†РёРѕРЅРёСЂРѕРІР°РЅРЅС‹Рј С‚РµР»РѕРј.
+                РЎСЂРµРґРЅСЏСЏ С‚РѕС‡РєР° Р»РµР¶РёС‚ РЅР° РїСЂСЏРјРѕРј РјР°СЂС€СЂСѓС‚Рµ, РїРѕСЌС‚РѕРјСѓ РєРѕСЂР°Р±Р»СЊ
+                СЃРѕРІРїР°РґР°РµС‚ СЃ СЃРѕС…СЂР°РЅС‘РЅРЅС‹Рј РїСЂСЏРјС‹Рј СЃР»РµРґРѕРј. */}
             <div
               key={flight?.key ?? "ship-marker"}
               className={`ship-marker${flight ? " is-flying" : ""}`}
@@ -799,7 +494,7 @@ export function CampaignScreen() {
                     <dd>
                       {selected.enemies.map((entry) => (
                         <span key={entry.unitId} className={`foe-chip ${entry.unitId}`}>
-                          {t(unitName(entry.unitId))} ×{entry.count}
+                          {t(unitName(entry.unitId))} Г—{entry.count}
                         </span>
                       ))}
                     </dd>
@@ -850,12 +545,12 @@ export function CampaignScreen() {
                   </div>
                 </dl>
                 {selectedPoint.status === "open" && state.activeMissionId === selected.id ? (
-                  // Начатая миссия (0.20.18): вернуться в неё либо осознанно
-                  // покинуть — молча миссия не теряется ни из боя, ни из меню.
+                  // РќР°С‡Р°С‚Р°СЏ РјРёСЃСЃРёСЏ (0.20.18): РІРµСЂРЅСѓС‚СЊСЃСЏ РІ РЅРµС‘ Р»РёР±Рѕ РѕСЃРѕР·РЅР°РЅРЅРѕ
+                  // РїРѕРєРёРЅСѓС‚СЊ вЂ” РјРѕР»С‡Р° РјРёСЃСЃРёСЏ РЅРµ С‚РµСЂСЏРµС‚СЃСЏ РЅРё РёР· Р±РѕСЏ, РЅРё РёР· РјРµРЅСЋ.
                   <div className="mission-actions">
                     <button type="button" className="campaign-start-btn" onClick={() => session.resumeCampaign()}>
                       {t("campaign.resumeMission")}
-                      <span aria-hidden="true">→</span>
+                      <span aria-hidden="true">в†’</span>
                     </button>
                     <button
                       type="button"
@@ -869,7 +564,7 @@ export function CampaignScreen() {
                     </button>
                   </div>
                 ) : selectedPoint.status === "open" && state.activeMissionId !== null ? (
-                  // Другая точка, пока миссия начата: старт недоступен.
+                  // Р”СЂСѓРіР°СЏ С‚РѕС‡РєР°, РїРѕРєР° РјРёСЃСЃРёСЏ РЅР°С‡Р°С‚Р°: СЃС‚Р°СЂС‚ РЅРµРґРѕСЃС‚СѓРїРµРЅ.
                   <div className="mission-actions">
                     <button
                       type="button"
@@ -887,9 +582,9 @@ export function CampaignScreen() {
                       type="button"
                       className="campaign-start-btn"
                       onClick={() => {
-                        // Этап 4.1 (правка по ревью): корабль улетает к точке
-                        // выбранной миссии сразу после «В бой», до перехода
-                        // к выбору состава, — это и есть момент прогресса.
+                        // Р­С‚Р°Рї 4.1 (РїСЂР°РІРєР° РїРѕ СЂРµРІСЊСЋ): РєРѕСЂР°Р±Р»СЊ СѓР»РµС‚Р°РµС‚ Рє С‚РѕС‡РєРµ
+                        // РІС‹Р±СЂР°РЅРЅРѕР№ РјРёСЃСЃРёРё СЃСЂР°Р·Сѓ РїРѕСЃР»Рµ В«Р’ Р±РѕР№В», РґРѕ РїРµСЂРµС…РѕРґР°
+                        // Рє РІС‹Р±РѕСЂСѓ СЃРѕСЃС‚Р°РІР°, вЂ” СЌС‚Рѕ Рё РµСЃС‚СЊ РјРѕРјРµРЅС‚ РїСЂРѕРіСЂРµСЃСЃР°.
                         setFlight({
                           key: Date.now(),
                           from: { ...shipPosition },
@@ -903,7 +598,7 @@ export function CampaignScreen() {
                       }}
                     >
                       {t("campaign.start")}
-                      <span aria-hidden="true">→</span>
+                      <span aria-hidden="true">в†’</span>
                     </button>
                   </div>
                 ) : null}
@@ -995,7 +690,7 @@ export function CampaignScreen() {
                   ) : null}
                   {fighter.alive && !recruit && !fighter.wounded && !equipped ? (
                     <span className="fighter-ready" aria-hidden="true" title={t("roster.ready")}>
-                      ✓
+                      вњ“
                     </span>
                   ) : null}
                 </div>
@@ -1094,7 +789,7 @@ export function CampaignScreen() {
                     {item.weaponId ? <SwordsIcon /> : <GemIcon />}
                   </span>
                   <span className="forge-name">{t(itemName(item.id))}</span>
-                  <span className="forge-effects">{parts.join(" · ")}</span>
+                  <span className="forge-effects">{parts.join(" В· ")}</span>
                   <span className="forge-cost" aria-label={t("forge.cost")}>
                     {item.cost.gold > 0 ? (
                       <span className="cost-chip gold">
