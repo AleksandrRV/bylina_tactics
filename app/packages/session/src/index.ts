@@ -1,4 +1,4 @@
-import { APP_VERSION, matchOutcome } from "@bylina/core";
+import { APP_VERSION, clonePrologueRunState, matchOutcome } from "@bylina/core";
 import type {
   ApplyResult,
   CellPos,
@@ -7,6 +7,7 @@ import type {
   GameEvent,
   HitPreview,
   MatchState,
+  PrologueRunState,
   ReachableCell,
   SkillPreview,
   TacticsKernel,
@@ -306,9 +307,17 @@ export interface SessionApi {
   startPrologue(missionId: string, enabled: boolean): boolean;
   /** Следующая миссия пролога либо карта кампании. */
   advancePrologue(nextMissionId: string | null): boolean;
-  /** Снимок чекпоинта боя (не пишется в журнал повтора). */
-  saveBattleCheckpoint(): boolean;
-  restoreBattleCheckpoint(): boolean;
+  /**
+   * Снимок чекпоинта боя (не пишется в журнал повтора). Для пролога вместе со
+   * снимком ядра сохраняется и состояние сцены (`PrologueRunState`): откат к
+   * контрольной точке обязан вернуть миссию целиком, а не только поле.
+   */
+  saveBattleCheckpoint(runState?: PrologueRunState): boolean;
+  /**
+   * Откат к контрольной точке: восстанавливает снимок ядра и возвращает
+   * сохранённое состояние сцены пролога (или `null`, если чекпоинт не пролог).
+   */
+  restoreBattleCheckpoint(): PrologueRunState | null;
   hasBattleCheckpoint(): boolean;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
@@ -375,7 +384,13 @@ export function createSession(
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
   let state: SessionState = { screen: initial, trainingDone: [], campaignHintsDone: [], ...idle, ...(restored ?? {}) };
-  let battleCheckpoint: { match: MatchState; fog: FogState } | null = null;
+  interface BattleCheckpoint {
+    match: MatchState;
+    fog: FogState;
+    /** Состояние сцены пролога в момент контрольной точки (0.21.24). */
+    prologue?: PrologueRunState;
+  }
+  let battleCheckpoint: BattleCheckpoint | null = null;
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -1213,21 +1228,24 @@ export function createSession(
       });
       return true;
     },
-    saveBattleCheckpoint: () => {
+    saveBattleCheckpoint: (runState) => {
       if (!tacticsHost) return false;
       battleCheckpoint = {
         match: tacticsHost.getSnapshot(),
         fog: tacticsHost.getFog(),
+        prologue: runState ? clonePrologueRunState(runState) : undefined,
       };
       return true;
     },
     restoreBattleCheckpoint: () => {
-      if (!tacticsHost || !battleCheckpoint) return false;
+      if (!tacticsHost || !battleCheckpoint) return null;
       tacticsHost.restoreMatch(battleCheckpoint.match, battleCheckpoint.fog);
       // Восстановление чекпоинта меняет ядро: ревизию отдаёт само ядро
       // (restoreMatch → emit), локальный счётчик не двигаем.
       notifyBattle(false);
-      return true;
+      // Состояние сцены возвращаем свежей копией: экран кладёт его в ссылку,
+      // и следующие ходы мутируют её, не задевая сохранённый откат.
+      return battleCheckpoint.prologue ? clonePrologueRunState(battleCheckpoint.prologue) : null;
     },
     hasBattleCheckpoint: () => battleCheckpoint !== null,
     bindTacticsHost: (host) => {

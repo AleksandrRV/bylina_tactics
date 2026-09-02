@@ -1092,12 +1092,6 @@ export function BattleScreenView() {
       // Принудительная стойка (0.20.45): пульсация кнопки и закрытые
       // прочие действия живут ровно до команды «DEFEND».
       setPrologueStanceLock(next.forceDefend);
-      // Контрольная точка миссии: вход в миссию уже ею обеспечен, дальше —
-      // ключевые сюжетные вехи, включая выход крысы в М1.
-      const armed = next.fedotFreed || next.firstWave || next.vasilisaJoined || next.ratSpawned;
-      if (armed && !session.hasBattleCheckpoint()) {
-        session.saveBattleCheckpoint();
-      }
       // Что делать с итогами команды — решает battle-command: откат к
       // контрольной точке, честное поражение или выход стаи сценой.
       const aftermath = prologueAftermath({
@@ -1107,6 +1101,13 @@ export function BattleScreenView() {
         hasCheckpoint: session.hasBattleCheckpoint(),
       });
       prologueRunRef.current = aftermath.state;
+      // Контрольная точка миссии: вход в миссию уже ею обеспечен, дальше —
+      // ключевые сюжетные вехи, включая выход крысы в М1. Вместе со снимком
+      // ядра сохраняется и состояние сцены — откат возвращает миссию целиком.
+      const armed = next.fedotFreed || next.firstWave || next.vasilisaJoined || next.ratSpawned;
+      if (armed && !session.hasBattleCheckpoint()) {
+        session.saveBattleCheckpoint(aftermath.state);
+      }
       switch (aftermath.kind) {
         case "restore":
           prologueTelemetryRef.current = recordTelemetry(prologueTelemetryRef.current, {

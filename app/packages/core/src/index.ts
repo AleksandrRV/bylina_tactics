@@ -68,6 +68,7 @@ export type { PrologueLayout, CompiledLayout } from "./prologue-layout.js";
 export { createPrologueMatch } from "./prologue-match.js";
 export {
   createPrologueRunState,
+  clonePrologueRunState,
   afterPrologueApply,
   gatePrologueCommand,
   clampPrologueCommand,

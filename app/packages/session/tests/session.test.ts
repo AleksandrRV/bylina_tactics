@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { DEBUG_BOW, createDebugMatch, createTacticsKernel } from "@bylina/core";
+import { DEBUG_BOW, createDebugMatch, createPrologueRunState, createTacticsKernel } from "@bylina/core";
 import { createCampaign } from "@bylina/campaign";
 import type { CampaignConfig } from "@bylina/content";
 import { APP_VERSION, createSession } from "../src/index.js";
@@ -575,9 +575,45 @@ describe("createSession battle checkpoint (0.20.32)", () => {
     session.applyBattleCommand({ type: "END_TURN", playerId: "1" });
     expect(host.getSnapshot().activeOwner).not.toBe(before.activeOwner);
     const draftBefore = session.getReplayDraft();
-    expect(session.restoreBattleCheckpoint()).toBe(true);
+    // Быстрый матч — не пролог: сохранённого состояния сцены нет, вернётся null.
+    expect(session.restoreBattleCheckpoint()).toBeNull();
     expect(host.getSnapshot().activeOwner).toBe(before.activeOwner);
     expect(session.getReplayDraft()).toEqual(draftBefore);
+  });
+
+  it("stores and restores the prologue run state as a deep copy (0.21.24)", () => {
+    const session = createSession("menu");
+    session.openQuickMatch();
+    session.selectDifficulty("easy");
+    const host = createTacticsKernel({ initial: createDebugMatch(), seed: 2 });
+    session.bindTacticsHost(host);
+
+    // Состояние сцены пролога в момент контрольной точки: ключевые вехи М2.
+    const runState = createPrologueRunState("prologue_cry");
+    runState.fedotFreed = true;
+    runState.waveArmed = true;
+    runState.extractPending = true;
+    runState.objectiveKey = "prologue.objective.evacuate";
+
+    expect(session.saveBattleCheckpoint(runState)).toBe(true);
+    // Мутация исходника после сохранения не трогает зафиксированный откат.
+    runState.fedotFreed = false;
+    runState.waveArmed = false;
+
+    const restored = session.restoreBattleCheckpoint();
+    expect(restored).not.toBeNull();
+    expect(restored!.fedotFreed).toBe(true);
+    expect(restored!.waveArmed).toBe(true);
+    expect(restored!.extractPending).toBe(true);
+    expect(restored!.objectiveKey).toBe("prologue.objective.evacuate");
+
+    // Возвращённое состояние — независимая копия: следующие ходы мутируют её,
+    // не задевая сохранённый откат.
+    restored!.fedotFreed = false;
+    restored!.objectiveKey = "changed";
+    const second = session.restoreBattleCheckpoint();
+    expect(second!.fedotFreed).toBe(true);
+    expect(second!.objectiveKey).toBe("prologue.objective.evacuate");
   });
 });
 

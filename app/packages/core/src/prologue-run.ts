@@ -130,6 +130,20 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
   };
 }
 
+/**
+ * Полная копия состояния сцены пролога (0.21.24).
+ *
+ * Контрольная точка хранит не только снимок ядра, но и состояние сценария:
+ * счётчик подкреплений, очередь подсказок, флаги вех, цель миссии. При откате
+ * после гибели героя миссия обязана вернуться и к нему — иначе сценарий
+ * продолжает жить «поверх» восстановленного поля: игрок оказывается не там,
+ * счётчик врагов не сбрасывается, подсказки и цель разъезжаются. Копия
+ * глубокая: состояние живёт в ссылке экрана и мутируется следующими ходами.
+ */
+export function clonePrologueRunState(state: PrologueRunState): PrologueRunState {
+  return structuredClone(state);
+}
+
 const M1_TRIGGERS: MissionTrigger[] = [
   { id: "pickup_stick", kind: "OnPickup", itemId: "stick", once: true, flag: "stick" },
 ];

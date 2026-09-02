@@ -228,7 +228,17 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
       deps.showStoryNote(deps.translate("prologue.scene.revive"));
       try {
         await (renderer?.fadeScreen?.("out", 600) ?? Promise.resolve());
-        deps.session.restoreBattleCheckpoint();
+        // Полный откат к контрольной точке (0.21.24): восстанавливается и
+        // снимок ядра, и состояние сцены. Только снимка мало — иначе сценарий
+        // живёт «поверх» восстановленного поля: игрок оказывается не на своей
+        // клетке, счётчик врагов и подсказки не сбрасываются.
+        const restored = deps.session.restoreBattleCheckpoint();
+        if (restored) {
+          deps.runRef.current = restored;
+          deps.setPrologueStanceLock(restored.forceDefend);
+          deps.setPrologueHintKey(restored.hints.forcedKey ?? restored.hints.queue[0] ?? null);
+          deps.setPrologueObjectiveKey(restored.objectiveKey);
+        }
         deps.resetSelection();
         // Клетку героя берём из свежего снимка: состояние `view` обновится
         // только после перерисовки, и опора на него дала бы гонку.
