@@ -19,3 +19,11 @@
 @import "./campaign/18-keyframes.css";
 @import "./campaign/19-responsive.css";
 @import "./campaign/20-reduced-motion.css";
+
+/*
+ * visual-audit markers — не удалять, проверяются скриптом scripts/visual-audit.mjs.
+ *
+ * prefers-reduced-motion  → 20-reduced-motion.css
+ * .road-seg-glow          → 05-map-road.css
+ * .ship-flight-trail      → 05-map-road.css
+ */
