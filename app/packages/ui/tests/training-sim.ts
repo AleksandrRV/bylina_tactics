@@ -72,6 +72,7 @@ export function makeRig(missionId: string, seedOverride?: number): TrainingRig {
       map: mission.map,
       playerSlots: mission.playerSlots,
       enemies: mission.enemies,
+      loadouts: parsed.data.training.loadouts,
       seed,
     }),
     weapons,

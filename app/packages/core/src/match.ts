@@ -27,6 +27,13 @@ export function spawnUnitState(
   rosterIndex?: number,
 ): EntityState {
   const weaponIds = [...config.weapons];
+  // Оружие не привязано к классу (0.21.25): человек дружины без оружия из
+  // экипировки получает базовый «удар» (кулак). Звери и чудовища Нави всегда
+  // несут естественное оружие в записи, поэтому для них этот путь не
+  // срабатывает.
+  if (weaponIds.length === 0 && config.side === "druzhina") {
+    weaponIds.push("strike");
+  }
   return {
     id,
     configId: config.id,
@@ -73,6 +80,8 @@ export interface QuickMatchOptions {
   map?: MapGenConfig;
   playerSlots?: readonly [string, string, string];
   enemyPool?: readonly [string, string, string];
+  /** Стандартное снаряжение бойцов режима (0.21.25): оружие по записи юнита. */
+  loadouts?: Record<string, readonly string[]>;
   enemyCount: number;
   seed: number;
 }
@@ -107,7 +116,20 @@ export interface MissionMatchOptions {
   generals?: readonly string[];
   /** Генералы, погибшие ранее в кампании: не появляются вновь (0.18.0). */
   excludedGenerals?: readonly string[];
+  /** Стандартное снаряжение бойцов режима (0.21.25): оружие по записи юнита. */
+  loadouts?: Record<string, readonly string[]>;
   seed: number;
+}
+
+/**
+ * Применить стандартное снаряжение режима (0.21.25): оружие берётся из
+ * экипировки, а не из записи класса. Режимы без кампании (быстрый матч,
+ * состязание, обучение) выдают его из своей конфигурации.
+ */
+function applyLoadout(entity: EntityState, weaponIds: readonly string[]): void {
+  if (weaponIds.length === 0) return;
+  entity.weaponIds = [...weaponIds];
+  entity.weaponId = weaponIds[0]!;
 }
 
 /** Ближайшая свободная клетка к точке (x0, y0): без ямы, стены, укрытия и сущности. */
@@ -179,6 +201,8 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
     }
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
     const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1, index);
+    const loadout = options.loadouts?.[entry.unitId];
+    if (loadout) applyLoadout(spawned, loadout);
     if (entry.mods.aimMod) spawned.aim += entry.mods.aimMod;
     if (entry.mods.defenseMod) spawned.defense += entry.mods.defenseMod;
     if (entry.mods.mobilityMod) spawned.mobility = Math.max(1, spawned.mobility + entry.mods.mobilityMod);
@@ -312,7 +336,10 @@ export function createQuickMatch(options: QuickMatchOptions): MatchState {
       throw new Error(`Quick match roster of ${roster.length} exceeds ${players.length} player spawn cells`);
     }
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+    const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1);
+    const loadout = options.loadouts?.[config.id];
+    if (loadout) applyLoadout(spawned, loadout);
+    state.entities.push(spawned);
   });
 
   enemies.forEach((point, index) => {
@@ -334,6 +361,8 @@ export interface PvpMatchOptions {
   side2: readonly string[];
   /** Условие победы (0.16.0): уничтожение либо вынос предмета «молодильное яблоко». */
   objective?: "elimination" | "apple";
+  /** Стандартное снаряжение бойцов режима (0.21.25): оружие по записи юнита. */
+  loadouts?: Record<string, readonly string[]>;
   seed: number;
 }
 
@@ -373,12 +402,18 @@ export function createPvpMatch(options: PvpMatchOptions): MatchState {
   side1Spawns.forEach((point, index) => {
     const config = pickUnit(options.units, options.side1[index]!);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1));
+    const spawned = spawnUnitState(index + 1, config, PLAYER_OWNER, point.x, point.y, z, 1);
+    const loadout = options.loadouts?.[config.id];
+    if (loadout) applyLoadout(spawned, loadout);
+    state.entities.push(spawned);
   });
   side2Spawns.forEach((point, index) => {
     const config = pickUnit(options.units, options.side2[index]!);
     const z = tileAt(generated.grid, point.x, point.y)?.z ?? 1;
-    state.entities.push(spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3));
+    const spawned = spawnUnitState(10 + index, config, ENEMY_OWNER, point.x, point.y, z, 3);
+    const loadout = options.loadouts?.[config.id];
+    if (loadout) applyLoadout(spawned, loadout);
+    state.entities.push(spawned);
   });
 
   // Предмет «молодильное яблоко» (math §17): клетки домашнего края — западный

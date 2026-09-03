@@ -22,7 +22,7 @@ export const REPLAY_FORMAT_VERSION = 1;
  * оружия/умений). Журнал, записанный при других правилах, воспроизводится
  * иначе, чем шёл бой, — и не должен проигрываться молча.
  */
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 
 export interface ReplayJournal {
   /** Версия формата журнала; определяет разбор полей ниже. */

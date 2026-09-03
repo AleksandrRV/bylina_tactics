@@ -115,6 +115,7 @@ function trainingRecipe(deps: BattleMatchDeps, mission: TrainingMission): Kernel
       map: mission.map,
       playerSlots: mission.playerSlots,
       enemies: mission.enemies,
+      loadouts: deps.content.training.loadouts,
       seed,
     }),
     units: deps.content.units,
@@ -130,6 +131,7 @@ function replayRecipe(deps: BattleMatchDeps, journal: ReplayJournal): KernelReci
       side1: journal.options.side1,
       side2: journal.options.side2,
       objective: journal.options.objective,
+      loadouts: journal.options.loadouts,
       seed: journal.options.seed,
     }),
     units: deps.content.units,
@@ -157,6 +159,7 @@ function pvpMatch(deps: BattleMatchDeps, seed: number): MatchState {
     side1: sides.side1,
     side2: sides.side2,
     objective: deps.session.get().pvpObjective ?? "elimination",
+    loadouts: deps.content.pvp.loadouts,
     seed,
   });
 }
@@ -217,6 +220,7 @@ function quickMatch(deps: BattleMatchDeps, seed: number): MatchState {
     map: deps.content.quickMatch.map,
     playerSlots: deps.content.quickMatch.playerSlots,
     enemyPool: deps.content.quickMatch.enemyPool,
+    loadouts: deps.content.quickMatch.loadouts,
     enemyCount: count,
     seed,
   });

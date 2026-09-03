@@ -2,6 +2,8 @@ import type { WeaponStats } from "./weapons.js";
 
 export interface SpawnUnitConfig {
   id: string;
+  /** Сторона записи: люди дружины без оружия получают базовый «удар». */
+  side?: "druzhina" | "nav" | "pvp";
   maxHealth: number;
   maxAP: number;
   mobility: number;
@@ -32,6 +34,21 @@ export const SWORD: WeaponStats = {
   maxDmg: 6,
   crit: 10,
   critBonus: 2,
+};
+
+/** Базовый удар кулаком: ближняя атака человека без экипированного оружия. */
+export const STRIKE: WeaponStats = {
+  id: "strike",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 1,
+  maxDmg: 2,
+  crit: 5,
+  critBonus: 1,
 };
 
 export const BOW: WeaponStats = {
@@ -141,6 +158,7 @@ const PISHCHAL: WeaponStats = {
 export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
   bogatyr: {
     id: "bogatyr",
+    side: "druzhina",
     maxHealth: 12,
     maxAP: 2,
     mobility: 5,
@@ -148,11 +166,13 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     defense: 10,
     will: 40,
     vision: 12,
-    weapons: ["sword", "mace"],
-    skills: ["circular_sweep", "breach", "shield_bash"],
+    // Оружие не привязано к классу (0.21.25): без экипировки — базовый «удар».
+    weapons: [],
+    skills: ["breach"],
   },
   strelets: {
     id: "strelets",
+    side: "druzhina",
     maxHealth: 8,
     maxAP: 2,
     mobility: 6,
@@ -160,11 +180,12 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     defense: 0,
     will: 30,
     vision: 14,
-    weapons: ["bow", "pishchal"],
+    weapons: [],
     skills: ["aimed_eye"],
   },
   znaharka: {
     id: "znaharka",
+    side: "druzhina",
     maxHealth: 7,
     maxAP: 2,
     mobility: 6,
@@ -172,11 +193,12 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
     defense: 0,
     will: 55,
     vision: 12,
-    weapons: ["sling"],
+    weapons: [],
     skills: ["heal", "cleanse", "summon_forest_beast"],
   },
   upyr: {
     id: "upyr",
+    side: "nav",
     maxHealth: 8,
     maxAP: 2,
     mobility: 5,
@@ -188,6 +210,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
   },
   leshy: {
     id: "leshy",
+    side: "nav",
     maxHealth: 8,
     maxAP: 2,
     mobility: 5,
@@ -203,6 +226,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
   },
   kikimora: {
     id: "kikimora",
+    side: "nav",
     maxHealth: 7,
     maxAP: 2,
     mobility: 6,
@@ -217,6 +241,7 @@ export const DEFAULT_TRAINING_UNITS: Record<string, SpawnUnitConfig> = {
 
 export function defaultTrainingWeapons(): Record<string, WeaponStats> {
   return {
+    [STRIKE.id]: STRIKE,
     [SWORD.id]: SWORD,
     [BOW.id]: BOW,
     [SLING.id]: SLING,

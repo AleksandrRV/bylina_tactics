@@ -9,7 +9,8 @@
   defense: 0,
   will: 55,
   vision: 12,
-  weapons: ["sling"],
+  // Оружие не привязано к классу (0.21.25): определяется экипировкой.
+  weapons: [],
   skills: ["heal", "cleanse", "summon_forest_beast"],
   tags: [],
 }

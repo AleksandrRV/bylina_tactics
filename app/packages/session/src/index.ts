@@ -46,7 +46,8 @@ export type AppScreen =
   | "pvpRoom"
   | "replays"
   | "training"
-  | "trainingBattle";
+  | "trainingBattle"
+  | "levelup"; // Окно прокачки героя пролога после Миссии 2 (0.21.25).
 
 type GameMode = "quickMatch" | "campaign" | "pvp";
 
@@ -125,6 +126,12 @@ export interface SessionState {
   campaignHintsDone?: string[];
   /** Каркас маршрута пролога (0.20.31). UI не подключён до Этапа 3. */
   prologueMissionId?: string | null;
+  /**
+   * Следующая миссия пролога после экрана победы (0.21.25): запоминается,
+   * пока показывается стандартный экран результата, чтобы кнопка «Дальше»
+   * знала, куда вести игрока.
+   */
+  prologueNextMissionId?: string | null;
   /**
    * Счётчик запусков боя (0.20.38). Прирастает при КАЖДОМ переходе в
    * сражение — в том числе когда бой начинается с уже смонтированным
@@ -308,6 +315,15 @@ export interface SessionApi {
   /** Следующая миссия пролога либо карта кампании. */
   advancePrologue(nextMissionId: string | null): boolean;
   /**
+   * Зафиксировать исход сюжетной миссии пролога и показать стандартный экран
+   * победы после финального текстового сообщения (0.21.25).
+   */
+  finishPrologueMission(outcome: MatchOutcome, nextMissionId: string | null): void;
+  /** Кнопка «Дальше» на экране победы пролога: переход к следующей миссии. */
+  continuePrologue(): boolean;
+  /** Подтвердить прокачку героя после М2 и начать Миссию 3 (0.21.25). */
+  confirmLevelUp(): void;
+  /**
    * Снимок чекпоинта боя (не пишется в журнал повтора). Для пролога вместе со
    * снимком ядра сохраняется и состояние сцены (`PrologueRunState`): откат к
    * контрольной точке обязан вернуть миссию целиком, а не только поле.
@@ -349,6 +365,7 @@ const idle: Omit<SessionState, "screen" | "trainingDone" | "campaignHintsDone" |
   replayDraft: null,
   trainingMissionId: null,
   prologueMissionId: null,
+  prologueNextMissionId: null,
 };
 
 /**
@@ -460,6 +477,47 @@ export function createSession(
    */
   const openBattle = (next: SessionState): void => {
     emit({ ...next, battleEpoch: (state.battleEpoch ?? 0) + 1 });
+  };
+
+  /** Постоянные зёрна сюжетных миссий пролога: партии воспроизводимы. */
+  const PROLOGUE_SEED: Record<string, number> = {
+    prologue_brushwood: 701,
+    prologue_cry: 702,
+    prologue_glade: 703,
+    prologue_village: 704,
+  };
+
+  /** Запустить миссию пролога с постоянным посевом. */
+  const openPrologueBattle = (missionId: string): void => {
+    openBattle({
+      ...idle,
+      screen: "battle",
+      battleKind: "prologue",
+      prologueMissionId: missionId,
+      matchSeed: PROLOGUE_SEED[missionId] ?? 701,
+      suspendedCampaign: null,
+    });
+  };
+
+  /**
+   * Переход от миссии пролога к следующей: после Миссии 2 — окно прокачки
+   * героя (0.21.25), в остальных случаях — сразу новый бой; `null` — карта
+   * открытой песочницы кампании.
+   */
+  const routeNextPrologue = (nextMissionId: string | null): boolean => {
+    if (!nextMissionId) {
+      campaign?.openSandboxFromPrologue();
+      emit({ ...idle, screen: "campaign", prologueMissionId: null });
+      return true;
+    }
+    // После Миссии 2 герой повышает уровень и выбирает класс (единственная
+    // опция — Богатырь): вместо боя открывается окно прокачки.
+    if (state.prologueMissionId === "prologue_cry" && nextMissionId === "prologue_glade") {
+      emit({ ...idle, screen: "levelup", prologueMissionId: nextMissionId });
+      return true;
+    }
+    openPrologueBattle(nextMissionId);
+    return true;
   };
 
   /** Ведущий: снимок подключённого (0.15.0/0.16.0). Гость получает свою сторону
@@ -1190,43 +1248,25 @@ export function createSession(
     startPrologue: (missionId, enabled) => {
       if (!enabled) return false;
       if (campaign && campaign.getState().chapter !== "prologue") campaign.setChapter("prologue");
-      const SEED: Record<string, number> = {
-        prologue_brushwood: 701,
-        prologue_cry: 702,
-        prologue_glade: 703,
-        prologue_village: 704,
-      };
-      openBattle({
-        ...idle,
-        screen: "battle",
-        battleKind: "prologue",
-        prologueMissionId: missionId,
-        matchSeed: SEED[missionId] ?? 701,
-        suspendedCampaign: null,
-      });
+      openPrologueBattle(missionId);
       return true;
     },
-    advancePrologue: (nextMissionId) => {
-      if (!nextMissionId) {
-        campaign?.openSandboxFromPrologue();
-        emit({ ...idle, screen: "campaign", prologueMissionId: null });
-        return true;
-      }
-      const SEED: Record<string, number> = {
-        prologue_brushwood: 701,
-        prologue_cry: 702,
-        prologue_glade: 703,
-        prologue_village: 704,
-      };
-      openBattle({
-        ...idle,
-        screen: "battle",
-        battleKind: "prologue",
-        prologueMissionId: nextMissionId,
-        matchSeed: SEED[nextMissionId] ?? 701,
-        suspendedCampaign: null,
-      });
-      return true;
+    advancePrologue: (nextMissionId) => routeNextPrologue(nextMissionId),
+    finishPrologueMission: (outcome, nextMissionId) => {
+      // Стандартный экран победы после финального текстового сообщения
+      // миссии (0.21.25). Следующая миссия запоминается, чтобы кнопка
+      // «Дальше» вела именно в неё.
+      emit({ ...state, screen: "result", paused: false, outcome, prologueNextMissionId: nextMissionId });
+    },
+    continuePrologue: () => routeNextPrologue(state.prologueNextMissionId ?? null),
+    confirmLevelUp: () => {
+      if (state.screen !== "levelup") return;
+      const nextMissionId = state.prologueMissionId;
+      if (!nextMissionId) return;
+      // Прокачка применяется в автомате кампании: Микула становится
+      // богатырём и получает уровень 2; дубина остаётся при нём (0.21.25).
+      if (campaign) campaign.promotePrologueHero();
+      openPrologueBattle(nextMissionId);
     },
     saveBattleCheckpoint: (runState) => {
       if (!tacticsHost) return false;

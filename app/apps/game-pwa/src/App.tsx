@@ -240,6 +240,7 @@ export function App() {
         side1: draft.sides.side1,
         side2: draft.sides.side2,
         objective: draft.objective ?? "elimination",
+        loadouts: contentData!.pvp.loadouts,
         seed: draft.seed,
       };
       const recorder = createReplayRecorder(
