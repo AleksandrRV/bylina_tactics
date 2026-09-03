@@ -1,0 +1,98 @@
+/* ============================================================
+ * 14-replay.css
+ * Повторы.
+ * ============================================================ */
+
+/* ===== Повторы и публичная сеть (0.17.0) ===== */
+
+.replay-screen {
+  gap: 16px;
+}
+
+.replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.replay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(120, 140, 160, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.55);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.replay-row:hover {
+  border-color: rgba(106, 169, 217, 0.5);
+  transform: translateX(3px);
+}
+
+.replay-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.replay-title {
+  color: #e8e2d4;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Пометка совместимости повтора (0.21.5): другие правила — янтарным,
+   неподдерживаемый формат — приглушённо-красным. */
+.replay-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.replay-badge-warn {
+  color: var(--amber, #e0b34a);
+}
+
+.replay-badge-off {
+  color: #c9807a;
+}
+
+.replay-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.room-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.room-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px dashed rgba(120, 140, 160, 0.3);
+  border-radius: 6px;
+}
+
+.room-id {
+  font-family: monospace;
+  color: var(--amber, #e0b34a);
+  font-size: 0.85rem;
+}

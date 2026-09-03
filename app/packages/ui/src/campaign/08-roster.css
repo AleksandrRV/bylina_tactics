@@ -1,0 +1,453 @@
+/* ============================================================
+ * 08-roster.css
+ * Дружина, Горница, ранения, лечение, уровни.
+ * ============================================================ */
+
+/* ---- Реестр дружины и Горница --------------------------------- */
+
+.roster-panel {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  padding: 16px 16px 14px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.3rem;
+  color: #f3ecdc;
+}
+
+.fighter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fighter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), #171d23);
+  transition: border-color 0.15s ease;
+}
+
+.fighter-row.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.fighter-row.is-fallen {
+  border-color: #2a323b;
+  opacity: 0.55;
+}
+
+.fighter-row.is-fallen .fighter-face {
+  filter: grayscale(1);
+  background: #10151a;
+}
+
+.fighter-face {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  color: var(--mist-dim);
+}
+
+.fighter-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fighter-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.fighter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.fighter-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.fallen-tag,
+.wounded-tag {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 2px;
+}
+
+.fallen-tag {
+  color: #8fa1ad;
+  border: 1px solid #46525c;
+}
+
+.wounded-tag {
+  color: #e8b4bc;
+  border: 1px solid rgba(224, 122, 122, 0.45);
+  background: rgba(107, 45, 58, 0.25);
+}
+
+.fighter-class {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.fighter-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.fighter-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.level-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.level-pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #46525c;
+}
+
+.level-pips i.on {
+  background: var(--amber);
+}
+
+.level-label {
+  font-size: 0.68rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.train-btn {
+  flex: none;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.heal-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #a9c88a;
+  background: linear-gradient(180deg, #1f2a1d, #171f15);
+}
+
+.heal-btn:hover,
+.heal-btn:focus-visible {
+  border-color: #7fa857;
+  color: #cfe3b4;
+}
+
+.fighter-ready {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #14181c;
+  background: #5d7d44;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* ---- Модалка выбора класса ------------------------------------- */
+
+.train-card {
+  width: min(100%, 480px);
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    background 0.15s ease;
+}
+
+.class-card:hover,
+.class-card:focus-visible {
+  border-color: var(--amber);
+  background: #2c2a20;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.class-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.class-card .deploy-face-empty {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+}
+
+/* ---- Вкладки: активное состояние и счётчик Горницы ------------- */
+
+.campaign-tab {
+  position: relative;
+}
+
+.campaign-tab.is-active {
+  border-color: var(--amber-dim);
+  color: var(--mist);
+  background: linear-gradient(180deg, #26241b, #1d1b13);
+}
+
+.campaign-tab.is-active svg {
+  color: var(--amber);
+}
+
+.tab-alert {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #a03a4e;
+  color: #f3ecdc;
+  font-size: 0.68rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* ---- Итоги дружины на экране результата ------------------------- */
+
+.roster-outcomes {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.outcome-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  text-align: left;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.outcome-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  color: var(--mist-dim);
+}
+
+.outcome-group.is-fallen .outcome-icon {
+  color: #8fa1ad;
+}
+
+.outcome-group.is-wounded .outcome-icon {
+  color: #e07a7a;
+  border-color: rgba(224, 122, 122, 0.45);
+}
+
+.outcome-group.is-level .outcome-icon {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+}
+
+.outcome-group.is-recruit .outcome-icon {
+  color: #9b6bbf;
+  border-color: rgba(155, 107, 191, 0.45);
+  font-size: 0.9rem;
+}
+
+.outcome-title {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.outcome-names {
+  margin: 2px 0 0;
+  color: #f3ecdc;
+  font-size: 0.95rem;
+}
+
+/* ============================================================
+   UI/UX-полировка 0.11.0: анимации и эффекты
+   ============================================================ */
+
+/* Появление карточек высадки каскадом */
+.deployment-grid .deploy-card {
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.deployment-grid .deploy-card:nth-child(2) {
+  animation-delay: 0.03s;
+}
+
+.deployment-grid .deploy-card:nth-child(3) {
+  animation-delay: 0.06s;
+}
+
+.deployment-grid .deploy-card:nth-child(4) {
+  animation-delay: 0.09s;
+}
+
+.deployment-grid .deploy-card:nth-child(5) {
+  animation-delay: 0.12s;
+}
+
+/* Пульс бейджа ранения */
+.wound-badge {
+  animation: wound-pulse 2s ease-in-out infinite;
+}
+
+@keyframes wound-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(160, 58, 78, 0.55);
+  }
+  50% {
+    box-shadow: 0 0 0 5px rgba(160, 58, 78, 0);
+  }
+}
+
+/* Тёплое свечение портрета раненого в реестре и Горнице */
+.fighter-row.is-wounded .fighter-face {
+  box-shadow: 0 0 0 2px rgba(160, 58, 78, 0.45);
+}
+
+.fighter-row.is-fallen .fighter-face {
+  box-shadow: none;
+}
+
+/* Каскад итогов дружины на экране результата */
+.roster-outcomes .outcome-group:nth-child(2) {
+  animation-delay: 0.08s;
+}
+
+.roster-outcomes .outcome-group:nth-child(3) {
+  animation-delay: 0.16s;
+}
+
+.roster-outcomes .outcome-group:nth-child(4) {
+  animation-delay: 0.24s;
+}
+
+/* Вспышка лечения в Горнице */
+.heal-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.heal-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(60% 120% at 50% 50%, rgba(143, 174, 107, 0.55), transparent 70%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.heal-btn:active::after {
+  opacity: 1;
+}
+
+/* Мягкое свечение вкладки Горницы при наличии раненых */
+.campaign-tab.is-active .tab-alert {
+  animation: wound-pulse 2s ease-in-out infinite;
+}
+
+/* Уменьшение движения */
+@media (prefers-reduced-motion: reduce) {
+  .deployment-grid .deploy-card,
+  .roster-outcomes .outcome-group,
+  .wound-badge,
+  .campaign-tab.is-active .tab-alert {
+    animation: none !important;
+  }
+}
+
+/* «Лечить всех» в шапке Горницы */
+.heal-all-btn {
+  margin-left: auto;
+}

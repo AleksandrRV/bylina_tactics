@@ -1,0 +1,166 @@
+/* ============================================================
+ * 05-map-road.css
+ * Дорога кампании и перелёт Летучего Корабля.
+ * ============================================================ */
+
+/* ---- Летучий Корабль ----------------------------------------- */
+
+.ship-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 6;
+  animation: ship-bob 3.6s ease-in-out infinite;
+}
+
+@keyframes ship-bob {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) translateY(0);
+  }
+  50% {
+    transform: translate(-50%, -50%) translateY(-3px);
+  }
+}
+
+.ship-glyph {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 32% 28%, #3d4752, #232b33);
+  border: 1px solid var(--mist-dim);
+  color: var(--mist);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.ship-glyph svg {
+  display: block;
+}
+
+/* Тень-«волна» под кораблём */
+.ship-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 22px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  filter: blur(1px);
+}
+
+/* ---- Этап 4 (0.20.x): интерфейс и стратегический слой -------------- */
+
+/* 4.2: дорога проявляется штрихом до открытых сканированием участков. */
+.map-road .road-seg {
+  stroke: rgba(224, 179, 74, 0.18);
+  stroke-width: 0.55;
+  stroke-dasharray: 1.8 2;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.map-road .road-seg-draw {
+  stroke: rgba(224, 179, 74, 0.5);
+  stroke-width: 1;
+  fill: none;
+  stroke-linecap: round;
+  /* Штрих «дорисовывает» сегмент за один проход. */
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: road-draw 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) forwards;
+}
+
+@keyframes road-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* 4.3: иконка типа миссии внутри медальона отметки. */
+.marker-medallion svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 4.1: полёт анимирует сам marker. У него уже есть размер благодаря
+   .ship-glyph, поэтому left/top и transform работают в одной системе
+   координат; отдельная нулевая обёртка больше не нужна. */
+.ship-marker.is-flying,
+.campaign-map.is-flying .ship-marker {
+  z-index: 7;
+  animation: ship-flight 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) both;
+}
+
+@keyframes ship-flight {
+  0% {
+    left: var(--ship-from-x);
+    top: var(--ship-from-y);
+    transform: translate(-50%, -50%) rotate(-5deg) scale(0.94);
+  }
+  42% {
+    left: var(--ship-mid-x);
+    top: var(--ship-mid-y);
+    transform: translate(-50%, -50%) rotate(3deg) scale(1.06);
+  }
+  100% {
+    left: var(--ship-to-x);
+    top: var(--ship-to-y);
+    transform: translate(-50%, -50%) rotate(0deg) scale(1);
+  }
+}
+
+/* Этап 4.1 (правка по ревью): прямой след перелёта — свечение под
+   линией, дорисовывается синхронно с движением корабля и растворяется. */
+.ship-flight-layer {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 6;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.ship-flight-trail,
+.ship-flight-trail-glow {
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: ship-trail-draw 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) both;
+}
+
+.ship-flight-trail {
+  stroke: var(--movement, #6aa9d9);
+  stroke-width: 0.7;
+  opacity: 0.8;
+}
+
+.ship-flight-trail-glow {
+  stroke: var(--movement, #388cdc);
+  stroke-width: 2.4;
+  opacity: 0.22;
+}
+
+@keyframes ship-trail-draw {
+  0% {
+    stroke-dashoffset: 100;
+    opacity: 0;
+  }
+  16% {
+    opacity: 0.9;
+  }
+  76% {
+    stroke-dashoffset: 0;
+    opacity: 0.72;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 0;
+  }
+}

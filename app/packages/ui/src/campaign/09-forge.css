@@ -1,0 +1,283 @@
+/* ============================================================
+ * 09-forge.css
+ * Кузня.
+ * ============================================================ */
+
+/* ---- Кузня ------------------------------------------------------ */
+
+.forge-panel {
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.forge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 12px;
+}
+
+.forge-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  padding: 14px 14px 12px;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.forge-card:hover {
+  border-color: var(--amber-dim);
+  transform: translateY(-1px);
+}
+
+.forge-card.is-crafted {
+  border-color: rgba(127, 168, 87, 0.4);
+  opacity: 0.82;
+}
+
+.forge-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.forge-card.is-crafted .forge-icon {
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #7fa857;
+  background: radial-gradient(circle at 32% 28%, #1e2a1d, #161f15);
+}
+
+.forge-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  font-size: 0.95rem;
+}
+
+.forge-effects {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  min-height: 2.2em;
+}
+
+.forge-cost {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.craft-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 8px 10px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.craft-btn:hover:not(:disabled),
+.craft-btn:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.craft-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.crafted-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(127, 168, 87, 0.45);
+  color: #a9c88a;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forge-note {
+  margin: 14px 0 0;
+  color: var(--mist-dim);
+  font-size: 0.84rem;
+}
+
+/* ---- Полировка 0.12: отклик ковки и снаряжения ------------------ */
+
+/* Вспышка появления «Изготовлено» с искрами */
+.forge-card.is-crafted {
+  animation: crafted-in 0.45s ease both;
+}
+
+@keyframes crafted-in {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(127, 168, 87, 0.6);
+  }
+  55% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px rgba(127, 168, 87, 0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.crafted-tag::before {
+  content: "✓";
+  font-weight: 700;
+}
+
+/* Кнопка «Снять снаряжение» в модалке */
+.equip-unequip {
+  width: 100%;
+  appearance: none;
+  border: 1px dashed rgba(224, 122, 122, 0.5);
+  background: rgba(107, 45, 58, 0.18);
+  color: #e8b4bc;
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-unequip:hover,
+.equip-unequip:focus-visible {
+  border-color: #e07a7a;
+  background: rgba(107, 45, 58, 0.3);
+  outline: none;
+}
+
+/* Мягкое свечение кнопки снаряжения, когда есть что надеть */
+.deploy-card .equip-btn {
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.deploy-card .equip-btn:hover,
+.deploy-card .equip-btn:focus-visible {
+  box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}
+
+/* Отклик кнопки сканирования */
+.scan-btn:active:not(:disabled) {
+  transform: translateY(1px) scale(0.99);
+}
+
+.scan-btn svg {
+  animation: radar-spin 6s linear infinite;
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-card.is-crafted,
+  .scan-btn svg {
+    animation: none !important;
+  }
+}
+
+/* Типы миссий 0.13.0: цветовой акцент иконок и карточек */
+.mission-type-icon.is-destroy {
+  color: #d97a4a;
+  border-color: rgba(217, 122, 74, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33241c, #1c1410);
+}
+
+.mission-type-icon.is-rescue {
+  color: #d96a6a;
+  border-color: rgba(217, 106, 106, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33201e, #1c1010);
+}
+
+.mission-type-icon.is-recon {
+  color: #7ab8d9;
+  border-color: rgba(122, 184, 217, 0.55);
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.mission-card.is-destroy {
+  border-top-color: rgba(217, 122, 74, 0.5);
+}
+
+.mission-card.is-rescue {
+  border-top-color: rgba(217, 106, 106, 0.5);
+}
+
+.mission-card.is-recon {
+  border-top-color: rgba(122, 184, 217, 0.5);
+}
+
+.objective-chip,
+.escortee-chip {
+  border-color: rgba(224, 179, 74, 0.45);
+  color: #e8cf9a;
+}
+
+/* Полировка 0.13.0: волна-кольцо у открытых миссий и мягкий подъём карточки */
+.map-marker.is-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  animation: marker-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+
+@keyframes marker-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+.mission-card {
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.mission-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}

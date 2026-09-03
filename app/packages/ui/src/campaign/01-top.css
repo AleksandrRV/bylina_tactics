@@ -1,0 +1,55 @@
+/* ============================================================
+ * 01-top.css
+ * Шапка экрана кампании: заголовок, выход, общие действия.
+ * ============================================================ */
+
+/* ---- Шапка корабля: Тьма и запасы --------------------------- */
+
+.campaign-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+/* Кнопка выхода из стратегического режима в главное меню (доработка). */
+.campaign-exit-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-exit-btn:hover,
+.campaign-exit-btn:focus-visible {
+  border-color: var(--amber-dim);
+  color: var(--amber);
+  outline: none;
+}
+
+.campaign-title-block {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.campaign-title-block .eyebrow {
+  margin-bottom: 2px;
+}
+
+.campaign-title-block h1 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: #f3ecdc;
+  letter-spacing: 0.05em;
+}

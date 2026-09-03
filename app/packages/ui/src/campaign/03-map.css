@@ -1,0 +1,199 @@
+/* ============================================================
+ * 03-map.css
+ * Карта царства: подложка, туман, рельеф, панель карты.
+ * ============================================================ */
+
+/* ---- Карта царства ------------------------------------------- */
+
+.campaign-map {
+  position: relative;
+  height: min(56vh, 420px);
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background:
+    radial-gradient(560px 260px at 28% 18%, rgba(224, 179, 74, 0.05), transparent 70%),
+    linear-gradient(160deg, #1a222b, #12161b 85%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+/* Резкость краёв карты */
+.campaign-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 110% at 50% 40%, transparent 58%, rgba(10, 13, 16, 0.55) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.map-terrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+/* Медленно плывущий туман */
+.map-fog {
+  position: absolute;
+  inset: -20%;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(38% 30% at 30% 40%, rgba(120, 140, 150, 0.07), transparent 70%),
+    radial-gradient(42% 34% at 72% 62%, rgba(120, 140, 150, 0.06), transparent 70%);
+  animation: map-fog-drift 26s ease-in-out infinite alternate;
+}
+
+@keyframes map-fog-drift {
+  from {
+    transform: translate3d(-2%, -1%, 0);
+  }
+  to {
+    transform: translate3d(2.5%, 1.5%, 0);
+  }
+}
+
+/* ---- Панель сканирования -------------------------------------- */
+
+.map-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  margin-bottom: 10px;
+}
+
+.map-toolbar-note {
+  margin: 0;
+  color: var(--mist-dim);
+  font-size: 0.84rem;
+}
+
+.scan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #262a2e, #1c2025);
+  color: var(--mist);
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.scan-btn:hover:not(:disabled),
+.scan-btn:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #30343a, #23282e);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.scan-btn.is-disabled,
+.scan-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.scan-btn svg {
+  color: var(--amber);
+}
+
+.scan-cost {
+  display: inline-flex;
+  gap: 4px;
+  margin-left: 2px;
+}
+
+/* Чипы стоимости/наград */
+
+.cost-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 1px 7px;
+  font-size: 0.78rem;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color: var(--mist-dim);
+  white-space: nowrap;
+}
+
+.cost-chip.gold {
+  color: var(--amber);
+  border-color: rgba(224, 179, 74, 0.35);
+}
+
+.cost-chip.herbs {
+  color: #7fa857;
+  border-color: rgba(127, 168, 87, 0.35);
+}
+
+.cost-chip.artifacts {
+  color: #9b6bbf;
+  border-color: rgba(155, 107, 191, 0.35);
+}
+
+.reward-chips {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+/* ---- Волна сканирования ---------------------------------------- */
+
+/* Плашка пустого сканирования (0.19.2): в радиусе нет закрытых точек,
+   запасы не списываются. */
+.scan-toast {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 6px 14px;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  border-radius: 6px;
+  background: rgba(16, 22, 16, 0.92);
+  color: #f3ecdc;
+  font-size: 0.85rem;
+  z-index: 6;
+  pointer-events: none;
+  animation: hint-in 300ms ease-out;
+}
+
+.campaign-map.is-scanning .scan-wave {
+  position: absolute;
+  left: var(--ship-x, 50%);
+  top: var(--ship-y, 50%);
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid rgba(224, 179, 74, 0.9);
+  transform: translate(-50%, -50%);
+  z-index: 4;
+  pointer-events: none;
+  animation: scan-ring 1.15s ease-out forwards;
+}
+
+@keyframes scan-ring {
+  from {
+    width: 10px;
+    height: 10px;
+    opacity: 1;
+  }
+  to {
+    width: 640px;
+    height: 640px;
+    opacity: 0;
+  }
+}
