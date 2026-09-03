@@ -1,6 +1,5 @@
 import { useBattleScreen } from "./context.js";
 import { BattleTopBar } from "./BattleTopBar.js";
-import { BattleRosterPanel } from "./BattleRosterPanel.js";
 import { BattleBottomPanel } from "./BattleBottomPanel.js";
 import { BattleDialogs } from "./BattleDialogs.js";
 import { BattleReplayBar } from "./BattleReplayBar.js";
@@ -17,7 +16,6 @@ export function BattleScreenLayout() {
         <BattleTrainingLayer />
         {model.isReplay ? <BattleReplayBar /> : null}
         <BattleTopBar />
-        <BattleRosterPanel />
         <div className="battle-mid">
           {model.saveNotice ? (
             <p className="save-toast" role="status" aria-live="polite">

@@ -3,6 +3,7 @@ import { unitPortrait } from "../portraits.js";
 import { buildUnitInfo } from "../unit-info.js";
 import { AutoWinIcon, DebugIcon, ExitIcon } from "../BattleScreenView.icons.js";
 import { useBattleScreen } from "./context.js";
+import { BattleRosterPanel } from "./BattleRosterPanel.js";
 
 export function BattleTopBar() {
   const model = useBattleScreen();
@@ -226,6 +227,7 @@ export function BattleTopBar() {
           </span>
         </div>
       ) : null}
+      <BattleRosterPanel />
     </header>
   );
 }
