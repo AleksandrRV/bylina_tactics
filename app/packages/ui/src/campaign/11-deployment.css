@@ -1,0 +1,230 @@
+/* ============================================================
+ * 11-deployment.css
+ * Экран высадки и формирования отряда.
+ * ============================================================ */
+
+/* ============================================================
+   0.11.0: высадка, дружина, Горница
+   ============================================================ */
+
+/* ---- Экран формирования высадки ------------------------------- */
+
+.deployment-screen {
+  max-width: 720px;
+}
+
+@media (min-width: 1400px) {
+  .deployment-screen {
+    max-width: 960px;
+  }
+
+  .deployment-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+}
+
+.deployment-head {
+  margin-bottom: 20px;
+}
+
+.deployment-head .display-title {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+}
+
+.deployment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .deployment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deploy-card {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+.deploy-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  color: var(--mist);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.deploy-card:hover,
+.deploy-card:focus-visible {
+  border-color: var(--amber-dim);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.deploy-card.is-picked {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  box-shadow:
+    0 0 0 1px rgba(224, 179, 74, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.deploy-card.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.deploy-face {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  overflow: visible;
+  color: var(--mist-dim);
+}
+
+.deploy-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.deploy-face-empty {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.deploy-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.wound-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #a03a4e;
+  border: 2px solid #14181c;
+  display: grid;
+  place-items: center;
+}
+
+.wound-badge::after {
+  content: "✚";
+  color: #f3ecdc;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.deploy-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.deploy-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deploy-class {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.deploy-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.deploy-wound-note {
+  font-size: 0.72rem;
+  color: #e07a7a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pick-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: transparent;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.deploy-card.is-picked .pick-mark {
+  color: var(--ink);
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+.deployment-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.deployment-count {
+  margin: 0;
+  color: var(--mist-dim);
+  font-size: 0.9rem;
+}
+
+.deployment-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.deploy-confirm {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.deploy-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}

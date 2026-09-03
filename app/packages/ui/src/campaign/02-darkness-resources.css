@@ -1,0 +1,89 @@
+/* ============================================================
+ * 02-darkness-resources.css
+ * Тьма и запасы корабля.
+ * ============================================================ */
+
+.campaign-darkness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 300px;
+  min-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.campaign-darkness-name {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.campaign-darkness-value {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.95rem;
+  color: #f3ecdc;
+  white-space: nowrap;
+}
+
+.darkness-bar {
+  position: relative;
+  flex: 1 1 90px;
+  height: 10px;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.darkness-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6b2d3a, #a03a4e);
+  transition: width 0.6s ease;
+}
+
+/* Деления четвертей на шкале Тьмы */
+.darkness-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 24.5%, rgba(213, 207, 192, 0.18) 24.5% 25.5%);
+  pointer-events: none;
+}
+
+.campaign-resources {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.resource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist-dim);
+  font-size: 0.82rem;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.resource svg {
+  flex: none;
+}
+
+.resource.gold svg {
+  color: var(--amber);
+}
+
+.resource.herbs svg {
+  color: #7fa857;
+}
+
+.resource.artifacts svg {
+  color: #9b6bbf;
+}

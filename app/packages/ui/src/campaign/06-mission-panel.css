@@ -1,0 +1,226 @@
+/* ============================================================
+ * 06-mission-panel.css
+ * Панель выбранной миссии.
+ * ============================================================ */
+
+/* ---- Панель миссии ------------------------------------------- */
+
+.mission-panel {
+  margin-top: 14px;
+}
+
+.mission-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  padding: 16px 18px 18px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.mission-card.is-done {
+  border-left-color: #5d6b76;
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.mission-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mission-type-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--amber-dim);
+  border-radius: 50%;
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.mission-title {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.35rem;
+  color: #f3ecdc;
+}
+
+.mission-id {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.mission-status.done {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 2px 8px;
+  border: 1px solid #5d6b76;
+  color: #8fa1ad;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mission-facts {
+  margin: 0 0 14px;
+}
+
+.fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 5px 0;
+}
+
+.fact-row dt {
+  color: var(--mist-dim);
+  min-width: 136px;
+  font-size: 0.88rem;
+}
+
+.fact-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.foe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 2px 9px;
+  font-size: 0.84rem;
+  color: #d8d2c2;
+}
+
+.foe-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7fa857; /* ядовито-зелёный Нави, ui-design §2 */
+}
+
+.foe-chip.upyr::before {
+  background: #9aa7b0;
+}
+
+.foe-chip.kikimora::before {
+  background: #6b9b7a;
+}
+
+.darkness-growth {
+  display: inline-flex;
+  gap: 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+.growth-victory {
+  color: #8fae6b;
+  border: 1px solid rgba(143, 174, 107, 0.35);
+  padding: 1px 8px;
+}
+
+.growth-defeat {
+  color: #e07a7a;
+  border: 1px solid rgba(224, 122, 122, 0.35);
+  padding: 1px 8px;
+}
+
+.mission-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.campaign-abandon-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mist);
+  padding: 11px 18px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-abandon-btn:hover,
+.campaign-abandon-btn:focus-visible {
+  border-color: #c45c5c;
+  color: #d98080;
+  outline: none;
+}
+
+/* Подсказка о начатой миссии (0.20.18): старт других точек недоступен. */
+.mission-active-note {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mist);
+  opacity: 0.8;
+}
+
+.campaign-start-btn {
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.campaign-start-btn:hover,
+.campaign-start-btn:focus-visible {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.campaign-start-btn:active {
+  transform: translateY(1px);
+}
+
+.mission-empty {
+  border: 1px dashed var(--line);
+  background: var(--ink-2);
+  padding: 26px 20px;
+  text-align: center;
+  color: var(--mist-dim);
+}
+
+.mission-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--amber-dim);
+}

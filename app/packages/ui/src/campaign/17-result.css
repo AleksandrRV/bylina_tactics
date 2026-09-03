@@ -1,0 +1,181 @@
+/* ============================================================
+ * 17-result.css
+ * Итог миссии, модальное окно проигрыша кампании, награды.
+ * ============================================================ */
+
+/* ---- Итог миссии ---------------------------------------------- */
+
+.mission-result-screen {
+  max-width: 480px;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 1400px) {
+  .mission-result-screen {
+    max-width: 560px;
+  }
+}
+
+.result-emblem {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.result-emblem.is-victory {
+  border: 2px solid var(--amber);
+  background: radial-gradient(circle at 34% 30%, #3a3120, #1d1a12);
+  color: var(--amber);
+  box-shadow: 0 0 34px rgba(224, 179, 74, 0.22);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.result-emblem.is-defeat {
+  border: 2px solid #6b2d3a;
+  background: radial-gradient(circle at 34% 30%, #2a1d22, #171114);
+  color: #c96a7a;
+  box-shadow: 0 0 26px rgba(107, 45, 58, 0.25);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.mission-result-screen .eyebrow {
+  margin-bottom: 4px;
+}
+
+.mission-result-screen .menu-brand {
+  margin-bottom: 0;
+}
+
+.mission-result-screen .display-title {
+  font-size: clamp(2rem, 8vw, 2.8rem);
+}
+
+.mission-result-screen .menu-nav {
+  width: 100%;
+  margin-top: 26px;
+}
+
+.darkness-summary {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  text-align: left;
+}
+
+.darkness-summary .summary-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: var(--mist-dim);
+  margin-bottom: 8px;
+}
+
+.darkness-summary .summary-line b {
+  color: #e07a7a;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-weight: 600;
+}
+
+.darkness-summary .darkness-bar {
+  display: block;
+  width: 100%;
+}
+
+.darkness-summary .darkness-bar i {
+  background: linear-gradient(90deg, #4a2530, #7a3242);
+}
+
+.darkness-summary .darkness-bar b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: linear-gradient(90deg, #a03a4e, #c14a60);
+  animation: gain-grow 0.7s ease both;
+}
+
+@keyframes gain-grow {
+  from {
+    width: 0;
+  }
+}
+
+.loss-banner {
+  margin-top: 16px;
+  border: 1px solid rgba(224, 122, 122, 0.5);
+  background: linear-gradient(180deg, rgba(107, 45, 58, 0.28), rgba(107, 45, 58, 0.12));
+  color: #e8b4bc;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+}
+
+/* ---- Модальное окно проигрыша кампании ------------------------ */
+
+.campaign-lost-card {
+  border: 1px solid rgba(224, 122, 122, 0.45);
+}
+
+.campaign-lost-card h2 {
+  color: #e8b4bc;
+}
+
+/* ---- Награды на итоге миссии ----------------------------------- */
+
+.rewards-strip {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 168, 87, 0.35);
+  background: linear-gradient(180deg, rgba(31, 42, 29, 0.55), rgba(23, 31, 21, 0.4));
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.rewards-title {
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a9c88a;
+}
+
+.reward-gain {
+  animation: reward-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.reward-gain:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.reward-gain:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+@keyframes reward-pop {
+  0% {
+    transform: scale(0.6);
+    opacity: 0;
+  }
+  70% {
+    transform: scale(1.12);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Вкладка Кузни: счётчик */
+.tab-alert.forge-alert {
+  background: #6b5d24;
+}

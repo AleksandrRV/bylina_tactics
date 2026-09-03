@@ -1,0 +1,172 @@
+/* ============================================================
+ * 20-reduced-motion.css
+ * Отключение анимаций при prefers-reduced-motion: reduce.
+ * ============================================================ */
+
+/* ---- Уменьшение движения -------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .map-fog,
+  .ship-marker,
+  .map-marker.is-open .marker-medallion,
+  .mission-card,
+  .result-emblem,
+  .darkness-summary .darkness-bar b {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .deployment-grid .deploy-card,
+  .roster-outcomes .outcome-group,
+  .wound-badge,
+  .campaign-tab.is-active .tab-alert {
+    animation: none !important;
+  }
+}
+
+/* «Лечить всех» в шапке Горницы */
+.heal-all-btn {
+  margin-left: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ship-flight-layer {
+    display: none;
+  }
+
+  .ship-marker.is-flying,
+  .campaign-map.is-flying .ship-marker {
+    animation: none;
+    left: var(--ship-to-x);
+    top: var(--ship-to-y);
+    transform: translate(-50%, -50%);
+  }
+}
+
+/* Этап 4.2 (полировка карты): мягкое свечение под открытыми сегментами
+   дороги — тропа читается как путь, не как пунктирная сетка. */
+.map-road .road-seg-glow {
+  stroke: rgba(224, 179, 74, 0.09);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* 4.5: темизация служб корабля. Кузня — терракотово-медное тепло, Горница —
+   мягкое травяное; приглушённо-красный — вторичный акцент ранений и потерь
+   (не пересекается с семантикой янтарного/синего/зелёного/жёлтого). */
+.campaign-screen {
+  --service-accent: var(--amber);
+  --service-accent-soft: rgba(224, 179, 74, 0.14);
+}
+
+.campaign-screen.is-tab-forge {
+  --service-accent: #c97a4a;
+  --service-accent-soft: rgba(201, 122, 74, 0.16);
+}
+
+.campaign-screen.is-tab-chamber {
+  --service-accent: #8fb863;
+  --service-accent-soft: rgba(143, 184, 99, 0.15);
+}
+
+.campaign-screen.is-tab-forge .forge-panel,
+.campaign-screen.is-tab-forge .panel-head h2 {
+  border-color: rgba(201, 122, 74, 0.45);
+}
+
+.campaign-screen.is-tab-forge .panel-head h2 {
+  color: #d99a6c;
+}
+
+.campaign-screen.is-tab-chamber .roster-panel,
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  border-color: rgba(143, 184, 99, 0.4);
+}
+
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  color: #a9cc85;
+}
+
+.campaign-screen.is-tab-forge .campaign-tab svg,
+.campaign-screen.is-tab-chamber .campaign-tab svg {
+  transition: color var(--pop-duration, 240ms) ease;
+}
+
+.campaign-screen .fighter-row.is-wounded,
+.campaign-screen .fighter-row.is-fallen {
+  border-left-color: var(--danger-muted, #b05a5a);
+}
+
+.campaign-screen .tab-alert {
+  background: var(--danger-muted, #b05a5a);
+}
+
+.map-marker.is-revealed .marker-medallion {
+  animation: reveal-pop 0.6s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .campaign-map.is-scanning .scan-wave,
+  .map-marker.is-revealed .marker-medallion,
+  .reward-gain {
+    animation: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .forge-card.is-crafted,
+  .scan-btn svg {
+    animation: none !important;
+  }
+}
+
+/* Типы миссий 0.13.0: цветовой акцент иконок и карточек */
+.mission-type-icon.is-destroy {
+  color: #d97a4a;
+  border-color: rgba(217, 122, 74, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33241c, #1c1410);
+}
+
+.mission-type-icon.is-rescue {
+  color: #d96a6a;
+  border-color: rgba(217, 106, 106, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33201e, #1c1010);
+}
+
+.mission-type-icon.is-recon {
+  color: #7ab8d9;
+  border-color: rgba(122, 184, 217, 0.55);
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.mission-card.is-destroy {
+  border-top-color: rgba(217, 122, 74, 0.5);
+}
+
+.mission-card.is-rescue {
+  border-top-color: rgba(217, 106, 106, 0.5);
+}
+
+.mission-card.is-recon {
+  border-top-color: rgba(122, 184, 217, 0.5);
+}
+
+.objective-chip,
+.escortee-chip {
+  border-color: rgba(224, 179, 74, 0.45);
+  color: #e8cf9a;
+}
+
+/* Полировка 0.13.0: волна-кольцо у открытых миссий и мягкий подъём карточки */
+.map-marker.is-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  animation: marker-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}

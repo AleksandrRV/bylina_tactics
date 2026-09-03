@@ -1,0 +1,149 @@
+/* ============================================================
+ * 10-equipment.css
+ * Снаряжение бойцов.
+ * ============================================================ */
+
+/* ---- Снаряжение ------------------------------------------------ */
+
+.equip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  border: 1px solid rgba(224, 179, 74, 0.4);
+  background: rgba(224, 179, 74, 0.08);
+  color: var(--amber);
+  padding: 1px 8px;
+  font-size: 0.74rem;
+  border-radius: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equip-chip svg {
+  flex: none;
+}
+
+/* Кнопка снаряжения на карточке высадки */
+.equip-btn {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink-3);
+  color: var(--mist-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.equip-btn:hover,
+.equip-btn:focus-visible {
+  border-color: var(--amber);
+  color: var(--amber);
+  outline: none;
+  transform: scale(1.1);
+}
+
+/* Модалка снаряжения */
+
+.equip-card {
+  width: min(100%, 480px);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.equip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.equip-empty {
+  margin: 6px 0;
+}
+
+.equip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-item:hover:not(:disabled),
+.equip-item:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  outline: none;
+  background: #2c2a20;
+}
+
+.equip-item.is-on {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+}
+
+.equip-item.is-taken {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.equip-item-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+}
+
+.equip-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.equip-item-name {
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.equip-item-effects {
+  font-size: 0.78rem;
+  color: var(--mist-dim);
+}
+
+.equip-item-state {
+  flex: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.equip-item.is-on .equip-item-state {
+  color: var(--amber);
+}
