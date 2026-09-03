@@ -28,7 +28,13 @@ export function ResultScreen() {
                 : t("result.defeat")}
         </h1>
         <p className="muted">
-          {isPrologue ? t(victory ? "prologue.victory.body" : "result.defeatHint") : isPvp ? t("pvp.won") : victory ? t("result.victoryHint") : t("result.defeatHint")}
+          {isPrologue
+            ? t(victory ? "prologue.victory.body" : "result.defeatHint")
+            : isPvp
+              ? t("pvp.won")
+              : victory
+                ? t("result.victoryHint")
+                : t("result.defeatHint")}
         </p>
       </header>
       <nav className="menu-nav">
