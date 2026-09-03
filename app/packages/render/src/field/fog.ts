@@ -64,7 +64,12 @@ export function paintFogBase(fogBaseLayer: Graphics, view: FieldView | null): vo
  * Текстура мглы: перекрывающиеся мягкие полупрозрачные эллипсы вместо
  * резких «клякс» (этап 3.5); при reduced motion — статичная фаза.
  */
-export function paintFogDrift(fogDriftLayer: Graphics, view: FieldView | null, now: number, reducedMotion: boolean): void {
+export function paintFogDrift(
+  fogDriftLayer: Graphics,
+  view: FieldView | null,
+  now: number,
+  reducedMotion: boolean,
+): void {
   const g = fogDriftLayer;
   const v = view;
   if (!v || !v.visibleCells) {

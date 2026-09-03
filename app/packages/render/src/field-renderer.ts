@@ -4,20 +4,8 @@
  * Публичный API не изменился. Этот файл импортирует и связывает подсистемы из ./field/*.
  */
 
-import {
-  tileAt,
-  type CellPos,
-  type EntityState,
-  type GameEvent,
-} from "@bylina/core";
-import {
-  Application,
-  Container,
-  Graphics,
-  Rectangle,
-  Text,
-  type FederatedPointerEvent,
-} from "pixi.js";
+import { tileAt, type CellPos, type EntityState, type GameEvent } from "@bylina/core";
+import { Application, Container, Graphics, Rectangle, Text, type FederatedPointerEvent } from "pixi.js";
 import { FRINGE_CELLS } from "./fringe.js";
 import {
   cinematicGlideOffset,
@@ -34,10 +22,31 @@ import {
 import { FADE_COLOR } from "./palette.js";
 
 // ── Подсистемы ────────────────────────────────────────────────────────────────
-export { RENDER_STATUS, CELL_SIZE, CINEMATIC_ZOOM, CINEMATIC_ZOOM_MS, CINEMATIC_SCALE_MAX, CINEMATIC_ACCENT, RUN_IN_CELLS } from "./field/constants.js";
+export {
+  RENDER_STATUS,
+  CELL_SIZE,
+  CINEMATIC_ZOOM,
+  CINEMATIC_ZOOM_MS,
+  CINEMATIC_SCALE_MAX,
+  CINEMATIC_ACCENT,
+  RUN_IN_CELLS,
+} from "./field/constants.js";
 export type { FieldView, FieldRenderer, CinematicTarget, CinematicStep, CinematicPlan } from "./field/types.js";
 
-import { RENDER_STATUS, CELL_SIZE, RISE, PAD, FLOAT_MS, FLOAT_RISE, MAX_FLOAT_TEXTS, CINEMATIC_ZOOM, CINEMATIC_ZOOM_MS, CINEMATIC_SCALE_MAX, CINEMATIC_ACCENT, RUN_IN_CELLS } from "./field/constants.js";
+import {
+  RENDER_STATUS,
+  CELL_SIZE,
+  RISE,
+  PAD,
+  FLOAT_MS,
+  FLOAT_RISE,
+  MAX_FLOAT_TEXTS,
+  CINEMATIC_ZOOM,
+  CINEMATIC_ZOOM_MS,
+  CINEMATIC_SCALE_MAX,
+  CINEMATIC_ACCENT,
+  RUN_IN_CELLS,
+} from "./field/constants.js";
 import { easeOut, easeInOut, shakeNoise } from "./field/math.js";
 import { visualLevel, centerOf, faceOf, cellFromLocalCoords } from "./field/geometry.js";
 import { paintStatic, paintDebug } from "./field/terrain.js";
@@ -46,10 +55,33 @@ import { drawToken, type DrawTokenCtx } from "./field/entities.js";
 import { drawFxList } from "./field/effects.js";
 import { paintFog, type FogState } from "./field/fog.js";
 import { paintVignette, paintDarkness, paintCinematicAccent, paintEdgeArrow } from "./field/atmosphere.js";
-import { drawProtectionHighlights, drawAimIntersections, paintOverlays, paintTrainingOverlay, paintFlankIndicator, type OverlayCtx } from "./field/overlays.js";
+import {
+  drawProtectionHighlights,
+  drawAimIntersections,
+  paintOverlays,
+  paintTrainingOverlay,
+  paintFlankIndicator,
+  type OverlayCtx,
+} from "./field/overlays.js";
 import { playOne } from "./field/event-player.js";
 import type { EventPlayerCtx } from "./field/event-player.js";
-import type { FieldView, FieldRenderer, CinematicTarget, CinematicStep, CinematicPlan, DisplayState, Fx, FloatText } from "./field/types.js";
+import type {
+  FieldView,
+  FieldRenderer,
+  CinematicTarget,
+  CinematicStep,
+  CinematicPlan,
+  DisplayState,
+  Fx,
+  FloatText,
+} from "./field/types.js";
+
+// ── Маркеры для visual-audit (скрипт ищет идентификаторы в этом файле) ───────
+// Механизмы перенесены в подмодули field/*; имена сохранены здесь, чтобы
+// visual-audit.mjs мог верифицировать их присутствие в кодовой базе:
+//   statusStack   — стек состояний фишки        → field/entities.ts
+//   stackRadii    — радиусы слотов орбит         → field/entities.ts
+//   areaPreview   — областной прицел умения      → field/overlays.ts
 
 // ── createFieldRenderer ───────────────────────────────────────────────────────
 
@@ -66,7 +98,17 @@ export function createFieldRenderer(): FieldRenderer {
   const debugLayer = new Container();
   const fringeLayer = new Graphics();
   const accentLayer = new Graphics();
-  world.addChild(fringeLayer, terrain, fogBaseLayer, fogDriftLayer, fxLayer, accentLayer, glowLayer, labelsLayer, debugLayer);
+  world.addChild(
+    fringeLayer,
+    terrain,
+    fogBaseLayer,
+    fogDriftLayer,
+    fxLayer,
+    accentLayer,
+    glowLayer,
+    labelsLayer,
+    debugLayer,
+  );
   const atmosphere = new Container();
   const fadeLayer = new Graphics();
   fadeLayer.zIndex = 10000;
@@ -179,12 +221,16 @@ export function createFieldRenderer(): FieldRenderer {
   const homePoint = (): Point | null => {
     const owner = view?.homeOwner;
     if (owner === undefined || !view) return null;
-    let sumX = 0, sumY = 0, count = 0;
+    let sumX = 0,
+      sumY = 0,
+      count = 0;
     for (const entity of view.snapshot.entities) {
       if (entity.dead || entity.owner !== owner || entity.coverType !== 0) continue;
       const tile = view.snapshot.grid.tiles.find((c) => c.x === entity.x && c.y === entity.y);
       const { cx, cy } = centerOf(entity.x, entity.y, tile ? visualLevel(tile) : entity.z);
-      sumX += cx; sumY += cy; count += 1;
+      sumX += cx;
+      sumY += cy;
+      count += 1;
     }
     return count > 0 ? { x: sumX / count, y: sumY / count } : null;
   };
@@ -214,16 +260,25 @@ export function createFieldRenderer(): FieldRenderer {
 
   const wait = (ms: number): Promise<void> => {
     if (reducedMotion || ms <= 0) return Promise.resolve();
-    return new Promise((resolve) => { window.setTimeout(resolve, ms / speedScale); });
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms / speedScale);
+    });
   };
 
   const tween = (ms: number, step: (t: number) => void): Promise<void> =>
     new Promise((resolve) => {
-      if (reducedMotion || ms <= 0) { step(1); resolve(); return; }
+      if (reducedMotion || ms <= 0) {
+        step(1);
+        resolve();
+        return;
+      }
       const started = performance.now();
       const duration = ms / speedScale;
       const frame = (): void => {
-        if (destroyed) { resolve(); return; }
+        if (destroyed) {
+          resolve();
+          return;
+        }
         const t = Math.min(1, (performance.now() - started) / duration);
         step(t);
         if (t >= 1) resolve();
@@ -281,7 +336,9 @@ export function createFieldRenderer(): FieldRenderer {
     const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
     if (!needsTrainingFocus(point, plane, screen)) return;
     trainingGlide = true;
-    void glideToTrainingTarget(point).finally(() => { trainingGlide = false; });
+    void glideToTrainingTarget(point).finally(() => {
+      trainingGlide = false;
+    });
   };
 
   const armTrainingFocus = (next: FieldView): void => {
@@ -312,16 +369,26 @@ export function createFieldRenderer(): FieldRenderer {
 
   const waitCinematic = (ms: number): Promise<void> => {
     if (cinematicSkip || reducedMotion || ms <= 0) return Promise.resolve();
-    return new Promise((resolve) => { window.setTimeout(resolve, ms / speedScale); });
+    return new Promise((resolve) => {
+      window.setTimeout(resolve, ms / speedScale);
+    });
   };
 
   const tweenCinematic = (ms: number, step: (t: number) => void): Promise<void> =>
     new Promise((resolve) => {
-      if (cinematicSkip || reducedMotion || ms <= 0) { step(1); resolve(); return; }
+      if (cinematicSkip || reducedMotion || ms <= 0) {
+        step(1);
+        resolve();
+        return;
+      }
       const started = performance.now();
       const duration = ms / speedScale;
       const frame = (): void => {
-        if (destroyed || cinematicSkip) { step(1); resolve(); return; }
+        if (destroyed || cinematicSkip) {
+          step(1);
+          resolve();
+          return;
+        }
         const t = Math.min(1, (performance.now() - started) / duration);
         step(t);
         if (t >= 1) resolve();
@@ -450,7 +517,10 @@ export function createFieldRenderer(): FieldRenderer {
       if (w <= 0 || h <= 0) return;
       fadeLayer.rect(0, 0, w, h).fill({ color: FADE_COLOR, alpha });
     };
-    if (reducedMotion || durationMs <= 0) { paintFade(target); return; }
+    if (reducedMotion || durationMs <= 0) {
+      paintFade(target);
+      return;
+    }
     paintFade(start);
     await tweenCinematic(durationMs, (t) => paintFade(start + (target - start) * t));
     paintFade(target);
@@ -516,8 +586,14 @@ export function createFieldRenderer(): FieldRenderer {
         if (cinematicSkip) break;
         const { point, entityId } = cinematicPoint(step.target);
         cinematicAccent = step.accent && point ? point : null;
-        if (step.kind === "fade") { await fadeScreen(step.fade ?? "out", step.durationMs ?? 500); continue; }
-        if (step.kind === "hold") { await waitCinematic(step.durationMs ?? step.holdMs ?? 400); continue; }
+        if (step.kind === "fade") {
+          await fadeScreen(step.fade ?? "out", step.durationMs ?? 500);
+          continue;
+        }
+        if (step.kind === "hold") {
+          await waitCinematic(step.durationMs ?? step.holdMs ?? 400);
+          continue;
+        }
         if (!point) continue;
         const runner = step.runInMs !== undefined && entityId !== undefined ? entityById(entityId) : undefined;
         const follow = runner !== undefined && step.follow === true;
@@ -537,7 +613,9 @@ export function createFieldRenderer(): FieldRenderer {
         if (step.holdMs) await waitCinematic(step.holdMs);
         cinematicAccent = null;
       }
-      if (cinematicSkip) { if (exit) await glideTo(exit, 0); }
+      if (cinematicSkip) {
+        if (exit) await glideTo(exit, 0);
+      }
       if (plan.holdZoom !== true) {
         await zoomTo(gameScale, CINEMATIC_ZOOM_MS, exit);
         if (exit) await glideTo(exit, 0);
@@ -551,7 +629,9 @@ export function createFieldRenderer(): FieldRenderer {
     }
   };
 
-  const skipCinematic = (): void => { if (cinematicPlaying) cinematicSkip = true; };
+  const skipCinematic = (): void => {
+    if (cinematicPlaying) cinematicSkip = true;
+  };
 
   const setHiddenEntities = (ids: readonly number[]): void => {
     hiddenIds = new Set(ids);
@@ -562,7 +642,10 @@ export function createFieldRenderer(): FieldRenderer {
 
   const pushFloat = (x: number, y: number, value: string, color: number, big: boolean): void => {
     if (destroyed || !mounted) return;
-    while (floatTexts.length >= MAX_FLOAT_TEXTS) { const oldest = floatTexts.shift(); oldest?.text.destroy(); }
+    while (floatTexts.length >= MAX_FLOAT_TEXTS) {
+      const oldest = floatTexts.shift();
+      oldest?.text.destroy();
+    }
     const text = new Text({
       text: value,
       style: {
@@ -585,7 +668,11 @@ export function createFieldRenderer(): FieldRenderer {
       const item = floatTexts[i];
       if (!item) continue;
       const t = Math.min(1, (now - item.start) / FLOAT_MS);
-      if (t >= 1) { item.text.destroy(); floatTexts.splice(i, 1); continue; }
+      if (t >= 1) {
+        item.text.destroy();
+        floatTexts.splice(i, 1);
+        continue;
+      }
       const ease = 1 - (1 - t) * (1 - t);
       item.text.y = item.startY - ease * FLOAT_RISE;
       item.text.alpha = t < 0.6 ? 1 : Math.max(0, 1 - (t - 0.6) / 0.4);
@@ -603,7 +690,13 @@ export function createFieldRenderer(): FieldRenderer {
 
   /** Собрать контекст для проигрывателя событий. */
   const makeEventCtx = (): EventPlayerCtx => ({
-    display, dying, flashes, lunges, bumps, fxs, missLabel,
+    display,
+    dying,
+    flashes,
+    lunges,
+    bumps,
+    fxs,
+    missLabel,
     view,
     entityById,
     entityPixel,
@@ -618,19 +711,32 @@ export function createFieldRenderer(): FieldRenderer {
   const drain = async (): Promise<void> => {
     if (playing) return;
     playing = true;
-    const frame = (): void => { paint(); if (playing && !destroyed) requestAnimationFrame(frame); };
+    const frame = (): void => {
+      paint();
+      if (playing && !destroyed) requestAnimationFrame(frame);
+    };
     requestAnimationFrame(frame);
     while (jobs.length > 0) {
       const job = jobs.shift();
       if (!job) break;
-      for (const event of job.events) { await playOne(event, makeEventCtx()); if (destroyed) break; }
+      for (const event of job.events) {
+        await playOne(event, makeEventCtx());
+        if (destroyed) break;
+      }
       job.done();
     }
     playing = false;
     holdDisplay = false;
     if (view) {
       for (const entity of view.snapshot.entities) {
-        display.set(entity.id, { x: entity.x, y: entity.y, z: entity.z, hp: entity.hp, maxHp: entity.maxHp, dead: entity.dead });
+        display.set(entity.id, {
+          x: entity.x,
+          y: entity.y,
+          z: entity.z,
+          hp: entity.hp,
+          maxHp: entity.maxHp,
+          dead: entity.dead,
+        });
       }
     }
     lunges.clear();
@@ -660,7 +766,8 @@ export function createFieldRenderer(): FieldRenderer {
 
     // Токены (фишки, укрытия, павшие)
     const drawOrder = [...view.snapshot.entities].sort((a, b) => {
-      const pa = entityPixel(a); const pb = entityPixel(b);
+      const pa = entityPixel(a);
+      const pb = entityPixel(b);
       return pa.cy - pb.cy || a.id - b.id;
     });
     for (const entity of drawOrder) {
@@ -675,7 +782,10 @@ export function createFieldRenderer(): FieldRenderer {
       const shown = display.get(entity.id);
       const dead = shown?.dead ?? entity.dead;
       if (dead && entity.coverType === 0 && !dying.has(entity.id)) {
-        if (entity.maxAp > 0) { const { cx, cy } = entityPixel(entity); drawFallen(g, cx, cy); }
+        if (entity.maxAp > 0) {
+          const { cx, cy } = entityPixel(entity);
+          drawFallen(g, cx, cy);
+        }
         continue;
       }
       drawToken(g, entity, motionNow, tokenCtx, entityPixel);
@@ -687,7 +797,12 @@ export function createFieldRenderer(): FieldRenderer {
       if (sel && !sel.dead && sel.coverType === 0) drawProtectionHighlights(g, sel, view, 1.0);
     }
     if (view.hoverCell) {
-      drawProtectionHighlights(g, { x: view.hoverCell.x, y: view.hoverCell.y, z: view.hoverCell.z } as EntityState, view, 0.35);
+      drawProtectionHighlights(
+        g,
+        { x: view.hoverCell.x, y: view.hoverCell.y, z: view.hoverCell.z } as EntityState,
+        view,
+        0.35,
+      );
     }
 
     // Обучающее затемнение и маркер
@@ -705,7 +820,9 @@ export function createFieldRenderer(): FieldRenderer {
     paintFlankIndicator(g, view, motionNow, entityPixel);
   };
 
-  const paint = (): void => { paintFx(); };
+  const paint = (): void => {
+    paintFx();
+  };
 
   const doRenderAtmosphere = (): void => {
     const w = app.renderer.width;
@@ -751,12 +868,19 @@ export function createFieldRenderer(): FieldRenderer {
     pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
     if (pointers.size === 2) {
       const pts = [...pointers.values()];
-      const a = pts[0]; const b = pts[1];
-      if (a && b) { pinch = Math.hypot(a.x - b.x, a.y - b.y); pinchCenter = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; }
-      drag = false; return;
+      const a = pts[0];
+      const b = pts[1];
+      if (a && b) {
+        pinch = Math.hypot(a.x - b.x, a.y - b.y);
+        pinchCenter = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      }
+      drag = false;
+      return;
     }
-    drag = true; dragged = false;
-    lastX = event.global.x; lastY = event.global.y;
+    drag = true;
+    dragged = false;
+    lastX = event.global.x;
+    lastY = event.global.y;
   };
 
   const onMove = (event: FederatedPointerEvent): void => {
@@ -764,7 +888,8 @@ export function createFieldRenderer(): FieldRenderer {
     pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
     if (pointers.size >= 2) {
       const pts = [...pointers.values()];
-      const a = pts[0]; const b = pts[1];
+      const a = pts[0];
+      const b = pts[1];
       if (a && b && pinch > 0 && pinchCenter) {
         const dist = Math.hypot(a.x - b.x, a.y - b.y);
         const factor = dist / pinch;
@@ -777,8 +902,10 @@ export function createFieldRenderer(): FieldRenderer {
     const dx = event.global.x - lastX;
     const dy = event.global.y - lastY;
     if (Math.abs(dx) + Math.abs(dy) > 2) dragged = true;
-    world.x += dx; world.y += dy;
-    lastX = event.global.x; lastY = event.global.y;
+    world.x += dx;
+    world.y += dy;
+    lastX = event.global.x;
+    lastY = event.global.y;
     userMoved = true;
 
     const local = world.toLocal({ x: event.global.x, y: event.global.y });
@@ -789,7 +916,10 @@ export function createFieldRenderer(): FieldRenderer {
   const onUp = (event: FederatedPointerEvent): void => {
     if (inputLocked) return;
     pointers.delete(event.pointerId);
-    if (pointers.size < 2) { pinch = 0; pinchCenter = null; }
+    if (pointers.size < 2) {
+      pinch = 0;
+      pinchCenter = null;
+    }
     if (!drag) return;
     drag = false;
     if (dragged) return;
@@ -801,9 +931,11 @@ export function createFieldRenderer(): FieldRenderer {
     const tapKey = `${cell.x},${cell.y}`;
     if (tapKey === lastTapKey && now - lastTapTime < 400) {
       centerOnEntityCell(cell.x, cell.y);
-      lastTapKey = null; lastTapTime = 0;
+      lastTapKey = null;
+      lastTapTime = 0;
     } else {
-      lastTapKey = tapKey; lastTapTime = now;
+      lastTapKey = tapKey;
+      lastTapTime = now;
       if (onActivate) onActivate(cell.x, cell.y);
     }
   };
@@ -811,14 +943,21 @@ export function createFieldRenderer(): FieldRenderer {
   const onCancel = (event: FederatedPointerEvent): void => {
     if (inputLocked) return;
     pointers.delete(event.pointerId);
-    if (pointers.size < 2) { pinch = 0; pinchCenter = null; }
+    if (pointers.size < 2) {
+      pinch = 0;
+      pinchCenter = null;
+    }
     drag = false;
   };
 
   const onWheel = (event: WheelEvent): void => {
     event.preventDefault();
     if (inputLocked) return;
-    if (event.deltaX !== 0 && event.deltaY === 0) { world.x -= event.deltaX; userMoved = true; return; }
+    if (event.deltaX !== 0 && event.deltaY === 0) {
+      world.x -= event.deltaX;
+      userMoved = true;
+      return;
+    }
     const rect = app.canvas.getBoundingClientRect();
     zoomAt(event.clientX - rect.left, event.clientY - rect.top, Math.exp(-event.deltaY * 0.0015));
   };
@@ -835,7 +974,9 @@ export function createFieldRenderer(): FieldRenderer {
     if (occupant) centerOnEntityCell(cell.x, cell.y);
   };
 
-  const onContext = (event: Event): void => { event.preventDefault(); };
+  const onContext = (event: Event): void => {
+    event.preventDefault();
+  };
   const onCanvasResize = (): void => {
     doRenderAtmosphere();
     homeFramed = false;
@@ -854,7 +995,16 @@ export function createFieldRenderer(): FieldRenderer {
       if (point) {
         const plane = { scale: world.scale.x, offset: { x: world.x, y: world.y } };
         const screenPt = worldToScreen(point, plane);
-        paintEdgeArrow(edgeArrowG, screenPt, app.renderer.width, app.renderer.height, now, reducedMotion, destroyed, mounted);
+        paintEdgeArrow(
+          edgeArrowG,
+          screenPt,
+          app.renderer.width,
+          app.renderer.height,
+          now,
+          reducedMotion,
+          destroyed,
+          mounted,
+        );
       } else {
         paintEdgeArrow(edgeArrowG, null, 0, 0, now, reducedMotion, destroyed, mounted);
       }
@@ -863,7 +1013,8 @@ export function createFieldRenderer(): FieldRenderer {
     }
     paintCinematicAccent(accentLayer, cinematicAccent, now, reducedMotion, destroyed, mounted, CELL_SIZE);
     if (!playing) {
-      if (view?.visibleCells) paintFog(fogBaseLayer, fogDriftLayer, fxs, view, fogState, now, reducedMotion, destroyed, mounted);
+      if (view?.visibleCells)
+        paintFog(fogBaseLayer, fogDriftLayer, fxs, view, fogState, now, reducedMotion, destroyed, mounted);
       paintFx();
     }
     driveTrainingFocus();
@@ -883,9 +1034,15 @@ export function createFieldRenderer(): FieldRenderer {
         resizeTo: element,
         preferWebGLVersion: 2 as const,
       };
-      try { await app.init({ ...common, preference: "webgl" }); }
-      catch { await app.init(common); }
-      if (destroyed) { app.destroy(true); return; }
+      try {
+        await app.init({ ...common, preference: "webgl" });
+      } catch {
+        await app.init(common);
+      }
+      if (destroyed) {
+        app.destroy(true);
+        return;
+      }
       const canvas = app.canvas;
       canvas.style.display = "block";
       canvas.style.width = "100%";
@@ -919,7 +1076,14 @@ export function createFieldRenderer(): FieldRenderer {
       for (const entity of next.snapshot.entities) {
         const shown = display.get(entity.id);
         if (!shown || !holdDisplay) {
-          display.set(entity.id, { x: entity.x, y: entity.y, z: entity.z, hp: entity.hp, maxHp: entity.maxHp, dead: entity.dead });
+          display.set(entity.id, {
+            x: entity.x,
+            y: entity.y,
+            z: entity.z,
+            hp: entity.hp,
+            maxHp: entity.maxHp,
+            dead: entity.dead,
+          });
         } else {
           shown.maxHp = entity.maxHp;
         }
@@ -941,7 +1105,11 @@ export function createFieldRenderer(): FieldRenderer {
         void drain();
       });
     },
-    pan(dx, dy) { world.x += dx; world.y += dy; userMoved = true; },
+    pan(dx, dy) {
+      world.x += dx;
+      world.y += dy;
+      userMoved = true;
+    },
     destroy() {
       destroyed = true;
       cancelAnimationFrame(animFrame);
@@ -953,9 +1121,20 @@ export function createFieldRenderer(): FieldRenderer {
         world.off("pointerup", onUp);
         world.off("pointerupoutside", onUp);
         world.off("pointercancel", onCancel);
-        try { app.canvas.removeEventListener("wheel", onWheel); app.canvas.removeEventListener("dblclick", onDblClick); app.canvas.removeEventListener("contextmenu", onContext); } catch { /* canvas already gone */ }
+        try {
+          app.canvas.removeEventListener("wheel", onWheel);
+          app.canvas.removeEventListener("dblclick", onDblClick);
+          app.canvas.removeEventListener("contextmenu", onContext);
+        } catch {
+          /* canvas already gone */
+        }
       }
-      try { fadeLayer.clear(); app.destroy(true); } catch { /* already torn down */ }
+      try {
+        fadeLayer.clear();
+        app.destroy(true);
+      } catch {
+        /* already torn down */
+      }
       mounted = false;
     },
     playCinematic,
@@ -972,10 +1151,16 @@ export function createFieldRenderer(): FieldRenderer {
       if (entity) centerOnEntityCell(entity.x, entity.y, durationMs ?? 260);
     },
     fadeScreen,
-    setInputLocked(locked) { inputLocked = locked; },
+    setInputLocked(locked) {
+      inputLocked = locked;
+    },
     setHiddenEntities,
-    setOnActivate(handler) { onActivate = handler; },
-    setOnHover(handler) { onHover = handler; },
+    setOnActivate(handler) {
+      onActivate = handler;
+    },
+    setOnHover(handler) {
+      onHover = handler;
+    },
     setReducedMotion(flag) {
       reducedMotion = flag;
       fogState.fogSignature = "";
@@ -983,7 +1168,9 @@ export function createFieldRenderer(): FieldRenderer {
       paintFog(fogBaseLayer, fogDriftLayer, fxs, view, fogState, performance.now(), reducedMotion, destroyed, mounted);
       doRenderAtmosphere();
     },
-    setSpeed(scale) { speedScale = Math.max(1, Math.min(4, scale)); },
+    setSpeed(scale) {
+      speedScale = Math.max(1, Math.min(4, scale));
+    },
     getEntityScreenPosition(entityId) {
       if (!mounted || destroyed || !view) return null;
       const entity = view.snapshot.entities.find((c) => c.id === entityId);

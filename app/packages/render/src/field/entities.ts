@@ -106,9 +106,26 @@ function drawZnaharka({ g, cx, cy }: TokenCtx): void {
 /** Упырь: чёрный плащ-крыло с алым подбоем, бледное лицо, угольные глаза. */
 function drawUpyr({ g, cx, cy }: TokenCtx): void {
   g.poly([
-    cx - 13, cy + 4, cx - 8, cy + 11, cx - 3, cy + 6.5,
-    cx + 2, cy + 11.5, cx + 8, cy + 6, cx + 13, cy + 10.5,
-    cx + 12, cy - 4, cx + 6, cy - 8, cx - 6, cy - 8, cx - 12, cy - 4,
+    cx - 13,
+    cy + 4,
+    cx - 8,
+    cy + 11,
+    cx - 3,
+    cy + 6.5,
+    cx + 2,
+    cy + 11.5,
+    cx + 8,
+    cy + 6,
+    cx + 13,
+    cy + 10.5,
+    cx + 12,
+    cy - 4,
+    cx + 6,
+    cy - 8,
+    cx - 6,
+    cy - 8,
+    cx - 12,
+    cy - 4,
   ]).fill(0x1c1a20);
   g.poly([cx - 7, cy - 4, cx, cy - 1, cx + 7, cy - 4, cx + 5, cy + 1.5, cx - 5, cy + 1.5]).fill(0x8e2f26);
   g.ellipse(cx, cy - 3.5, 5.4, 6.4).fill(0xd8cfc0);
@@ -131,9 +148,15 @@ function drawLeshy({ g, cx, cy }: TokenCtx): void {
     .stroke({ width: 0.9, color: 0x463320, alpha: 0.9 });
   for (const side of [-1, 1] as const) {
     const ax = cx + side * 5;
-    g.moveTo(ax, cy - 6.5).lineTo(ax + side * 5.5, cy - 13).stroke({ width: 1.8, color: 0xc7b189 });
-    g.moveTo(ax + side * 2.6, cy - 9.4).lineTo(ax + side * 1.4, cy - 13.5).stroke({ width: 1.5, color: 0xc7b189 });
-    g.moveTo(ax + side * 4.4, cy - 11).lineTo(ax + side * 7.4, cy - 14.5).stroke({ width: 1.5, color: 0xc7b189 });
+    g.moveTo(ax, cy - 6.5)
+      .lineTo(ax + side * 5.5, cy - 13)
+      .stroke({ width: 1.8, color: 0xc7b189 });
+    g.moveTo(ax + side * 2.6, cy - 9.4)
+      .lineTo(ax + side * 1.4, cy - 13.5)
+      .stroke({ width: 1.5, color: 0xc7b189 });
+    g.moveTo(ax + side * 4.4, cy - 11)
+      .lineTo(ax + side * 7.4, cy - 14.5)
+      .stroke({ width: 1.5, color: 0xc7b189 });
     g.circle(ax + side * 7.4, cy - 14.5, 1.3).fill(0x5f8a3c);
   }
   g.circle(cx - 2.3, cy - 1.5, 1).fill(0xcfe8a0);
@@ -158,18 +181,26 @@ function drawKikimora({ g, cx, cy }: TokenCtx): void {
   }
   g.circle(cx - 1.8, cy - 4.6, 1.1).fill(0xe4d24e);
   g.circle(cx + 1.8, cy - 4.6, 1.1).fill(0xe4d24e);
-  g.moveTo(cx + 4, cy + 3).lineTo(cx + 10, cy + 9).stroke({ width: 1, color: 0xb9c0c8 });
-  g.moveTo(cx + 9.2, cy + 8.2).lineTo(cx + 10.8, cy + 9.8).stroke({ width: 0.7, color: 0xb9c0c8 });
+  g.moveTo(cx + 4, cy + 3)
+    .lineTo(cx + 10, cy + 9)
+    .stroke({ width: 1, color: 0xb9c0c8 });
+  g.moveTo(cx + 9.2, cy + 8.2)
+    .lineTo(cx + 10.8, cy + 9.8)
+    .stroke({ width: 0.7, color: 0xb9c0c8 });
 }
 
 function drawVolkhv({ g, cx, cy }: TokenCtx): void {
   g.ellipse(cx, cy + 6, 11, 7).fill(0x264f57);
   g.poly([cx - 9, cy + 5, cx, cy - 12, cx + 9, cy + 5]).fill(0x357681);
-  g.moveTo(cx - 9, cy + 5).lineTo(cx + 9, cy + 5).stroke({ width: 1.2, color: 0x1d3a40 });
+  g.moveTo(cx - 9, cy + 5)
+    .lineTo(cx + 9, cy + 5)
+    .stroke({ width: 1.2, color: 0x1d3a40 });
   g.circle(cx, cy - 2, 5).fill(0xd9c9a5);
   g.circle(cx - 2, cy - 2, 1.05).fill(0x9ff3ff);
   g.circle(cx + 2, cy - 2, 1.05).fill(0x9ff3ff);
-  g.moveTo(cx + 8, cy - 7).lineTo(cx + 12, cy + 11).stroke({ width: 2, color: 0x8b6a42 });
+  g.moveTo(cx + 8, cy - 7)
+    .lineTo(cx + 12, cy + 11)
+    .stroke({ width: 2, color: 0x8b6a42 });
   g.circle(cx + 8, cy - 8, 3).stroke({ width: 1.5, color: 0x75e0eb });
   for (const offset of [0, Math.PI]) {
     const a = performance.now() * 0.003 + offset;
@@ -195,8 +226,12 @@ function drawIllusion({ g, cx, cy }: TokenCtx): void {
   const outline = { width: 1.5, color: 0xbdf8ff, alpha: 0.85 } as const;
   g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).fill({ color: 0x72dce8, alpha: 0.32 });
   g.poly([cx, cy - 13, cx + 10, cy + 7, cx, cy + 13, cx - 10, cy + 7]).stroke(outline);
-  g.moveTo(cx, cy - 13).lineTo(cx, cy + 13).stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
-  g.moveTo(cx - 10, cy + 7).lineTo(cx + 10, cy + 7).stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
+  g.moveTo(cx, cy - 13)
+    .lineTo(cx, cy + 13)
+    .stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
+  g.moveTo(cx - 10, cy + 7)
+    .lineTo(cx + 10, cy + 7)
+    .stroke({ width: 1, color: 0xbdf8ff, alpha: 0.45 });
   g.circle(cx, cy - 2, 4).fill({ color: 0xe8ffff, alpha: 0.6 });
   g.circle(cx - 3.4, cy + 4, 1.1).fill({ color: 0xe8ffff, alpha: 0.5 });
   g.circle(cx + 3.4, cy + 4, 1.1).fill({ color: 0xe8ffff, alpha: 0.5 });
@@ -204,8 +239,12 @@ function drawIllusion({ g, cx, cy }: TokenCtx): void {
 
 /** Идол Нави: каменная стела с ликом; цель уничтожения (0.13.0). */
 function drawIdol({ g, cx, cy }: TokenCtx): void {
-  g.roundRect(cx - 14, cy + 6, 28, 7, 2).fill({ color: 0x4a4a52, alpha: 1 }).stroke({ width: 1, color: 0x2e2e34 });
-  g.roundRect(cx - 11, cy - 14, 22, 21, 3).fill(0x5d5d66).stroke({ width: 1.2, color: 0x34343b });
+  g.roundRect(cx - 14, cy + 6, 28, 7, 2)
+    .fill({ color: 0x4a4a52, alpha: 1 })
+    .stroke({ width: 1, color: 0x2e2e34 });
+  g.roundRect(cx - 11, cy - 14, 22, 21, 3)
+    .fill(0x5d5d66)
+    .stroke({ width: 1.2, color: 0x34343b });
   g.circle(cx, cy - 6, 4.5).fill(0x3f3f47);
   g.circle(cx - 1.6, cy - 7, 1.2).fill(0xb8b8c4);
   g.circle(cx + 1.6, cy - 7, 1.2).fill(0xb8b8c4);
@@ -231,16 +270,22 @@ function drawCaptive({ g, cx, cy }: TokenCtx): void {
 
 /** Баба Яга: ведьма в ступе; полёт, контроль, пороговый уход (0.18.0). */
 function drawBabaYaga({ g, cx, cy }: TokenCtx): void {
-  g.ellipse(cx, cy + 9, 11, 5).fill(0x3a2a1a).stroke({ width: 1, color: 0x241a10 });
+  g.ellipse(cx, cy + 9, 11, 5)
+    .fill(0x3a2a1a)
+    .stroke({ width: 1, color: 0x241a10 });
   g.ellipse(cx, cy + 6, 7.5, 4).fill(0x241a10);
   g.ellipse(cx, cy + 12, 5, 2.5).fill({ color: 0x7a4a2a, alpha: 0.9 });
   g.ellipse(cx, cy + 13, 3, 1.6).fill({ color: 0xc97a3a, alpha: 0.95 });
-  g.circle(cx, cy - 3, 6).fill(0x8a8f98).stroke({ width: 0.8, color: 0x4a4e55 });
+  g.circle(cx, cy - 3, 6)
+    .fill(0x8a8f98)
+    .stroke({ width: 0.8, color: 0x4a4e55 });
   g.circle(cx, cy - 3.4, 4.4).fill(0xd8cfc0);
   g.poly([cx - 6.5, cy - 2, cx + 6.5, cy - 2, cx + 4.5, cy + 6, cx - 4.5, cy + 6]).fill(0x5a5f68);
   g.circle(cx, cy - 8.6, 2).fill(0x8a4a3a);
   g.poly([cx + 3.4, cy - 4.6, cx + 6, cy - 3.2, cx + 3.4, cy - 2.4]).fill(0xd8cfc0);
-  g.moveTo(cx + 7, cy + 4).lineTo(cx + 13, cy - 2).stroke({ width: 1.4, color: 0x6b4f2a });
+  g.moveTo(cx + 7, cy + 4)
+    .lineTo(cx + 13, cy - 2)
+    .stroke({ width: 1.4, color: 0x6b4f2a });
   g.poly([cx + 11, cy - 1, cx + 16, cy - 4, cx + 13, cy + 1]).fill(0xa08050);
   g.circle(cx - 4, cy + 2.4, 1.8).fill({ color: 0x5fd6a8, alpha: 0.9 });
 }
@@ -253,9 +298,15 @@ function drawSolovey({ g, cx, cy }: TokenCtx): void {
   g.circle(cx, cy - 6, 5.5).fill(0xd8c9a8);
   g.poly([cx - 6, cy - 9, cx + 6, cy - 9, cx + 4, cy - 4, cx - 4, cy - 4]).fill(0x8a2a2a);
   g.poly([cx - 3.4, cy - 3, cx + 3.4, cy - 3, cx, cy + 2.4]).fill(0x6b5b48);
-  g.moveTo(cx + 8, cy - 2).quadraticCurveTo(cx + 14, cy + 2, cx + 8, cy + 7).stroke({ width: 1.4, color: 0x8a6a3a });
-  g.moveTo(cx + 8, cy - 2).lineTo(cx + 8, cy + 7).stroke({ width: 0.6, color: 0xd8cfc0 });
-  g.circle(cx - 2, cy + 7, 2).fill(0xd9b64a).stroke({ width: 0.6, color: 0x8a6f2a });
+  g.moveTo(cx + 8, cy - 2)
+    .quadraticCurveTo(cx + 14, cy + 2, cx + 8, cy + 7)
+    .stroke({ width: 1.4, color: 0x8a6a3a });
+  g.moveTo(cx + 8, cy - 2)
+    .lineTo(cx + 8, cy + 7)
+    .stroke({ width: 0.6, color: 0xd8cfc0 });
+  g.circle(cx - 2, cy + 7, 2)
+    .fill(0xd9b64a)
+    .stroke({ width: 0.6, color: 0x8a6f2a });
 }
 
 const CLASS_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
@@ -334,10 +385,14 @@ export function drawToken(
     const depth = CELL_SIZE * 7;
     const width = CELL_SIZE * 6;
     g.poly([
-      cx + sideX * width, cy + sideY * width,
-      cx - sideX * width, cy - sideY * width,
-      cx + forwardX * depth - sideX * width, cy + forwardY * depth - sideY * width,
-      cx + forwardX * depth + sideX * width, cy + forwardY * depth + sideY * width,
+      cx + sideX * width,
+      cy + sideY * width,
+      cx - sideX * width,
+      cy - sideY * width,
+      cx + forwardX * depth - sideX * width,
+      cy + forwardY * depth - sideY * width,
+      cx + forwardX * depth + sideX * width,
+      cy + forwardY * depth + sideY * width,
     ]).fill({ color: 0xe8b64c, alpha: 0.08 });
   }
 
@@ -399,10 +454,12 @@ export function drawToken(
         const angle = statusTime + (i * Math.PI * 2) / 4;
         const radius = orbit + Math.sin(statusTime * 1.7 + i) * 2;
         g.circle(cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius - 2, 2.2 + (i % 2) * 0.7).fill({
-          color: 0x78d83d, alpha: 0.8,
+          color: 0x78d83d,
+          alpha: 0.8,
         });
         g.circle(cx + Math.cos(angle) * radius - 0.6, cy + Math.sin(angle) * radius - 2.8, 0.8).fill({
-          color: 0xd7ff8a, alpha: 0.9,
+          color: 0xd7ff8a,
+          alpha: 0.9,
         });
       }
     } else if (entry.key === "immobile") {
@@ -432,15 +489,20 @@ export function drawToken(
       for (let i = 0; i < 3; i += 1) {
         const angle = statusTime * 0.5 + (i * Math.PI * 2) / 3;
         g.ellipse(cx + Math.cos(angle) * orbit * 0.85, cy + Math.sin(angle) * orbit * 0.55, 3.6, 1.9).fill({
-          color: 0x7fb84d, alpha: 0.75,
+          color: 0x7fb84d,
+          alpha: 0.75,
         });
       }
     }
   }
   if (entity.flying) {
     const wing = 7 + Math.sin(statusTime * 2) * 3;
-    g.moveTo(cx - 13, cy - 2).quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2).stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
-    g.moveTo(cx + 13, cy - 2).quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2).stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+    g.moveTo(cx - 13, cy - 2)
+      .quadraticCurveTo(cx - 21, cy - wing, cx - 24, cy + 2)
+      .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
+    g.moveTo(cx + 13, cy - 2)
+      .quadraticCurveTo(cx + 21, cy - wing, cx + 24, cy + 2)
+      .stroke({ width: 2, color: 0xbfe8ff, alpha: 0.8 });
   }
 
   if (fade < 1) {
@@ -449,9 +511,12 @@ export function drawToken(
 
   const angle = (-90 + entity.dir * 90) * (Math.PI / 180);
   g.poly([
-    cx + Math.cos(angle) * 20.5, cy + Math.sin(angle) * 20.5,
-    cx + Math.cos(angle + 0.32) * 16, cy + Math.sin(angle + 0.32) * 16,
-    cx + Math.cos(angle - 0.32) * 16, cy + Math.sin(angle - 0.32) * 16,
+    cx + Math.cos(angle) * 20.5,
+    cy + Math.sin(angle) * 20.5,
+    cx + Math.cos(angle + 0.32) * 16,
+    cy + Math.sin(angle + 0.32) * 16,
+    cx + Math.cos(angle - 0.32) * 16,
+    cy + Math.sin(angle - 0.32) * 16,
   ]).fill(faction.ring);
 
   if (entity.id === view?.selectedId) {
@@ -489,8 +554,12 @@ export function drawToken(
     const sy = cy - 18;
     g.roundRect(sx - 5, sy - 6, 10, 12, 2).fill(0x388cdc);
     g.roundRect(sx - 5, sy - 6, 10, 12, 2).stroke({ width: 1.2, color: 0x8fd0ff });
-    g.moveTo(sx, sy - 3).lineTo(sx, sy + 3).stroke({ width: 1.4, color: 0xf3ecdc });
-    g.moveTo(sx - 2.5, sy).lineTo(sx + 2.5, sy).stroke({ width: 1.4, color: 0xf3ecdc });
+    g.moveTo(sx, sy - 3)
+      .lineTo(sx, sy + 3)
+      .stroke({ width: 1.4, color: 0xf3ecdc });
+    g.moveTo(sx - 2.5, sy)
+      .lineTo(sx + 2.5, sy)
+      .stroke({ width: 1.4, color: 0xf3ecdc });
   }
 
   if (entity.overwatch) {
