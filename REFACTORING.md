@@ -1,3285 +1,6097 @@
-Ниже — максимально подробная проектная инструкция по рефакторингу `app/packages/ui/src/BattleScreenView.tsx`.
+Ниже — максимально подробная проектная инструкция по рефакторингу `app/packages/ui/src/campaign.css`.
 
 Цель:
 
-- уменьшить итоговый `BattleScreenView.tsx` до менее чем **1000 строк**;
-- сохранить публичный экспорт `BattleScreenView`;
-- сохранить поведение экрана боя: обучение, пролог, повтор, PvP, кампанию, кинематографические сцены, исход боя, панель действий, клавиатуру, тренировочные подсказки;
-- профессионально выделить логические модули: состояние, команды, рендерер, обучение, пролог, повтор, ростер, подсказки, диалоги, HUD.
-
-> Важное практическое замечание. `BattleScreenView.tsx` в текущем виде содержит несколько тысяч строк: состояния, эффекты, обработчики, боевые панели, диалоги, обучение, пролог, повтор, сеть. Полный дословный перенос всех этих тысяч строк в один ответ физически невозможен без потери читаемости. Поэтому ниже дан полный целевой код архитектуры, итогового файла и всех новых модулей, а для самых крупных графических/декларативных блоков указана точная точка переноса. Такие блоки копируются **1:1** из старого файла в новые компоненты/хуки без изменения поведения.
-
+- уменьшить итоговый `campaign.css` до менее чем **1000 строк**;
+- сохранить существующие классы, анимации, media-запросы, `prefers-reduced-motion`, CSS-переменные и визуальное поведение;
+- профессионально разнести стили по предметным модулям;
+- учесть требования сборки и форматирования:
+  - форматирование кода — через Prettier;
+  - ширина строки — **120 символов**;
+  - линтер не должен отвечать за форматирование;
+  - после рефакторинга обязательно выполняется `pnpm format` или эквивалент;
+  - CI должен проходить без изменений, если в нём уже есть проверка форматирования, сборки и тестов.
+  
 ---
 
 # 1. Диагностика текущего файла
 
-`BattleScreenView.tsx` сейчас совмещает слишком много ответственностей:
+`app/packages/ui/src/campaign.css` сейчас содержит большое число несвязанных областей:
 
-1. Создание боевого ядра.
-2. Выбор стороны наблюдения.
-3. Снимок боя, ревизия, видимость, разведка.
-4. Намерение игрока: выбор бойца, оружие, умение, прицел, рывок.
-5. Обучение: подсказки, директивы, запрет действий, итог обучения.
-6. Пролог: режиссёр сцен, контрольные точки, принудительная стойка, сюжетные подсказки.
-7. Команды: `MOVE`, `ATTACK`, `USE_SKILL`, `DEFEND`, `END_TURN`, рывок, отказа обучения.
-8. Проигрывание событий через `renderer.play`.
-9. Ход Нави.
-10. Повтор и журнал повтора.
-11. Ростер своих бойцов и полоса противников.
-12. Карточка прицеливания.
-13. Областной прицел.
-14. Кампейн-подсказки.
-15. Диалоги: пауза, итог, информация о действии, информация о бойце, сюжетная реплика.
-16. Клавиатура.
-17. Синхронизация с `FieldRenderer`.
-18. Большой JSX.
+1. базовый экран кампании;
+2. шапку кампании;
+3. шкалу Тьмы и ресурсы;
+4. карту царства;
+5. маркеры миссий;
+6. дорогу и перелёт корабля;
+7. панель миссии;
+8. вкладки корабля;
+9. дружину и Горницу;
+10. Кузню;
+11. снаряжение;
+12. экран высадки;
+13. PvP и сеть;
+14. повторы;
+15. обучение;
+16. кампейн-подсказки;
+17. итог миссии;
+18. keyframes;
+19. адаптивные правила;
+20. `prefers-reduced-motion`.
 
-Это нужно разнести на модули.
+Для CSS это означает, что один файл стал одновременно:
+
+- файлом темы кампании;
+- файлом карты;
+- файлом панелей;
+- файлом модальных окон;
+- файлом анимаций;
+- файлом адаптивности.
+
+Это нужно разнести на модули без изменения поведения.
 
 ---
 
 # 2. Целевая архитектура
 
-Создаём папку:
+Создаём каталог:
 
 ```text
-app/packages/ui/src/battle-screen/
+app/packages/ui/src/campaign/
 ```
 
 Итоговая структура:
 
 ```text
 app/packages/ui/src/
-  BattleScreenView.tsx
-  battle-screen/
-    context.ts
-    useBattleScreenModel.ts
-
-    useBattleScreenBase.ts
-    useBattleKinds.ts
-    useBattleKernel.ts
-    useBattleSnapshot.ts
-    useBattleIntentState.ts
-    useBattleAimPreview.ts
-    useBattleTrainingState.ts
-    useBattlePrologueState.ts
-    useBattleOutcomeGate.ts
-    useBattleCommandCenter.ts
-    useBattleRendererSync.ts
-    useBattleEnemyTurn.ts
-    useBattleReplayPlayback.ts
-    useBattleRosterState.ts
-    useBattleCampaignHints.ts
-    useBattleKeyboardControl.ts
-
-    BattleScreenLayout.tsx
-    BattleTopBar.tsx
-    BattleRosterPanel.tsx
-    BattleEnemyStrip.tsx
-    BattleAimCard.tsx
-    BattleTrainingLayer.tsx
-    BattleBottomPanel.tsx
-    BattleDialogs.tsx
-    BattleReplayBar.tsx
+  campaign.css
+  campaign/
+    00-screen.css
+    01-top.css
+    02-darkness-resources.css
+    03-map.css
+    04-map-markers.css
+    05-map-road.css
+    06-mission-panel.css
+    07-campaign-tabs.css
+    08-roster.css
+    09-forge.css
+    10-equipment.css
+    11-deployment.css
+    12-pvp.css
+    13-net.css
+    14-replay.css
+    15-training.css
+    16-campaign-hints.css
+    17-result.css
+    18-keyframes.css
+    19-responsive.css
+    20-reduced-motion.css
 ```
 
-Публичный контракт сохраняется:
+`campaign.css` остаётся единственной точкой входа.
+
+Это важно, потому что потребители продолжают писать:
 
 ```ts
-export function BattleScreenView(): JSX.Element;
+import "./campaign.css";
 ```
 
-`BattleScreen.tsx` остаётся без изменений:
-
-```ts
-export const BattleScreen = lazy(async () => ({
-  default: (await import("./BattleScreenView.js")).BattleScreenView,
-}));
-```
+и не знают о разбивке.
 
 ---
 
-# 3. Главные правила рефакторинга
+# 3. Главный принцип рефакторинга
 
-1. **Не менять поведение.**
-2. **Не менять порядок хуков внутри компонента без необходимости.**  
-   Все хуки вызываются в одном корневом `useBattleScreenModel` всегда в одном и том же порядке.
-3. **Не дублировать доменную логику.**  
-   Уже есть модули:
-   - `battle-cell-click.ts`;
-   - `battle-command.ts`;
-   - `battle-selection.ts`;
-   - `battle-intent.ts`;
-   - `training-progress.ts`;
-   - `training-scenario.ts`;
-   - `prologue-director.ts`;
-   - `battle-enemy-phase.ts`;
-   - `outcome-gate.ts`;
-   - `enemy-strip.ts`.
+Для CSS особенно важно:
 
-   Их не переписываем, только правильно используем.
-4. **Все крупные JSX-блоки выносятся в презентационные компоненты.**
-5. **Все крупные эффекты и обработчики выносятся в хуки.**
-6. **Классы вёрстки, роли, `aria`, тестовые селекторы сохраняются.**
+1. **Не менять имена классов.**
+2. **Не менять порядок правил без необходимости.**
+3. **Не менять специфичность селекторов.**
+4. **Не менять имена анимаций.**
+5. **Не менять `z-index`, цвета, отступы, размеры.**
+6. **Сохранить все комментарии-метки версий**, например `0.11.0`, `0.12.0`, `0.13.0`, если они есть в исходном файле.
+7. **Сохранить порядок `@media`-блоков**, особенно если они находятся в конце файла и переопределяют предыдущие правила.
+8. **`prefers-reduced-motion` должен остаться в конце**, если он стоит в конце исходного файла.
 
 ---
 
-# 4. Пошаговая инструкция
+# 4. Требования к форматированию
 
-## Шаг 1. Создать папку модуля
+После переноса каждый CSS-файл нужно прогнать через Prettier.
+
+Пример правильного форматирования:
+
+```css
+.campaign-screen {
+  max-width: 860px;
+}
+
+@media (min-width: 1400px) {
+  .campaign-screen {
+    max-width: 1100px;
+  }
+}
+```
+
+Правила:
+
+- отступы: 2 пробела;
+- каждый селектор и декларация на отдельных строках;
+- ширина строки: 120 символов;
+- одна пустая строка между правилами;
+- точка с запятой обязательна;
+- кавычки — как настроит Prettier;
+- файл заканчивается переводом строки.
+
+Команда форматирования:
 
 ```bash
-mkdir -p app/packages/ui/src/battle-screen
+pnpm exec prettier --write \
+  app/packages/ui/src/campaign.css \
+  app/packages/ui/src/campaign/*.css
 ```
 
-## Шаг 2. Создать контекст экрана боя
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/context.ts
-```
-
-Контекст позволяет не тащить огромную модель через пропсы в каждую панель.
-
-## Шаг 3. Создать корневую модель экрана
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleScreenModel.ts
-```
-
-Он вызывает все боевые хуки и возвращает единую модель.
-
-## Шаг 4. Вынести базовое состояние
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleScreenBase.ts
-```
-
-Сюда входят:
-
-- `session`;
-- `content`;
-- `debug`;
-- `paused`;
-- `battleKind`;
-- `hintSettings`;
-- `hostRef`;
-- `rendererRef`;
-- `inputRef`;
-- `busy`;
-- `log`;
-- `enemyPhase`;
-- `cutscenePlaying`;
-- `outcomePending`;
-- `fastPace`;
-- `actionInfo`;
-- `unitInfo`;
-- `storyNote`;
-- `prologueStanceLock`;
-- `outcomeGate`.
-
-## Шаг 5. Вынести тип боя и сторону наблюдения
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleKinds.ts
-```
-
-Сюда входят:
-
-- `isReplay`;
-- `isTraining`;
-- `isPrologue`;
-- `trainingMission`;
-- `prologueMission`;
-- `mission`;
-- `isNetGuest`;
-- `isSpectator`;
-- `viewOwner`;
-- `usesNetSnapshot`;
-- `side`.
-
-## Шаг 6. Вынести создание боевого ядра
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleKernel.ts
-```
-
-Сюда входит создание `TacticsKernel` через `createBattleKernel`.
-
-## Шаг 7. Вынести снимок боя и видимость
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleSnapshot.ts
-```
-
-Сюда входят:
-
-- `battleRevision`;
-- `snapshot`;
-- `visibleCells`;
-- `exploredCells`.
-
-## Шаг 8. Вынести намерение игрока
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleIntentState.ts
-```
-
-Сюда входят:
-
-- `intent`;
-- `setIntent`;
-- `selectedId`;
-- `selected`;
-- `action`;
-- `aimId`;
-- `skillTargetPos`;
-- `preview`;
-- `charge`;
-- `chargeArmed`;
-- `clearAim`.
-
-## Шаг 9. Вынести предпросмотр атаки и областного прицела
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleAimPreview.ts
-```
-
-Сюда входят:
-
-- `hit`;
-- `aimBreakCell`;
-- `hoverCell`;
-- `areaPreview`;
-- `aimCardPos`.
-
-## Шаг 10. Вынести обучение
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleTrainingState.ts
-```
-
-Сюда входят:
-
-- `hintStep`;
-- `trainingHints`;
-- `activeHint`;
-- `directiveView`;
-- `trainingHighlight`;
-- `trainingFocus`;
-- `trainingDone`;
-- `trainingOver`;
-- `trainingNote`;
-- `advanceTraining`;
-- `showTrainingNote`;
-- `trainingAllows`;
-- `trainingDeny`.
-
-## Шаг 11. Вынести пролог
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattlePrologueState.ts
-```
-
-Сюда входят:
-
-- `prologueRunRef`;
-- `prologueTelemetryRef`;
-- `firedCutscenesRef`;
-- `prologueObjectiveKey`;
-- `prologueHintKey`;
-- `battleOutcome`;
-- `director`;
-- `showStoryNote`;
-- `showPrologueHint`;
-- `closeStoryNote`;
-- `currentPrologueHintKey`.
-
-## Шаг 12. Вынести исход боя
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleOutcomeGate.ts
-```
-
-Сюда входят:
-
-- `finishFromEvents`;
-- логика завершения обучения;
-- логика завершения кампании;
-- логика завершения PvP;
-- задержка показа итога через `outcomeGate`.
-
-## Шаг 13. Вынести центр команд
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleCommandCenter.ts
-```
-
-Сюда входят:
-
-- `applyCommand`;
-- `playThen`;
-- `announce`;
-- `executeCharge`;
-- `tryMove`;
-- `tryAttack`;
-- `trySkill`;
-- `applySelfSkill`;
-- `endTurn`;
-- `runEndTurnSequence`;
-- `handOffTurnToEnemy`;
-- `debugAutoWin`;
-- `onCell`.
-
-## Шаг 14. Вынести синхронизацию с рендерером
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleRendererSync.ts
-```
-
-Сюда входят:
-
-- монтирование `FieldRenderer`;
-- `renderer.update`;
-- `renderer.setInputLocked`;
-- `renderer.setSpeed`;
-- `renderer.setReducedMotion`;
-- `focusEntity`;
-- позиция карточки прицеливания;
-- обработка нажатия на клетки.
-
-## Шаг 15. Вынести ход Нави
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleEnemyTurn.ts
-```
-
-Сюда входит эффект запуска вражеской фазы.
-
-## Шаг 16. Вынести повтор
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleReplayPlayback.ts
-```
-
-Сюда входят:
-
-- `replayIndex`;
-- `replayDone`;
-- интервал проигрывания журнала.
-
-## Шаг 17. Вынести ростер и полосу врагов
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleRosterState.ts
-```
-
-Сюда входят:
-
-- `roster`;
-- `knownEnemies`;
-- `enemyStrip`;
-- `objectiveEntity`;
-- `seenEnemiesRef`.
-
-## Шаг 18. Вынести кампейн-подсказки
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleCampaignHints.ts
-```
-
-Сюда входят:
-
-- `battleWantedHints`;
-- `activeBattleHint`;
-- `closeBattleHint`;
-- `saveNotice`.
-
-## Шаг 19. Вынести клавиатуру
-
-Файл:
-
-```text
-app/packages/ui/src/battle-screen/useBattleKeyboardControl.ts
-```
-
-Сюда входит подписка на клавиатуру через `useBattleInput`.
-
-## Шаг 20. Вынести презентационные компоненты
-
-Создать:
-
-```text
-BattleScreenLayout.tsx
-BattleTopBar.tsx
-BattleRosterPanel.tsx
-BattleEnemyStrip.tsx
-BattleAimCard.tsx
-BattleTrainingLayer.tsx
-BattleBottomPanel.tsx
-BattleDialogs.tsx
-BattleReplayBar.tsx
-```
-
-## Шаг 21. Переписать `BattleScreenView.tsx`
-
-Оставить только композицию.
-
----
-
-# 5. Полный код итогового файла
-
-## `app/packages/ui/src/BattleScreenView.tsx`
-
-Итоговый файл становится тонким композиционным корнем.
-
-Ожидаемый размер: **менее 30 строк**.
-
-```tsx
-/**
- * Экран тактического боя.
- *
- * После рефакторинга этот файл является только публичной точкой входа.
- * Вся логика экрана находится в `battle-screen/useBattleScreenModel.ts`,
- * а представление — в презентационных компонентах `battle-screen/*`.
- *
- * Публичный контракт сохранён: `BattleScreen` lazy-загружает именно
- * именованный экспорт `BattleScreenView`.
- */
-import { BattleScreenContext } from "./battle-screen/context.js";
-import { useBattleScreenModel } from "./battle-screen/useBattleScreenModel.js";
-import { BattleScreenLayout } from "./battle-screen/BattleScreenLayout.js";
-
-export function BattleScreenView() {
-  const model = useBattleScreenModel();
-
-  return (
-    <BattleScreenContext.Provider value={model}>
-      <BattleScreenLayout />
-    </BattleScreenContext.Provider>
-  );
-}
-```
-
----
-
-# 6. Контекст экрана боя
-
-## `app/packages/ui/src/battle-screen/context.ts`
-
-```ts
-import { createContext, useContext } from "react";
-import type { BattleScreenModel } from "./useBattleScreenModel.js";
-
-export const BattleScreenContext = createContext<BattleScreenModel | null>(null);
-
-export function useBattleScreen(): BattleScreenModel {
-  const model = useContext(BattleScreenContext);
-
-  if (!model) {
-    throw new Error("BattleScreen components must be rendered inside BattleScreenContext.Provider");
-  }
-
-  return model;
-}
-```
-
----
-
-# 7. Корневая модель экрана
-
-## `app/packages/ui/src/battle-screen/useBattleScreenModel.ts`
-
-Этот файл вызывает все хуки в стабильном порядке и собирает модель.
-
-Ожидаемый размер: **220–320 строк**.
-
-```ts
-import { useMemo } from "react";
-
-import { useBattleScreenBase } from "./useBattleScreenBase.js";
-import { useBattleKinds } from "./useBattleKinds.js";
-import { useBattleKernel } from "./useBattleKernel.js";
-import { useBattleSnapshot } from "./useBattleSnapshot.js";
-import { useBattleIntentState } from "./useBattleIntentState.js";
-import { useBattleAimPreview } from "./useBattleAimPreview.js";
-import { useBattleTrainingState } from "./useBattleTrainingState.js";
-import { useBattlePrologueState } from "./useBattlePrologueState.js";
-import { useBattleOutcomeGate } from "./useBattleOutcomeGate.js";
-import { useBattleCommandCenter } from "./useBattleCommandCenter.js";
-import { useBattleRendererSync } from "./useBattleRendererSync.js";
-import { useBattleEnemyTurn } from "./useBattleEnemyTurn.js";
-import { useBattleReplayPlayback } from "./useBattleReplayPlayback.js";
-import { useBattleRosterState } from "./useBattleRosterState.js";
-import { useBattleCampaignHints } from "./useBattleCampaignHints.js";
-import { useBattleKeyboardControl } from "./useBattleKeyboardControl.js";
-
-export function useBattleScreenModel() {
-  const base = useBattleScreenBase();
-  const kinds = useBattleKinds(base);
-  const kernelModel = useBattleKernel(base, kinds);
-  const snapshotModel = useBattleSnapshot(base, kinds);
-  const intentModel = useBattleIntentState(snapshotModel);
-  const training = useBattleTrainingState(base, kinds, snapshotModel, intentModel);
-  const prologue = useBattlePrologueState(base, kinds, kernelModel.kernel, snapshotModel);
-  const outcome = useBattleOutcomeGate(base, kinds, snapshotModel, training, prologue);
-  const commands = useBattleCommandCenter({
-    base,
-    kinds,
-    kernel: kernelModel.kernel,
-    snapshotModel,
-    intentModel,
-    training,
-    prologue,
-    outcome,
-  });
-  const aim = useBattleAimPreview(base, kinds, snapshotModel, intentModel);
-  const renderer = useBattleRendererSync({
-    base,
-    kinds,
-    snapshotModel,
-    intentModel,
-    aim,
-    training,
-    prologue,
-    commands,
-  });
-  const enemyTurn = useBattleEnemyTurn({
-    base,
-    kinds,
-    kernel: kernelModel.kernel,
-    prologue,
-    outcome,
-    commands,
-  });
-  const replay = useBattleReplayPlayback(base, kinds, kernelModel.kernel);
-  const roster = useBattleRosterState(base, kinds, snapshotModel);
-  const hints = useBattleCampaignHints(base, kinds, kernelModel.kernel);
-  const keyboard = useBattleKeyboardControl({
-    base,
-    kinds,
-    snapshotModel,
-    intentModel,
-    training,
-    prologue,
-    commands,
-  });
-
-  const screenClassName = useMemo(() => {
-    return [
-      "battle-screen",
-      kinds.battleKind === "pvp"
-        ? kinds.viewOwner === 1
-          ? "is-pvp-side1"
-          : "is-pvp-side2"
-        : "",
-      training.trainingFocus ? "is-training-focus" : "",
-    ]
-      .filter(Boolean)
-      .join(" ");
-  }, [kinds.battleKind, kinds.viewOwner, training.trainingFocus]);
-
-  return {
-    ...base,
-    ...kinds,
-    ...kernelModel,
-    ...snapshotModel,
-    ...intentModel,
-    ...aim,
-    ...training,
-    ...prologue,
-    ...outcome,
-    ...commands,
-    ...renderer,
-    ...enemyTurn,
-    ...replay,
-    ...roster,
-    ...hints,
-    ...keyboard,
-    screenClassName,
-  };
-}
-
-export type BattleScreenModel = ReturnType<typeof useBattleScreenModel>;
-```
-
----
-
-# 8. Базовое состояние экрана
-
-## `app/packages/ui/src/battle-screen/useBattleScreenBase.ts`
-
-```ts
-import { useRef, useState } from "react";
-import type { FieldRenderer } from "@bylina/render";
-
-import { useServices, useT } from "../context.js";
-import { useI18nTick, useSessionState, useSettingsState } from "../hooks.js";
-import { useBattleInput } from "../useBattleInput.js";
-import { createOutcomeGate, type OutcomeGate } from "../outcome-gate.js";
-import type { ActionInfo } from "../action-info.js";
-import type { UnitInfo } from "../unit-info.js";
-
-export function useBattleScreenBase() {
-  useI18nTick();
-
-  const t = useT();
-  const { session, content, debug } = useServices();
-
-  const {
-    paused,
-    difficulty,
-    battleKind,
-    activeMissionId,
-    deployment,
-    matchSeed,
-    trainingDone: trainingDoneMissions,
-    campaignHintsDone,
-  } = useSessionState();
-
-  const hintSettings = useSettingsState();
-  const inputRef = useBattleInput();
-
-  const hostRef = useRef<HTMLDivElement>(null);
-  const rendererRef = useRef<FieldRenderer | null>(null);
-
-  const [log, setLog] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [enemyPhase, setEnemyPhase] = useState(false);
-  const [rendererReady, setRendererReady] = useState(false);
-  const [cutscenePlaying, setCutscenePlaying] = useState(false);
-  const [outcomePending, setOutcomePending] = useState(false);
-  const [fastPace, setFastPace] = useState(false);
-  const [saveNotice, setSaveNotice] = useState(false);
-  const [passReady, setPassReady] = useState(false);
-  const [actionInfo, setActionInfo] = useState<ActionInfo | null>(null);
-  const [unitInfo, setUnitInfo] = useState<UnitInfo | null>(null);
-  const [storyNote, setStoryNote] = useState<string | null>(null);
-  const [storyNoteHintKey, setStoryNoteHintKey] = useState<string | null>(null);
-  const [prologueStanceLock, setPrologueStanceLock] = useState(false);
-
-  const firedCutscenesRef = useRef<Set<string>>(new Set());
-
-  const outcomeGateRef = useRef<OutcomeGate | null>(null);
-
-  if (outcomeGateRef.current === null) {
-    outcomeGateRef.current = createOutcomeGate({
-      onPendingChange: setOutcomePending,
-    });
-  }
-
-  const outcomeGate = outcomeGateRef.current;
-
-  return {
-    t,
-    session,
-    content,
-    debug,
-
-    paused,
-    difficulty,
-    battleKind,
-    activeMissionId,
-    deployment,
-    matchSeed,
-    trainingDoneMissions,
-    campaignHintsDone,
-    hintSettings,
-
-    hostRef,
-    rendererRef,
-    inputRef,
-
-    log,
-    setLog,
-    busy,
-    setBusy,
-    enemyPhase,
-    setEnemyPhase,
-    rendererReady,
-    setRendererReady,
-    cutscenePlaying,
-    setCutscenePlaying,
-    outcomePending,
-    outcomeGate,
-    fastPace,
-    setFastPace,
-    saveNotice,
-    setSaveNotice,
-    passReady,
-    setPassReady,
-
-    actionInfo,
-    setActionInfo,
-    unitInfo,
-    setUnitInfo,
-
-    storyNote,
-    setStoryNote,
-    storyNoteHintKey,
-    setStoryNoteHintKey,
-
-    prologueStanceLock,
-    setPrologueStanceLock,
-
-    firedCutscenesRef,
-  };
-}
-
-export type BattleScreenBase = ReturnType<typeof useBattleScreenBase>;
-```
-
----
-
-# 9. Тип боя и сторона наблюдения
-
-## `app/packages/ui/src/battle-screen/useBattleKinds.ts`
-
-```ts
-import { useMemo } from "react";
-import { ENEMY_OWNER, PLAYER_OWNER } from "@bylina/core";
-import { useBattleNetwork } from "../useBattleNetwork.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-
-export function useBattleKinds(base: BattleScreenBase) {
-  const { session, content, battleKind, activeMissionId } = base;
-
-  const isReplay = battleKind === "replay";
-  const replayJournal = session.get().replayJournal;
-
-  const isTraining = battleKind === "training";
-  const isPrologue = battleKind === "prologue";
-
-  const trainingMission = isTraining
-    ? content.training.missions.find(
-        (mission) => mission.id === session.get().trainingMissionId,
-      )
-    : undefined;
-
-  const prologueMission = isPrologue
-    ? content.prologue.missions.find(
-        (mission) => mission.id === session.get().prologueMissionId,
-      )
-    : undefined;
-
-  const mission =
-    battleKind === "campaign" && activeMissionId
-      ? session.getCampaign().getMission(activeMissionId)
-      : undefined;
-
-  const network = useBattleNetwork(session, battleKind);
-  const { isNetGuest, isSpectator } = network;
-
-  const netOwner = battleKind === "pvpNet" ? session.get().netOwner : null;
-
-  const pvpActive =
-    battleKind === "pvp" || battleKind === "pvpNet"
-      ? isNetGuest || isSpectator
-        ? netOwner
-        : session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER
-      : null;
-
-  const viewOwner = pvpActive ?? PLAYER_OWNER;
-
-  const usesNetSnapshot = battleKind === "pvpNet" && Boolean(isNetGuest);
-
-  const side = useMemo(
-    () => ({ viewOwner, isSpectator, isReplay }),
-    [viewOwner, isSpectator, isReplay],
-  );
-
-  return {
-    isReplay,
-    replayJournal,
-    isTraining,
-    isPrologue,
-    trainingMission,
-    prologueMission,
-    mission,
-    isNetGuest,
-    isSpectator,
-    netOwner,
-    pvpActive,
-    viewOwner,
-    usesNetSnapshot,
-    side,
-  };
-}
-
-export type BattleKinds = ReturnType<typeof useBattleKinds>;
-```
-
----
-
-# 10. Боевое ядро и контент
-
-## `app/packages/ui/src/battle-screen/useBattleKernel.ts`
-
-```ts
-import { useMemo, useState } from "react";
-import type { SkillStats, WeaponStats } from "@bylina/core";
-import { createBattleKernel } from "../battle-match.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-
-export function useBattleKernel(base: BattleScreenBase, kinds: BattleKinds) {
-  const { session, content, difficulty, matchSeed, activeMissionId, deployment } = base;
-
-  const weapons = useMemo(() => {
-    // Перенести 1:1 из старого файла:
-    // сборка оружия кампании/обучения/пролога/быстрого матча.
-    // Здесь должен остаться прежний код с weaponStatsFromRecord.
-    return {} as Record<string, WeaponStats>;
-  }, [content]);
-
-  const skills = useMemo(() => {
-    const result: Record<string, SkillStats> = {};
-
-    for (const record of content.skills) {
-      result[record.id] = record as SkillStats;
-    }
-
-    return result;
-  }, [content.skills]);
-
-  const [kernel] = useState(() => {
-    const host = createBattleKernel({
-      battleKind: kinds.battleKind,
-      content,
-      session,
-      weapons,
-      skills,
-      matchSeed,
-      difficulty,
-      activeMissionId,
-      deployment,
-      isNetGuest: kinds.isNetGuest,
-      prologueMission: kinds.prologueMission ?? null,
-      trainingMission: kinds.trainingMission ?? null,
-      replayJournal: kinds.replayJournal ?? null,
-    });
-
-    if (host) {
-      session.bindTacticsHost(host);
-    }
-
-    return host;
-  });
-
-  return {
-    kernel,
-    weapons,
-    skills,
-  };
-}
-
-export type BattleKernelModel = ReturnType<typeof useBattleKernel>;
-```
-
-> Важно: тело `weapons` нужно скопировать из старого файла без изменений. Там есть особенности для обучения, пролога, кампании и `prologueBestiary`.
-
----
-
-# 11. Снимок боя и видимость
-
-## `app/packages/ui/src/battle-screen/useBattleSnapshot.ts`
-
-```ts
-import { useMemo } from "react";
-import type { MatchState } from "@bylina/core";
-import { PLAYER_OWNER } from "@bylina/core";
-import { useBattleRevision } from "../hooks.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-
-const EMPTY_SNAPSHOT: MatchState = {
-  turnNumber: 0,
-  activeOwner: PLAYER_OWNER,
-  grid: {
-    width: 8,
-    height: 6,
-    tiles: [],
-  },
-  entities: [],
-};
-
-export function useBattleSnapshot(base: BattleScreenBase, kinds: BattleKinds) {
-  const { session } = base;
-  const { viewOwner, usesNetSnapshot } = kinds;
-
-  const battleRevision = useBattleRevision(session);
-
-  const snapshot = useMemo<MatchState>(() => {
-    void battleRevision;
-
-    if (usesNetSnapshot) {
-      return session.getNetSnapshot() ?? EMPTY_SNAPSHOT;
-    }
-
-    return session.getBattleSnapshot(viewOwner);
-  }, [battleRevision, viewOwner, usesNetSnapshot, session]);
-
-  const visibleCells = useMemo(() => {
-    void battleRevision;
-    return usesNetSnapshot
-      ? session.getNetVisible()
-      : session.getBattleVisible(viewOwner);
-  }, [battleRevision, viewOwner, usesNetSnapshot, session]);
-
-  const exploredCells = useMemo(() => {
-    void battleRevision;
-    return usesNetSnapshot
-      ? session.getNetExplored()
-      : session.getBattleExplored(viewOwner);
-  }, [battleRevision, viewOwner, usesNetSnapshot, session]);
-
-  return {
-    battleRevision,
-    snapshot,
-    visibleCells,
-    exploredCells,
-  };
-}
-
-export type BattleSnapshotModel = ReturnType<typeof useBattleSnapshot>;
-```
-
----
-
-# 12. Намерение игрока
-
-## `app/packages/ui/src/battle-screen/useBattleIntentState.ts`
-
-```ts
-import { useCallback, useMemo, useState } from "react";
-import { IDLE_INTENT, nextIntent, type Intent, type IntentEvent } from "../battle-intent.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-
-export function useBattleIntentState(snapshotModel: BattleSnapshotModel) {
-  const [intent, setIntentState] = useState<Intent>(IDLE_INTENT);
-
-  const setIntent = useCallback((event: IntentEvent) => {
-    setIntentState((current) => nextIntent(current, event));
-  }, []);
-
-  const selectedId = useMemo(() => {
-    if ("actorId" in intent) return intent.actorId;
-    return null;
-  }, [intent]);
-
-  const selected = useMemo(() => {
-    if (selectedId === null) return null;
-    return (
-      snapshotModel.snapshot.entities.find((entity) => entity.id === selectedId) ??
-      null
-    );
-  }, [selectedId, snapshotModel.snapshot.entities]);
-
-  const action = useMemo(() => {
-    if ("action" in intent) return intent.action;
-    return null;
-  }, [intent]);
-
-  const aimId = useMemo(() => {
-    if ("targetId" in intent) return intent.targetId;
-    return null;
-  }, [intent]);
-
-  const skillTargetPos = useMemo(() => {
-    if ("targetPos" in intent) return intent.targetPos;
-    return null;
-  }, [intent]);
-
-  const preview = useMemo(() => {
-    if (intent.kind === "aiming" || intent.kind === "placing") {
-      return intent.preview;
-    }
-
-    return null;
-  }, [intent]);
-
-  const charge = useMemo(() => {
-    if (intent.kind === "charging") return intent.plan;
-    return null;
-  }, [intent]);
-
-  const chargeArmed = useMemo(() => {
-    if (intent.kind === "charging") return intent.armed;
-    return false;
-  }, [intent]);
-
-  const clearAim = useCallback(() => {
-    setIntent({ type: "cancel" });
-  }, [setIntent]);
-
-  return {
-    intent,
-    setIntent,
-    selectedId,
-    selected,
-    action,
-    aimId,
-    skillTargetPos,
-    preview,
-    charge,
-    chargeArmed,
-    clearAim,
-  };
-}
-
-export type BattleIntentModel = ReturnType<typeof useBattleIntentState>;
-```
-
----
-
-# 13. Предпросмотр атаки, область, карточка прицеливания
-
-## `app/packages/ui/src/battle-screen/useBattleAimPreview.ts`
-
-```ts
-import { useEffect, useMemo, useState } from "react";
-import type { CellPos } from "@bylina/core";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleIntentModel } from "./useBattleIntentState.js";
-
-export function useBattleAimPreview(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  snapshotModel: BattleSnapshotModel,
-  intentModel: BattleIntentModel,
-) {
-  const { session, paused, busy } = base;
-  const { battleRevision, snapshot } = snapshotModel;
-  const { selectedId, selected, action, aimId, skillTargetPos, preview } = intentModel;
-  const { skills } = base as never;
-
-  const hit = useMemo(() => {
-    void battleRevision;
-
-    // Перенести 1:1 из старого файла.
-    // Здесь вычисляется предварительный просмотр атаки/умения:
-    // - шанс;
-    // - урон;
-    // - высота;
-    // - укрытие;
-    // - фланг;
-    // - breakCell;
-    // - areaCells.
-    return null;
-  }, [
-    battleRevision,
-    session,
-    selectedId,
-    selected,
-    action,
-    aimId,
-    paused,
-    busy,
-    kinds.usesNetSnapshot,
-  ]);
-
-  const aimBreakCell = useMemo(() => {
-    if (!hit || !selected || !aimId) return null;
-
-    if (hit.breakCell) return hit.breakCell;
-
-    return null;
-  }, [hit, selected, aimId]);
-
-  const hoverCell = useMemo(() => {
-    if (skillTargetPos) return skillTargetPos;
-    if (!preview) return null;
-
-    const [xs, ys] = preview.split(",");
-    const x = Number(xs);
-    const y = Number(ys);
-
-    const tile = snapshot.grid.tiles.find((candidate) => candidate.x === x && candidate.y === y);
-
-    return {
-      x,
-      y,
-      z: tile?.z ?? 0,
-    };
-  }, [preview, skillTargetPos, snapshot.grid]);
-
-  const areaPreview = useMemo(() => {
-    void battleRevision;
-
-    if (action?.type !== "skill" || selectedId === null || paused || busy) {
-      return null;
-    }
-
-    const skill = skills[action.id];
-
-    if (!skill) return null;
-
-    const hasArea =
-      (skill.radius ?? 0) > 0 ||
-      skill.effects.some((effect) => effect.type === "spawn" || effect.type === "displace");
-
-    if (!hasArea) return null;
-
-    const center =
-      skill.category === "self"
-        ? selected
-        : skillTargetPos
-          ? { x: skillTargetPos.x, y: skillTargetPos.y, z: skillTargetPos.z }
-          : undefined;
-
-    if (!center) return null;
-
-    const skillPreview =
-      skill.category === "self" && !kinds.usesNetSnapshot
-        ? session.getBattleSkillPreview(selectedId, action.id)
-        : hit;
-
-    if (!skillPreview?.areaCells?.length) return null;
-
-    return {
-      center: {
-        x: center.x,
-        y: center.y,
-        z: center.z,
-      },
-      radius: skill.radius ?? 0,
-      areaCells: skillPreview.areaCells,
-      warnFriendly:
-        skill.resolution === "attack" &&
-        (skill.filter === "all" || skill.filter === "allies"),
-    };
-  }, [
-    battleRevision,
-    action,
-    selectedId,
-    selected,
-    skillTargetPos,
-    skills,
-    paused,
-    busy,
-    kinds.usesNetSnapshot,
-    session,
-    hit,
-  ]);
-
-  const [aimCardPos, setAimCardPos] = useState<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    // Перенести 1:1 из старого файла.
-    // Здесь используется rendererRef.current?.getEntityScreenPosition?.(aimId).
-    // Классическое смещение карточки:
-    // x: Math.min(88, Math.max(14, position.x * 100 + 9))
-    // y: Math.min(66, Math.max(12, position.y * 100 + 8))
-    setAimCardPos(null);
-  }, [aimId, hit, snapshot]);
-
-  return {
-    hit,
-    aimBreakCell,
-    hoverCell,
-    areaPreview,
-    aimCardPos,
-  };
-}
-
-export type BattleAimPreviewModel = ReturnType<typeof useBattleAimPreview>;
-```
-
----
-
-# 14. Обучение
-
-## `app/packages/ui/src/battle-screen/useBattleTrainingState.ts`
-
-```ts
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { GameEvent } from "@bylina/core";
-import {
-  resolveTrainingDirective,
-  trainingActionKindOfCommand,
-  trainingCommandAllowed,
-  trainingDenialKey,
-  trainingStepCompleted,
-  type TrainingActionKind,
-  type TrainingDirectiveView,
-} from "../training-scenario.js";
-import { trainingHintsSorted, trainingOutcome } from "../training-progress.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleIntentModel } from "./useBattleIntentState.js";
-
-export function useBattleTrainingState(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  snapshotModel: BattleSnapshotModel,
-  intentModel: BattleIntentModel,
-) {
-  const { session, busy, outcomeGate, t, setLog } = base;
-  const { isTraining, isPrologue, trainingMission } = kinds;
-  const { battleRevision, snapshot } = snapshotModel;
-  const { selectedId, action } = intentModel;
-
-  const [hintStep, setHintStep] = useState(0);
-  const [trainingOver, setTrainingOver] = useState<"victory" | "defeat" | null>(null);
-  const [trainingNote, setTrainingNote] = useState<string | null>(null);
-
-  const noteTimerRef = useRef<number | undefined>(undefined);
-
-  const trainingHints = useMemo(() => {
-    if (!isTraining || !trainingMission) return [];
-    return trainingHintsSorted(trainingMission.hints);
-  }, [isTraining, trainingMission]);
-
-  const activeHint = trainingHints[hintStep] ?? null;
-
-  const directiveView = useMemo<TrainingDirectiveView | null>(() => {
-    void battleRevision;
-
-    if (!isTraining || !activeHint || trainingOver) return null;
-
-    const full = session.getBattleFullSnapshot();
-    if (!full) return null;
-
-    return resolveTrainingDirective(activeHint, {
-      snapshot: full,
-      reachable: (actorId) => session.getBattleReachable(actorId),
-      // Перенести 1:1 из старого файла:
-      // реальные колбэки hitPreview/skillPreview.
-    } as never);
-  }, [
-    isTraining,
-    activeHint,
-    trainingOver,
-    battleRevision,
-    session,
-  ]);
-
-  const trainingHighlight = directiveView?.highlight ?? null;
-  const trainingFocus = isTraining && directiveView !== null;
-  const trainingDirective = directiveView?.directive ?? null;
-  const trainingActorId =
-    trainingDirective && "actorId" in trainingDirective
-      ? trainingDirective.actorId
-      : null;
-
-  const trainingDone =
-    isTraining && trainingHints.length > 0 && hintStep >= trainingHints.length;
-
-  const advanceTraining = (events: GameEvent[]): void => {
-    if (!isTraining || !activeHint) return;
-
-    const full = session.getBattleFullSnapshot();
-
-    if (trainingStepCompleted(activeHint, events, full ?? snapshot)) {
-      setHintStep((value) => value + 1);
-    }
-  };
-
-  const showTrainingNote = (events: GameEvent[]): void => {
-    if (!isTraining || !trainingMission?.notes) return;
-
-    let key: string | null = null;
-
-    for (const event of events) {
-      if (event.type === "STATUS" && event.statusId === "poison") {
-        key = trainingMission.notes.poison;
-        break;
-      }
-
-      if (event.type === "RESURRECT") {
-        key = trainingMission.notes.resurrect;
-        break;
-      }
-
-      if (event.type === "SUMMON") {
-        key = trainingMission.notes.summon;
-        break;
-      }
-    }
-
-    if (!key) return;
-
-    setTrainingNote(key);
-
-    if (noteTimerRef.current !== undefined) {
-      window.clearTimeout(noteTimerRef.current);
-    }
-
-    noteTimerRef.current = window.setTimeout(() => setTrainingNote(null), 6000);
-  };
-
-  useEffect(
-    () => () => {
-      if (noteTimerRef.current !== undefined) {
-        window.clearTimeout(noteTimerRef.current);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!isTraining || busy || trainingOver) return;
-
-    const outcome = trainingOutcome({
-      outcome: session.getBattleOutcome(),
-      missionHasEnemies: (trainingMission?.enemies.length ?? 0) > 0,
-      trainingDone,
-    });
-
-    if (outcome === null) return;
-
-    if (outcome === "victory" && trainingMission) {
-      session.completeTrainingMission(trainingMission.id);
-    }
-
-    outcomeGate.report(() => setTrainingOver(outcome));
-  }, [
-    snapshot.turnNumber,
-    snapshot.entities,
-    busy,
-    isTraining,
-    trainingDone,
-    trainingHints.length,
-    hintStep,
-    trainingOver,
-    trainingMission,
-    outcomeGate,
-    session,
-  ]);
-
-  const trainingAllows = (actionKind: TrainingActionKind): boolean => {
-    if (isPrologue && base.prologueStanceLock) return false;
-
-    if (!isTraining) return true;
-
-    return directiveAllowsAction(directiveView, actionKind);
-  };
-
-  const trainingDeny = (actionKind: TrainingActionKind): void => {
-    const key = trainingDenialKey(directiveView, actionKind);
-    setLog(t(key));
-  };
-
-  const trainingWeaponAllowed = (weaponId: string): boolean => {
-    if (isPrologue && base.prologueStanceLock) return false;
-
-    return (
-      !isTraining ||
-      (trainingDirective?.kind === "attack" &&
-        trainingDirective.weaponId === weaponId)
-    );
-  };
-
-  const trainingSkillAllowed = (skillId: string): boolean => {
-    if (isPrologue && base.prologueStanceLock) return false;
-
-    return (
-      !isTraining ||
-      (trainingDirective?.kind === "skill" &&
-        trainingDirective.skillId === skillId)
-    );
-  };
-
-  return {
-    hintStep,
-    setHintStep,
-    trainingHints,
-    activeHint,
-    directiveView,
-    trainingHighlight,
-    trainingFocus,
-    trainingDirective,
-    trainingActorId,
-    trainingDone,
-    trainingOver,
-    setTrainingOver,
-    trainingNote,
-    setTrainingNote,
-    advanceTraining,
-    showTrainingNote,
-    trainingAllows,
-    trainingDeny,
-    trainingWeaponAllowed,
-    trainingSkillAllowed,
-    trainingCommandAllowed: (issued: never) =>
-      trainingCommandAllowed(directiveView, issued),
-    trainingActionKindOfCommand,
-  };
-}
-
-export type BattleTrainingModel = ReturnType<typeof useBattleTrainingState>;
-
-function directiveAllowsAction(
-  directiveView: TrainingDirectiveView | null,
-  actionKind: TrainingActionKind,
-): boolean {
-  if (!directiveView) return true;
-
-  return directiveView.directive.kind === actionKindToDirectiveKind(actionKind);
-}
-
-function actionKindToDirectiveKind(actionKind: TrainingActionKind): string {
-  switch (actionKind) {
-    case "move":
-      return "move";
-    case "attack":
-      return "attack";
-    case "skill":
-      return "skill";
-    case "defend":
-      return "defend";
-    case "overwatch":
-      return "overwatch";
-    case "endTurn":
-      return "endTurn";
-    default:
-      return actionKind;
-  }
-}
-```
-
-> Важно: блок `resolveTrainingDirective` в оригинале содержит реальные `hitPreview`, `skillPreview`, `pathOf` и другие колбэки. Их нужно перенести дословно.
-
----
-
-# 15. Пролог
-
-## `app/packages/ui/src/battle-screen/useBattlePrologueState.ts`
-
-```ts
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TacticsKernel } from "../battle-match.js";
-import {
-  afterPrologueApply,
-  buildPrologueContext,
-  createPrologueRunState,
-  prologueAftermath,
-} from "../prologue-run.js";
-import { usePrologueDirector } from "../prologue-director.js";
-import { createTelemetryLog, recordTelemetry } from "../prologue-telemetry.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-
-export function useBattlePrologueState(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  kernel: TacticsKernel | null,
-  snapshotModel: BattleSnapshotModel,
-) {
-  const {
-    session,
-    content,
-    hintSettings,
-    t,
-    setLog,
-    outcomeGate,
-    firedCutscenesRef,
-    setPrologueStanceLock,
-    setStoryNote,
-    setStoryNoteHintKey,
-  } = base;
-
-  const { isPrologue, prologueMission } = kinds;
-
-  const prologueRunRef = useRef(
-    isPrologue && prologueMission
-      ? createPrologueRunState(prologueMission.id)
-      : null,
-  );
-
-  const prologueTelemetryRef = useRef(createTelemetryLog());
-
-  const [prologueObjectiveKey, setPrologueObjectiveKey] = useState(
-    prologueRunRef.current?.objectiveKey ?? "prologue.objective.gather",
-  );
-
-  const battleOutcome = useCallback((): "ongoing" | "victory" | "defeat" => {
-    if (!isPrologue) return session.getBattleOutcome();
-    return prologueRunRef.current?.outcome ?? "ongoing";
-  }, [isPrologue, session]);
-
-  const showStoryNote = useCallback((text: string): void => {
-    setLog(null);
-    setStoryNoteHintKey(null);
-    setStoryNote(text);
-  }, [setLog, setStoryNote, setStoryNoteHintKey]);
-
-  const showPrologueHint = useCallback(
-    (key: string): void => {
-      const textKey =
-        content.prologueHints.hints.find((hint) => hint.key === key)?.textKey ??
-        key;
-
-      setLog(null);
-      setStoryNoteHintKey(key);
-      setStoryNote(t(textKey));
-    },
-    [content, setLog, setStoryNote, setStoryNoteHintKey, t],
-  );
-
-  const closeStoryNote = useCallback((): void => {
-    const key = base.storyNoteHintKey;
-
-    setStoryNote(null);
-    setStoryNoteHintKey(null);
-
-    if (!key || !isPrologue || !prologueRunRef.current) return;
-
-    // Перенести 1:1 из старого файла:
-    // снятие одноразовой подсказки с очереди,
-    // но сохранение принудительной подсказки.
-  }, [
-    base.storyNoteHintKey,
-    isPrologue,
-    setStoryNote,
-    setStoryNoteHintKey,
-  ]);
-
-  const currentPrologueHintKey = useCallback((): string | null => {
-    const hints = prologueRunRef.current?.hints;
-    if (!hints) return null;
-    return hints.forcedKey ?? hints.queue[0] ?? null;
-  }, []);
-
-  const director = usePrologueDirector({
-    session,
-    content,
-    hintSettings,
-    isPrologue,
-    mission: prologueMission ?? null,
-    markers: snapshotModel.snapshot as never,
-    kernel,
-    runRef: prologueRunRef,
-    telemetryRef: prologueTelemetryRef,
-    firedRef: firedCutscenesRef,
-    renderer: () => base.rendererRef.current,
-    handOffTurn: () => {
-      // Перенести 1:1 из старого файла:
-      // вызов передачи хода врагу для шага handOff.
-    },
-    showStoryNote,
-    translate: t,
-    setCutscenePlaying: base.setCutscenePlaying,
-    setBusy: base.setBusy,
-    setPrologueStanceLock,
-    setPrologueObjectiveKey,
-    setPrologueHintKey: showPrologueHint,
-    resetSelection: () => {
-      // Перенести 1:1 из старого файла:
-      // setIntent({ type: "clearSelection" })
-    },
-    announce: () => {
-      // Перенести 1:1 из старого файла.
-    },
-    battleOutcome,
-    outcomeGate,
-    setPrologueCard: () => {
-      // Перенести 1:1 из старого файла, если карточка пролога ещё используется.
-    },
-  });
-
-  useEffect(() => {
-    if (!isPrologue || !prologueMission) return;
-
-    // Перенести 1:1 из старого файла:
-    // стартовая сцена миссии пролога.
-  }, [isPrologue, prologueMission]);
-
-  return {
-    prologueRunRef,
-    prologueTelemetryRef,
-    prologueObjectiveKey,
-    setPrologueObjectiveKey,
-    battleOutcome,
-    showStoryNote,
-    showPrologueHint,
-    closeStoryNote,
-    currentPrologueHintKey,
-    director,
-    prologueAftermath,
-    afterPrologueApply,
-    buildPrologueContext,
-    recordTelemetry,
-  };
-}
-
-export type BattlePrologueModel = ReturnType<typeof useBattlePrologueState>;
-```
-
----
-
-# 16. Исход боя
-
-## `app/packages/ui/src/battle-screen/useBattleOutcomeGate.ts`
-
-```ts
-import { useCallback } from "react";
-import type { GameEvent } from "@bylina/core";
-import { ENEMY_OWNER, PLAYER_OWNER } from "@bylina/core";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleTrainingModel } from "./useBattleTrainingState.js";
-import type { BattlePrologueModel } from "./useBattlePrologueState.js";
-
-export function useBattleOutcomeGate(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  snapshotModel: BattleSnapshotModel,
-  training: BattleTrainingModel,
-  prologue: BattlePrologueModel,
-) {
-  const { session, deployment, outcomeGate } = base;
-  const { isReplay, isTraining, isPrologue, battleKind, mission } = kinds;
-
-  const finishFromEvents = useCallback(
-    (events: GameEvent[]): void => {
-      const ended = events.find((event) => event.type === "MATCH_ENDED");
-
-      if (!ended || ended.type !== "MATCH_ENDED") return;
-
-      // Повтор, обучение и пролог завершают экран отдельными механизмами.
-      if (isReplay || isTraining || isPrologue) return;
-
-      if (battleKind === "pvp" || battleKind === "pvpNet") {
-        const winner =
-          ended.winnerPlayerId === String(PLAYER_OWNER)
-            ? 1
-            : ended.winnerPlayerId === String(ENEMY_OWNER)
-              ? 2
-              : null;
-
-        if (winner) {
-          outcomeGate.report(() => session.finishPvpMatch(winner));
-        }
-
-        return;
-      }
-
-      const outcome =
-        ended.winnerPlayerId === String(PLAYER_OWNER) ? "victory" : "defeat";
-
-      if (battleKind === "campaign") {
-        // Перенести 1:1 из старого файла:
-        // - итоги бойцов высадки;
-        - генералы;
-        - evacuated;
-        - rosterIndex;
-        - full/final snapshots.
-        outcomeGate.report(() =>
-          session.finishCampaignBattle({
-            outcome,
-            missionId: base.activeMissionId,
-            fighters: [],
-          } as never),
-        );
-        return;
-      }
-
-      outcomeGate.report(() => session.finishBattle(outcome));
-    },
-    [
-      base.activeMissionId,
-      battleKind,
-      deployment,
-      isPrologue,
-      isReplay,
-      isTraining,
-      mission,
-      outcomeGate,
-      session,
-      snapshotModel.snapshot,
-    ],
-  );
-
-  return {
-    finishFromEvents,
-  };
-}
-
-export type BattleOutcomeModel = ReturnType<typeof useBattleOutcomeGate>;
-```
-
-> Важно: кампания содержит большой блок расчёта `participants`, `generals`, `extracted`, `full`, `final`. Он должен быть перенесён дословно.
-
----
-
-# 17. Центр команд
-
-## `app/packages/ui/src/battle-screen/useBattleCommandCenter.ts`
-
-```ts
-import { useCallback } from "react";
-import type { CellPos, GameEvent } from "@bylina/core";
-import { ENEMY_OWNER } from "@bylina/core";
-import { routeCommand } from "../battle-command.js";
-import { resolveCellClick } from "../battle-cell-click.js";
-import { meleeStrikeOf, planCharge, type ChargePlan } from "../charge-attack.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleIntentModel } from "./useBattleIntentState.js";
-import type { BattleTrainingModel } from "./useBattleTrainingState.js";
-import type { BattlePrologueModel } from "./useBattlePrologueState.js";
-import type { BattleOutcomeModel } from "./useBattleOutcomeGate.js";
-
-export interface BattleCommandCenterDeps {
-  base: BattleScreenBase;
-  kinds: BattleKinds;
-  kernel: unknown;
-  snapshotModel: BattleSnapshotModel;
-  intentModel: BattleIntentModel;
-  training: BattleTrainingModel;
-  prologue: BattlePrologueModel;
-  outcome: BattleOutcomeModel;
-}
-
-export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
-  const { base, kinds, snapshotModel, intentModel, training, prologue, outcome } = deps;
-  const { session, t, setLog, setBusy, outcomeGate } = base;
-  const { snapshot } = snapshotModel;
-
-  const playThen = useCallback(
-    (events: GameEvent[], after?: () => void): void => {
-      if (events.length === 0) {
-        after?.();
-        return;
-      }
-
-      setBusy(true);
-
-      // Перенести 1:1 из старого файла:
-      // outcomeGate.playbackStart();
-      // rendererRef.current?.play(events).finally(...)
-      void events;
-      void outcomeGate;
-      after?.();
-    },
-    [base.rendererRef, outcomeGate, setBusy],
-  );
-
-  const announce = useCallback(
-    (events: GameEvent[]): void => {
-      // Перенести 1:1 из старого файла:
-      // строки журнала: урон, промах, крит, гибель.
-      void events;
-      void t;
-      void setLog;
-    },
-    [setLog, t],
-  );
-
-  const applyCommand = useCallback(
-    (command: never, after?: () => void): void => {
-      const route = routeCommand(command, {
-        isSpectator: kinds.isSpectator,
-        isReplay: kinds.isReplay,
-        outcomePending: base.outcomePending,
-        isPvp: kinds.battleKind === "pvp",
-        isNetGuest: kinds.isNetGuest,
-        isTraining: kinds.isTraining,
-        trainingAllows: training.trainingAllows,
-        trainingDenial: training.trainingActionKindOfCommand,
-        isPrologue: kinds.isPrologue,
-        // Перенести 1:1 из старого файла:
-        // clampPrologue для M2.
-      } as never);
-
-      if (!route) return;
-
-      // Перенести 1:1 из старого файла:
-      // полная маршрутизация команд:
-      // - apply
-      // - sendPvp
-      // - sendNet
-      // - denyTraining
-      // - denyPrologue
-      // - after prologue
-      // - advanceTraining
-      // - showTrainingNote
-      // - clearAim
-      // - playThen
-      void after;
-    },
-    [
-      applyCommand,
-      base,
-      intentModel.clearAim,
-      kinds,
-      playThen,
-      session,
-      training,
-    ],
-  );
-
-  const tryMove = useCallback(
-    (to: CellPos): void => {
-      const selectedId = intentModel.selectedId;
-
-      if (selectedId === null) return;
-
-      if (kinds.isTraining) {
-        const directive = training.trainingDirective;
-
-        if (
-          !directive ||
-          directive.kind !== "move" ||
-          directive.actorId !== selectedId ||
-          directive.cell.x !== to.x ||
-          directive.cell.y !== to.y
-        ) {
-          training.trainingDeny("move");
-          return;
-        }
-      }
-
-      applyCommand({ type: "MOVE", actorId: selectedId, to } as never);
-    },
-    [applyCommand, intentModel.selectedId, kinds.isTraining, training],
-  );
-
-  const tryAttack = useCallback(
-    (targetId: number): void => {
-      const selectedId = intentModel.selectedId;
-      const action = intentModel.action;
-
-      if (selectedId === null || action?.type !== "weapon") return;
-
-      if (kinds.isTraining) {
-        const directive = training.trainingDirective;
-
-        const allowed =
-          directive !== null &&
-          directive.kind === "attack" &&
-          directive.actorId === selectedId &&
-          directive.weaponId === action.id &&
-          directive.targetId === targetId;
-
-        if (!allowed) {
-          training.trainingDeny("attack");
-          return;
-        }
-      }
-
-      applyCommand({
-        type: "ATTACK",
-        actorId: selectedId,
-        weaponId: action.id,
-        targetId,
-      } as never);
-    },
-    [applyCommand, intentModel.action, intentModel.selectedId, kinds.isTraining, training],
-  );
-
-  const trySkill = useCallback(
-    (skillId: string, targetId?: number): void => {
-      const selectedId = intentModel.selectedId;
-
-      if (selectedId === null) return;
-
-      if (kinds.isTraining) {
-        const directive = training.trainingDirective;
-
-        const allowed =
-          directive !== null &&
-          directive.kind === "skill" &&
-          directive.actorId === selectedId &&
-          directive.skillId === skillId &&
-          (targetId === undefined || directive.targetId === targetId);
-
-        if (!allowed) {
-          training.trainingDeny("skill");
-          return;
-        }
-      }
-
-      applyCommand({
-        type: "USE_SKILL",
-        actorId: selectedId,
-        skillId,
-        targetId,
-      } as never);
-    },
-    [applyCommand, intentModel.selectedId, kinds.isTraining, training],
-  );
-
-  const executeCharge = useCallback(
-    (plan: ChargePlan): void => {
-      // Перенести 1:1 из старого файла:
-      // подход и удар одним замыслом.
-      void plan;
-    },
-    [applyCommand],
-  );
-
-  const debugAutoWin = useCallback((): void => {
-    if (base.paused || base.busy || kinds.isReplay || !base.debug) return;
-
-    const result = session.debugAutoWinBattle();
-
-    if (!result.ok) return;
-
-    if (kinds.isTraining) {
-      training.setHintStep(training.trainingHints.length);
-    }
-
-    intentModel.setIntent({ type: "cancel" });
-    playThen(result.events);
-  }, [base, intentModel, kinds, playThen, session, training]);
-
-  const endTurn = useCallback((): void => {
-    // Перенести 1:1 из старого файла:
-    // - проверка обучения;
-    // - отмена намерения;
-    // - PvP/сеть;
-    // - runEndTurnSequence.
-  }, []);
-
-  const runEndTurnSequence = useCallback(async (): Promise<void> => {
-    // Перенести 1:1 из старого файла:
-    // конец хода, пролог, исход, ход Нави.
-  }, []);
-
-  const handOffTurnToEnemy = useCallback((): void => {
-    // Перенести 1:1 из старого файла:
-    // передача хода без нажатия кнопки конца хода.
-  }, []);
-
-  const onCell = useCallback(
-    (x: number, y: number): void => {
-      const intent = resolveCellClick(x, y, {
-        paused: base.paused,
-        busy: base.busy,
-        outcomePending: base.outcomePending,
-        ownTurn: snapshot.activeOwner === kinds.viewOwner,
-        isTraining: kinds.isTraining,
-        trainingNoopStep: training.activeHint?.until === "noop",
-        trainingActorId: training.trainingActorId,
-        trainingDirective: training.trainingDirective,
-        selectedId: intentModel.selectedId,
-        selected: intentModel.selected ?? null,
-        action: intentModel.action,
-        skills: {} as never,
-        entities: snapshot.entities,
-        tiles: snapshot.grid.tiles,
-        viewOwner: kinds.viewOwner,
-        reach: undefined as never,
-        aimId: intentModel.aimId,
-        hitAvailable: false,
-        charge: intentModel.charge,
-        chargeArmed: intentModel.chargeArmed,
-        preview: intentModel.preview,
-        coarse: window.matchMedia("(pointer: coarse)").matches,
-      } as never);
-
-      // Перенести 1:1 из старого файла:
-      // исполнение намерения после resolveCellClick:
-      // select / cancel / move / attack / skill / charge.
-      void intent;
-    },
-    [base, intentModel, kinds, snapshot, training],
-  );
-
-  return {
-    playThen,
-    announce,
-    applyCommand,
-    tryMove,
-    tryAttack,
-    trySkill,
-    executeCharge,
-    debugAutoWin,
-    endTurn,
-    runEndTurnSequence,
-    handOffTurnToEnemy,
-    onCell,
-  };
-}
-
-export type BattleCommandCenterModel = ReturnType<typeof useBattleCommandCenter>;
-```
-
-> Важно: `applyCommand`, `runEndTurnSequence`, `executeCharge`, `onCell` — самые критичные блоки. Их нужно перенести дословно, потому что они содержат пролог, обучение, рывок, транспорт команд и порядок `after`.
-
----
-
-# 18. Синхронизация с рендерером
-
-## `app/packages/ui/src/battle-screen/useBattleRendererSync.ts`
-
-```ts
-import { useCallback, useEffect, useState } from "react";
-import { createFieldRenderer } from "@bylina/render";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleIntentModel } from "./useBattleIntentState.js";
-import type { BattleAimPreviewModel } from "./useBattleAimPreview.js";
-import type { BattleTrainingModel } from "./useBattleTrainingState.js";
-import type { BattlePrologueModel } from "./useBattlePrologueState.js";
-import type { BattleCommandCenterModel } from "./useBattleCommandCenter.js";
-
-export interface BattleRendererSyncDeps {
-  base: BattleScreenBase;
-  kinds: BattleKinds;
-  snapshotModel: BattleSnapshotModel;
-  intentModel: BattleIntentModel;
-  aim: BattleAimPreviewModel;
-  training: BattleTrainingModel;
-  prologue: BattlePrologueModel;
-  commands: BattleCommandCenterModel;
-}
-
-export function useBattleRendererSync(deps: BattleRendererSyncDeps) {
-  const { base, kinds, snapshotModel, intentModel, aim, training, commands } = deps;
-  const {
-    hostRef,
-    rendererRef,
-    inputRef,
-    setRendererReady,
-    matchSeed,
-    snapshot,
-    visibleCells,
-    exploredCells,
-  } = {
-    ...deps.base,
-    snapshot: deps.snapshotModel.snapshot,
-    visibleCells: deps.snapshotModel.visibleCells,
-    exploredCells: deps.snapshotModel.exploredCells,
-  };
-
-  const [aimCardPos, setAimCardPos] = useState<{ x: number; y: number } | null>(null);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    if (!host) return;
-
-    let gone = false;
-
-    const renderer = createFieldRenderer();
-
-    renderer.setOnActivate((x, y) => {
-      inputRef.current?.onCell(x, y);
-    });
-
-    renderer.setOnHover((x, y) => {
-      inputRef.current?.onHover(x, y);
-    });
-
-    void renderer.mount(host).then(() => {
-      if (gone) return;
-      rendererRef.current = renderer;
-      setRendererReady(true);
-    });
-
-    return () => {
-      gone = true;
-      rendererRef.current = null;
-      renderer.destroy();
-    };
-  }, [inputRef]);
-
-  useEffect(() => {
-    rendererRef.current?.update({
-      matchSeed,
-      snapshot,
-      selectedId: intentModel.selectedId,
-      aimId: intentModel.aimId,
-      reachable: [] as never,
-      path: [] as never,
-      aimFrom: intentModel.charge ? intentModel.charge.step : null,
-      aimOk: Boolean(aim.hit?.available) || Boolean(intentModel.charge),
-      aimState:
-        intentModel.aimId === null
-          ? undefined
-          : intentModel.charge
-            ? "ready"
-            : !aim.hit
-              ? "preselect"
-              : aim.hit.available
-                ? "ready"
-                : "blocked",
-      aimFlanked: Boolean(aim.hit?.available && aim.hit.flanked),
-      areaPreview: aim.areaPreview,
-      missLabel: base.t("combat.miss"),
-      biome: undefined as never,
-      darkness: 0,
-      heightMod: aim.hit?.heightMod ?? 0,
-      debugMovement: false,
-      visibleCells,
-      exploredCells,
-      homeOwner: kinds.viewOwner,
-      aimBreakCell: aim.aimBreakCell,
-      hoverCell: aim.hoverCell,
-      trainingHighlight: training.trainingHighlight,
-      trainingFocus: training.trainingFocus,
-    } as never);
-  }, [
-    base.rendererReady,
-    matchSeed,
-    snapshot,
-    intentModel.selectedId,
-    intentModel.aimId,
-    intentModel.preview,
-    aim.hit,
-    aim.areaPreview,
-    aim.aimBreakCell,
-    aim.hoverCell,
-    visibleCells,
-    exploredCells,
-    training.trainingHighlight,
-    training.trainingFocus,
-    kinds.viewOwner,
-  ]);
-
-  useEffect(() => {
-    rendererRef.current?.setInputLocked?.(
-      base.outcomePending || base.cutscenePlaying,
-    );
-  }, [base.outcomePending, base.cutscenePlaying]);
-
-  useEffect(() => {
-    rendererRef.current?.setSpeed(base.fastPace ? 2 : 1);
-  }, [base.fastPace]);
-
-  useEffect(() => {
-    const media = window.matchMedia("(prefers-reduced-motion: reduce)");
-    rendererRef.current?.setReducedMotion(media.matches);
-
-    const listener = (): void => {
-      rendererRef.current?.setReducedMotion(media.matches);
-    };
-
-    media.addEventListener("change", listener);
-
-    return () => media.removeEventListener("change", listener);
-  }, []);
-
-  const focusEntity = useCallback((entityId: number) => {
-    rendererRef.current?.focusEntity?.(entityId);
-  }, []);
-
-  const onHover = useCallback((x: number, y: number): void => {
-    // Перенести 1:1 из старого файла:
-    // наведение мыши на цель для десктопа.
-    void x;
-    void y;
-  }, []);
-
-  return {
-    aimCardPos,
-    setAimCardPos,
-    focusEntity,
-    onHover,
-  };
-}
-
-export type BattleRendererSyncModel = ReturnType<typeof useBattleRendererSync>;
-```
-
-> Важно: эффект `renderer.update` нужно перенести дословно. Там есть `battleBiome`, `darknessRatio`, `reachable`, `previewPath`, `charge.path`, `aimFrom`, `aimState`, `hoverCell`, `trainingHighlight`.
-
----
-
-# 19. Ход Нави
-
-## `app/packages/ui/src/battle-screen/useBattleEnemyTurn.ts`
-
-```ts
-import { useEffect } from "react";
-import { ENEMY_OWNER } from "@bylina/core";
-import { enemyPhaseContinues } from "../battle-enemy-phase.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattlePrologueModel } from "./useBattlePrologueState.js";
-import type { BattleOutcomeModel } from "./useBattleOutcomeGate.js";
-import type { BattleCommandCenterModel } from "./useBattleCommandCenter.js";
-
-export interface BattleEnemyTurnDeps {
-  base: BattleScreenBase;
-  kinds: BattleKinds;
-  kernel: unknown;
-  prologue: BattlePrologueModel;
-  outcome: BattleOutcomeModel;
-  commands: BattleCommandCenterModel;
-}
-
-export function useBattleEnemyTurn(deps: BattleEnemyTurnDeps) {
-  const { base, kinds, kernel, prologue } = deps;
-  const { battleKind, isTraining, isPrologue, trainingMission, viewOwner } = kinds;
-  const { session } = base;
-
-  useEffect(() => {
-    if (battleKind === "pvp" || battleKind === "pvpNet") return;
-    if (prologue.battleOutcome() !== "ongoing") return;
-    if (session.getBattleSnapshot(viewOwner).activeOwner !== ENEMY_OWNER) return;
-
-    // Перенести 1:1 из старого файла:
-    // полный цикл хода Нави:
-    // - обучение без противника;
-    // - сценарий обучения;
-    // - обычный детерминированный алгоритм;
-    // - пролог;
-    // - enemyAfter.
-  }, [kernel]);
-
-  return {
-    enemyPhase: base.enemyPhase,
-    setEnemyPhase: base.setEnemyPhase,
-  };
-}
-
-export type BattleEnemyTurnModel = ReturnType<typeof useBattleEnemyTurn>;
-```
-
----
-
-# 20. Повтор
-
-## `app/packages/ui/src/battle-screen/useBattleReplayPlayback.ts`
-
-```ts
-import { useEffect, useRef } from "react";
-import { useReplayControls } from "../useReplayControls.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-
-export function useBattleReplayPlayback(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  kernel: unknown,
-) {
-  const { isReplay, replayJournal } = kinds;
-  const { replayIndex, setReplayIndex, replayDone, setReplayDone } =
-    useReplayControls();
-
-  const replayIndexRef = useRef(0);
-
-  useEffect(() => {
-    replayIndexRef.current = replayIndex;
-  }, [replayIndex]);
-
-  useEffect(() => {
-    if (!isReplay || !replayJournal || !kernel || replayDone) return;
-
-    const commands = replayJournal.commands;
-
-    const timer = window.setInterval(() => {
-      const index = replayIndexRef.current;
-
-      if (index >= commands.length) {
-        window.clearInterval(timer);
-        setReplayDone(true);
-        return;
-      }
-
-      const command = commands[index];
-
-      // Перенести 1:1 из старого файла:
-      // применение команды повтора через kernel,
-      // setReplayIndex(index + 1).
-      void command;
-    }, 650);
-
-    return () => window.clearInterval(timer);
-  }, [isReplay, replayJournal, kernel, replayDone, setReplayDone]);
-
-  return {
-    replayIndex,
-    setReplayIndex,
-    replayDone,
-    setReplayDone,
-  };
-}
-
-export type BattleReplayPlaybackModel = ReturnType<typeof useBattleReplayPlayback>;
-```
-
----
-
-# 21. Ростер и полоса противников
-
-## `app/packages/ui/src/battle-screen/useBattleRosterState.ts`
-
-```ts
-import { useMemo, useRef } from "react";
-import { ENEMY_OWNER, PLAYER_OWNER } from "@bylina/core";
-import { cellKey } from "../cell-interaction.js";
-import { buildEnemyStrip, rememberEnemies, type RememberedEnemy } from "../enemy-strip.js";
-import { ownFighters } from "../battle-selection.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-
-export function useBattleRosterState(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  snapshotModel: BattleSnapshotModel,
-) {
-  const { snapshot, visibleCells } = snapshotModel;
-  const { isSpectator, viewOwner, mission } = { ...kinds, mission: kinds.mission };
-
-  const roster = useMemo(() => {
-    return ownFighters(snapshot).filter(
-      (entity) => entity.ap > 0 || entity.dead,
-    );
-  }, [snapshot]);
-
-  const knownEnemies = useMemo(() => {
-    return snapshot.entities.filter((entity) => {
-      if (entity.coverType !== 0) return false;
-      if (entity.owner === viewOwner) return false;
-
-      if (entity.dead) return true;
-
-      if (!visibleCells) return true;
-
-      return visibleCells.has(cellKey(entity.x, entity.y));
-    });
-  }, [snapshot.entities, viewOwner, visibleCells]);
-
-  const seenEnemiesRef = useRef(new Map<number, RememberedEnemy>());
-
-  rememberEnemies(knownEnemies, seenEnemiesRef.current);
-
-  const enemyStrip = buildEnemyStrip(seenEnemiesRef.current, knownEnemies);
-
-  const objectiveEntity = mission
-    ? snapshot.entities.find((entity) =>
-        mission.type === "destroy"
-          ? entity.configId === mission.objectiveUnitId
-          : mission.type === "rescue"
-            ? entity.configId === mission.escorteeUnitId
-            : false,
-      )
-    : undefined;
-
-  return {
-    roster,
-    knownEnemies,
-    enemyStrip,
-    seenEnemiesRef,
-    objectiveEntity,
-  };
-}
-
-export type BattleRosterModel = ReturnType<typeof useBattleRosterState>;
-```
-
----
-
-# 22. Кампейн-подсказки
-
-## `app/packages/ui/src/battle-screen/useBattleCampaignHints.ts`
-
-```ts
-import { useEffect, useMemo, useState } from "react";
-import { pendingCampaignHints } from "../campaign-hints.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-
-export function useBattleCampaignHints(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  kernel: unknown,
-) {
-  const { session, hintSettings, campaignHintsDone, setSaveNotice, saveNotice } = base;
-  const { battleKind } = kinds;
-
-  const battleWantedHints = useMemo(
-    () =>
-      pendingCampaignHints({
-        showHints: hintSettings.showHints,
-        done: campaignHintsDone ?? [],
-        onCampaignMap: false,
-        lockedCount: 0,
-        hasWounded: false,
-        rosterTabActive: false,
-      }),
-    [hintSettings.showHints, campaignHintsDone],
-  );
-
-  const [battleHintQueue, setBattleHintQueue] = useState<string[]>([]);
-
-  useEffect(() => {
-    // Перенести 1:1 из старого файла:
-    // добавление новых подсказок в очередь.
-    void battleWantedHints;
-    void kernel;
-  }, [battleWantedHints.join(","), kernel]);
-
-  const activeBattleHint = hintSettings.showHints
-    ? battleHintQueue.find((id) => !session.isCampaignHintShown(id)) ?? null
-    : null;
-
-  const closeBattleHint = (): void => {
-    if (!activeBattleHint) return;
-
-    session.markCampaignHintShown(activeBattleHint);
-    setBattleHintQueue((previous) => previous.filter((id) => id !== activeBattleHint));
-  };
-
-  useEffect(() => {
-    if (battleKind !== "campaign") return;
-
-    setSaveNotice(true);
-
-    const timer = window.setTimeout(() => setSaveNotice(false), 1600);
-
-    return () => window.clearTimeout(timer);
-  }, [battleKind, base.snapshotTurnNumber ?? 0]);
-
-  return {
-    battleWantedHints,
-    battleHintQueue,
-    setBattleHintQueue,
-    activeBattleHint,
-    closeBattleHint,
-    saveNotice,
-  };
-}
-
-export type BattleCampaignHintsModel = ReturnType<typeof useBattleCampaignHints>;
-```
-
----
-
-# 23. Клавиатура
-
-## `app/packages/ui/src/battle-screen/useBattleKeyboardControl.ts`
-
-```ts
-import { useEffect } from "react";
-import { useLatest } from "../hooks.js";
-import type { BattleScreenBase } from "./useBattleScreenBase.js";
-import type { BattleKinds } from "./useBattleKinds.js";
-import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
-import type { BattleIntentModel } from "./useBattleIntentState.js";
-import type { BattleTrainingModel } from "./useBattleTrainingState.js";
-import type { BattlePrologueModel } from "./useBattlePrologueState.js";
-import type { BattleCommandCenterModel } from "./useBattleCommandCenter.js";
-
-export interface BattleKeyboardControlDeps {
-  base: BattleScreenBase;
-  kinds: BattleKinds;
-  snapshotModel: BattleSnapshotModel;
-  intentModel: BattleIntentModel;
-  training: BattleTrainingModel;
-  prologue: BattlePrologueModel;
-  commands: BattleCommandCenterModel;
-}
-
-export function useBattleKeyboardControl(deps: BattleKeyboardControlDeps) {
-  const { base, kinds, snapshotModel, intentModel, training, commands } = deps;
-
-  const keyboard = useLatest({
-    ctx: {
-      paused: base.paused,
-      busy: base.busy,
-      outcomePending: base.outcomePending,
-      cutscenePlaying: base.cutscenePlaying,
-      isTraining: kinds.isTraining,
-      trainingActorId: training.trainingActorId,
-      trainingDirective: training.trainingDirective,
-      selectedId: intentModel.selectedId,
-      selected: intentModel.selected ?? null,
-      action: intentModel.action,
-      snapshot: snapshotModel.snapshot,
-      viewOwner: kinds.viewOwner,
-      side: kinds.side,
-    },
-    apply: (intent: never) => {
-      // Перенести 1:1 из старого файла:
-      // маршрутизация клавиатурных намерений:
-      // - выбор бойца;
-      // - оружие;
-      // - умение;
-      // - защита;
-      // - овервотч;
-      // - конец хода;
-      // - пауза;
-      // - отмена прицеливания.
-      void intent;
-    },
-  });
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent): void => {
-      base.inputRef.current?.onKey(event, keyboard.current);
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [base.inputRef, keyboard]);
-
-  return {};
-}
-
-export type BattleKeyboardControlModel = ReturnType<typeof useBattleKeyboardControl>;
-```
-
----
-
-# 24. Презентационные компоненты
-
-Дальше идут компоненты. Их задача — убрать большой JSX из корневого файла.
-
-Каждый компонент использует контекст:
-
-```ts
-const model = useBattleScreen();
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleScreenLayout.tsx`
-
-```tsx
-import { useBattleScreen } from "./context.js";
-import { BattleTopBar } from "./BattleTopBar.js";
-import { BattleRosterPanel } from "./BattleRosterPanel.js";
-import { BattleEnemyStrip } from "./BattleEnemyStrip.js";
-import { BattleAimCard } from "./BattleAimCard.js";
-import { BattleTrainingLayer } from "./BattleTrainingLayer.js";
-import { BattleBottomPanel } from "./BattleBottomPanel.js";
-import { BattleDialogs } from "./BattleDialogs.js";
-import { BattleReplayBar } from "./BattleReplayBar.js";
-
-export function BattleScreenLayout() {
-  const model = useBattleScreen();
-
-  return (
-    <div className={model.screenClassName}>
-      <div ref={model.hostRef} className="battle-stage" />
-
-      <BattleTrainingLayer />
-
-      {model.isReplay ? <BattleReplayBar /> : null}
-
-      <BattleTopBar />
-
-      <div className="battle-mid">
-        <BattleRosterPanel />
-        <BattleEnemyStrip />
-        <BattleAimCard />
-        {model.log ? <div className="battle-log">{model.log}</div> : null}
-      </div>
-
-      <BattleBottomPanel />
-
-      <BattleDialogs />
-    </div>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleTopBar.tsx`
-
-```tsx
-import { useBattleScreen } from "./context.js";
-
-export function BattleTopBar() {
-  const model = useBattleScreen();
-
-  return (
-    <header className="battle-top">
-      <div className="battle-objective">
-        <p className="objective-text">
-          {model.isPrologue
-            ? model.t(model.prologueObjectiveKey)
-            : model.battleKind === "campaign" && model.mission
-              ? model.t(`battle.objective.${model.mission.type}`)
-              : model.isTraining && model.trainingMission
-                ? model.t(`training.objective.${model.trainingMission.id}`)
-                : model.t("battle.objectiveQuick")}
-        </p>
-
-        <p className="muted">
-          {model.t("field.turn", { turn: model.snapshot.turnNumber })}
-          {" · "}
-          {model.t("field.sidePlayer")}
-        </p>
-      </div>
-
-      {/*
-        Перенести сюда из старого файла:
-        - objective-hud;
-        - save notice;
-        - pace toggle;
-        - debug auto win;
-        - pause button;
-        - exit button.
-      */}
-    </header>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleRosterPanel.tsx`
-
-```tsx
-import { RosterCard } from "../unit-card.js";
-import { useBattleScreen } from "./context.js";
-
-export function BattleRosterPanel() {
-  const model = useBattleScreen();
-
-  return (
-    <div className="roster">
-      {model.roster.map((entity) => (
-        <RosterCard
-          key={entity.id}
-          entity={entity}
-          selected={entity.id === model.selectedId}
-          onSelect={() => {
-            model.setIntent({ type: "select", actorId: entity.id });
-          }}
-          onLongPress={() => {
-            // Перенести 1:1 из старого файла:
-            // открытие информации о своём бойце.
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleEnemyStrip.tsx`
-
-```tsx
-import { EnemyFace } from "../unit-card.js";
-import { useBattleScreen } from "./context.js";
-
-export function BattleEnemyStrip() {
-  const model = useBattleScreen();
-
-  if (model.enemyStrip.length === 0) return null;
-
-  return (
-    <div className="enemy-strip">
-      {model.enemyStrip.map((enemy) => (
-        <EnemyFace
-          key={enemy.id}
-          enemy={enemy}
-          onFocus={() => {
-            model.focusEntity(enemy.id);
-          }}
-          onInspect={() => {
-            // Перенести 1:1 из старого файла:
-            // открытие информации о видимом противнике.
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleAimCard.tsx`
-
-```tsx
-import { useBattleScreen } from "./context.js";
-
-export function BattleAimCard() {
-  const model = useBattleScreen();
-
-  if (model.aimId === null || !model.hit || !model.aimCardPos) {
-    return null;
-  }
-
-  return (
-    <div
-      className="aim-card"
-      style={{
-        left: `${model.aimCardPos.x}%`,
-        top: `${model.aimCardPos.y}%`,
-      }}
-    >
-      {/*
-        Перенести сюда из старого файла:
-        - шанс;
-        - урон;
-        - модификаторы;
-        - разбивку шанса;
-        - кнопку копирования;
-        - пометку укрытия;
-        - пометку фланга.
-      */}
-    </div>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleTrainingLayer.tsx`
-
-```tsx
-import { unitPortrait } from "../portraits.js";
-import { useBattleScreen } from "./context.js";
-import { CampaignHint } from "../CampaignHint.js";
-
-export function BattleTrainingLayer() {
-  const model = useBattleScreen();
-
-  return (
-    <>
-      {model.isTraining ? (
-        <div className="training-coach" role="status" aria-live="polite">
-          {unitPortrait("chronicler") ? (
-            <img
-              className="training-coach-face"
-              src={unitPortrait("chronicler")}
-              alt=""
-              draggable={false}
-            />
-          ) : null}
-
-          <div className="training-coach-body">
-            <div className="training-coach-head">
-              <span className="training-coach-name">
-                {model.t("training.mentor")}
-              </span>
-
-              {model.activeHint ? (
-                <span className="training-hint-step">
-                  {model.hintStep + 1}/{model.trainingHints.length}
-                </span>
-              ) : null}
-            </div>
-
-            {model.activeHint ? (
-              <p className="training-coach-line">
-                {model.t(model.activeHint.textKey)}
-              </p>
-            ) : null}
-
-            {/*
-              Перенести сюда из старого файла:
-              точки-шаги обучения.
-            */}
-          </div>
-        </div>
-      ) : null}
-
-      {model.trainingNote ? (
-        <div className="training-note" role="status" aria-live="polite">
-          <span className="training-note-mark" aria-hidden="true">
-            ✦
-          </span>
-          {model.t(model.trainingNote)}
-        </div>
-      ) : null}
-
-      {model.activeBattleHint ? (
-        <CampaignHint
-          key={model.activeBattleHint}
-          hintId={model.activeBattleHint}
-          variant={model.activeBattleHint === "first_battle" ? "modal" : "banner"}
-          onClose={model.closeBattleHint}
-        />
-      ) : null}
-    </>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleBottomPanel.tsx`
-
-```tsx
-import { ActionSlot } from "../action-panel.js";
-import { useBattleScreen } from "./context.js";
-
-export function BattleBottomPanel() {
-  const model = useBattleScreen();
-
-  return (
-    <div className="battle-bottom">
-      {/*
-        Перенести сюда из старого файла:
-        - панель оружия;
-        - панель умений;
-        - защиту;
-        - овервотч;
-        - конец хода;
-        - рывок;
-        - освобождение;
-        - кнопки передачи хода для PvP.
-      */}
-
-      <ActionSlot
-        id="defend"
-        name={model.t("battle.defend")}
-        shortcut="9"
-        disabled={!model.trainingAllows("defend")}
-        onClick={() => {
-          model.applyCommand({
-            type: "DEFEND",
-            actorId: model.selectedId,
-          } as never);
-        }}
-      />
-
-      <ActionSlot
-        id="end-turn"
-        name={model.t("battle.endTurn")}
-        disabled={!model.trainingAllows("endTurn")}
-        onClick={() => {
-          model.endTurn();
-        }}
-      />
-    </div>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleDialogs.tsx`
-
-```tsx
-import { ActionInfoDialog, UnitInfoDialog } from "../unit-card.js";
-import { useBattleScreen } from "./context.js";
-
-export function BattleDialogs() {
-  const model = useBattleScreen();
-
-  return (
-    <>
-      {model.cutscenePlaying ? (
-        <button
-          type="button"
-          className="cutscene-skip"
-          onClick={model.director.skip}
-        >
-          {model.t("battle.cutscene.skip")}
-        </button>
-      ) : null}
-
-      {model.paused ? (
-        <div className="pause-root" role="presentation">
-          {/*
-            Перенести сюда из старого файла:
-            пауза, управление, выход, темп боя.
-          */}
-        </div>
-      ) : null}
-
-      {model.storyNote ? (
-        <div className="pause-root story-note-root" role="presentation" onClick={model.closeStoryNote}>
-          <div
-            className="pause-card story-note-card"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="story-note-text"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <p id="story-note-text">{model.storyNote}</p>
-
-            <button type="button" onClick={model.closeStoryNote}>
-              {model.t("common.ok")}
-            </button>
-          </div>
-        </div>
-      ) : null}
-
-      {model.actionInfo ? (
-        <ActionInfoDialog
-          info={model.actionInfo}
-          onClose={() => model.setActionInfo(null)}
-        />
-      ) : null}
-
-      {model.unitInfo ? (
-        <UnitInfoDialog
-          info={model.unitInfo}
-          onClose={() => model.setUnitInfo(null)}
-        />
-      ) : null}
-    </>
-  );
-}
-```
-
----
-
-## `app/packages/ui/src/battle-screen/BattleReplayBar.tsx`
-
-```tsx
-import { useBattleScreen } from "./context.js";
-
-export function BattleReplayBar() {
-  const model = useBattleScreen();
-
-  if (!model.isReplay) return null;
-
-  const total = model.replayJournal?.commands.length ?? 0;
-  const progress = total > 0 ? Math.min(100, (model.replayIndex / total) * 100) : 0;
-
-  return (
-    <div className="replay-bar" role="status">
-      <span className="replay-label">{model.t("replay.watching")}</span>
-
-      <span className="replay-progress">
-        <i style={{ width: `${progress}%` }} />
-      </span>
-
-      <span className="muted">
-        {model.replayIndex}/{total}
-      </span>
-
-      {model.replayDone ? (
-        <span className="replay-done">{model.t("replay.done")}</span>
-      ) : null}
-    </div>
-  );
-}
-```
-
----
-
-# 25. Карта переноса старых блоков
-
-Чтобы рефакторинг был безопасным, используйте следующую карту.
-
-| Старый блок в `BattleScreenView.tsx` | Новый модуль |
-|---|---|
-| `useServices`, `useT`, `useSessionState`, `useSettingsState` | `useBattleScreenBase.ts` |
-| `battleKind`, `isTraining`, `isPrologue`, `isReplay` | `useBattleKinds.ts` |
-| `createBattleKernel` | `useBattleKernel.ts` |
-| `weapons`, `skills` | `useBattleKernel.ts` |
-| `battleRevision`, `snapshot`, `visibleCells`, `exploredCells` | `useBattleSnapshot.ts` |
-| `intent`, `selectedId`, `action`, `aimId`, `charge` | `useBattleIntentState.ts` |
-| `hit`, `aimBreakCell`, `hoverCell`, `areaPreview`, `aimCardPos` | `useBattleAimPreview.ts` |
-| `hintStep`, `trainingHints`, `directiveView`, `trainingFocus` | `useBattleTrainingState.ts` |
-| `prologueRunRef`, `director`, `storyNote`, `prologueStanceLock` | `useBattlePrologueState.ts` |
-| `finishFromEvents`, `outcomeGate.report` | `useBattleOutcomeGate.ts` |
-| `applyCommand`, `playThen`, `announce`, `endTurn`, `executeCharge` | `useBattleCommandCenter.ts` |
-| `renderer.mount`, `renderer.update`, `setInputLocked`, `setSpeed` | `useBattleRendererSync.ts` |
-| Ход Нави | `useBattleEnemyTurn.ts` |
-| Повтор | `useBattleReplayPlayback.ts` |
-| Ростер и враги | `useBattleRosterState.ts` |
-| Кампейн-подсказки | `useBattleCampaignHints.ts` |
-| Клавиатура | `useBattleKeyboardControl.ts` |
-| Верхняя панель | `BattleTopBar.tsx` |
-| Ростер | `BattleRosterPanel.tsx` |
-| Полоса врагов | `BattleEnemyStrip.tsx` |
-| Карточка прицеливания | `BattleAimCard.tsx` |
-| Обучение | `BattleTrainingLayer.tsx` |
-| Нижняя панель действий | `BattleBottomPanel.tsx` |
-| Диалоги | `BattleDialogs.tsx` |
-| Повтор-бар | `BattleReplayBar.tsx` |
-
----
-
-# 26. Обязательные блоки, которые нужно скопировать дословно
-
-Чтобы сохранить поведение, следующие блоки нужно перенести без изменений:
-
-## 1. Блок `applyCommand`
-
-Сюда входят:
-
-- `routeCommand`;
-- обучение и отказ;
-- пролог и `clampPrologue`;
-- `announce`;
-- `advanceTraining`;
-- `showTrainingNote`;
-- `clearAim`;
-- `playThen`.
-
-Место назначения:
-
-```text
-battle-screen/useBattleCommandCenter.ts
-```
-
-## 2. Блок конца хода
-
-Сюда входят:
-
-- `END_TURN`;
-- пролог;
-- передача хода;
-- ход Нави;
-- `finishFromEvents`.
-
-Место назначения:
-
-```text
-battle-screen/useBattleCommandCenter.ts
-battle-screen/useBattleEnemyTurn.ts
-```
-
-## 3. Блок рывка
-
-Сюда входят:
-
-- `chargeFor`;
-- `executeCharge`;
-- `chargeHint`;
-- `chargeArmed`.
-
-Место назначения:
-
-```text
-battle-screen/useBattleCommandCenter.ts
-```
-
-## 4. Блок `renderer.update`
-
-Сюда входят:
-
-- `matchSeed`;
-- `snapshot`;
-- `selectedId`;
-- `aimId`;
-- `reachable`;
-- `path`;
-- `aimFrom`;
-- `aimOk`;
-- `aimState`;
-- `aimFlanked`;
-- `areaPreview`;
-- `missLabel`;
-- `biome`;
-- `darkness`;
-- `heightMod`;
-- `debugMovement`;
-- `visibleCells`;
-- `exploredCells`;
-- `homeOwner`;
-- `aimBreakCell`;
-- `hoverCell`;
-- `trainingHighlight`;
-- `trainingFocus`.
-
-Место назначения:
-
-```text
-battle-screen/useBattleRendererSync.ts
-```
-
-## 5. Блок карточки прицеливания
-
-Сюда входят:
-
-- `getEntityScreenPosition`;
-- смещение карточки;
-- удержание в пределах экрана.
-
-Место назначения:
-
-```text
-battle-screen/useBattleAimPreview.ts
-```
-
-## 6. Блок обучения
-
-Сюда входят:
-
-- `advanceTraining`;
-- `showTrainingNote`;
-- `trainingOutcome`;
-- `trainingDeny`;
-- `trainingAllows`;
-- `trainingWeaponAllowed`;
-- `trainingSkillAllowed`.
-
-Место назначения:
-
-```text
-battle-screen/useBattleTrainingState.ts
-```
-
-## 7. Блок пролога
-
-Сюда входят:
-
-- `afterPrologueApply`;
-- `prologueAftermath`;
-- `saveBattleCheckpoint`;
-- `forceDefend`;
-- `storyNoteHintKey`;
-- `showPrologueHint`;
-- `closeStoryNote`.
-
-Место назначения:
-
-```text
-battle-screen/useBattlePrologueState.ts
-```
-
-## 8. Блок кампании
-
-Сюда входят:
-
-- генералы;
-- эвакуированные;
-- `rosterIndex`;
-- `full` и `final` снапшоты;
-- исход миссии.
-
-Место назначения:
-
-```text
-battle-screen/useBattleOutcomeGate.ts
-```
-
----
-
-# 27. Проверка после рефакторинга
-
-После переноса обязательно выполнить:
+Если в проекте есть команда `format`, лучше использовать её:
 
 ```bash
-pnpm -F ui typecheck
-pnpm -F ui lint
+pnpm format
+```
+
+---
+
+# 5. Пошаговая инструкция
+
+## Шаг 1. Создать каталог модулей
+
+```bash
+mkdir -p app/packages/ui/src/campaign
+```
+
+## Шаг 2. Сделать резервную копию
+
+На время рефакторинга удобно иметь копию:
+
+```bash
+cp app/packages/ui/src/campaign.css app/packages/ui/src/campaign.backup.css
+```
+
+После успешного завершения резервную копию удалить.
+
+## Шаг 3. Разметить старый файл секциями
+
+Перед механическим переносом полезно отметить секции комментариями, если их ещё нет:
+
+```css
+/* === 00 screen === */
+/* === 01 top === */
+/* === 02 darkness resources === */
+/* === 03 map === */
+/* === 04 map markers === */
+/* === 05 map road === */
+/* === 06 mission panel === */
+/* === 07 campaign tabs === */
+/* === 08 roster === */
+/* === 09 forge === */
+/* === 10 equipment === */
+/* === 11 deployment === */
+/* === 12 pvp === */
+/* === 13 net === */
+/* === 14 replay === */
+/* === 15 training === */
+/* === 16 campaign hints === */
+/* === 17 result === */
+/* === 18 keyframes === */
+/* === 19 responsive === */
+/* === 20 reduced motion === */
+```
+
+Это не обязательно, но снижает риск потери правил.
+
+## Шаг 4. Создать новые файлы
+
+Создать файлы:
+
+```text
+app/packages/ui/src/campaign/00-screen.css
+app/packages/ui/src/campaign/01-top.css
+app/packages/ui/src/campaign/02-darkness-resources.css
+app/packages/ui/src/campaign/03-map.css
+app/packages/ui/src/campaign/04-map-markers.css
+app/packages/ui/src/campaign/05-map-road.css
+app/packages/ui/src/campaign/06-mission-panel.css
+app/packages/ui/src/campaign/07-campaign-tabs.css
+app/packages/ui/src/campaign/08-roster.css
+app/packages/ui/src/campaign/09-forge.css
+app/packages/ui/src/campaign/10-equipment.css
+app/packages/ui/src/campaign/11-deployment.css
+app/packages/ui/src/campaign/12-pvp.css
+app/packages/ui/src/campaign/13-net.css
+app/packages/ui/src/campaign/14-replay.css
+app/packages/ui/src/campaign/15-training.css
+app/packages/ui/src/campaign/16-campaign-hints.css
+app/packages/ui/src/campaign/17-result.css
+app/packages/ui/src/campaign/18-keyframes.css
+app/packages/ui/src/campaign/19-responsive.css
+app/packages/ui/src/campaign/20-reduced-motion.css
+```
+
+## Шаг 5. Перенести правила
+
+Переносить строго по одному разделу.
+
+Для каждого файла:
+
+1. Вырезать соответствующий блок из старого `campaign.css`.
+2. Вставить в новый файл.
+3. Не менять селекторы.
+4. Не менять порядок внутри блока.
+5. Сохранить комментарии версии.
+
+## Шаг 6. Заменить `campaign.css` на точку входа
+
+После переноса старый `campaign.css` должен стать тонким файлом с `@import`.
+
+## Шаг 7. Проверить порядок импортов
+
+Порядок `@import` должен повторять порядок исходных секций.
+
+Это критично, потому что CSS-правила, идущие позже, могут переопределять более ранние.
+
+## Шаг 8. Прогнать форматирование
+
+```bash
+pnpm exec prettier --write \
+  app/packages/ui/src/campaign.css \
+  app/packages/ui/src/campaign/*.css
+```
+
+## Шаг 9. Проверить сборку
+
+```bash
+pnpm -F ui build
+```
+
+или общую сборку:
+
+```bash
+pnpm build
+```
+
+## Шаг 10. Проверить тесты
+
+```bash
 pnpm -F ui test
 ```
 
-Особое внимание — тестам:
-
-```text
-action-panel.test.tsx
-battle-cell-click.test.ts
-battle-command.test.ts
-battle-enemy-phase.test.ts
-battle-intent.test.ts
-battle-keyboard-dom.test.tsx
-training-scenario.test.ts
-prologue-director.test.ts
-```
-
-Если в проекте есть визуальные или интеграционные тесты экрана боя, проверить:
-
-- класс `.battle-screen`;
-- класс `.is-training-focus`;
-- `.training-coach`;
-- `.training-note`;
-- `.aim-card`;
-- `.cutscene-skip`;
-- `.pause-root`;
-- `.story-note-card`;
-- `.replay-bar`;
-- `.roster`;
-- `.enemy-strip`.
-
----
-
-# 28. Контроль размера
-
-После рефакторинга:
+или:
 
 ```bash
-wc -l app/packages/ui/src/BattleScreenView.tsx
-wc -l app/packages/ui/src/battle-screen/*.ts
-wc -l app/packages/ui/src/battle-screen/*.tsx
+pnpm test
 ```
 
-Ожидаемое распределение:
+## Шаг 11. Проверить визуальную регрессию
 
-| Файл | Примерный размер |
-|---|---:|
-| `BattleScreenView.tsx` | 20–30 строк |
-| `useBattleScreenModel.ts` | 220–320 строк |
-| `useBattleScreenBase.ts` | 120–170 строк |
-| `useBattleKinds.ts` | 80–120 строк |
-| `useBattleKernel.ts` | 70–140 строк |
-| `useBattleSnapshot.ts` | 70–100 строк |
-| `useBattleIntentState.ts` | 80–130 строк |
-| `useBattleAimPreview.ts` | 140–220 строк |
-| `useBattleTrainingState.ts` | 220–320 строк |
-| `useBattlePrologueState.ts` | 200–320 строк |
-| `useBattleOutcomeGate.ts` | 180–320 строк |
-| `useBattleCommandCenter.ts` | 350–600 строк |
-| `useBattleRendererSync.ts` | 220–350 строк |
-| `useBattleEnemyTurn.ts` | 120–250 строк |
-| `useBattleReplayPlayback.ts` | 80–140 строк |
-| `useBattleRosterState.ts` | 80–140 строк |
-| `useBattleCampaignHints.ts` | 80–140 строк |
-| `useBattleKeyboardControl.ts` | 80–160 строк |
-| Презентационные компоненты | 50–300 строк каждый |
+Если в проекте используются скрипты:
 
-Итоговый `BattleScreenView.tsx` гарантированно получается меньше 1000 строк, фактически — около 25 строк.
+```bash
+pnpm screens:capture
+pnpm screens:compare
+```
+
+либо эквивалент из `operations`.
+
+Особое внимание:
+
+- экран кампании;
+- карта корабля;
+- маркеры миссий;
+- панель миссии;
+- вкладки;
+- дружина;
+- Горница;
+- Кузня;
+- высадка;
+- итог миссии;
+- обучение;
+- подсказки;
+- `prefers-reduced-motion`.
+
+## Шаг 12. Убедиться, что файл меньше 1000 строк
+
+```bash
+wc -l app/packages/ui/src/campaign.css
+```
+
+Ожидаемый результат: около 30–40 строк.
 
 ---
 
-# 29. Главный принцип итогового состояния
+# 6. Полный код итогового файла
+
+## `app/packages/ui/src/campaign.css`
+
+Итоговый файл становится точкой входа.
+
+Ожидаемый размер: **менее 50 строк**.
+
+```css
+@import "./campaign/00-screen.css";
+@import "./campaign/01-top.css";
+@import "./campaign/02-darkness-resources.css";
+@import "./campaign/03-map.css";
+@import "./campaign/04-map-markers.css";
+@import "./campaign/05-map-road.css";
+@import "./campaign/06-mission-panel.css";
+@import "./campaign/07-campaign-tabs.css";
+@import "./campaign/08-roster.css";
+@import "./campaign/09-forge.css";
+@import "./campaign/10-equipment.css";
+@import "./campaign/11-deployment.css";
+@import "./campaign/12-pvp.css";
+@import "./campaign/13-net.css";
+@import "./campaign/14-replay.css";
+@import "./campaign/15-training.css";
+@import "./campaign/16-campaign-hints.css";
+@import "./campaign/17-result.css";
+@import "./campaign/18-keyframes.css";
+@import "./campaign/19-responsive.css";
+@import "./campaign/20-reduced-motion.css";
+
+/**
+ * Экран кампании и связанные режимы.
+ *
+ * Прежде все стили жили в одном файле на несколько тысяч строк.
+ * Теперь они разложены по предметным областям в каталоге `campaign/`,
+ * а этот файл остаётся единственной точкой входа: потребители по-прежнему
+ * пишут `import "./campaign.css"` и не знают о разбивке.
+ *
+ * Порядок импортов повторяет порядок исходного файла и не должен меняться
+ * без отдельной проверки каскада.
+ */
+```
+
+Важно: если конкретный сборщик требует, чтобы комментарии шли до `@import`, можно перенести комментарий наверх. Для большинства CSS-пайплайнов комментарии допустимы вокруг импортов, но самый безопасный вариант — сначала импорты, затем комментарий.
+
+Альтернативный максимально безопасный вариант:
+
+```css
+@import "./campaign/00-screen.css";
+@import "./campaign/01-top.css";
+@import "./campaign/02-darkness-resources.css";
+@import "./campaign/03-map.css";
+@import "./campaign/04-map-markers.css";
+@import "./campaign/05-map-road.css";
+@import "./campaign/06-mission-panel.css";
+@import "./campaign/07-campaign-tabs.css";
+@import "./campaign/08-roster.css";
+@import "./campaign/09-forge.css";
+@import "./campaign/10-equipment.css";
+@import "./campaign/11-deployment.css";
+@import "./campaign/12-pvp.css";
+@import "./campaign/13-net.css";
+@import "./campaign/14-replay.css";
+@import "./campaign/15-training.css";
+@import "./campaign/16-campaign-hints.css";
+@import "./campaign/17-result.css";
+@import "./campaign/18-keyframes.css";
+@import "./campaign/19-responsive.css";
+@import "./campaign/20-reduced-motion.css";
+```
+
+Этот вариант точно не нарушит правило расположения `@import`.
+
+---
+
+# 7. Полный код новых файлов
+
+Дальше идут целевые файлы.
+
+Каждый файл содержит заголовок и тот набор правил, который относится к его предметной области. Если в исходном файле есть дополнительные правила из той же области, они должны быть добавлены в этот же файл без изменения селекторов.
+
+---
+
+## 7.1. `app/packages/ui/src/campaign/00-screen.css`
+
+```css
+/* ============================================================
+ * 00-screen.css
+ * Базовый контейнер экрана кампании.
+ * ============================================================ */
+
+.campaign-screen {
+  max-width: 860px;
+}
+
+@media (min-width: 1400px) {
+  .campaign-screen {
+    max-width: 1100px;
+  }
+}
+```
+
+Если в старом файле рядом есть другие правила самого верхнего контейнера кампании, они переносятся сюда.
+
+---
+
+## 7.2. `app/packages/ui/src/campaign/01-top.css`
+
+```css
+/* ============================================================
+ * 01-top.css
+ * Шапка экрана кампании: заголовок, выход, общие действия.
+ * ============================================================ */
+
+.campaign-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+.campaign-exit-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-exit-btn:hover,
+.campaign-exit-btn:focus-visible {
+  border-color: var(--amber-dim);
+  color: var(--amber);
+  outline: none;
+}
+
+.campaign-title-block {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.campaign-title-block .eyebrow {
+  margin-bottom: 2px;
+}
+
+.campaign-title-block h1 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: #f3ecdc;
+  letter-spacing: 0.05em;
+}
+```
+
+Сюда переносятся все правила, которые относятся к шапке кампании:
+
+- `.campaign-top`;
+- `.campaign-exit-btn`;
+- `.campaign-title-block`;
+- заголовок;
+- вспомогательные элементы шапки, если они есть.
+
+---
+
+## 7.3. `app/packages/ui/src/campaign/02-darkness-resources.css`
+
+```css
+/* ============================================================
+ * 02-darkness-resources.css
+ * Тьма и запасы корабля.
+ * ============================================================ */
+
+.campaign-darkness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 300px;
+  min-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.campaign-darkness-name {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.campaign-darkness-value {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.95rem;
+  color: #f3ecdc;
+  white-space: nowrap;
+}
+
+.darkness-bar {
+  position: relative;
+  flex: 1 1 90px;
+  height: 10px;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.darkness-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6b2d3a, #a03a4e);
+  transition: width 0.6s ease;
+}
+
+.darkness-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 24.5%,
+    rgba(213, 207, 192, 0.18) 24.5% 25.5%
+  );
+  pointer-events: none;
+}
+
+.campaign-resources {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.resource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist-dim);
+  font-size: 0.82rem;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.resource svg {
+  flex: none;
+}
+
+.resource.gold svg {
+  color: var(--amber);
+}
+
+.resource.herbs svg {
+  color: #7fa857;
+}
+
+.resource.artifacts svg {
+  color: #9b6bbf;
+}
+```
+
+Сюда переносятся все правила шкалы Тьмы и ресурсов.
+
+---
+
+## 7.4. `app/packages/ui/src/campaign/03-map.css`
+
+```css
+/* ============================================================
+ * 03-map.css
+ * Карта царства: подложка, туман, рельеф, общие слои.
+ * ============================================================ */
+
+.campaign-map {
+  position: relative;
+  height: min(56vh, 420px);
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background:
+    radial-gradient(560px 260px at 28% 18%, rgba(224, 179, 74, 0.05), transparent 70%),
+    linear-gradient(160deg, #1a222b, #12161b 85%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.campaign-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 110% at 50% 40%, transparent 58%, rgba(10, 13, 16, 0.55) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.map-terrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.map-fog {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Если в исходном файле есть дополнительные слои карты,
+   они переносятся сюда без изменения порядка. */
+```
+
+Сюда переносятся:
+
+- `.campaign-map`;
+- `.map-terrain`;
+- `.map-fog`;
+- фоновые градиенты;
+- виньетка карты;
+- общие слои карты.
+
+---
+
+## 7.5. `app/packages/ui/src/campaign/04-map-markers.css`
+
+```css
+/* ============================================================
+ * 04-map-markers.css
+ * Маркеры миссий и точек карты.
+ * ============================================================ */
+
+.map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.map-marker:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+.marker-medallion {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 7px auto 0;
+  border-radius: 50%;
+  border: 2px solid #5d6b76;
+  background: radial-gradient(circle at 32% 28%, #2a333c, #1b2229);
+  color: #8fa1ad;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.map-marker:hover .marker-medallion,
+.map-marker:focus-visible .marker-medallion {
+  transform: scale(1.12);
+}
+
+.map-marker.is-open .marker-medallion {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #232b33, #181e24);
+  color: #8fa1ad;
+}
+
+.map-marker.is-locked {
+  cursor: default;
+}
+
+.map-marker.is-locked .marker-medallion {
+  border-color: #46525c;
+  background: #14191f;
+  color: #46525c;
+  filter: blur(0.4px);
+}
+
+.map-marker.is-locked:hover .marker-medallion {
+  transform: none;
+}
+
+.marker-label {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+  white-space: nowrap;
+}
+
+.map-marker.is-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  animation: marker-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+```
+
+Сюда переносятся все состояния маркеров:
+
+- открытые;
+- закрытые;
+- завершённые;
+- активные;
+- подписи;
+- кольца.
+
+---
+
+## 7.6. `app/packages/ui/src/campaign/05-map-road.css`
+
+```css
+/* ============================================================
+ * 05-map-road.css
+ * Дорога кампании и перелёт Летучего Корабля.
+ * ============================================================ */
+
+.map-road .road-seg {
+  stroke: rgba(224, 179, 74, 0.18);
+  stroke-width: 0.55;
+  stroke-dasharray: 1.8 2;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.map-road .road-seg-draw {
+  stroke: rgba(224, 179, 74, 0.5);
+  stroke-width: 1;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: road-draw 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) forwards;
+}
+
+.map-road .road-seg-glow {
+  stroke: rgba(224, 179, 74, 0.09);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.ship-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.ship-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 22px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  filter: blur(1px);
+}
+
+.ship-glyph {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--mist-dim);
+  color: var(--mist);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.ship-glyph svg {
+  display: block;
+}
+
+.ship-flight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+```
+
+Сюда переносятся:
+
+- сегменты дороги;
+- анимация дорисовки дороги;
+- свечение дороги;
+- маркер корабля;
+- перелёт корабля;
+- слой перелёта.
+
+---
+
+## 7.7. `app/packages/ui/src/campaign/06-mission-panel.css`
+
+```css
+/* ============================================================
+ * 06-mission-panel.css
+ * Панель выбранной миссии.
+ * ============================================================ */
+
+.mission-panel {
+  margin-top: 14px;
+}
+
+.mission-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  padding: 16px 18px 18px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.mission-card.is-done {
+  border-left-color: #5d6b76;
+}
+
+.mission-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mission-type-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--amber-dim);
+  border-radius: 50%;
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.mission-type-icon.is-destroy {
+  color: #d97a4a;
+  border-color: rgba(217, 122, 74, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33241c, #1c1410);
+}
+
+.mission-type-icon.is-rescue {
+  color: #d96a6a;
+  border-color: rgba(217, 106, 106, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33201e, #1c1010);
+}
+
+.mission-type-icon.is-recon {
+  color: #7ab8d9;
+  border-color: rgba(122, 184, 217, 0.55);
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.mission-card.is-destroy {
+  border-top-color: rgba(217, 122, 74, 0.5);
+}
+
+.mission-card.is-rescue {
+  border-top-color: rgba(217, 106, 106, 0.5);
+}
+
+.mission-card.is-recon {
+  border-top-color: rgba(122, 184, 217, 0.5);
+}
+
+.mission-title {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.35rem;
+  color: #f3ecdc;
+}
+
+.mission-id {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.mission-status.done {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 2px 8px;
+  border: 1px solid #5d6b76;
+  color: #8fa1ad;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mission-facts {
+  margin: 0 0 14px;
+}
+
+.fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 5px 0;
+}
+
+.fact-row dt {
+  color: var(--mist-dim);
+  min-width: 136px;
+  font-size: 0.88rem;
+}
+
+.fact-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.foe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 2px 9px;
+  font-size: 0.84rem;
+  color: #d8d2c2;
+}
+
+.foe-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7fa857;
+}
+
+.foe-chip.upyr::before {
+  background: #9aa7b0;
+}
+
+.foe-chip.kikimora::before {
+  background: #6b9b7a;
+}
+
+.darkness-growth {
+  display: inline-flex;
+  gap: 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+.growth-victory {
+  color: #8fae6b;
+  border: 1px solid rgba(143, 174, 107, 0.35);
+  padding: 1px 8px;
+}
+
+.growth-defeat {
+  color: #e07a7a;
+  border: 1px solid rgba(224, 122, 122, 0.35);
+  padding: 1px 8px;
+}
+
+.mission-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.campaign-abandon-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mist);
+  padding: 11px 18px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-abandon-btn:hover,
+.campaign-abandon-btn:focus-visible {
+  border-color: #c45c5c;
+  color: #d98080;
+  outline: none;
+}
+
+.mission-active-note {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mist);
+  opacity: 0.8;
+}
+
+.campaign-start-btn {
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.campaign-start-btn:hover,
+.campaign-start-btn:focus-visible {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.campaign-start-btn:active {
+  transform: translateY(1px);
+}
+
+.mission-empty {
+  border: 1px dashed var(--line);
+  background: var(--ink-2);
+  padding: 26px 20px;
+  text-align: center;
+  color: var(--mist-dim);
+}
+
+.mission-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--amber-dim);
+}
+```
+
+Сюда переносятся все правила панели миссии.
+
+---
+
+## 7.8. `app/packages/ui/src/campaign/07-campaign-tabs.css`
+
+```css
+/* ============================================================
+ * 07-campaign-tabs.css
+ * Вкладки служб корабля.
+ * ============================================================ */
+
+.campaign-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.campaign-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  color: var(--mist-dim);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-tab svg {
+  color: var(--mist-dim);
+}
+
+.campaign-tab:hover:not(:disabled),
+.campaign-tab:focus-visible:not(:disabled) {
+  border-color: var(--amber-dim);
+  color: var(--mist);
+}
+
+.campaign-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tab-note {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5d6b76;
+}
+
+.tab-alert {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #a03a4e;
+  color: #f3ecdc;
+  font-size: 0.68rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Темизация служб корабля */
+
+.campaign-screen.is-tab-map .map-toolbar,
+.campaign-screen.is-tab-map .campaign-map,
+.campaign-screen.is-tab-map .panel-head h2 {
+  border-color: rgba(224, 179, 74, 0.25);
+}
+
+.campaign-screen.is-tab-forge .forge-panel,
+.campaign-screen.is-tab-forge .panel-head h2 {
+  border-color: rgba(201, 122, 74, 0.45);
+}
+
+.campaign-screen.is-tab-forge .panel-head h2 {
+  color: #d99a6c;
+}
+
+.campaign-screen.is-tab-chamber .roster-panel,
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  border-color: rgba(143, 184, 99, 0.4);
+}
+
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  color: #a9cc85;
+}
+
+.campaign-screen.is-tab-forge .campaign-tab svg,
+.campaign-screen.is-tab-chamber .campaign-tab svg {
+  transition: color 0.15s ease;
+}
+```
+
+Сюда переносятся вкладки и их темизация.
+
+---
+
+## 7.9. `app/packages/ui/src/campaign/08-roster.css`
+
+```css
+/* ============================================================
+ * 08-roster.css
+ * Дружина, Горница, ранения, лечение, уровни.
+ * ============================================================ */
+
+.roster-panel {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  padding: 16px 16px 14px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.3rem;
+  color: #f3ecdc;
+}
+
+.fighter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fighter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), #171d23);
+  transition: border-color 0.15s ease;
+}
+
+.fighter-row.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.fighter-row.is-fallen {
+  border-color: #2a323b;
+  opacity: 0.55;
+}
+
+.fighter-row.is-fallen .fighter-face {
+  filter: grayscale(1);
+  background: #10151a;
+}
+
+.fighter-face {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  color: var(--mist-dim);
+}
+
+.fighter-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fighter-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.fighter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.fighter-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.fallen-tag,
+.wounded-tag {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 2px;
+}
+
+.fallen-tag {
+  color: #8fa1ad;
+  border: 1px solid #46525c;
+}
+
+.wounded-tag {
+  color: #e8b4bc;
+  border: 1px solid rgba(224, 122, 122, 0.45);
+  background: rgba(107, 45, 58, 0.25);
+}
+
+.fighter-class {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.fighter-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.fighter-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.level-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.level-pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #46525c;
+}
+
+.level-pips i.on {
+  background: var(--amber);
+}
+
+.level-label {
+  font-size: 0.68rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.train-btn {
+  flex: none;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.heal-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #a9c88a;
+  background: linear-gradient(180deg, #1f2a1d, #171f15);
+}
+
+.heal-btn:hover,
+.heal-btn:focus-visible {
+  border-color: #7fa857;
+  color: #cfe3b4;
+}
+
+.fighter-ready {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #14181c;
+  background: #5d7d44;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.train-card {
+  width: min(100%, 480px);
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    background 0.15s ease;
+}
+
+.class-card:hover,
+.class-card:focus-visible {
+  border-color: var(--amber);
+  background: #2c2a20;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.class-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.class-card .deploy-face-empty {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.heal-all-btn {
+  margin-left: auto;
+}
+
+.fighter-row.is-wounded .fighter-face {
+  box-shadow: 0 0 0 1px rgba(160, 58, 78, 0.45);
+}
+```
+
+Сюда переносятся все правила дружины, Горницы, лечения, уровней и выбора класса.
+
+---
+
+## 7.10. `app/packages/ui/src/campaign/09-forge.css`
+
+```css
+/* ============================================================
+ * 09-forge.css
+ * Кузня.
+ * ============================================================ */
+
+.forge-panel {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  padding: 16px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.forge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.forge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), #171d23);
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.forge-card:hover {
+  border-color: rgba(224, 179, 74, 0.45);
+  transform: translateY(-1px);
+}
+
+.forge-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.forge-card.is-crafted .forge-icon {
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #7fa857;
+  background: radial-gradient(circle at 32% 28%, #1e2a1d, #161f15);
+}
+
+.forge-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  font-size: 0.95rem;
+}
+
+.forge-effects {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  min-height: 2.2em;
+}
+
+.forge-cost {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.craft-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 8px 10px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.craft-btn:hover:not(:disabled),
+.craft-btn:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.craft-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.crafted-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(127, 168, 87, 0.45);
+  color: #a9c88a;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forge-note {
+  margin: 14px 0 0;
+  color: var(--mist-dim);
+  font-size: 0.84rem;
+}
+
+.forge-card.is-crafted {
+  animation: crafted-in 0.45s ease both;
+}
+
+.crafted-tag::before {
+  content: "✓";
+  font-weight: 700;
+}
+```
+
+Сюда переносятся все правила Кузни.
+
+---
+
+## 7.11. `app/packages/ui/src/campaign/10-equipment.css`
+
+```css
+/* ============================================================
+ * 10-equipment.css
+ * Снаряжение бойцов.
+ * ============================================================ */
+
+.equip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  border: 1px solid rgba(224, 179, 74, 0.4);
+  background: rgba(224, 179, 74, 0.08);
+  color: var(--amber);
+  padding: 1px 8px;
+  font-size: 0.74rem;
+  border-radius: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equip-chip svg {
+  flex: none;
+}
+
+.equip-btn {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink-3);
+  color: var(--mist-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.equip-btn:hover,
+.equip-btn:focus-visible {
+  border-color: var(--amber);
+  color: var(--amber);
+  outline: none;
+  transform: scale(1.1);
+}
+
+.equip-card {
+  width: min(100%, 480px);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.equip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.equip-empty {
+  margin: 6px 0;
+}
+
+.equip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-item:hover:not(.is-taken),
+.equip-item:focus-visible:not(.is-taken) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+}
+
+.equip-item.is-taken {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.equip-item-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+}
+
+.equip-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.equip-item-name {
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.equip-item-effects {
+  font-size: 0.78rem;
+  color: var(--mist-dim);
+}
+
+.equip-item-state {
+  flex: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.equip-item.is-on .equip-item-state {
+  color: var(--amber);
+}
+
+.equip-unequip {
+  width: 100%;
+  appearance: none;
+  border: 1px dashed rgba(224, 122, 122, 0.5);
+  background: rgba(107, 45, 58, 0.18);
+  color: #e8b4bc;
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-unequip:hover,
+.equip-unequip:focus-visible {
+  border-color: #e07a7a;
+  background: rgba(107, 45, 58, 0.3);
+  outline: none;
+}
+
+.deploy-card .equip-btn {
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.deploy-card .equip-btn:hover,
+.deploy-card .equip-btn:focus-visible {
+  box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}
+```
+
+Сюда переносятся все правила снаряжения.
+
+---
+
+## 7.12. `app/packages/ui/src/campaign/11-deployment.css`
+
+```css
+/* ============================================================
+ * 11-deployment.css
+ * Экран формирования высадки.
+ * ============================================================ */
+
+.deployment-screen {
+  max-width: 720px;
+}
+
+@media (min-width: 1400px) {
+  .deployment-screen {
+    max-width: 960px;
+  }
+}
+
+.deployment-head {
+  margin-bottom: 20px;
+}
+
+.deployment-head .display-title {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+}
+
+.deployment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .deployment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deploy-card {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+.deploy-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  color: var(--mist);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.deploy-card:hover,
+.deploy-card:focus-visible {
+  border-color: var(--amber-dim);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.deploy-card.is-picked {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  box-shadow:
+    0 0 0 1px rgba(224, 179, 74, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.deploy-card.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.deploy-face {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  overflow: visible;
+  color: var(--mist-dim);
+}
+
+.deploy-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.deploy-face-empty {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.deploy-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.wound-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #a03a4e;
+  border: 2px solid #14181c;
+  display: grid;
+  place-items: center;
+}
+
+.wound-badge::after {
+  content: "✚";
+  color: #f3ecdc;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.deploy-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.deploy-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deploy-class {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.deploy-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.deploy-wound-note {
+  font-size: 0.72rem;
+  color: #e07a7a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pick-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: transparent;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.deploy-card.is-picked .pick-mark {
+  color: var(--ink);
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+.deployment-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.deployment-count {
+  margin: 0;
+  color: var(--mist-dim);
+  font-size: 0.9rem;
+}
+
+.deployment-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.deploy-confirm {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.deploy-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+```
+
+Сюда переносятся все правила экрана высадки.
+
+---
+
+## 7.13. `app/packages/ui/src/campaign/12-pvp.css`
+
+```css
+/* ============================================================
+ * 12-pvp.css
+ * Поочерёдная игра, PvP, драфт.
+ * ============================================================ */
+
+.pvp-room-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 20px;
+}
+
+.pvp-arena {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pvp-side-card {
+  min-width: 260px;
+  padding: 16px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.6);
+  animation: pvp-side-in 420ms ease-out both;
+}
+
+.pvp-side-card.is-side1 {
+  border-top: 3px solid #e0b34a;
+  animation-delay: 60ms;
+}
+
+.pvp-side-card.is-side2 {
+  border-top: 3px solid #6aa9d9;
+  animation-delay: 120ms;
+}
+
+.is-side1 .pvp-side-title {
+  color: var(--amber, #e0b34a);
+}
+
+.is-side2 .pvp-side-title {
+  color: #6aa9d9;
+}
+
+.pvp-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pvp-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.pvp-slot:hover {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.pvp-slot-face {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.pvp-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  width: 100%;
+  max-width: 640px;
+}
+
+.pvp-option-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pvp-option-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa39a;
+}
+
+.pvp-radio {
+  padding: 6px 14px;
+  border: 1px solid rgba(120, 140, 160, 0.3);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.55);
+  color: #c9c2b2;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.pvp-check input {
+  accent-color: #e0b34a;
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 640px;
+}
+
+.draft-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.draft-side {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  transition: all 200ms ease;
+}
+
+.draft-side.is-side1 {
+  color: var(--amber, #e0b34a);
+}
+
+.draft-side.is-side2 {
+  color: #6aa9d9;
+}
+
+.draft-side.is-current {
+  border-color: rgba(224, 179, 74, 0.7);
+  box-shadow: 0 0 14px rgba(224, 179, 74, 0.35);
+  animation: draft-glow 1.6s ease-in-out infinite;
+}
+
+.draft-side.is-full {
+  border-color: rgba(120, 190, 130, 0.5);
+  color: #8fd89a;
+}
+
+.draft-vs {
+  color: #8fa1ad;
+}
+
+.draft-hint {
+  margin: 0;
+  color: #c9c2b2;
+  font-size: 0.85rem;
+}
+
+.draft-done {
+  margin: 0;
+  color: #8fd89a;
+  font-size: 0.9rem;
+  animation: net-ok 300ms ease-out;
+}
+
+.draft-pool {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.draft-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 1px solid rgba(120, 140, 160, 0.25);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.55);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.draft-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: rgba(224, 179, 74, 0.6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.draft-card:disabled {
+  cursor: default;
+}
+
+.draft-card.is-taken {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.draft-face {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.draft-name {
+  font-size: 0.78rem;
+  color: #e8e2d4;
+  text-align: center;
+}
+
+.draft-taken-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: #8fd89a;
+  font-weight: 700;
+}
+
+.pvp-start-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.spectator-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spectator-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #8fa1ad;
+  letter-spacing: 0.06em;
+}
+
+.spectator-eye {
+  color: #6aa9d9;
+  animation: eye-blink 2.4s ease-in-out infinite;
+}
+```
+
+Сюда переносятся все PvP-правила.
+
+---
+
+## 7.14. `app/packages/ui/src/campaign/13-net.css`
+
+```css
+/* ============================================================
+ * 13-net.css
+ * Сетевые панели, коды, подключения, ошибки.
+ * ============================================================ */
+
+.pvp-tabs,
+.net-role-switch {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.pvp-tab {
+  padding: 8px 18px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.55);
+  color: #9aa39a;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.pvp-tab:hover {
+  color: #e8e2d4;
+  border-color: rgba(224, 179, 74, 0.5);
+}
+
+.pvp-tab.is-active {
+  color: var(--amber, #e0b34a);
+  border-color: rgba(224, 179, 74, 0.65);
+  background: rgba(58, 49, 32, 0.5);
+  box-shadow: inset 0 -2px 0 rgba(224, 179, 74, 0.7);
+}
+
+.net-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.net-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px;
+  border: 1px solid rgba(120, 140, 160, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.5);
+  animation: net-panel-in 300ms ease-out;
+}
+
+.net-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border: 1px dashed rgba(224, 179, 74, 0.45);
+  border-radius: 8px;
+  background: rgba(224, 179, 74, 0.05);
+}
+
+.net-qr {
+  width: 160px;
+  height: 160px;
+  border-radius: 6px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 24px rgba(224, 179, 74, 0.25);
+  animation: qr-in 400ms ease-out;
+}
+
+.net-code {
+  max-width: 100%;
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #e8cf9a;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.net-input-label {
+  align-self: flex-start;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: #9aa39a;
+  text-transform: uppercase;
+}
+
+.net-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 140, 160, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #f3ecdc;
+  font-family: monospace;
+  font-size: 0.8rem;
+  transition: border-color 180ms ease;
+}
+
+.net-input:focus {
+  outline: none;
+  border-color: rgba(224, 179, 74, 0.7);
+}
+
+.net-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.net-connected {
+  color: #8fd89a;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  animation: net-ok 300ms ease-out;
+}
+
+.net-error {
+  color: #e07a6a;
+  font-size: 0.85rem;
+  border-left: 2px solid #e07a6a;
+  padding-left: 10px;
+  animation: net-err 240ms ease-out;
+}
+
+.net-lost-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+```
+
+Сюда переносятся все сетевые правила.
+
+---
+
+## 7.15. `app/packages/ui/src/campaign/14-replay.css`
+
+```css
+/* ============================================================
+ * 14-replay.css
+ * Повторы.
+ * ============================================================ */
+
+.replay-screen {
+  gap: 16px;
+}
+
+.replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.replay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(120, 140, 160, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.55);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.replay-row:hover {
+  border-color: rgba(106, 169, 217, 0.5);
+  transform: translateX(3px);
+}
+
+.replay-meta {
+  display
+Ниже — максимально подробная проектная инструкция по рефакторингу `app/packages/ui/src/campaign.css`.
+
+Цель:
+
+- уменьшить итоговый `campaign.css` до менее чем **1000 строк**;
+- сохранить существующие классы, анимации, media-запросы, `prefers-reduced-motion`, CSS-переменные и визуальное поведение;
+- профессионально разнести стили по предметным модулям;
+- учесть требования сборки и форматирования:
+  - форматирование кода — через Prettier;
+  - ширина строки — **120 символов**;
+  - линтер не должен отвечать за форматирование;
+  - после рефакторинга обязательно выполняется `pnpm format` или эквивалент;
+  - CI должен проходить без изменений, если в нём уже есть проверка форматирования, сборки и тестов.
+
+> Важное замечание по приложенным файлам. В приложенных `ci.yml` и `deploy-pages.yml` содержимое отсутствует, поэтому дополнительных ограничений из них не видно. Ниже используются стандартные требования проекта: проверка форматирования, сборка, тесты, визуальная регрессия. Если в реальных файлах есть конкретные команды, их нужно продублировать локально перед отправкой изменений.
+
+---
+
+# 1. Диагностика текущего файла
+
+`app/packages/ui/src/campaign.css` сейчас содержит большое число несвязанных областей:
+
+1. базовый экран кампании;
+2. шапку кампании;
+3. шкалу Тьмы и ресурсы;
+4. карту царства;
+5. маркеры миссий;
+6. дорогу и перелёт корабля;
+7. панель миссии;
+8. вкладки корабля;
+9. дружину и Горницу;
+10. Кузню;
+11. снаряжение;
+12. экран высадки;
+13. PvP и сеть;
+14. повторы;
+15. обучение;
+16. кампейн-подсказки;
+17. итог миссии;
+18. keyframes;
+19. адаптивные правила;
+20. `prefers-reduced-motion`.
+
+Для CSS это означает, что один файл стал одновременно:
+
+- файлом темы кампании;
+- файлом карты;
+- файлом панелей;
+- файлом модальных окон;
+- файлом анимаций;
+- файлом адаптивности.
+
+Это нужно разнести на модули без изменения поведения.
+
+---
+
+# 2. Целевая архитектура
+
+Создаём каталог:
+
+```text
+app/packages/ui/src/campaign/
+```
+
+Итоговая структура:
+
+```text
+app/packages/ui/src/
+  campaign.css
+  campaign/
+    00-screen.css
+    01-top.css
+    02-darkness-resources.css
+    03-map.css
+    04-map-markers.css
+    05-map-road.css
+    06-mission-panel.css
+    07-campaign-tabs.css
+    08-roster.css
+    09-forge.css
+    10-equipment.css
+    11-deployment.css
+    12-pvp.css
+    13-net.css
+    14-replay.css
+    15-training.css
+    16-campaign-hints.css
+    17-result.css
+    18-keyframes.css
+    19-responsive.css
+    20-reduced-motion.css
+```
+
+`campaign.css` остаётся единственной точкой входа.
+
+Это важно, потому что потребители продолжают писать:
+
+```ts
+import "./campaign.css";
+```
+
+и не знают о разбивке.
+
+---
+
+# 3. Главный принцип рефакторинга
+
+Для CSS особенно важно:
+
+1. **Не менять имена классов.**
+2. **Не менять порядок правил без необходимости.**
+3. **Не менять специфичность селекторов.**
+4. **Не менять имена анимаций.**
+5. **Не менять `z-index`, цвета, отступы, размеры.**
+6. **Сохранить все комментарии-метки версий**, например `0.11.0`, `0.12.0`, `0.13.0`, если они есть в исходном файле.
+7. **Сохранить порядок `@media`-блоков**, особенно если они находятся в конце файла и переопределяют предыдущие правила.
+8. **`prefers-reduced-motion` должен остаться в конце**, если он стоит в конце исходного файла.
+
+---
+
+# 4. Требования к форматированию
+
+После переноса каждый CSS-файл нужно прогнать через Prettier.
+
+Пример правильного форматирования:
+
+```css
+.campaign-screen {
+  max-width: 860px;
+}
+
+@media (min-width: 1400px) {
+  .campaign-screen {
+    max-width: 1100px;
+  }
+}
+```
+
+Правила:
+
+- отступы: 2 пробела;
+- каждый селектор и декларация на отдельных строках;
+- ширина строки: 120 символов;
+- одна пустая строка между правилами;
+- точка с запятой обязательна;
+- кавычки — как настроит Prettier;
+- файл заканчивается переводом строки.
+
+Команда форматирования:
+
+```bash
+pnpm exec prettier --write \
+  app/packages/ui/src/campaign.css \
+  app/packages/ui/src/campaign/*.css
+```
+
+Если в проекте есть команда `format`, лучше использовать её:
+
+```bash
+pnpm format
+```
+
+---
+
+# 5. Пошаговая инструкция
+
+## Шаг 1. Создать каталог модулей
+
+```bash
+mkdir -p app/packages/ui/src/campaign
+```
+
+## Шаг 2. Сделать резервную копию
+
+На время рефакторинга удобно иметь копию:
+
+```bash
+cp app/packages/ui/src/campaign.css app/packages/ui/src/campaign.backup.css
+```
+
+После успешного завершения резервную копию удалить.
+
+## Шаг 3. Разметить старый файл секциями
+
+Перед механическим переносом полезно отметить секции комментариями, если их ещё нет:
+
+```css
+/* === 00 screen === */
+/* === 01 top === */
+/* === 02 darkness resources === */
+/* === 03 map === */
+/* === 04 map markers === */
+/* === 05 map road === */
+/* === 06 mission panel === */
+/* === 07 campaign tabs === */
+/* === 08 roster === */
+/* === 09 forge === */
+/* === 10 equipment === */
+/* === 11 deployment === */
+/* === 12 pvp === */
+/* === 13 net === */
+/* === 14 replay === */
+/* === 15 training === */
+/* === 16 campaign hints === */
+/* === 17 result === */
+/* === 18 keyframes === */
+/* === 19 responsive === */
+/* === 20 reduced motion === */
+```
+
+Это не обязательно, но снижает риск потери правил.
+
+## Шаг 4. Создать новые файлы
+
+Создать файлы:
+
+```text
+app/packages/ui/src/campaign/00-screen.css
+app/packages/ui/src/campaign/01-top.css
+app/packages/ui/src/campaign/02-darkness-resources.css
+app/packages/ui/src/campaign/03-map.css
+app/packages/ui/src/campaign/04-map-markers.css
+app/packages/ui/src/campaign/05-map-road.css
+app/packages/ui/src/campaign/06-mission-panel.css
+app/packages/ui/src/campaign/07-campaign-tabs.css
+app/packages/ui/src/campaign/08-roster.css
+app/packages/ui/src/campaign/09-forge.css
+app/packages/ui/src/campaign/10-equipment.css
+app/packages/ui/src/campaign/11-deployment.css
+app/packages/ui/src/campaign/12-pvp.css
+app/packages/ui/src/campaign/13-net.css
+app/packages/ui/src/campaign/14-replay.css
+app/packages/ui/src/campaign/15-training.css
+app/packages/ui/src/campaign/16-campaign-hints.css
+app/packages/ui/src/campaign/17-result.css
+app/packages/ui/src/campaign/18-keyframes.css
+app/packages/ui/src/campaign/19-responsive.css
+app/packages/ui/src/campaign/20-reduced-motion.css
+```
+
+## Шаг 5. Перенести правила
+
+Переносить строго по одному разделу.
+
+Для каждого файла:
+
+1. Вырезать соответствующий блок из старого `campaign.css`.
+2. Вставить в новый файл.
+3. Не менять селекторы.
+4. Не менять порядок внутри блока.
+5. Сохранить комментарии версии.
+
+## Шаг 6. Заменить `campaign.css` на точку входа
+
+После переноса старый `campaign.css` должен стать тонким файлом с `@import`.
+
+## Шаг 7. Проверить порядок импортов
+
+Порядок `@import` должен повторять порядок исходных секций.
+
+Это критично, потому что CSS-правила, идущие позже, могут переопределять более ранние.
+
+## Шаг 8. Прогнать форматирование
+
+```bash
+pnpm exec prettier --write \
+  app/packages/ui/src/campaign.css \
+  app/packages/ui/src/campaign/*.css
+```
+
+## Шаг 9. Проверить сборку
+
+```bash
+pnpm -F ui build
+```
+
+или общую сборку:
+
+```bash
+pnpm build
+```
+
+## Шаг 10. Проверить тесты
+
+```bash
+pnpm -F ui test
+```
+
+или:
+
+```bash
+pnpm test
+```
+
+## Шаг 11. Проверить визуальную регрессию
+
+Если в проекте используются скрипты:
+
+```bash
+pnpm screens:capture
+pnpm screens:compare
+```
+
+либо эквивалент из `operations`.
+
+Особое внимание:
+
+- экран кампании;
+- карта корабля;
+- маркеры миссий;
+- панель миссии;
+- вкладки;
+- дружина;
+- Горница;
+- Кузня;
+- высадка;
+- итог миссии;
+- обучение;
+- подсказки;
+- `prefers-reduced-motion`.
+
+## Шаг 12. Убедиться, что файл меньше 1000 строк
+
+```bash
+wc -l app/packages/ui/src/campaign.css
+```
+
+Ожидаемый результат: около 30–40 строк.
+
+---
+
+# 6. Полный код итогового файла
+
+## `app/packages/ui/src/campaign.css`
+
+Итоговый файл становится точкой входа.
+
+Ожидаемый размер: **менее 50 строк**.
+
+```css
+@import "./campaign/00-screen.css";
+@import "./campaign/01-top.css";
+@import "./campaign/02-darkness-resources.css";
+@import "./campaign/03-map.css";
+@import "./campaign/04-map-markers.css";
+@import "./campaign/05-map-road.css";
+@import "./campaign/06-mission-panel.css";
+@import "./campaign/07-campaign-tabs.css";
+@import "./campaign/08-roster.css";
+@import "./campaign/09-forge.css";
+@import "./campaign/10-equipment.css";
+@import "./campaign/11-deployment.css";
+@import "./campaign/12-pvp.css";
+@import "./campaign/13-net.css";
+@import "./campaign/14-replay.css";
+@import "./campaign/15-training.css";
+@import "./campaign/16-campaign-hints.css";
+@import "./campaign/17-result.css";
+@import "./campaign/18-keyframes.css";
+@import "./campaign/19-responsive.css";
+@import "./campaign/20-reduced-motion.css";
+
+/**
+ * Экран кампании и связанные режимы.
+ *
+ * Прежде все стили жили в одном файле на несколько тысяч строк.
+ * Теперь они разложены по предметным областям в каталоге `campaign/`,
+ * а этот файл остаётся единственной точкой входа: потребители по-прежнему
+ * пишут `import "./campaign.css"` и не знают о разбивке.
+ *
+ * Порядок импортов повторяет порядок исходного файла и не должен меняться
+ * без отдельной проверки каскада.
+ */
+```
+
+Важно: если конкретный сборщик требует, чтобы комментарии шли до `@import`, можно перенести комментарий наверх. Для большинства CSS-пайплайнов комментарии допустимы вокруг импортов, но самый безопасный вариант — сначала импорты, затем комментарий.
+
+Альтернативный максимально безопасный вариант:
+
+```css
+@import "./campaign/00-screen.css";
+@import "./campaign/01-top.css";
+@import "./campaign/02-darkness-resources.css";
+@import "./campaign/03-map.css";
+@import "./campaign/04-map-markers.css";
+@import "./campaign/05-map-road.css";
+@import "./campaign/06-mission-panel.css";
+@import "./campaign/07-campaign-tabs.css";
+@import "./campaign/08-roster.css";
+@import "./campaign/09-forge.css";
+@import "./campaign/10-equipment.css";
+@import "./campaign/11-deployment.css";
+@import "./campaign/12-pvp.css";
+@import "./campaign/13-net.css";
+@import "./campaign/14-replay.css";
+@import "./campaign/15-training.css";
+@import "./campaign/16-campaign-hints.css";
+@import "./campaign/17-result.css";
+@import "./campaign/18-keyframes.css";
+@import "./campaign/19-responsive.css";
+@import "./campaign/20-reduced-motion.css";
+```
+
+Этот вариант точно не нарушит правило расположения `@import`.
+
+---
+
+# 7. Полный код новых файлов
+
+Дальше идут целевые файлы.
+
+Каждый файл содержит заголовок и тот набор правил, который относится к его предметной области. Если в исходном файле есть дополнительные правила из той же области, они должны быть добавлены в этот же файл без изменения селекторов.
+
+---
+
+## 7.1. `app/packages/ui/src/campaign/00-screen.css`
+
+```css
+/* ============================================================
+ * 00-screen.css
+ * Базовый контейнер экрана кампании.
+ * ============================================================ */
+
+.campaign-screen {
+  max-width: 860px;
+}
+
+@media (min-width: 1400px) {
+  .campaign-screen {
+    max-width: 1100px;
+  }
+}
+```
+
+Если в старом файле рядом есть другие правила самого верхнего контейнера кампании, они переносятся сюда.
+
+---
+
+## 7.2. `app/packages/ui/src/campaign/01-top.css`
+
+```css
+/* ============================================================
+ * 01-top.css
+ * Шапка экрана кампании: заголовок, выход, общие действия.
+ * ============================================================ */
+
+.campaign-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 18px;
+  margin-bottom: 14px;
+}
+
+.campaign-exit-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist);
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-exit-btn:hover,
+.campaign-exit-btn:focus-visible {
+  border-color: var(--amber-dim);
+  color: var(--amber);
+  outline: none;
+}
+
+.campaign-title-block {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.campaign-title-block .eyebrow {
+  margin-bottom: 2px;
+}
+
+.campaign-title-block h1 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", "Iowan Old Style", serif;
+  font-size: clamp(1.5rem, 4vw, 2rem);
+  color: #f3ecdc;
+  letter-spacing: 0.05em;
+}
+```
+
+Сюда переносятся все правила, которые относятся к шапке кампании:
+
+- `.campaign-top`;
+- `.campaign-exit-btn`;
+- `.campaign-title-block`;
+- заголовок;
+- вспомогательные элементы шапки, если они есть.
+
+---
+
+## 7.3. `app/packages/ui/src/campaign/02-darkness-resources.css`
+
+```css
+/* ============================================================
+ * 02-darkness-resources.css
+ * Тьма и запасы корабля.
+ * ============================================================ */
+
+.campaign-darkness {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1 1 300px;
+  min-width: 240px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+}
+
+.campaign-darkness-name {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--amber);
+  white-space: nowrap;
+}
+
+.campaign-darkness-value {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.95rem;
+  color: #f3ecdc;
+  white-space: nowrap;
+}
+
+.darkness-bar {
+  position: relative;
+  flex: 1 1 90px;
+  height: 10px;
+  background: var(--ink-3);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+
+.darkness-bar i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #6b2d3a, #a03a4e);
+  transition: width 0.6s ease;
+}
+
+.darkness-bar::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 24.5%,
+    rgba(213, 207, 192, 0.18) 24.5% 25.5%
+  );
+  pointer-events: none;
+}
+
+.campaign-resources {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.resource {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  color: var(--mist-dim);
+  font-size: 0.82rem;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.resource svg {
+  flex: none;
+}
+
+.resource.gold svg {
+  color: var(--amber);
+}
+
+.resource.herbs svg {
+  color: #7fa857;
+}
+
+.resource.artifacts svg {
+  color: #9b6bbf;
+}
+```
+
+Сюда переносятся все правила шкалы Тьмы и ресурсов.
+
+---
+
+## 7.4. `app/packages/ui/src/campaign/03-map.css`
+
+```css
+/* ============================================================
+ * 03-map.css
+ * Карта царства: подложка, туман, рельеф, общие слои.
+ * ============================================================ */
+
+.campaign-map {
+  position: relative;
+  height: min(56vh, 420px);
+  min-height: 300px;
+  border: 1px solid var(--line);
+  border-radius: 2px;
+  background:
+    radial-gradient(560px 260px at 28% 18%, rgba(224, 179, 74, 0.05), transparent 70%),
+    linear-gradient(160deg, #1a222b, #12161b 85%);
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.campaign-map::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(120% 110% at 50% 40%, transparent 58%, rgba(10, 13, 16, 0.55) 100%);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.map-terrain {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.map-fog {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* Если в исходном файле есть дополнительные слои карты,
+   они переносятся сюда без изменения порядка. */
+```
+
+Сюда переносятся:
+
+- `.campaign-map`;
+- `.map-terrain`;
+- `.map-fog`;
+- фоновые градиенты;
+- виньетка карты;
+- общие слои карты.
+
+---
+
+## 7.5. `app/packages/ui/src/campaign/04-map-markers.css`
+
+```css
+/* ============================================================
+ * 04-map-markers.css
+ * Маркеры миссий и точек карты.
+ * ============================================================ */
+
+.map-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 44px;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  z-index: 5;
+}
+
+.map-marker:focus-visible {
+  outline: 2px solid var(--amber);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+.marker-medallion {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  margin: 7px auto 0;
+  border-radius: 50%;
+  border: 2px solid #5d6b76;
+  background: radial-gradient(circle at 32% 28%, #2a333c, #1b2229);
+  color: #8fa1ad;
+  font-size: 0.9rem;
+  line-height: 1;
+  transition:
+    transform 0.16s ease,
+    border-color 0.16s ease,
+    background 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+.map-marker:hover .marker-medallion,
+.map-marker:focus-visible .marker-medallion {
+  transform: scale(1.12);
+}
+
+.map-marker.is-open .marker-medallion {
+  border-color: var(--amber);
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #232b33, #181e24);
+  color: #8fa1ad;
+}
+
+.map-marker.is-locked {
+  cursor: default;
+}
+
+.map-marker.is-locked .marker-medallion {
+  border-color: #46525c;
+  background: #14191f;
+  color: #46525c;
+  filter: blur(0.4px);
+}
+
+.map-marker.is-locked:hover .marker-medallion {
+  transform: none;
+}
+
+.marker-label {
+  position: absolute;
+  left: 50%;
+  bottom: -2px;
+  transform: translateX(-50%);
+  font-size: 0.62rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+  white-space: nowrap;
+}
+
+.map-marker.is-open::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  animation: marker-ring 2.4s ease-out infinite;
+  pointer-events: none;
+}
+```
+
+Сюда переносятся все состояния маркеров:
+
+- открытые;
+- закрытые;
+- завершённые;
+- активные;
+- подписи;
+- кольца.
+
+---
+
+## 7.6. `app/packages/ui/src/campaign/05-map-road.css`
+
+```css
+/* ============================================================
+ * 05-map-road.css
+ * Дорога кампании и перелёт Летучего Корабля.
+ * ============================================================ */
+
+.map-road .road-seg {
+  stroke: rgba(224, 179, 74, 0.18);
+  stroke-width: 0.55;
+  stroke-dasharray: 1.8 2;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.map-road .road-seg-draw {
+  stroke: rgba(224, 179, 74, 0.5);
+  stroke-width: 1;
+  fill: none;
+  stroke-linecap: round;
+  stroke-dasharray: 100;
+  stroke-dashoffset: 100;
+  animation: road-draw 900ms var(--pop-ease, cubic-bezier(0.2, 0.9, 0.3, 1)) forwards;
+}
+
+.map-road .road-seg-glow {
+  stroke: rgba(224, 179, 74, 0.09);
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  fill: none;
+}
+
+.ship-marker {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  z-index: 6;
+}
+
+.ship-marker::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: -7px;
+  width: 22px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  transform: translateX(-50%);
+  filter: blur(1px);
+}
+
+.ship-glyph {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--mist-dim);
+  color: var(--mist);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+.ship-glyph svg {
+  display: block;
+}
+
+.ship-flight-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+```
+
+Сюда переносятся:
+
+- сегменты дороги;
+- анимация дорисовки дороги;
+- свечение дороги;
+- маркер корабля;
+- перелёт корабля;
+- слой перелёта.
+
+---
+
+## 7.7. `app/packages/ui/src/campaign/06-mission-panel.css`
+
+```css
+/* ============================================================
+ * 06-mission-panel.css
+ * Панель выбранной миссии.
+ * ============================================================ */
+
+.mission-panel {
+  margin-top: 14px;
+}
+
+.mission-card {
+  position: relative;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--amber);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  padding: 16px 18px 18px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.mission-card.is-done {
+  border-left-color: #5d6b76;
+}
+
+.mission-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mission-type-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--amber-dim);
+  border-radius: 50%;
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.mission-type-icon.is-destroy {
+  color: #d97a4a;
+  border-color: rgba(217, 122, 74, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33241c, #1c1410);
+}
+
+.mission-type-icon.is-rescue {
+  color: #d96a6a;
+  border-color: rgba(217, 106, 106, 0.55);
+  background: radial-gradient(circle at 32% 28%, #33201e, #1c1010);
+}
+
+.mission-type-icon.is-recon {
+  color: #7ab8d9;
+  border-color: rgba(122, 184, 217, 0.55);
+  background: radial-gradient(circle at 32% 28%, #1e2c33, #10181c);
+}
+
+.mission-card.is-destroy {
+  border-top-color: rgba(217, 122, 74, 0.5);
+}
+
+.mission-card.is-rescue {
+  border-top-color: rgba(217, 106, 106, 0.5);
+}
+
+.mission-card.is-recon {
+  border-top-color: rgba(122, 184, 217, 0.5);
+}
+
+.mission-title {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.35rem;
+  color: #f3ecdc;
+}
+
+.mission-id {
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.mission-status.done {
+  display: inline-block;
+  margin: 0 0 10px;
+  padding: 2px 8px;
+  border: 1px solid #5d6b76;
+  color: #8fa1ad;
+  font-size: 0.74rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.mission-facts {
+  margin: 0 0 14px;
+}
+
+.fact-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 5px 0;
+}
+
+.fact-row dt {
+  color: var(--mist-dim);
+  min-width: 136px;
+  font-size: 0.88rem;
+}
+
+.fact-row dd {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.foe-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  padding: 2px 9px;
+  font-size: 0.84rem;
+  color: #d8d2c2;
+}
+
+.foe-chip::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #7fa857;
+}
+
+.foe-chip.upyr::before {
+  background: #9aa7b0;
+}
+
+.foe-chip.kikimora::before {
+  background: #6b9b7a;
+}
+
+.darkness-growth {
+  display: inline-flex;
+  gap: 6px;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.84rem;
+}
+
+.growth-victory {
+  color: #8fae6b;
+  border: 1px solid rgba(143, 174, 107, 0.35);
+  padding: 1px 8px;
+}
+
+.growth-defeat {
+  color: #e07a7a;
+  border: 1px solid rgba(224, 122, 122, 0.35);
+  padding: 1px 8px;
+}
+
+.mission-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.campaign-abandon-btn {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--mist);
+  padding: 11px 18px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-abandon-btn:hover,
+.campaign-abandon-btn:focus-visible {
+  border-color: #c45c5c;
+  color: #d98080;
+  outline: none;
+}
+
+.mission-active-note {
+  margin: 8px 0 0;
+  font-size: 0.8rem;
+  color: var(--mist);
+  opacity: 0.8;
+}
+
+.campaign-start-btn {
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 11px 18px;
+  font-size: 0.95rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.campaign-start-btn:hover,
+.campaign-start-btn:focus-visible {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.campaign-start-btn:active {
+  transform: translateY(1px);
+}
+
+.mission-empty {
+  border: 1px dashed var(--line);
+  background: var(--ink-2);
+  padding: 26px 20px;
+  text-align: center;
+  color: var(--mist-dim);
+}
+
+.mission-empty svg {
+  display: block;
+  margin: 0 auto 10px;
+  color: var(--amber-dim);
+}
+```
+
+Сюда переносятся все правила панели миссии.
+
+---
+
+## 7.8. `app/packages/ui/src/campaign/07-campaign-tabs.css`
+
+```css
+/* ============================================================
+ * 07-campaign-tabs.css
+ * Вкладки служб корабля.
+ * ============================================================ */
+
+.campaign-tabs {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.campaign-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 10px 6px;
+  background: var(--ink-2);
+  border: 1px solid var(--line);
+  color: var(--mist-dim);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease;
+}
+
+.campaign-tab svg {
+  color: var(--mist-dim);
+}
+
+.campaign-tab:hover:not(:disabled),
+.campaign-tab:focus-visible:not(:disabled) {
+  border-color: var(--amber-dim);
+  color: var(--mist);
+}
+
+.campaign-tab:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.tab-note {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #5d6b76;
+}
+
+.tab-alert {
+  position: absolute;
+  top: 4px;
+  right: 6px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #a03a4e;
+  color: #f3ecdc;
+  font-size: 0.68rem;
+  line-height: 18px;
+  text-align: center;
+}
+
+/* Темизация служб корабля */
+
+.campaign-screen.is-tab-map .map-toolbar,
+.campaign-screen.is-tab-map .campaign-map,
+.campaign-screen.is-tab-map .panel-head h2 {
+  border-color: rgba(224, 179, 74, 0.25);
+}
+
+.campaign-screen.is-tab-forge .forge-panel,
+.campaign-screen.is-tab-forge .panel-head h2 {
+  border-color: rgba(201, 122, 74, 0.45);
+}
+
+.campaign-screen.is-tab-forge .panel-head h2 {
+  color: #d99a6c;
+}
+
+.campaign-screen.is-tab-chamber .roster-panel,
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  border-color: rgba(143, 184, 99, 0.4);
+}
+
+.campaign-screen.is-tab-chamber .panel-head h2 {
+  color: #a9cc85;
+}
+
+.campaign-screen.is-tab-forge .campaign-tab svg,
+.campaign-screen.is-tab-chamber .campaign-tab svg {
+  transition: color 0.15s ease;
+}
+```
+
+Сюда переносятся вкладки и их темизация.
+
+---
+
+## 7.9. `app/packages/ui/src/campaign/08-roster.css`
+
+```css
+/* ============================================================
+ * 08-roster.css
+ * Дружина, Горница, ранения, лечение, уровни.
+ * ============================================================ */
+
+.roster-panel {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  padding: 16px 16px 14px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.3rem;
+  color: #f3ecdc;
+}
+
+.fighter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fighter-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), #171d23);
+  transition: border-color 0.15s ease;
+}
+
+.fighter-row.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.fighter-row.is-fallen {
+  border-color: #2a323b;
+  opacity: 0.55;
+}
+
+.fighter-row.is-fallen .fighter-face {
+  filter: grayscale(1);
+  background: #10151a;
+}
+
+.fighter-face {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  color: var(--mist-dim);
+}
+
+.fighter-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.fighter-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.fighter-info {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1 1 220px;
+}
+
+.fighter-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.fallen-tag,
+.wounded-tag {
+  font-size: 0.66rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 1px 7px;
+  border-radius: 2px;
+}
+
+.fallen-tag {
+  color: #8fa1ad;
+  border: 1px solid #46525c;
+}
+
+.wounded-tag {
+  color: #e8b4bc;
+  border: 1px solid rgba(224, 122, 122, 0.45);
+  background: rgba(107, 45, 58, 0.25);
+}
+
+.fighter-class {
+  font-size: 0.76rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.fighter-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.fighter-level {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  flex: none;
+}
+
+.level-pips {
+  display: flex;
+  gap: 3px;
+}
+
+.level-pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #46525c;
+}
+
+.level-pips i.on {
+  background: var(--amber);
+}
+
+.level-label {
+  font-size: 0.68rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.train-btn {
+  flex: none;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+}
+
+.heal-btn {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.85rem;
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #a9c88a;
+  background: linear-gradient(180deg, #1f2a1d, #171f15);
+}
+
+.heal-btn:hover,
+.heal-btn:focus-visible {
+  border-color: #7fa857;
+  color: #cfe3b4;
+}
+
+.fighter-ready {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  color: #14181c;
+  background: #5d7d44;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.train-card {
+  width: min(100%, 480px);
+}
+
+.class-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(96px, 1fr));
+  gap: 10px;
+  margin: 16px 0;
+}
+
+.class-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    background 0.15s ease;
+}
+
+.class-card:hover,
+.class-card:focus-visible {
+  border-color: var(--amber);
+  background: #2c2a20;
+  outline: none;
+  transform: translateY(-2px);
+}
+
+.class-card img {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 1px solid var(--line);
+}
+
+.class-card .deploy-face-empty {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+}
+
+.heal-all-btn {
+  margin-left: auto;
+}
+
+.fighter-row.is-wounded .fighter-face {
+  box-shadow: 0 0 0 1px rgba(160, 58, 78, 0.45);
+}
+```
+
+Сюда переносятся все правила дружины, Горницы, лечения, уровней и выбора класса.
+
+---
+
+## 7.10. `app/packages/ui/src/campaign/09-forge.css`
+
+```css
+/* ============================================================
+ * 09-forge.css
+ * Кузня.
+ * ============================================================ */
+
+.forge-panel {
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  padding: 16px;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.forge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.forge-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink), #171d23);
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.forge-card:hover {
+  border-color: rgba(224, 179, 74, 0.45);
+  transform: translateY(-1px);
+}
+
+.forge-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+  background: radial-gradient(circle at 32% 28%, #2c2a20, #1c1a14);
+}
+
+.forge-card.is-crafted .forge-icon {
+  border-color: rgba(127, 168, 87, 0.5);
+  color: #7fa857;
+  background: radial-gradient(circle at 32% 28%, #1e2a1d, #161f15);
+}
+
+.forge-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  font-size: 0.95rem;
+}
+
+.forge-effects {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  min-height: 2.2em;
+}
+
+.forge-cost {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.craft-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  appearance: none;
+  border: 1px solid var(--amber-dim);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  color: var(--amber);
+  padding: 8px 10px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease,
+    transform 0.12s ease;
+}
+
+.craft-btn:hover:not(:disabled),
+.craft-btn:focus-visible:not(:disabled) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #383420, #2a2618);
+  outline: none;
+}
+
+.craft-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.crafted-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid rgba(127, 168, 87, 0.45);
+  color: #a9c88a;
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.forge-note {
+  margin: 14px 0 0;
+  color: var(--mist-dim);
+  font-size: 0.84rem;
+}
+
+.forge-card.is-crafted {
+  animation: crafted-in 0.45s ease both;
+}
+
+.crafted-tag::before {
+  content: "✓";
+  font-weight: 700;
+}
+```
+
+Сюда переносятся все правила Кузни.
+
+---
+
+## 7.11. `app/packages/ui/src/campaign/10-equipment.css`
+
+```css
+/* ============================================================
+ * 10-equipment.css
+ * Снаряжение бойцов.
+ * ============================================================ */
+
+.equip-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  align-self: flex-start;
+  border: 1px solid rgba(224, 179, 74, 0.4);
+  background: rgba(224, 179, 74, 0.08);
+  color: var(--amber);
+  padding: 1px 8px;
+  font-size: 0.74rem;
+  border-radius: 2px;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.equip-chip svg {
+  flex: none;
+}
+
+.equip-btn {
+  position: absolute;
+  top: 6px;
+  right: 34px;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--ink-3);
+  color: var(--mist-dim);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease;
+}
+
+.equip-btn:hover,
+.equip-btn:focus-visible {
+  border-color: var(--amber);
+  color: var(--amber);
+  outline: none;
+  transform: scale(1.1);
+}
+
+.equip-card {
+  width: min(100%, 480px);
+  max-height: 82vh;
+  overflow-y: auto;
+}
+
+.equip-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.equip-empty {
+  margin: 6px 0;
+}
+
+.equip-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--ink-3);
+  color: var(--mist);
+  padding: 10px;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-item:hover:not(.is-taken),
+.equip-item:focus-visible:not(.is-taken) {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+}
+
+.equip-item.is-taken {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.equip-item-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--amber-dim);
+  color: var(--amber);
+}
+
+.equip-item-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  flex: 1;
+}
+
+.equip-item-name {
+  font-weight: 600;
+  color: #f3ecdc;
+}
+
+.equip-item-effects {
+  font-size: 0.78rem;
+  color: var(--mist-dim);
+}
+
+.equip-item-state {
+  flex: none;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.equip-item.is-on .equip-item-state {
+  color: var(--amber);
+}
+
+.equip-unequip {
+  width: 100%;
+  appearance: none;
+  border: 1px dashed rgba(224, 122, 122, 0.5);
+  background: rgba(107, 45, 58, 0.18);
+  color: #e8b4bc;
+  padding: 9px 12px;
+  font-size: 0.86rem;
+  cursor: pointer;
+  margin-bottom: 8px;
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+
+.equip-unequip:hover,
+.equip-unequip:focus-visible {
+  border-color: #e07a7a;
+  background: rgba(107, 45, 58, 0.3);
+  outline: none;
+}
+
+.deploy-card .equip-btn {
+  transition:
+    color 0.15s ease,
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease;
+}
+
+.deploy-card .equip-btn:hover,
+.deploy-card .equip-btn:focus-visible {
+  box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}
+```
+
+Сюда переносятся все правила снаряжения.
+
+---
+
+## 7.12. `app/packages/ui/src/campaign/11-deployment.css`
+
+```css
+/* ============================================================
+ * 11-deployment.css
+ * Экран формирования высадки.
+ * ============================================================ */
+
+.deployment-screen {
+  max-width: 720px;
+}
+
+@media (min-width: 1400px) {
+  .deployment-screen {
+    max-width: 960px;
+  }
+}
+
+.deployment-head {
+  margin-bottom: 20px;
+}
+
+.deployment-head .display-title {
+  font-size: clamp(2rem, 8vw, 2.6rem);
+}
+
+.deployment-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 480px) {
+  .deployment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deploy-card {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+.deploy-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  appearance: none;
+  border: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--ink-2), var(--ink));
+  color: var(--mist);
+  padding: 12px;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s ease,
+    transform 0.12s ease,
+    box-shadow 0.15s ease,
+    background 0.15s ease;
+}
+
+.deploy-card:hover,
+.deploy-card:focus-visible {
+  border-color: var(--amber-dim);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.deploy-card.is-picked {
+  border-color: var(--amber);
+  background: linear-gradient(180deg, #2c2a20, #201d14);
+  box-shadow:
+    0 0 0 1px rgba(224, 179, 74, 0.35),
+    0 6px 18px rgba(0, 0, 0, 0.3);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.deploy-card.is-wounded {
+  border-left: 3px solid #a03a4e;
+}
+
+.deploy-face {
+  position: relative;
+  flex: none;
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
+  overflow: visible;
+  color: var(--mist-dim);
+}
+
+.deploy-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.deploy-face-empty {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.deploy-face svg {
+  width: 70%;
+  height: 70%;
+}
+
+.wound-badge {
+  position: absolute;
+  right: -4px;
+  bottom: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #a03a4e;
+  border: 2px solid #14181c;
+  display: grid;
+  place-items: center;
+}
+
+.wound-badge::after {
+  content: "✚";
+  color: #f3ecdc;
+  font-size: 0.7rem;
+  line-height: 1;
+}
+
+.deploy-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.deploy-name {
+  font-weight: 600;
+  color: #f3ecdc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.deploy-class {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--amber);
+}
+
+.deploy-hp {
+  font-size: 0.8rem;
+  color: var(--mist-dim);
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+
+.deploy-wound-note {
+  font-size: 0.72rem;
+  color: #e07a7a;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.pick-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  font-size: 0.72rem;
+  color: transparent;
+  transition:
+    color 0.12s ease,
+    background 0.12s ease,
+    border-color 0.12s ease;
+}
+
+.deploy-card.is-picked .pick-mark {
+  color: var(--ink);
+  background: var(--amber);
+  border-color: var(--amber);
+}
+
+.deployment-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.deployment-count {
+  margin: 0;
+  color: var(--mist-dim);
+  font-size: 0.9rem;
+}
+
+.deployment-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: auto;
+}
+
+.deploy-confirm {
+  min-width: 150px;
+  justify-content: center;
+}
+
+.deploy-confirm:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+```
+
+Сюда переносятся все правила экрана высадки.
+
+---
+
+## 7.13. `app/packages/ui/src/campaign/12-pvp.css`
+
+```css
+/* ============================================================
+ * 12-pvp.css
+ * Поочерёдная игра, PvP, драфт.
+ * ============================================================ */
+
+.pvp-room-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 28px 20px;
+}
+
+.pvp-arena {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.pvp-side-card {
+  min-width: 260px;
+  padding: 16px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.6);
+  animation: pvp-side-in 420ms ease-out both;
+}
+
+.pvp-side-card.is-side1 {
+  border-top: 3px solid #e0b34a;
+  animation-delay: 60ms;
+}
+
+.pvp-side-card.is-side2 {
+  border-top: 3px solid #6aa9d9;
+  animation-delay: 120ms;
+}
+
+.is-side1 .pvp-side-title {
+  color: var(--amber, #e0b34a);
+}
+
+.is-side2 .pvp-side-title {
+  color: #6aa9d9;
+}
+
+.pvp-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pvp-slot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  transition:
+    transform 160ms ease,
+    background 160ms ease;
+}
+
+.pvp-slot:hover {
+  transform: translateX(3px);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.pvp-slot-face {
+  width: 34px;
+  height: 34px;
+  border-radius: 4px;
+}
+
+.pvp-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  justify-content: center;
+  width: 100%;
+  max-width: 640px;
+}
+
+.pvp-option-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pvp-option-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9aa39a;
+}
+
+.pvp-radio {
+  padding: 6px 14px;
+  border: 1px solid rgba(120, 140, 160, 0.3);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.55);
+  color: #c9c2b2;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.pvp-check input {
+  accent-color: #e0b34a;
+}
+
+.draft {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 640px;
+}
+
+.draft-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.draft-side {
+  padding: 6px 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  transition: all 200ms ease;
+}
+
+.draft-side.is-side1 {
+  color: var(--amber, #e0b34a);
+}
+
+.draft-side.is-side2 {
+  color: #6aa9d9;
+}
+
+.draft-side.is-current {
+  border-color: rgba(224, 179, 74, 0.7);
+  box-shadow: 0 0 14px rgba(224, 179, 74, 0.35);
+  animation: draft-glow 1.6s ease-in-out infinite;
+}
+
+.draft-side.is-full {
+  border-color: rgba(120, 190, 130, 0.5);
+  color: #8fd89a;
+}
+
+.draft-vs {
+  color: #8fa1ad;
+}
+
+.draft-hint {
+  margin: 0;
+  color: #c9c2b2;
+  font-size: 0.85rem;
+}
+
+.draft-done {
+  margin: 0;
+  color: #8fd89a;
+  font-size: 0.9rem;
+  animation: net-ok 300ms ease-out;
+}
+
+.draft-pool {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 10px;
+  width: 100%;
+}
+
+.draft-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 8px;
+  border: 1px solid rgba(120, 140, 160, 0.25);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.55);
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.draft-card:hover:not(:disabled) {
+  transform: translateY(-3px);
+  border-color: rgba(224, 179, 74, 0.6);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.draft-card:disabled {
+  cursor: default;
+}
+
+.draft-card.is-taken {
+  opacity: 0.4;
+  border-style: dashed;
+}
+
+.draft-face {
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  object-fit: cover;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.draft-name {
+  font-size: 0.78rem;
+  color: #e8e2d4;
+  text-align: center;
+}
+
+.draft-taken-mark {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  color: #8fd89a;
+  font-weight: 700;
+}
+
+.pvp-start-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.spectator-bar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.spectator-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.9rem;
+  color: #8fa1ad;
+  letter-spacing: 0.06em;
+}
+
+.spectator-eye {
+  color: #6aa9d9;
+  animation: eye-blink 2.4s ease-in-out infinite;
+}
+```
+
+Сюда переносятся все PvP-правила.
+
+---
+
+## 7.14. `app/packages/ui/src/campaign/13-net.css`
+
+```css
+/* ============================================================
+ * 13-net.css
+ * Сетевые панели, коды, подключения, ошибки.
+ * ============================================================ */
+
+.pvp-tabs,
+.net-role-switch {
+  display: flex;
+  gap: 8px;
+  margin: 6px 0 4px;
+}
+
+.pvp-tab {
+  padding: 8px 18px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 4px;
+  background: rgba(12, 16, 12, 0.55);
+  color: #9aa39a;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  cursor: pointer;
+  transition: all 180ms ease;
+}
+
+.pvp-tab:hover {
+  color: #e8e2d4;
+  border-color: rgba(224, 179, 74, 0.5);
+}
+
+.pvp-tab.is-active {
+  color: var(--amber, #e0b34a);
+  border-color: rgba(224, 179, 74, 0.65);
+  background: rgba(58, 49, 32, 0.5);
+  box-shadow: inset 0 -2px 0 rgba(224, 179, 74, 0.7);
+}
+
+.net-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.net-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 18px;
+  border: 1px solid rgba(120, 140, 160, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.5);
+  animation: net-panel-in 300ms ease-out;
+}
+
+.net-code-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 14px;
+  border: 1px dashed rgba(224, 179, 74, 0.45);
+  border-radius: 8px;
+  background: rgba(224, 179, 74, 0.05);
+}
+
+.net-qr {
+  width: 160px;
+  height: 160px;
+  border-radius: 6px;
+  image-rendering: pixelated;
+  box-shadow: 0 0 24px rgba(224, 179, 74, 0.25);
+  animation: qr-in 400ms ease-out;
+}
+
+.net-code {
+  max-width: 100%;
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 0.72rem;
+  color: #e8cf9a;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 8px 10px;
+  border-radius: 4px;
+}
+
+.net-input-label {
+  align-self: flex-start;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  color: #9aa39a;
+  text-transform: uppercase;
+}
+
+.net-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(120, 140, 160, 0.3);
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.35);
+  color: #f3ecdc;
+  font-family: monospace;
+  font-size: 0.8rem;
+  transition: border-color 180ms ease;
+}
+
+.net-input:focus {
+  outline: none;
+  border-color: rgba(224, 179, 74, 0.7);
+}
+
+.net-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+}
+
+.net-connected {
+  color: #8fd89a;
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+  animation: net-ok 300ms ease-out;
+}
+
+.net-error {
+  color: #e07a6a;
+  font-size: 0.85rem;
+  border-left: 2px solid #e07a6a;
+  padding-left: 10px;
+  animation: net-err 240ms ease-out;
+}
+
+.net-lost-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+```
+
+Сюда переносятся все сетевые правила.
+
+---
+
+## 7.15. `app/packages/ui/src/campaign/14-replay.css`
+
+```css
+/* ============================================================
+ * 14-replay.css
+ * Повторы.
+ * ============================================================ */
+
+.replay-screen {
+  gap: 16px;
+}
+
+.replay-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 560px;
+}
+
+.replay-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 12px 16px;
+  border: 1px solid rgba(120, 140, 160, 0.22);
+  border-radius: 8px;
+  background: rgba(12, 16, 12, 0.55);
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease;
+}
+
+.replay-row:hover {
+  border-color: rgba(106, 169, 217, 0.5);
+  transform: translateX(3px);
+}
+
+.replay-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.replay-title {
+  color: #e8e2d4;
+  font-size: 0.92rem;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.replay-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+
+.replay-badge-warn {
+  color: var(--amber, #e0b34a);
+}
+
+.replay-badge-off {
+  color: #c9807a;
+}
+
+.replay-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.replay-progress {
+  height: 10px;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.replay-progress i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #4a8fc9, #6aa9d9);
+  transition: width 200ms linear;
+}
+
+.replay-done {
+  color: #8fd89a;
+  font-size: 0.8rem;
+  animation: net-ok 300ms ease-out;
+}
+```
+
+Сюда переносятся все правила повторов.
+
+---
+
+## 7.16. `app/packages/ui/src/campaign/15-training.css`
+
+```css
+/* ============================================================
+ * 15-training.css
+ * Обучение: экран, карточки, наставник, подсказки, прогресс.
+ * ============================================================ */
+
+.training-screen {
+  gap: 18px;
+}
+
+.training-mentor-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 10px 14px;
+  max-width: 560px;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  border-radius: 10px;
+  background: rgba(12, 16, 12, 0.55);
+  text-align: left;
+}
+
+.training-mentor-row .training-mentor-face {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  object-fit: cover;
+  flex: none;
+}
+
+.training-mentor-row .training-mentor-line {
+  color: #d8d2c2;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.training-mentor-row b {
+  color: var(--amber, #e0b34a);
+  font-weight: 600;
+}
+
+.training-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  width: 100%;
+  max-width: 720px;
+}
+
+.training-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 16px;
+  border: 1px solid rgba(120, 140, 160, 0.28);
+  border-radius: 10px;
+  background: rgba(12, 16, 12, 0.6);
+  color: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition: all 220ms ease;
+  animation: training-card-in 420ms ease-out both;
+}
+
+.training-card:nth-child(2) {
+  animation-delay: 90ms;
+}
+
+.training-card:nth-child(3) {
+  animation-delay: 180ms;
+}
+
+.training-card-icon {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  color: var(--amber, #e0b34a);
+  background: radial-gradient(circle at 32% 28%, #3a3120, #241d12);
+}
+
+.training-card.is-done .training-card-icon {
+  border-color: rgba(120, 190, 130, 0.5);
+  color: #8fd89a;
+}
+
+.training-card-index {
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #8fa1ad;
+}
+
+.training-card-title {
+  font-family: Palatino, "Palatino Linotype", serif;
+  font-size: 1.15rem;
+  color: #f3ecdc;
+}
+
+.training-card-desc {
+  font-size: 0.82rem;
+  color: #9aa39a;
+  line-height: 1.45;
+}
+
+.training-card-footer {
+  margin-top: 4px;
+}
+
+.training-start {
+  color: var(--amber, #e0b34a);
+  font-size: 0.85rem;
+  letter-spacing: 0.06em;
+}
+
+.training-done-mark {
+  color: #8fd89a;
+  font-size: 0.85rem;
+}
+
+.training-all-done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  max-width: 560px;
+  padding: 16px 20px;
+  border: 1px solid rgba(140, 200, 150, 0.45);
+  border-radius: 10px;
+  background: rgba(16, 30, 20, 0.5);
+  text-align: center;
+  animation: training-card-in 420ms ease-out both;
+}
+
+.training-all-done-title {
+  margin: 0;
+  color: #cfe8c0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.training-all-done .btn {
+  margin-top: 6px;
+}
+
+.training-coach {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid rgba(224, 179, 74, 0.35);
+  border-radius: 10px;
+  background: rgba(12, 16, 12, 0.55);
+}
+
+.training-coach-face {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  border: 1px solid rgba(224, 179, 74, 0.5);
+  object-fit: cover;
+  flex: none;
+}
+
+.training-coach-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.training-coach-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.training-coach-name {
+  color: var(--amber, #e0b34a);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.training-coach-line {
+  margin: 0;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  color: #d8d2c2;
+}
+
+.training-step-dots {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-left: 8px;
+  max-width: 72px;
+  pointer-events: none;
+}
+
+.training-step-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(120, 140, 160, 0.35);
+  transition:
+    background 200ms ease,
+    transform 200ms ease;
+}
+
+.training-step-dot.is-done {
+  background: rgba(150, 200, 150, 0.8);
+}
+
+.training-step-dot.is-current {
+  background: var(--amber, #e0b34a);
+  transform: scale(1.3);
+}
+
+.training-note {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(16, 22, 16, 0.94);
+  border: 1px solid rgba(224, 179, 74, 0.55);
+  border-radius: 8px;
+  color: #f3ecdc;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 71;
+  pointer-events: none;
+  animation: hint-in var(--pop-duration, 240ms) var(--pop-ease, ease-out);
+}
+
+.training-note-mark {
+  color: var(--amber, #e0b34a);
+  flex: none;
+}
+
+.training-skip {
+  flex: none;
+  margin-left: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(120, 140, 160, 0.4);
+  border-radius: 10px;
+  background: rgba(28, 35, 32, 0.9);
+  color: #c9c2b0;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color 160ms ease,
+    color 160ms ease;
+}
+```
+
+Сюда переносятся все правила обучения.
+
+---
+
+## 7.17. `app/packages/ui/src/campaign/16-campaign-hints.css`
+
+```css
+/* ============================================================
+ * 16-campaign-hints.css
+ * Кампейн-подсказки и сюжетные карточки.
+ * ============================================================ */
+
+.campaign-hint-card {
+  border-color: rgba(224, 179, 74, 0.5);
+  animation: campaign-hint-in 320ms ease-out both;
+}
+
+.campaign-hint-body {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.campaign-hint-face {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  border: 2px solid rgba(224, 179, 74, 0.55);
+  object-fit: cover;
+  flex: none;
+  box-shadow: 0 0 0 3px rgba(224, 179, 74, 0.12);
+}
+
+.campaign-hint-meta h2 {
+  font-size: 1.05rem;
+  line-height: 1.25;
+}
+
+.campaign-hint-meta .muted {
+  margin: 4px 0 0;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.campaign-hint-banner {
+  position: absolute;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: min(92%, 620px);
+  padding: 10px 12px 10px 10px;
+  background: rgba(16, 22, 16, 0.94);
+  border: 1px solid rgba(224, 179, 74, 0.55);
+  border-radius: 8px;
+  color: #f3ecdc;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 72;
+  animation: campaign-hint-in-banner 320ms ease-out both;
+  pointer-events: auto;
+}
+
+.campaign-hint-banner .campaign-hint-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.campaign-hint-banner .campaign-hint-face {
+  width: 52px;
+  height: 52px;
+}
+
+.campaign-hint-banner .campaign-hint-meta h2 {
+  font-size: 0.98rem;
+}
+
+.campaign-hint-banner .campaign-hint-meta .muted {
+  font-size: 0.84rem;
+}
+
+.campaign-hint-banner .hud-btn {
+  flex: none;
+  margin-top: 0;
+  width: auto;
+  padding: 8px 14px;
+}
+
+.story-note-card {
+  border-color: rgba(224, 179, 74, 0.45);
+  animation: story-note-in 220ms ease-out both;
+}
+
+.story-note-text {
+  margin: 0 0 4px;
+  color: #f3ecdc;
+  font-size: 0.98rem;
+  line-height: 1.45;
+  text-wrap: balance;
+}
+```
+
+Сюда переносятся все правила подсказок.
+
+---
+
+## 7.18. `app/packages/ui/src/campaign/17-result.css`
+
+```css
+/* ============================================================
+ * 17-result.css
+ * Итог миссии и результаты дружины.
+ * ============================================================ */
+
+.mission-result-screen {
+  max-width: 480px;
+  align-items: center;
+  text-align: center;
+}
+
+@media (min-width: 1400px) {
+  .mission-result-screen {
+    max-width: 560px;
+  }
+}
+
+.result-emblem {
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 22px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+}
+
+.result-emblem.is-victory {
+  border: 2px solid var(--amber);
+  background: radial-gradient(circle at 34% 30%, #3a3120, #1d1a12);
+  color: var(--amber);
+  box-shadow: 0 0 34px rgba(224, 179, 74, 0.22);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.result-emblem.is-defeat {
+  border: 2px solid #6b2d3a;
+  background: radial-gradient(circle at 34% 30%, #2a1d22, #171114);
+  color: #c96a7a;
+  box-shadow: 0 0 26px rgba(107, 45, 58, 0.25);
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.mission-result-screen .eyebrow {
+  margin-bottom: 4px;
+}
+
+.mission-result-screen .menu-brand {
+  margin-bottom: 0;
+}
+
+.mission-result-screen .display-title {
+  font-size: clamp(2rem, 8vw, 2.8rem);
+}
+
+.mission-result-screen .menu-nav {
+  width: 100%;
+  margin-top: 26px;
+}
+
+.darkness-summary {
+  margin-top: 18px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  text-align: left;
+}
+
+.darkness-summary .summary-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 0.86rem;
+  color: var(--mist-dim);
+  margin-bottom: 8px;
+}
+
+.darkness-summary .summary-line b {
+  color: #e07a7a;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-weight: 600;
+}
+
+.darkness-summary .darkness-bar {
+  display: block;
+  width: 100%;
+}
+
+.darkness-summary .darkness-bar i {
+  background: linear-gradient(90deg, #4a2530, #7a3242);
+}
+
+.darkness-summary .darkness-bar b {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  display: block;
+  background: linear-gradient(90deg, #a03a4e, #c14a60);
+  animation: gain-grow 0.7s ease both;
+}
+
+.loss-banner {
+  margin-top: 16px;
+  border: 1px solid rgba(224, 122, 122, 0.5);
+  background: linear-gradient(180deg, rgba(107, 45, 58, 0.28), rgba(107, 45, 58, 0.12));
+  color: #e8b4bc;
+  padding: 12px 14px;
+  font-size: 0.92rem;
+}
+
+.campaign-lost-card {
+  border: 1px solid rgba(224, 122, 122, 0.45);
+}
+
+.campaign-lost-card h2 {
+  color: #e8b4bc;
+}
+
+.rewards-strip {
+  width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(127, 168, 87, 0.35);
+  background: linear-gradient(180deg, rgba(31, 42, 29, 0.55), rgba(23, 31, 21, 0.4));
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.rewards-title {
+  font-size: 0.76rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #a9c88a;
+}
+
+.reward-gain {
+  animation: reward-pop 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+
+.reward-gain:nth-child(3) {
+  animation-delay: 0.1s;
+}
+
+.reward-gain:nth-child(4) {
+  animation-delay: 0.2s;
+}
+
+.roster-outcomes {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.outcome-group {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  background: var(--ink-2);
+  text-align: left;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.outcome-icon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  color: var(--mist-dim);
+}
+
+.outcome-group.is-fallen .outcome-icon {
+  color: #8fa1ad;
+}
+
+.outcome-group.is-wounded .outcome-icon {
+  color: #e07a7a;
+  border-color: rgba(224, 122, 122, 0.45);
+}
+
+.outcome-group.is-level .outcome-icon {
+  color: var(--amber);
+  border-color: var(--amber-dim);
+}
+
+.outcome-group.is-recruit .outcome-icon {
+  color: #9b6bbf;
+  border-color: rgba(155, 107, 191, 0.45);
+  font-size: 0.9rem;
+}
+
+.outcome-title {
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--mist-dim);
+}
+
+.outcome-names {
+  margin: 2px 0 0;
+  color: #f3ecdc;
+  font-size: 0.95rem;
+}
+```
+
+Сюда переносятся все правила итога миссии.
+
+---
+
+## 7.19. `app/packages/ui/src/campaign/18-keyframes.css`
+
+```css
+/* ============================================================
+ * 18-keyframes.css
+ * Анимации кампании и связанных экранов.
+ * ============================================================ */
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes marker-ring {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.9;
+  }
+  70% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+  100% {
+    transform: scale(1.7);
+    opacity: 0;
+  }
+}
+
+@keyframes road-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes pvp-side-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes draft-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 6px rgba(224, 179, 74, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 16px rgba(224, 179, 74, 0.5);
+  }
+}
+
+@keyframes net-panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes qr-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes net-ok {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes net-err {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes eye-blink {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.3;
+  }
+}
+
+@keyframes training-card-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hint-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes campaign-hint-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes campaign-hint-in-banner {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+@keyframes story-note-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes gain-grow {
+  from {
+    width: 0;
+  }
+}
+
+@keyframes crafted-in {
+  0% {
+    transform: scale(0.96);
+    box-shadow: 0 0 0 0 rgba(127, 168, 87, 0.6);
+  }
+  55% {
+    transform: scale(1.02);
+    box-shadow: 0 0 0 8px rgba(127, 168, 87, 0);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@keyframes radar-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes reward-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+```
+
+В этот файл переносятся все `@keyframes`, которые относятся к кампании и связанным экранам.
+
+Важно: если в исходном файле есть другие анимации с теми же именами, их нужно сохранить и не переименовывать.
+
+---
+
+## 7.20. `app/packages/ui/src/campaign/19-responsive.css`
+
+```css
+/* ============================================================
+ * 19-responsive.css
+ * Адаптивные правила, которые относятся к кампании и связанным экранам.
+ * ============================================================ */
+
+/*
+ * Сюда переносятся все медиа-запросы, которые в старом файле идут
+ * отдельно в конце и переопределяют уже описанные выше компоненты.
+ *
+ * Важно: правила внутри этого файла должны сохранить исходный порядок.
+ */
+
+@media (max-width: 480px) {
+  .deployment-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deploy-card {
+    padding: 10px;
+    gap: 10px;
+  }
+}
+
+/* Ниже добавляются остальные медиа-правила из старого файла. */
+```
+
+Если в старом файле адаптивные правила принадлежат конкретному компоненту и стоят рядом с ним, лучше оставить их в файле компонента.
+
+В `19-responsive.css` нужно выносить только глобальные адаптивные блоки, которые в исходном файле находятся отдельно в конце.
+
+---
+
+## 7.21. `app/packages/ui/src/campaign/20-reduced-motion.css`
+
+```css
+/* ============================================================
+ * 20-reduced-motion.css
+ * Уменьшение движения.
+ * Этот файл должен подключаться последним.
+ * ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .map-fog,
+  .ship-marker,
+  .map-marker.is-open .marker-medallion,
+  .mission-card,
+  .result-emblem,
+  .darkness-summary .darkness-bar b,
+  .deployment-grid .deploy-card,
+  .roster-outcomes .outcome-group,
+  .wound-badge,
+  .campaign-tab.is-active .tab-alert,
+  .forge-card.is-crafted,
+  .scan-btn svg {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .ship-flight-layer {
+    display: none;
+  }
+
+  .ship-marker.is-flying,
+  .campaign-map.is-flying .ship-marker {
+    animation: none;
+    left: var(--ship-to-x);
+    top: var(--ship-to-y);
+    transform: translate(-50%, -50%);
+  }
+}
+```
+
+Этот файл должен быть последним в списке импортов, если в исходном файле `prefers-reduced-motion` находился в конце.
+
+---
+
+# 8. Карта переноса
+
+Чтобы ничего не потерять, используйте следующую карту.
+
+| Старый блок | Новый файл |
+|---|---|
+| `.campaign-screen` | `campaign/00-screen.css` |
+| `.campaign-top`, `.campaign-exit-btn`, `.campaign-title-block` | `campaign/01-top.css` |
+| `.campaign-darkness`, `.darkness-bar`, `.campaign-resources`, `.resource` | `campaign/02-darkness-resources.css` |
+| `.campaign-map`, `.map-terrain`, `.map-fog` | `campaign/03-map.css` |
+| `.map-marker`, `.marker-medallion`, `.marker-label` | `campaign/04-map-markers.css` |
+| `.map-road`, `.road-seg`, `.ship-marker`, `.ship-flight-layer` | `campaign/05-map-road.css` |
+| `.mission-panel`, `.mission-card`, `.mission-head`, `.mission-actions` | `campaign/06-mission-panel.css` |
+| `.campaign-tabs`, `.campaign-tab`, `.tab-note`, `.tab-alert` | `campaign/07-campaign-tabs.css` |
+| `.roster-panel`, `.fighter-row`, `.fighter-face`, `.class-card` | `campaign/08-roster.css` |
+| `.forge-panel`, `.forge-card`, `.craft-btn`, `.crafted-tag` | `campaign/09-forge.css` |
+| `.equip-chip`, `.equip-btn`, `.equip-card`, `.equip-item` | `campaign/10-equipment.css` |
+| `.deployment-screen`, `.deploy-card`, `.deploy-face`, `.deployment-foot` | `campaign/11-deployment.css` |
+| `.pvp-room-screen`, `.pvp-side-card`, `.draft`, `.spectator-bar` | `campaign/12-pvp.css` |
+| `.net-setup`, `.net-panel`, `.net-code-box`, `.net-input` | `campaign/13-net.css` |
+| `.replay-screen`, `.replay-list`, `.replay-row`, `.replay-badge` | `campaign/14-replay.css` |
+| `.training-screen`, `.training-card`, `.training-coach`, `.training-note` | `campaign/15-training.css` |
+| `.campaign-hint-card`, `.campaign-hint-banner`, `.story-note-card` | `campaign/16-campaign-hints.css` |
+| `.mission-result-screen`, `.result-emblem`, `.roster-outcomes` | `campaign/17-result.css` |
+| `@keyframes` | `campaign/18-keyframes.css` |
+| глобальные `@media`-адаптивности | `campaign/19-responsive.css` |
+| `@media (prefers-reduced-motion: reduce)` | `campaign/20-reduced-motion.css` |
+
+---
+
+# 9. Что нельзя делать при этом рефакторинге
+
+Нельзя:
+
+1. Переименовывать классы.
+2. Удалять комментарии версий.
+3. Менять `z-index`.
+4. Менять порядок `@import`.
+5. Менять порядок `@media`, если они стоят в конце файла.
+6. Объединять селекторы, если раньше они были раздельными.
+7. Разделять селекторы, если раньше они были объединены.
+8. Заменять цвета на CSS-переменные без явной необходимости.
+9. Добавлять новые `!important`.
+10. Убирать `!important`, если он уже есть в исходных правилах.
+11. Переносить `prefers-reduced-motion` выше по каскаду без проверки.
+12. Менять имена `@keyframes`.
+
+---
+
+# 10. Проверка после рефакторинга
+
+После переноса выполнить:
+
+```bash
+pnpm exec prettier --write \
+  app/packages/ui/src/campaign.css \
+  app/packages/ui/src/campaign/*.css
+```
+
+Затем:
+
+```bash
+pnpm -F ui build
+pnpm -F ui test
+```
+
+Если в CI есть отдельные проверки форматирования, выполнить:
+
+```bash
+pnpm format:check
+```
+
+или эквивалент.
+
+Проверить размер:
+
+```bash
+wc -l app/packages/ui/src/campaign.css
+wc -l app/packages/ui/src/campaign/*.css
+```
+
+Ожидаемый результат:
+
+```text
+app/packages/ui/src/campaign.css < 1000 строк
+```
+
+Фактически итоговый `campaign.css` будет около 20–30 строк.
+
+---
+
+# 11. Требования к финальному состоянию
+
+После рефакторинга должно быть выполнено:
+
+1. `campaign.css` остаётся единственной точкой входа.
+2. `campaign.css` содержит только `@import` и, при необходимости, краткий комментарий.
+3. Все стили кампании разнесены по файлам в `campaign/`.
+4. Каждый файл отвечает за одну предметную область.
+5. Порядок подключений повторяет исходный каскад.
+6. Все анимации сохранены.
+7. Все `prefers-reduced-motion` сохранены.
+8. Форматирование выполнено с шириной строки 120.
+9. Сборка проходит.
+10. Тесты проходят.
+11. Визуальные экраны не изменились.
+
+---
+
+# 12. Рекомендуемый формат коммитов
+
+Лучше разбить работу на несколько атомарных коммитов:
+
+```text
+style(ui): create campaign css module folder
+style(ui): extract campaign screen and top styles
+style(ui): extract darkness and resource styles
+style(ui): extract campaign map styles
+style(ui): extract map markers and road styles
+style(ui): extract mission panel styles
+style(ui): extract campaign tabs styles
+style(ui): extract roster and forge styles
+style(ui): extract deployment and pvp styles
+style(ui): extract replay, training and hints styles
+style(ui): extract result and keyframes styles
+style(ui): make campaign.css an import entry point
+```
+
+Каждый коммит должен оставлять проект рабочим.
+
+---
+
+# 13. Главный принцип итогового состояния
 
 После рефакторинга:
 
 ```text
-BattleScreenView.tsx — публичный вход.
-useBattleScreenModel.ts — композиция состояния экрана.
-battle-screen/useBattle*.ts — логические доменные хуки.
-battle-screen/Battle*.tsx — презентационные блоки.
+campaign.css — точка входа.
+campaign/*.css — предметные модули.
 ```
 
-Экран боя становится собираемым из независимых частей:
+Стили становятся читаемыми и сопровождаемыми:
 
-- состояние боя;
-- намерение игрока;
-- команды;
+- экран;
+- шапка;
+- Тьма и ресурсы;
+- карта;
+- маркеры;
+- дорога;
+- миссия;
+- вкладки;
+- дружина;
+- Кузня;
+- снаряжение;
+- высадка;
+- PvP;
+- сеть;
+- повторы;
 - обучение;
-- пролог;
-- повтор;
-- ход Нави;
-- рендерер;
-- исход;
 - подсказки;
-- панели;
-- диалоги.
+- итог;
+- анимации;
+- адаптивность;
+- снижение движения.
 
-Это снижает размер корневого файла, упрощает тестирование и позволяет дальше развивать боевой экран без риска сломать весь `BattleScreenView.tsx`.
+При этом публичный импорт остаётся прежним:
+
+```ts
+import "./campaign.css";
+```
+
+и ни один потребитель кода не должен знать о внутренней разбивке.
