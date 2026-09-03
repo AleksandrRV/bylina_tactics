@@ -231,9 +231,7 @@ export function paintFringe(fringeLayer: Graphics, view: FieldView | null, destr
     const r = item.size * CELL_SIZE;
     if (item.kind === "canopy") {
       fringeLayer.ellipse(x, y, r * 0.62, r * 0.5).fill({ color: canopy, alpha: item.alpha });
-      fringeLayer
-        .ellipse(x - r * 0.14, y - r * 0.18, r * 0.4, r * 0.3)
-        .fill({ color: leaf, alpha: item.alpha * 0.7 });
+      fringeLayer.ellipse(x - r * 0.14, y - r * 0.18, r * 0.4, r * 0.3).fill({ color: leaf, alpha: item.alpha * 0.7 });
       // Ствол виден только у самой кромки: в глубине лес сливается в тень.
       if (item.alpha > 0.45) {
         fringeLayer

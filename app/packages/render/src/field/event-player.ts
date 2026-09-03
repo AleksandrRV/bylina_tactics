@@ -36,7 +36,21 @@ export async function playCombat(
   event: Extract<GameEvent, { type: "COMBAT_RESOLVED" }>,
   ctx: EventPlayerCtx,
 ): Promise<void> {
-  const { entityById, entityPixel, focusOn, wait, tween, shake, pushFloat, fxs, lunges, bumps, flashes, display, missLabel } = ctx;
+  const {
+    entityById,
+    entityPixel,
+    focusOn,
+    wait,
+    tween,
+    shake,
+    pushFloat,
+    fxs,
+    lunges,
+    bumps,
+    flashes,
+    display,
+    missLabel,
+  } = ctx;
   const source = entityById(event.sourceId);
   const target = entityById(event.targetId);
   if (!source || !target) return;
@@ -55,9 +69,15 @@ export async function playCombat(
     const len = Math.max(1, Math.hypot(reachX, reachY));
     const lungeX = (reachX / len) * Math.min(19, len * 0.45);
     const lungeY = (reachY / len) * Math.min(19, len * 0.45);
-    await tween(140, (t) => { const e = easeOut(t); lunges.set(event.sourceId, { dx: lungeX * e, dy: lungeY * e }); });
+    await tween(140, (t) => {
+      const e = easeOut(t);
+      lunges.set(event.sourceId, { dx: lungeX * e, dy: lungeY * e });
+    });
     impact();
-    await tween(170, (t) => { const e = 1 - easeOut(t); lunges.set(event.sourceId, { dx: lungeX * e, dy: lungeY * e }); });
+    await tween(170, (t) => {
+      const e = 1 - easeOut(t);
+      lunges.set(event.sourceId, { dx: lungeX * e, dy: lungeY * e });
+    });
     lunges.delete(event.sourceId);
   } else {
     const sign = (event.sourceId + event.targetId) % 2 === 0 ? 1 : -1;
@@ -107,17 +127,41 @@ export async function playSkill(
   const targetPos = event.targetPos;
   const to = targetPos ? centerOf(targetPos.x, targetPos.y, targetPos.z) : (target ?? from);
   await focusOn((from.cx + to.cx) / 2, (from.cy + to.cy) / 2);
-  fxs.push({ kind: "skill", x0: from.cx, y0: from.cy, x1: to.cx, y1: to.cy, start: performance.now(), dur: 560, style: event.skillId, success: event.success });
+  fxs.push({
+    kind: "skill",
+    x0: from.cx,
+    y0: from.cy,
+    x1: to.cx,
+    y1: to.cy,
+    start: performance.now(),
+    dur: 560,
+    style: event.skillId,
+    success: event.success,
+  });
   await wait(280);
 }
 
 export async function playOne(event: GameEvent, ctx: EventPlayerCtx): Promise<void> {
-  const { display, dying, fxs, view, entityById, entityPixel, displayPixel, focusOn, wait, tween, shake, pushFloat } = ctx;
+  const { display, dying, fxs, view, entityById, entityPixel, displayPixel, focusOn, wait, tween, shake, pushFloat } =
+    ctx;
 
-  if (event.type === "SKILL_RESOLVED") { await playSkill(event, ctx); return; }
+  if (event.type === "SKILL_RESOLVED") {
+    await playSkill(event, ctx);
+    return;
+  }
   if (event.type === "STATUS_CHANGED") {
     const at = displayPixel(event.entityId);
-    if (at) { fxs.push({ kind: "status", x: at.cx, y: at.cy, start: performance.now(), status: event.status, applied: event.applied }); await wait(140); }
+    if (at) {
+      fxs.push({
+        kind: "status",
+        x: at.cx,
+        y: at.cy,
+        start: performance.now(),
+        status: event.status,
+        applied: event.applied,
+      });
+      await wait(140);
+    }
     return;
   }
   if (event.type === "STAT_CHANGED") {
@@ -130,23 +174,54 @@ export async function playOne(event: GameEvent, ctx: EventPlayerCtx): Promise<vo
     return;
   }
   if (event.type === "COVER_DESTROYED") {
-    const z = visualLevel(tileAt(view?.snapshot.grid ?? { width: 0, height: 0, tiles: [] }, event.gridPos.x, event.gridPos.y) ?? ({ pit: false, z: 0 } as any));
+    const z = visualLevel(
+      tileAt(view?.snapshot.grid ?? { width: 0, height: 0, tiles: [] }, event.gridPos.x, event.gridPos.y) ??
+        ({ pit: false, z: 0 } as any),
+    );
     const { cx, cy } = centerOf(event.gridPos.x, event.gridPos.y, z);
-    fxs.push({ kind: "shards", x: cx, y: cy - 4, start: performance.now(), seed: event.gridPos.x * 131 + event.gridPos.y * 7, palette: "wood" });
+    fxs.push({
+      kind: "shards",
+      x: cx,
+      y: cy - 4,
+      start: performance.now(),
+      seed: event.gridPos.x * 131 + event.gridPos.y * 7,
+      palette: "wood",
+    });
     void shake(2.4);
     return;
   }
   if (event.type === "ENTITY_SPAWNED") {
     const at = centerOf(event.entity.x, event.entity.y, event.entity.z);
-    fxs.push({ kind: "skill", x0: at.cx, y0: at.cy, x1: at.cx, y1: at.cy, start: performance.now(), dur: 520,
-      style: event.cause === "ILLUSION" ? "create_illusion" : event.cause === "RESURRECTION" ? "raise_skeleton" : "summon_forest_beast",
-      success: true });
+    fxs.push({
+      kind: "skill",
+      x0: at.cx,
+      y0: at.cy,
+      x1: at.cx,
+      y1: at.cy,
+      start: performance.now(),
+      dur: 520,
+      style:
+        event.cause === "ILLUSION"
+          ? "create_illusion"
+          : event.cause === "RESURRECTION"
+            ? "raise_skeleton"
+            : "summon_forest_beast",
+      success: true,
+    });
     await wait(260);
     return;
   }
   if (event.type === "ENTITY_REMOVED") {
     const at = displayPixel(event.entityId);
-    if (at) { fxs.push({ kind: event.reason === "EXTRACTED" ? "extract" : "poof", x: at.cx, y: at.cy, start: performance.now() }); await wait(event.reason === "EXTRACTED" ? 420 : 260); }
+    if (at) {
+      fxs.push({
+        kind: event.reason === "EXTRACTED" ? "extract" : "poof",
+        x: at.cx,
+        y: at.cy,
+        start: performance.now(),
+      });
+      await wait(event.reason === "EXTRACTED" ? 420 : 260);
+    }
     display.delete(event.entityId);
     return;
   }
@@ -155,29 +230,59 @@ export async function playOne(event: GameEvent, ctx: EventPlayerCtx): Promise<vo
     if (moved.length === 0) return;
     const shown = display.get(event.entityId);
     const first = moved[0];
-    if (shown && first) { shown.x = first.x; shown.y = first.y; shown.z = first.z; }
+    if (shown && first) {
+      shown.x = first.x;
+      shown.y = first.y;
+      shown.z = first.z;
+    }
     const entity = entityById(event.entityId);
-    if (entity) { const mid = moved[Math.floor(moved.length / 2)]; if (mid) { const { cx, cy } = centerOf(mid.x, mid.y, mid.z); await focusOn(cx, cy); } }
+    if (entity) {
+      const mid = moved[Math.floor(moved.length / 2)];
+      if (mid) {
+        const { cx, cy } = centerOf(mid.x, mid.y, mid.z);
+        await focusOn(cx, cy);
+      }
+    }
     const stepMs = event.isDash ? 58 : 76;
     for (let i = 1; i < moved.length; i += 1) {
-      const a = moved[i - 1]; const b = moved[i];
+      const a = moved[i - 1];
+      const b = moved[i];
       if (!a || !b || !shown) continue;
-      await tween(stepMs, (t) => { shown.x = a.x + (b.x - a.x) * t; shown.y = a.y + (b.y - a.y) * t; shown.z = a.z + (b.z - a.z) * t; });
+      await tween(stepMs, (t) => {
+        shown.x = a.x + (b.x - a.x) * t;
+        shown.y = a.y + (b.y - a.y) * t;
+        shown.z = a.z + (b.z - a.z) * t;
+      });
     }
     const last = moved[moved.length - 1];
-    if (last && shown) { shown.x = last.x; shown.y = last.y; shown.z = last.z; }
+    if (last && shown) {
+      shown.x = last.x;
+      shown.y = last.y;
+      shown.z = last.z;
+    }
     return;
   }
   if (event.type === "ENTITY_DISPLACED") {
     const shown = display.get(event.entityId);
     if (shown) {
-      shown.x = event.from.x; shown.y = event.from.y; shown.z = event.from.z;
-      await tween(150, (t) => { shown.x = event.from.x + (event.to.x - event.from.x) * t; shown.y = event.from.y + (event.to.y - event.from.y) * t; shown.z = event.from.z + (event.to.z - event.from.z) * t; });
-      shown.x = event.to.x; shown.y = event.to.y; shown.z = event.to.z;
+      shown.x = event.from.x;
+      shown.y = event.from.y;
+      shown.z = event.from.z;
+      await tween(150, (t) => {
+        shown.x = event.from.x + (event.to.x - event.from.x) * t;
+        shown.y = event.from.y + (event.to.y - event.from.y) * t;
+        shown.z = event.from.z + (event.to.z - event.from.z) * t;
+      });
+      shown.x = event.to.x;
+      shown.y = event.to.y;
+      shown.z = event.to.z;
     }
     return;
   }
-  if (event.type === "COMBAT_RESOLVED") { await playCombat(event, ctx); return; }
+  if (event.type === "COMBAT_RESOLVED") {
+    await playCombat(event, ctx);
+    return;
+  }
   if (event.type === "ENTITY_DIED") {
     const shown = display.get(event.entityId);
     if (shown) shown.hp = 0;
@@ -189,7 +294,14 @@ export async function playOne(event: GameEvent, ctx: EventPlayerCtx): Promise<vo
       if (event.causeOfDeath === "FALL_INTO_PIT" || tile?.pit === true) {
         fxs.push({ kind: "pitfall", x: cx, y: cy, start: performance.now() });
       } else {
-        fxs.push({ kind: "shards", x: cx, y: cy, start: performance.now(), seed: event.entityId * 17 + 3, palette: "dark" });
+        fxs.push({
+          kind: "shards",
+          x: cx,
+          y: cy,
+          start: performance.now(),
+          seed: event.entityId * 17 + 3,
+          palette: "dark",
+        });
         void shake(1.8);
       }
       await wait(700);
@@ -198,5 +310,7 @@ export async function playOne(event: GameEvent, ctx: EventPlayerCtx): Promise<vo
     if (shown) shown.dead = true;
     return;
   }
-  if (event.type === "TURN_CHANGED") { await wait(230); }
+  if (event.type === "TURN_CHANGED") {
+    await wait(230);
+  }
 }

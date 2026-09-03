@@ -28,8 +28,8 @@ import type { FieldView } from "./types.js";
 export function drawProtectionHighlights(g: Graphics, entity: EntityState, v: FieldView, alpha: number): void {
   const edges: { dx: number; dy: number; edge: 0 | 1 | 2 | 3 }[] = [
     { dx: 0, dy: -1, edge: 0 }, // north
-    { dx: 1, dy: 0, edge: 1 },  // east
-    { dx: 0, dy: 1, edge: 2 },  // south
+    { dx: 1, dy: 0, edge: 1 }, // east
+    { dx: 0, dy: 1, edge: 2 }, // south
     { dx: -1, dy: 0, edge: 3 }, // west
   ];
   for (const { dx, dy, edge } of edges) {
@@ -141,20 +141,42 @@ export function paintOverlays(g: Graphics, ctx: OverlayCtx): void {
       const { fx, fy } = faceOf(tile.x, tile.y, visualLevel(tile));
       const areaColor = 0xe07a2a;
       g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: areaColor, alpha: 0.12 + pulse * 0.06 });
-      g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6).stroke({ width: 2.2, color: areaColor, alpha: 0.72 + pulse * 0.18 });
-      g.rect(fx + 7, fy + 7, CELL_SIZE - 14, CELL_SIZE - 14).stroke({ width: 0.9, color: 0xffd18a, alpha: 0.3 + pulse * 0.18 });
-      const ally = caster && view.snapshot.entities.find(
-        (candidate) =>
-          !candidate.dead && candidate.coverType === 0 && candidate.id !== caster.id &&
-          candidate.owner === caster.owner && candidate.x === cell.x && candidate.y === cell.y,
-      );
+      g.rect(fx + 3, fy + 3, CELL_SIZE - 6, CELL_SIZE - 6).stroke({
+        width: 2.2,
+        color: areaColor,
+        alpha: 0.72 + pulse * 0.18,
+      });
+      g.rect(fx + 7, fy + 7, CELL_SIZE - 14, CELL_SIZE - 14).stroke({
+        width: 0.9,
+        color: 0xffd18a,
+        alpha: 0.3 + pulse * 0.18,
+      });
+      const ally =
+        caster &&
+        view.snapshot.entities.find(
+          (candidate) =>
+            !candidate.dead &&
+            candidate.coverType === 0 &&
+            candidate.id !== caster.id &&
+            candidate.owner === caster.owner &&
+            candidate.x === cell.x &&
+            candidate.y === cell.y,
+        );
       if (warnFriendly && ally) {
         g.rect(fx + 4, fy + 4, CELL_SIZE - 8, CELL_SIZE - 8)
           .fill({ color: AIM_IMPOSSIBLE, alpha: 0.1 + pulse * 0.06 })
           .stroke({ width: 2.8, color: AIM_IMPOSSIBLE, alpha: 0.86 + pulse * 0.12 });
-        g.moveTo(fx + 8, fy + 8).lineTo(fx + CELL_SIZE - 8, fy + CELL_SIZE - 8).stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
-        g.moveTo(fx + CELL_SIZE - 8, fy + 8).lineTo(fx + 8, fy + CELL_SIZE - 8).stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
-        g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 8).stroke({ width: 1.2, color: 0xffb3a8, alpha: 0.65 + pulse * 0.2 });
+        g.moveTo(fx + 8, fy + 8)
+          .lineTo(fx + CELL_SIZE - 8, fy + CELL_SIZE - 8)
+          .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
+        g.moveTo(fx + CELL_SIZE - 8, fy + 8)
+          .lineTo(fx + 8, fy + CELL_SIZE - 8)
+          .stroke({ width: 2.2, color: AIM_IMPOSSIBLE, alpha: 0.9 });
+        g.circle(fx + CELL_SIZE / 2, fy + CELL_SIZE / 2, 8).stroke({
+          width: 1.2,
+          color: 0xffb3a8,
+          alpha: 0.65 + pulse * 0.2,
+        });
       }
     }
   }
@@ -182,15 +204,26 @@ export function paintOverlays(g: Graphics, ctx: OverlayCtx): void {
     if (!tile.extract) continue;
     const z = visualLevel(tile);
     const { fx, fy } = faceOf(tile.x, tile.y, z);
-    g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({ color: EXTRACT_GLOW, alpha: 0.08 + extractPulse * 0.07 });
-    g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({ width: 1.4, color: EXTRACT_GLOW, alpha: 0.3 + extractPulse * 0.35 });
+    g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).fill({
+      color: EXTRACT_GLOW,
+      alpha: 0.08 + extractPulse * 0.07,
+    });
+    g.rect(fx + 2, fy + 2, CELL_SIZE - 4, CELL_SIZE - 4).stroke({
+      width: 1.4,
+      color: EXTRACT_GLOW,
+      alpha: 0.3 + extractPulse * 0.35,
+    });
     g.poly([fx + CELL_SIZE / 2, fy + 5, fx + CELL_SIZE / 2 + 4, fy + 11, fx + CELL_SIZE / 2 - 4, fy + 11]).fill({
-      color: EXTRACT_SPARK, alpha: 0.5 + extractPulse * 0.3,
+      color: EXTRACT_SPARK,
+      alpha: 0.5 + extractPulse * 0.3,
     });
     const postH = 15;
     const archTop = fy - 13;
     g.roundRect(fx + 4, fy - postH + 8, 3, postH, 1.5).fill({ color: EXTRACT_GLOW, alpha: 0.5 + extractPulse * 0.3 });
-    g.roundRect(fx + CELL_SIZE - 7, fy - postH + 8, 3, postH, 1.5).fill({ color: EXTRACT_GLOW, alpha: 0.5 + extractPulse * 0.3 });
+    g.roundRect(fx + CELL_SIZE - 7, fy - postH + 8, 3, postH, 1.5).fill({
+      color: EXTRACT_GLOW,
+      alpha: 0.5 + extractPulse * 0.3,
+    });
     g.moveTo(fx + 5.5, archTop + 12)
       .quadraticCurveTo(fx + CELL_SIZE / 2, archTop - 5, fx + CELL_SIZE - 5.5, archTop + 12)
       .stroke({ width: 2.2, color: EXTRACT_SPARK, alpha: 0.45 + extractPulse * 0.35 });
@@ -221,10 +254,16 @@ export function paintOverlays(g: Graphics, ctx: OverlayCtx): void {
       const pulse = 0.5 + Math.sin(motionNow * 0.003) * 0.25;
       g.circle(cx, cy, 10 + pulse * 3).fill({ color: 0xe06a4a, alpha: 0.18 + pulse * 0.1 });
       g.ellipse(cx, cy + 7, 5, 2).fill({ color: 0x000000, alpha: 0.35 });
-      g.circle(cx, cy, 5.5 + pulse * 0.5).fill(0xd94a3a).stroke({ width: 1, color: 0x8a2a1e });
+      g.circle(cx, cy, 5.5 + pulse * 0.5)
+        .fill(0xd94a3a)
+        .stroke({ width: 1, color: 0x8a2a1e });
       g.circle(cx - 1.6, cy - 1.8, 1.6).fill({ color: 0xffe8c9, alpha: 0.85 });
-      g.moveTo(cx, cy - 5.5).lineTo(cx + 0.6, cy - 8).stroke({ width: 1, color: 0x6b4f2a });
-      g.ellipse(cx + 3.4, cy - 8, 2.6, 1.4).fill(0x7fb84d).stroke({ width: 0.6, color: 0x4a7a2e });
+      g.moveTo(cx, cy - 5.5)
+        .lineTo(cx + 0.6, cy - 8)
+        .stroke({ width: 1, color: 0x6b4f2a });
+      g.ellipse(cx + 3.4, cy - 8, 2.6, 1.4)
+        .fill(0x7fb84d)
+        .stroke({ width: 0.6, color: 0x4a7a2e });
     }
   }
 
@@ -287,11 +326,7 @@ export function paintOverlays(g: Graphics, ctx: OverlayCtx): void {
 }
 
 /** Подсветка обучающего затемнения и маркера цели. */
-export function paintTrainingOverlay(
-  g: Graphics,
-  view: FieldView,
-  motionNow: number,
-): void {
+export function paintTrainingOverlay(g: Graphics, view: FieldView, motionNow: number): void {
   if (!view.trainingFocus && !view.trainingHighlight) return;
   const highlight = view.trainingHighlight ?? null;
   const tile = highlight
@@ -329,18 +364,40 @@ export function paintTrainingOverlay(
     const dimScale = 0.34;
     if (cellRect) {
       const clamp = (r: { x0: number; y0: number; x1: number; y1: number }) => ({
-        x0: Math.max(r.x0, outer.x0), y0: Math.max(r.y0, outer.y0),
-        x1: Math.min(r.x1, outer.x1), y1: Math.min(r.y1, outer.y1),
+        x0: Math.max(r.x0, outer.x0),
+        y0: Math.max(r.y0, outer.y0),
+        x1: Math.min(r.x1, outer.x1),
+        y1: Math.min(r.y1, outer.y1),
       });
-      const m2 = 16; const m1 = 8;
-      const hole2 = clamp({ x0: cellRect.fx - m2, y0: cellRect.fy - m2, x1: cellRect.fx + CELL_SIZE + m2, y1: cellRect.fy + CELL_SIZE + m2 });
-      const hole1 = clamp({ x0: cellRect.fx - m1, y0: cellRect.fy - m1, x1: cellRect.fx + CELL_SIZE + m1, y1: cellRect.fy + CELL_SIZE + m1 });
-      const hole = clamp({ x0: cellRect.fx - 2, y0: cellRect.fy - 2, x1: cellRect.fx + CELL_SIZE + 2, y1: cellRect.fy + CELL_SIZE + 2 });
+      const m2 = 16;
+      const m1 = 8;
+      const hole2 = clamp({
+        x0: cellRect.fx - m2,
+        y0: cellRect.fy - m2,
+        x1: cellRect.fx + CELL_SIZE + m2,
+        y1: cellRect.fy + CELL_SIZE + m2,
+      });
+      const hole1 = clamp({
+        x0: cellRect.fx - m1,
+        y0: cellRect.fy - m1,
+        x1: cellRect.fx + CELL_SIZE + m1,
+        y1: cellRect.fy + CELL_SIZE + m1,
+      });
+      const hole = clamp({
+        x0: cellRect.fx - 2,
+        y0: cellRect.fy - 2,
+        x1: cellRect.fx + CELL_SIZE + 2,
+        y1: cellRect.fy + CELL_SIZE + 2,
+      });
       frameRects(outer, hole2, (0.5 * pulseDim + 0.14) * dimScale);
       frameRects(hole2, hole1, (0.28 * pulseDim + 0.06) * dimScale);
       frameRects(hole1, hole, 0.12 * pulseDim * dimScale);
     } else {
-      frameRects(outer, { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 }, (0.38 * pulseDim + 0.06) * dimScale);
+      frameRects(
+        outer,
+        { x0: outer.x1, y0: outer.y1, x1: outer.x0, y1: outer.y0 },
+        (0.38 * pulseDim + 0.06) * dimScale,
+      );
     }
   }
 
@@ -358,7 +415,10 @@ export function paintTrainingOverlay(
     const arm = 9;
     const cw = 2.6;
     const corner = (cx: number, cy: number, dx: number, dy: number): void => {
-      g.moveTo(cx + dx * arm, cy).lineTo(cx, cy).lineTo(cx, cy + dy * arm).stroke({ width: cw, color: 0xf4feff, alpha: 0.85 });
+      g.moveTo(cx + dx * arm, cy)
+        .lineTo(cx, cy)
+        .lineTo(cx, cy + dy * arm)
+        .stroke({ width: cw, color: 0xf4feff, alpha: 0.85 });
     };
     corner(fx + inset, fy + inset, 1, 1);
     corner(fx + C - inset, fy + inset, -1, 1);
@@ -392,7 +452,9 @@ export function paintFlankIndicator(
   const r = 24 + pulse * 3;
   const arm = 8;
   const bracket = (qx: number, qy: number, sx: number, sy: number): void => {
-    g.moveTo(qx - sx * arm, qy).lineTo(qx, qy).lineTo(qx, qy - sy * arm)
+    g.moveTo(qx - sx * arm, qy)
+      .lineTo(qx, qy)
+      .lineTo(qx, qy - sy * arm)
       .stroke({ width: 2.6, color: 0xd84a3a, alpha: 0.65 + pulse * 0.35 });
   };
   bracket(cx - r, cy - r, -1, -1);
@@ -401,6 +463,7 @@ export function paintFlankIndicator(
   bracket(cx + r, cy + r, 1, 1);
   const bob = Math.sin(motionNow * 0.009) * 2;
   g.poly([cx, cy - r - 10 + bob, cx - 5, cy - r - 19 + bob, cx + 5, cy - r - 19 + bob]).fill({
-    color: 0xd84a3a, alpha: 0.7 + pulse * 0.3,
+    color: 0xd84a3a,
+    alpha: 0.7 + pulse * 0.3,
   });
 }

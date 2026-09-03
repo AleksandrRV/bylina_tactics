@@ -57,7 +57,14 @@ export function paintVignette(vignetteG: Container, w: number, h: number, reduce
 }
 
 /** Холодный слой Тьмы: сила привязана к доле счётчика кампании. */
-export function paintDarkness(darknessG: Graphics, view: FieldView | null, w: number, h: number, mounted: boolean, destroyed: boolean): void {
+export function paintDarkness(
+  darknessG: Graphics,
+  view: FieldView | null,
+  w: number,
+  h: number,
+  mounted: boolean,
+  destroyed: boolean,
+): void {
   darknessG.clear();
   const ratio = view?.darkness ?? 0;
   if (!mounted || destroyed || ratio <= 0) return;
