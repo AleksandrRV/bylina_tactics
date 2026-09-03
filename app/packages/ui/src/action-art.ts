@@ -20,6 +20,7 @@ const ACTION_FILES: Record<string, string> = {
   needle: "needle.jpg",
   pishchal: "pishchal.jpg",
   sling: "sling.jpg",
+  strike: "strike.jpg",
   sword: "sword.jpg",
   // Оружие бестиария пролога.
   teeth: "teeth.jpg",

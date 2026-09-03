@@ -52,6 +52,7 @@ function makeKernel(): {
     map: MAP,
     side1: ["bogatyr"],
     side2: ["bogatyr"],
+    loadouts: { bogatyr: ["sword"] },
     seed: 2026,
   });
   const side1 = match.entities.find((e) => e.owner === PLAYER_OWNER && e.coverType === 0)!;

@@ -320,10 +320,14 @@
             ".": { kind: "ground" },
             "t": { kind: "decor", decor: "bush" },
             "P": { kind: "pit" },
-            "M": { kind: "spawn", side: "player", unitId: "bogatyr" },
+            // Микула-богатырь сохраняет дубину из М1: оружие выдаётся
+            // экипировкой (маркером раскладки), а не записью класса (0.21.25).
+            "M": { kind: "spawn", side: "player", unitId: "bogatyr", weapons: ["club"] },
             "U": { kind: "spawn", side: "enemy", unitId: "upyr" },
             "S": { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
-            "A": { kind: "spawn", side: "player", unitId: "strelets", scripted: true },
+            // Федот-стрелец бьёт из лука по сценарию: оружие выдаётся маркером
+            // раскладки, а не записью класса (0.21.25).
+            "A": { kind: "spawn", side: "player", unitId: "strelets", weapons: ["bow"], scripted: true },
           },
         },
       },
@@ -381,8 +385,10 @@
             "W": { kind: "wall" },
             "c": { kind: "cover", coverType: 1 },
             "t": { kind: "decor", decor: "bush" },
-            "M": { kind: "spawn", side: "player", unitId: "bogatyr" },
-            "A": { kind: "spawn", side: "player", unitId: "strelets" },
+            // Микула и Федот выходят на М4 со своим оружием: дубина из М1 и
+            // лук — экипировка, а не запись класса (0.21.25).
+            "M": { kind: "spawn", side: "player", unitId: "bogatyr", weapons: ["club"] },
+            "A": { kind: "spawn", side: "player", unitId: "strelets", weapons: ["bow"] },
             "U": { kind: "spawn", side: "enemy", unitId: "upyr" },
             "K": { kind: "spawn", side: "enemy", unitId: "kikimora" },
             "H": { kind: "decor", decor: "hut" },

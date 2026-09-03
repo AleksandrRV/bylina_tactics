@@ -10,6 +10,7 @@ import { MenuScreen } from "../src/MenuScreen.js";
 import { MissionResultScreen } from "../src/MissionResultScreen.js";
 import { PvpRoomScreen } from "../src/PvpRoomScreen.js";
 import { ReplayScreen } from "../src/ReplayScreen.js";
+import { LevelUpScreen } from "../src/LevelUpScreen.js";
 import { ResultScreen } from "../src/ResultScreen.js";
 import { SettingsScreen } from "../src/SettingsScreen.js";
 import { TrainingScreen } from "../src/TrainingScreen.js";
@@ -31,6 +32,7 @@ describe("screenComponent", () => {
     ["missionResult", MissionResultScreen],
     ["pvpRoom", PvpRoomScreen],
     ["replays", ReplayScreen],
+    ["levelup", LevelUpScreen],
     ["training", TrainingScreen],
     ["trainingBattle", BattleScreen],
     ["battle", BattleScreen],

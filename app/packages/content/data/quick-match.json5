@@ -1,6 +1,13 @@
 {
   // Состав противников набирается из пула случайно. Численность — единственный параметр трудности.
   playerSlots: ["bogatyr", "strelets", "znaharka"],
+  // Оружие не привязано к классу (0.21.25): в режиме без кампании и экипировки
+  // бойцы получают стандартное снаряжение отсюда, а не из записи класса.
+  loadouts: {
+    bogatyr: ["sword", "mace"],
+    strelets: ["bow", "pishchal"],
+    znaharka: ["sling"],
+  },
   enemyPool: ["upyr", "leshy", "kikimora"],
   difficulties: [
     { id: "easy", enemyCount: 3 },

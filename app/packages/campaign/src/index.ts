@@ -152,6 +152,12 @@ export interface CampaignApi {
    * Точка перехода задаётся `prologueFinalMissionId` (конфиг этапа 1).
    */
   openSandboxFromPrologue(): boolean;
+  /**
+   * Прокачка героя пролога после М2 (0.21.25): Микула становится богатырём
+   * и получает уровень 2. Оружие не переназначается — оно берётся из
+   * экипировки (дубина сохраняется). Действует только в главе «prologue».
+   */
+  promotePrologueHero(): boolean;
   subscribe(listener: () => void): () => void;
 }
 
@@ -346,6 +352,40 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     return true;
   };
 
+  /**
+   * Прокачка героя пролога после М2 (0.21.25): Микула становится богатырём
+   * и получает уровень 2. Оружие при смене класса НЕ переназначается — оно
+   * берётся из экипировки (дубина из М1 остаётся у бойца). Идемпотентна.
+   */
+  const promotePrologueHero = (): boolean => {
+    if (state.chapter !== "prologue") return false;
+    const hero = state.fighters.find(
+      (fighter) => fighter.alive && (fighter.unitId === "mikula_peasant" || fighter.unitId === "bogatyr"),
+    );
+    if (!hero) return false;
+    let changed = false;
+    if (hero.unitId === "mikula_peasant") {
+      hero.unitId = "bogatyr";
+      changed = true;
+    }
+    if (hero.level < 2) {
+      hero.level = 2;
+      changed = true;
+    }
+    // Смена записи влечёт пересчёт запаса здоровья (крестьянин → богатырь):
+    // соотношение текущего и максимального здоровья сохраняется, как и при
+    // переходе в песочницу (openSandboxFromPrologue).
+    const maxHp = hpOf(hero.unitId);
+    if (maxHp !== hero.maxHp) {
+      const ratio = hero.maxHp > 0 ? hero.hp / hero.maxHp : 1;
+      hero.maxHp = maxHp;
+      hero.hp = Math.max(1, Math.min(maxHp, Math.round(ratio * maxHp)));
+      changed = true;
+    }
+    if (changed) emit();
+    return true;
+  };
+
   return {
     getState: () => ({
       ...state,
@@ -521,6 +561,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       return true;
     },
     openSandboxFromPrologue,
+    promotePrologueHero,
     assignClass: (fighterId, unitId) => {
       const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
       if (!fighter || !fighter.alive) return false;

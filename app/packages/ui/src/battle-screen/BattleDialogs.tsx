@@ -158,7 +158,10 @@ export function BattleDialogs() {
                   session.startPrologue(prologueMission.id, true);
                   return;
                 }
-                session.advancePrologue(nextId);
+                // Стандартный экран победы после финального текстового
+                // сообщения миссии (0.21.25): кнопка «Дальше» на нём ведёт
+                // к следующей миссии либо к прокачке героя после М2.
+                session.finishPrologueMission("victory", nextId);
               }}
             >
               {t(

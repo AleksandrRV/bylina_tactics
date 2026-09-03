@@ -220,6 +220,14 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     for (const unitId of [...quickMatch.value.playerSlots, ...quickMatch.value.enemyPool]) {
       if (!unitIds.has(unitId)) issues.push({ file: "quick-match.json5", message: `unknown unit: ${unitId}` });
     }
+    for (const [unitId, loadout] of Object.entries(quickMatch.value.loadouts ?? {})) {
+      if (!unitIds.has(unitId)) issues.push({ file: "quick-match.json5", message: `unknown loadout unit: ${unitId}` });
+      for (const weaponId of loadout) {
+        if (!weaponIds.has(weaponId)) {
+          issues.push({ file: "quick-match.json5", message: `unknown loadout weapon: ${weaponId}` });
+        }
+      }
+    }
   }
   if (campaign.value) {
     const campaignConfig = campaign.value;
@@ -303,10 +311,26 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     for (const unitId of pvp.value.pool) {
       if (!unitIds.has(unitId)) issues.push({ file: "pvp.json5", message: `unknown unit: ${unitId}` });
     }
+    for (const [unitId, loadout] of Object.entries(pvp.value.loadouts ?? {})) {
+      if (!unitIds.has(unitId)) issues.push({ file: "pvp.json5", message: `unknown loadout unit: ${unitId}` });
+      for (const weaponId of loadout) {
+        if (!weaponIds.has(weaponId)) issues.push({ file: "pvp.json5", message: `unknown loadout weapon: ${weaponId}` });
+      }
+    }
   }
 
   // Ссылки миссий обучения: бойцы и противники должны существовать.
   if (training.value) {
+    for (const [unitId, loadout] of Object.entries(training.value.loadouts ?? {})) {
+      if (!unitIds.has(unitId)) {
+        issues.push({ file: "training.json5", message: `unknown loadout unit: ${unitId}` });
+      }
+      for (const weaponId of loadout) {
+        if (!weaponIds.has(weaponId)) {
+          issues.push({ file: "training.json5", message: `unknown loadout weapon: ${weaponId}` });
+        }
+      }
+    }
     for (const mission of training.value.missions) {
       for (const unitId of mission.playerSlots) {
         if (!unitIds.has(unitId)) {

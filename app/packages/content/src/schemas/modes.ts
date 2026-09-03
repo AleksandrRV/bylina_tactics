@@ -4,9 +4,15 @@ import { z } from "zod";
 import { id } from "./common.js";
 import { mapGenConfigSchema } from "./world.js";
 
+/** Стандартное снаряжение режима: оружие бойца по идентификатору записи. */
+export const loadoutsSchema = z.record(id, z.array(id));
+
 export const quickMatchConfigSchema = z
   .object({
     playerSlots: z.tuple([id, id, id]),
+    /** Стандартное снаряжение бойцов режима (0.21.25): оружие из экипировки,
+     *  а не из записи класса. */
+    loadouts: loadoutsSchema.optional(),
     enemyPool: z.tuple([id, id, id]),
     difficulties: z
       .array(
@@ -45,6 +51,9 @@ export const quickMatchConfigSchema = z
 export const pvpConfigSchema = z
   .object({
     pool: z.array(id),
+    /** Стандартное снаряжение бойцов режима (0.21.25): оружие из экипировки,
+     *  а не из записи класса. */
+    loadouts: loadoutsSchema.optional(),
     nMin: z.number().int().min(1),
     objective: z.enum(["elimination", "apple", "choice"]),
     /** Заготовка поля режима (roadmap 0.14.0: «Комната сбора без сети»). */

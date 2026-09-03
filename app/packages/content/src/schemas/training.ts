@@ -84,6 +84,9 @@ export const trainingMissionSchema = z
 export const trainingConfigSchema = z
   .object({
     missions: z.array(trainingMissionSchema).length(3),
+    /** Стандартное снаряжение бойцов учебной палубы (0.21.25): оружие из
+     *  экипировки, а не из записи класса. */
+    loadouts: z.record(id, z.array(id)).optional(),
   })
   .strict();
 

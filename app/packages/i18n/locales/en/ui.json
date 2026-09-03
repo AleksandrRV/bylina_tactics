@@ -135,7 +135,7 @@
   "unit": {
     "bogatyr": {
       "name": "Bogatyr",
-      "desc": "The wall of the host: sword, mace and shield. Takes the first blow and answers so the foe regrets closing in."
+      "desc": "The wall of the host. Takes the first blow and answers with Breach so the foe regrets closing in. His weapon comes from equipment."
     },
     "strelets": {
       "name": "Strelets",
@@ -171,7 +171,7 @@
     },
     "recruit": {
       "name": "Recruit",
-      "desc": "A recruit without a class. The sling gives him reach but not experience: he does not last long under fire."
+      "desc": "A recruit without a class. Unarmed, he fights with his fists — he will earn a sling and experience on campaign."
     },
     "idol": {
       "name": "Idol of Nav",
@@ -292,6 +292,10 @@
     "spit": {
       "name": "Spit",
       "flavor": "Wet, caustic and shameful. But it lands."
+    },
+    "strike": {
+      "name": "Punch",
+      "flavor": "No weapon left — only fists. Without them a man is no man."
     }
   },
   "combat": {
@@ -615,6 +619,15 @@
     },
     "pishchal_gun": {
       "name": "Pishchal"
+    },
+    "sword_of_druzhina": {
+      "name": "Druzhina Sword"
+    },
+    "hunter_bow": {
+      "name": "Hunter's Bow"
+    },
+    "shepherd_sling": {
+      "name": "Shepherd's Sling"
     }
   },
   "pvp": {
@@ -799,6 +812,16 @@
       "toVillage": "To the village",
       "onward": "Onward",
       "toMap": "To the map"
+    },
+    "victory": {
+      "title": "Victory",
+      "body": "The enemies are defeated.",
+      "continue": "Continue"
+    },
+    "levelup": {
+      "title": "Mikula has grown",
+      "body": "Mikula proved himself in battle. He can become a bogatyr — the defender of the druzhina. His club stays with him; he will find a sword and mace later.",
+      "confirm": "Become a bogatyr"
     },
     "objective": {
       "gather": "Gather brushwood",

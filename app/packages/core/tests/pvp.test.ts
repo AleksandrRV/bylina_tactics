@@ -78,6 +78,7 @@ describe("pvp battle flow", () => {
       map: MAP,
       side1: ["bogatyr"],
       side2: ["bogatyr"],
+      loadouts: { bogatyr: ["sword"] },
       seed: 93,
     });
     // Поставить бойцов вплотную (состояние до создания ядра).

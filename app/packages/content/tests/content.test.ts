@@ -64,11 +64,9 @@ describe("parseContent", () => {
         .sort(),
     ).toEqual(["kikimora_pvp", "leshy_pvp", "upyr_pvp"]);
     expect(result.data.pvp.pool).toEqual(["bogatyr", "strelets", "znaharka", "upyr_pvp", "leshy_pvp", "kikimora_pvp"]);
-    expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual([
-      "circular_sweep",
-      "breach",
-      "shield_bash",
-    ]);
+    // Оружие не привязано к классу (0.21.25): у богатыря остаётся одно
+    // классовое умение — «Пролом»; круговой взмах и удар щитом убраны.
+    expect(result.data.units.find((unit) => unit.id === "bogatyr")?.skills).toEqual(["breach"]);
     expect(result.data.weapons.map((weapon) => weapon.id).sort()).toEqual([
       "bow",
       "bow_debug",
@@ -78,15 +76,19 @@ describe("parseContent", () => {
       "needle",
       "pishchal",
       "sling",
+      "strike",
       "sword",
       "sword_debug",
     ]);
     expect(result.data.items.map((item) => item.id).sort()).toEqual([
       "aim_charm",
       "guard_charm",
+      "hunter_bow",
       "mace_of_trail",
       "pishchal_gun",
+      "shepherd_sling",
       "swift_boots",
+      "sword_of_druzhina",
       "vital_amulet",
     ]);
     expect(result.data.skills.map((skill) => skill.id).sort()).toEqual([

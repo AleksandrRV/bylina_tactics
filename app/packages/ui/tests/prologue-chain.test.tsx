@@ -251,9 +251,27 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       const next = cardButton();
       expect(next).not.toBeNull();
 
-      // Переход к М2: миссия обязана НАЧАТЬСЯ — вступлением и своей картой.
+      // Стандартный экран победы (0.21.25): после финального сообщения миссии
+      // показывается итоговый экран «Победа», и только его кнопка «Дальше»
+      // запускает следующую миссию — переход больше не мгновенный.
       await act(async () => {
         next!.click();
+      });
+      await act(async () => {
+        await tick(120);
+      });
+
+      expect(session.get().screen, "victory screen after M1 outro").toBe("result");
+      expect(
+        document.querySelector(".menu-screen .display-title")?.textContent,
+        "victory title",
+      ).toBe("Победа");
+      const onward = document.querySelector<HTMLButtonElement>(".menu-screen .btn-primary");
+      expect(onward, "continue button").not.toBeNull();
+
+      // Переход к М2: миссия обязана НАЧАТЬСЯ — вступлением и своей картой.
+      await act(async () => {
+        onward!.click();
       });
       await act(async () => {
         await tick(120);
