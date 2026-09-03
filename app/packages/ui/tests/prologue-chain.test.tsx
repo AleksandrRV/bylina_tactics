@@ -262,10 +262,7 @@ describe("battle screen remount between prologue missions (0.20.38)", () => {
       });
 
       expect(session.get().screen, "victory screen after M1 outro").toBe("result");
-      expect(
-        document.querySelector(".menu-screen .display-title")?.textContent,
-        "victory title",
-      ).toBe("Победа");
+      expect(document.querySelector(".menu-screen .display-title")?.textContent, "victory title").toBe("Победа");
       const onward = document.querySelector<HTMLButtonElement>(".menu-screen .btn-primary");
       expect(onward, "continue button").not.toBeNull();
 

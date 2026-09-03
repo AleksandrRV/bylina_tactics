@@ -314,7 +314,8 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
     for (const [unitId, loadout] of Object.entries(pvp.value.loadouts ?? {})) {
       if (!unitIds.has(unitId)) issues.push({ file: "pvp.json5", message: `unknown loadout unit: ${unitId}` });
       for (const weaponId of loadout) {
-        if (!weaponIds.has(weaponId)) issues.push({ file: "pvp.json5", message: `unknown loadout weapon: ${weaponId}` });
+        if (!weaponIds.has(weaponId))
+          issues.push({ file: "pvp.json5", message: `unknown loadout weapon: ${weaponId}` });
       }
     }
   }
