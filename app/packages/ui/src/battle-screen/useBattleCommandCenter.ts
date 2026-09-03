@@ -65,7 +65,19 @@ export interface BattleCommandCenterDeps {
 
 export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
   const { base, kinds, kernelModel, snapshotModel, intentModel, training, prologue, outcome, aim } = deps;
-  const { session, t, setLog, setBusy, outcomeGate, rendererRef, hintSettings, content, debug, paused, setPrologueStanceLock } = base;
+  const {
+    session,
+    t,
+    setLog,
+    setBusy,
+    outcomeGate,
+    rendererRef,
+    hintSettings,
+    content,
+    debug,
+    paused,
+    setPrologueStanceLock,
+  } = base;
   const { kernel, weapons, skills } = kernelModel;
   const { snapshot } = snapshotModel;
   const {
@@ -80,8 +92,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     trainingMission,
     prologueMission,
   } = kinds;
-  const { selectedId, selected, action, aimId, skillTargetPos, charge, chargeArmed, setIntent, clearAim } =
-    intentModel;
+  const { selectedId, selected, action, aimId, skillTargetPos, charge, chargeArmed, setIntent, clearAim } = intentModel;
   const {
     trainingDirective,
     trainingActorId,
@@ -282,20 +293,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       if (prologueFinished) outcomeGate.report(() => setPrologueCard("outro"));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      base,
-      kinds,
-      kernel,
-      intentModel,
-      training,
-      prologue,
-      outcome,
-      announce,
-      playThen,
-      session,
-      setLog,
-      t,
-    ],
+    [base, kinds, kernel, intentModel, training, prologue, outcome, announce, playThen, session, setLog, t],
   );
 
   // Вспомогательная ссылка на свежий applyCommand для замыкания PvP-подписки
@@ -348,7 +346,18 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       }
       applyCommand({ type: "MOVE", actorId: selectedId, to });
     },
-    [applyCommand, selectedId, paused, base.busy, base.outcomePending, snapshot.activeOwner, viewOwner, isTraining, trainingDirective, trainingDeny],
+    [
+      applyCommand,
+      selectedId,
+      paused,
+      base.busy,
+      base.outcomePending,
+      snapshot.activeOwner,
+      viewOwner,
+      isTraining,
+      trainingDirective,
+      trainingDeny,
+    ],
   );
 
   const tryAttack = useCallback(
@@ -390,7 +399,19 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
             };
       applyCommand(cmd);
     },
-    [applyCommand, selectedId, action, paused, base.busy, snapshot.activeOwner, viewOwner, isTraining, trainingDirective, trainingDeny, skillTargetPos],
+    [
+      applyCommand,
+      selectedId,
+      action,
+      paused,
+      base.busy,
+      snapshot.activeOwner,
+      viewOwner,
+      isTraining,
+      trainingDirective,
+      trainingDeny,
+      skillTargetPos,
+    ],
   );
 
   /** Применить умение «на себя» — одно ОД, ход не завершается. */
@@ -413,7 +434,17 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       }
       applyCommand({ type: "USE_SKILL", actorId: selectedId, skillId });
     },
-    [applyCommand, selectedId, paused, base.busy, snapshot.activeOwner, viewOwner, isTraining, trainingDirective, trainingDeny],
+    [
+      applyCommand,
+      selectedId,
+      paused,
+      base.busy,
+      snapshot.activeOwner,
+      viewOwner,
+      isTraining,
+      trainingDirective,
+      trainingDeny,
+    ],
   );
 
   /** «Освобождение»: особое действие рядом с захваченным лицом — одно ОД,
@@ -466,7 +497,19 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         targetPos: pos,
       });
     },
-    [applyCommand, selectedId, action, paused, base.busy, isTraining, trainingDirective, trainingDeny, skillTargetPos, aimId, setIntent],
+    [
+      applyCommand,
+      selectedId,
+      action,
+      paused,
+      base.busy,
+      isTraining,
+      trainingDirective,
+      trainingDeny,
+      skillTargetPos,
+      aimId,
+      setIntent,
+    ],
   );
 
   /**
@@ -491,7 +534,19 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         pathOf: (cell) => session.getBattlePath(actor.id, cell),
       });
     },
-    [isTraining, isReplay, isSpectator, usesNetSnapshot, kernel, selectedId, snapshot, action, weapons, skills, session],
+    [
+      isTraining,
+      isReplay,
+      isSpectator,
+      usesNetSnapshot,
+      kernel,
+      selectedId,
+      snapshot,
+      action,
+      weapons,
+      skills,
+      session,
+    ],
   );
 
   /**
@@ -730,7 +785,23 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       base.setEnemyPhase(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kernel, isTraining, isPrologue, trainingMission, prologueMission, base, kinds, prologue, announce, showTrainingNote, finishFromEvents, director, rendererRef, session, outcomeGate]);
+  }, [
+    kernel,
+    isTraining,
+    isPrologue,
+    trainingMission,
+    prologueMission,
+    base,
+    kinds,
+    prologue,
+    announce,
+    showTrainingNote,
+    finishFromEvents,
+    director,
+    rendererRef,
+    session,
+    outcomeGate,
+  ]);
 
   /**
    * Передача хода сопернику сценой (0.20.40). Кнопка игрока не нажата:
@@ -973,10 +1044,12 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
           // по той же цели его исполняет (0.20.50).
           const plan = target ? chargeFor(target) : null;
           if (plan) setLog(t("battle.chargeHint"));
-          const skill = action?.type === "skill" ? (skills as Record<string, { effects?: Array<{ type: string }> }>)[action.id] : undefined;
+          const skill =
+            action?.type === "skill"
+              ? (skills as Record<string, { effects?: Array<{ type: string }> }>)[action.id]
+              : undefined;
           // Клетка постановки сохраняется только у умения с переносом.
-          const targetPos =
-            skill?.effects?.some((effect) => effect.type === "displace") ? skillTargetPos : null;
+          const targetPos = skill?.effects?.some((effect) => effect.type === "displace") ? skillTargetPos : null;
           setIntent({ type: "aim", targetId: result.id, chargePlan: plan, armed: plan !== null, targetPos });
           return;
         }
@@ -1001,7 +1074,31 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [base, kinds, snapshotModel, intentModel, training, tryAttack, tryMove, tryPositionSkill, applySelfSkill, executeCharge, chargeFor, setIntent, trainingDeny, setLog, t, action, aimId, charge, chargeArmed, selectedId, selected, skills, byReach],
+    [
+      base,
+      kinds,
+      snapshotModel,
+      intentModel,
+      training,
+      tryAttack,
+      tryMove,
+      tryPositionSkill,
+      applySelfSkill,
+      executeCharge,
+      chargeFor,
+      setIntent,
+      trainingDeny,
+      setLog,
+      t,
+      action,
+      aimId,
+      charge,
+      chargeArmed,
+      selectedId,
+      selected,
+      skills,
+      byReach,
+    ],
   );
 
   const onHover = useCallback(
@@ -1082,7 +1179,5 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     allOwnApSpent,
   };
 }
-
-
 
 export type BattleCommandCenterModel = ReturnType<typeof useBattleCommandCenter>;

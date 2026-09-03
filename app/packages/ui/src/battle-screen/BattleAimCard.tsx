@@ -36,12 +36,8 @@ export function BattleAimCard() {
               const lines = [
                 `╠══ ${t("combat.bdTotal")}: ${b.finalChance}% ══╣`,
                 `${t("combat.bdBaseAim")}: +${b.baseAim}`,
-                b.weaponMod !== 0
-                  ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}`
-                  : null,
-                b.heightAim !== 0
-                  ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}`
-                  : null,
+                b.weaponMod !== 0 ? `${t("combat.bdWeaponMod")}: ${b.weaponMod > 0 ? "+" : ""}${b.weaponMod}` : null,
+                b.heightAim !== 0 ? `${t("combat.bdHeight")}: ${b.heightAim > 0 ? "+" : ""}${b.heightAim}` : null,
                 b.targetDefense > 0 ? `${t("combat.bdDefense")}: −${b.targetDefense}` : null,
                 b.stanceDefense > 0 ? `${t("combat.bdDefend")}: −${b.stanceDefense}` : null,
                 b.coverPenalty > 0 ? `${t("combat.bdCover")}: −${b.coverPenalty}` : null,

@@ -2,12 +2,7 @@ import { ActionSlot } from "../action-panel.js";
 import { unitPortrait } from "../portraits.js";
 import { actionArt } from "../action-art.js";
 import { ACTION_SHORTCUTS, shortcutForAction } from "../action-shortcuts.js";
-import {
-  liberateActionInfo,
-  skillActionInfo,
-  stanceActionInfo,
-  weaponActionInfo,
-} from "../action-info.js";
+import { liberateActionInfo, skillActionInfo, stanceActionInfo, weaponActionInfo } from "../action-info.js";
 import { useBattleScreen } from "./context.js";
 
 export function BattleBottomPanel() {
@@ -81,25 +76,17 @@ export function BattleBottomPanel() {
               </div>
               <div className="status-list" aria-label={t("battle.statuses")}>
                 {selected.poison ? (
-                  <span className="status-chip poison">
-                    {t("status.poison", { turns: selected.poison.turnsLeft })}
-                  </span>
+                  <span className="status-chip poison">{t("status.poison", { turns: selected.poison.turnsLeft })}</span>
                 ) : null}
                 {selected.panic ? <span className="status-chip panic">{t("status.panic")}</span> : null}
-                {selected.immobileTurns ? (
-                  <span className="status-chip immobile">{t("status.immobile")}</span>
-                ) : null}
+                {selected.immobileTurns ? <span className="status-chip immobile">{t("status.immobile")}</span> : null}
                 {selected.hidden ? <span className="status-chip hidden">{t("status.hidden")}</span> : null}
                 {selected.flying ? <span className="status-chip flying">{t("status.flying")}</span> : null}
                 {selected.timedLife !== undefined ? (
                   <span className="status-chip timed">{t("status.timed", { turns: selected.timedLife })}</span>
                 ) : null}
-                {selected.defending ? (
-                  <span className="status-chip defending">{t("status.defending")}</span>
-                ) : null}
-                {selected.overwatch ? (
-                  <span className="status-chip overwatch">{t("status.overwatch")}</span>
-                ) : null}
+                {selected.defending ? <span className="status-chip defending">{t("status.defending")}</span> : null}
+                {selected.overwatch ? <span className="status-chip overwatch">{t("status.overwatch")}</span> : null}
               </div>
             </div>
           </div>
@@ -219,9 +206,7 @@ export function BattleBottomPanel() {
             name={t("battle.free")}
             art={actionArt("free")}
             active={false}
-            disabled={
-              !selected || selected.ap < 1 || busy || snapshot.activeOwner !== viewOwner || prologueStanceLock
-            }
+            disabled={!selected || selected.ap < 1 || busy || snapshot.activeOwner !== viewOwner || prologueStanceLock}
             title={t("battle.freeHint")}
             onInspect={() => setActionInfo(liberateActionInfo(t))}
             onPress={applyLiberate}
@@ -235,11 +220,7 @@ export function BattleBottomPanel() {
           active={Boolean(selected?.defending)}
           hinted={hintPanelKey === "defend"}
           disabled={
-            !selected ||
-            selected.ap <= 0 ||
-            busy ||
-            snapshot.activeOwner !== viewOwner ||
-            !trainingAllows("defend")
+            !selected || selected.ap <= 0 || busy || snapshot.activeOwner !== viewOwner || !trainingAllows("defend")
           }
           title={t("battle.defendHint")}
           onInspect={() => setActionInfo(stanceActionInfo("defend", t))}
