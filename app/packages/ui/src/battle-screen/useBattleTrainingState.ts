@@ -63,8 +63,7 @@ export function useBattleTrainingState(
       snapshot: full,
       reachable: (actorId) => session.getBattleReachable(actorId),
       hitPreview: (actorId, targetId, weaponId) => session.getBattleHitPreview(actorId, targetId, weaponId),
-      skillPreview: (actorId, skillId, targetId, pos) =>
-        session.getBattleSkillPreview(actorId, skillId, targetId, pos),
+      skillPreview: (actorId, skillId, targetId, pos) => session.getBattleSkillPreview(actorId, skillId, targetId, pos),
       skills,
     });
     // Пересчёт на каждое изменение боя (ревизия): указание зависит от

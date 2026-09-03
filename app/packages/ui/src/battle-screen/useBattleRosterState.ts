@@ -6,11 +6,7 @@ import type { BattleScreenBase } from "./useBattleScreenBase.js";
 import type { BattleKinds } from "./useBattleKinds.js";
 import type { BattleSnapshotModel } from "./useBattleSnapshot.js";
 
-export function useBattleRosterState(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  snapshotModel: BattleSnapshotModel,
-) {
+export function useBattleRosterState(base: BattleScreenBase, kinds: BattleKinds, snapshotModel: BattleSnapshotModel) {
   const { snapshot, visibleCells } = snapshotModel;
   const { isSpectator, viewOwner, mission, enemyOwner } = kinds;
 

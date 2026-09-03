@@ -4,11 +4,7 @@ import type { BattleScreenBase } from "./useBattleScreenBase.js";
 import type { BattleKinds } from "./useBattleKinds.js";
 import type { TacticsKernel } from "@bylina/core";
 
-export function useBattleReplayPlayback(
-  base: BattleScreenBase,
-  kinds: BattleKinds,
-  kernel: TacticsKernel | null,
-) {
+export function useBattleReplayPlayback(base: BattleScreenBase, kinds: BattleKinds, kernel: TacticsKernel | null) {
   const { isReplay, replayJournal } = kinds;
   // Воспроизведение повтора (0.17.0): команды журнала применяются по таймеру.
   // 0.21.13 (P1-3): курсор повтора живёт в ref, поэтому интервал создаётся один

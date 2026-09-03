@@ -35,7 +35,7 @@ export function useBattleKinds(base: BattleScreenBase) {
     battleKind === "pvp" || battleKind === "pvpNet"
       ? isNetGuest || isSpectator
         ? netOwner
-        : session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER
+        : (session.getBattleFullSnapshot()?.activeOwner ?? PLAYER_OWNER)
       : null;
 
   const viewOwner = pvpActive ?? PLAYER_OWNER;

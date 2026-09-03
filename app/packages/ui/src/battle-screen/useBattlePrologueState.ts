@@ -178,7 +178,15 @@ export function useBattlePrologueState(
     if (seenPrologueHintRef.current === prologueHintKey) return;
     seenPrologueHintRef.current = prologueHintKey;
     showPrologueHint(prologueHintKey);
-  }, [isPrologue, prologueCard, prologueHintKey, storyNoteHintKey, showPrologueHint, setStoryNote, setStoryNoteHintKey]);
+  }, [
+    isPrologue,
+    prologueCard,
+    prologueHintKey,
+    storyNoteHintKey,
+    showPrologueHint,
+    setStoryNote,
+    setStoryNoteHintKey,
+  ]);
 
   // Режиссёр сцен пролога (0.20.67): восемь постановщиков, деливших общие
   // ссылки состояния, собраны отдельно. Зависимости читаются из ссылки,
