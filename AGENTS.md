@@ -56,6 +56,7 @@ The tactical rules run only on the host. UI and rendering display snapshots/even
 - Add user-facing text to both `app/packages/i18n/locales/ru/ui.json` and `en/ui.json`, and update the manifest only when adding a locale. Use the existing `t()`/catalog pattern.
 - New action art belongs in `app/apps/game-pwa/public/actions`, uses the content identifier as its filename, is mapped in `app/packages/ui/src/action-art.ts`, and is resized with `pnpm resize:action-art` when applicable.
 - Comments must explain only a non-obvious why (engine quirk, workaround, business rule, or issue). Never restate code, leave commented-out code, or add unlinked speculative TODOs.
+- Tests that involve real timers, sockets, workers, or animations must be deterministic: drive the outcome through the tested party's own behavior (for example, a client that does not answer pings), never by mutating internal state from outside while an async loop is running, and never by relying on a fixed `setTimeout` to "outrun" another event. Before committing such a test, run it 20+ times in a loop; CI is slower than a workstation, and a test that flakes once locally will fail regularly there.
 
 ## Versioning, generated files, and boundaries
 

@@ -3,8 +3,12 @@ import { WebSocket } from "ws";
 import { createRelayServer } from "../src/server.mjs";
 
 let relay: Awaited<ReturnType<typeof createRelayServer>> | null = null;
-async function connect(): Promise<WebSocket> {
-  const ws = new WebSocket(`ws://127.0.0.1:${relay!.port}`);
+/**
+ * Клиент ретранслятора. `autoPong: false` — клиент, который не отвечает на
+ * ping сервера (проверка сердцебиения); по умолчанию ws отвечает сам.
+ */
+async function connect(options: { autoPong?: boolean } = {}): Promise<WebSocket> {
+  const ws = new WebSocket(`ws://127.0.0.1:${relay!.port}`, options);
   await new Promise<void>((resolve, reject) => {
     ws.on("open", resolve);
     ws.on("error", reject);
@@ -72,13 +76,31 @@ describe("signaling relay server", () => {
   });
 
   it("terminates a socket that misses its heartbeat", async () => {
+    // Клиент молчит на ping (autoPong выключен): первый такт сердцебиения
+    // снимает признак isAlive и шлёт ping, второй — обрывает соединение.
+    // Прежний вариант сбрасывал isAlive снаружи и состязался с автоматическим
+    // pong клиента: если сброс попадал между ping и pong, pong возвращал
+    // признак, и сокет жил вечно (тест зависал до таймаута, чаще на CI).
     relay = await createRelayServer({ port: 0, heartbeatMs: 15 });
-    const socket = await connect();
+    const socket = await connect({ autoPong: false });
     const closed = new Promise<void>((resolve) => socket.on("close", () => resolve()));
-    const serverSocket = [...relay.wss.clients][0] as WebSocket & { isAlive?: boolean };
-    serverSocket.isAlive = false;
+    const serverSocket = [...relay.wss.clients][0]!;
     await closed;
     expect(serverSocket.readyState).not.toBe(WebSocket.OPEN);
+  });
+
+  it("keeps a socket that answers the heartbeat", async () => {
+    // Обратная проверка: отвечающий на ping клиент переживает несколько тактов.
+    relay = await createRelayServer({ port: 0, heartbeatMs: 15 });
+    const socket = await connect();
+    let closed = false;
+    socket.on("close", () => {
+      closed = true;
+    });
+    await wait(90);
+    expect(closed).toBe(false);
+    expect(socket.readyState).toBe(WebSocket.OPEN);
+    socket.close();
   });
 
   it("serves /rooms and /health with CORS headers for a foreign-origin client", async () => {
