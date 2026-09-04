@@ -81,9 +81,7 @@ export function useBattleScreenBase() {
    * выбирается: триггер `onSpawn` срабатывает на каждое появление, и
    * первая пара крыс М2 играется один раз, а волны — общей сценой стаи.
    */
-  const firedCutscenesRef = useRef<Set<string>>(
-    new Set(session.get().restoredPrologueProgress?.firedCutscenes ?? []),
-  );
+  const firedCutscenesRef = useRef<Set<string>>(new Set(session.get().restoredPrologueProgress?.firedCutscenes ?? []));
 
   /**
    * Позиция в очереди сценария Нави (0.20.13): живёт на время боя, очередь

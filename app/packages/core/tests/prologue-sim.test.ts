@@ -575,11 +575,19 @@ describe("prologue death restarts the mission", () => {
     const wave = createPrologueRunState("prologue_glade");
     wave.firstWave = true;
     expect(
-      shouldRestartPrologueMission(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+      shouldRestartPrologueMission(
+        wave,
+        [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }],
+        match as never,
+      ),
     ).toBe(true);
     const start = createPrologueRunState("prologue_glade");
     expect(
-      shouldRestartPrologueMission(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+      shouldRestartPrologueMission(
+        start,
+        [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }],
+        match as never,
+      ),
     ).toBe(true);
   });
 });
@@ -985,4 +993,3 @@ describe("prologue scripted spawns reach the screen (0.20.37)", () => {
     expect(spawned.map((event) => event.entity.configId)).toEqual(["forest_rat"]);
   });
 });
-
