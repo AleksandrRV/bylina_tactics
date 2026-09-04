@@ -347,6 +347,20 @@ describe("layout compiler", () => {
     expect(compiled.grid.tiles.find((tile) => tile.x === 0 && tile.y === 0)?.extract).toBe(true);
     expect(compiled.covers.some((cover) => cover.x === 2 && cover.y === 1 && cover.coverType === 1)).toBe(true);
     expect(compiled.markers.M?.[0]).toEqual({ x: 1, y: 1 });
+  });
+
+  it("marks hut cells as walls with a hut feature", () => {
+    const compiled = compilePrologueLayout({ rows: ["HH.", ".W."] });
+    const hut = compiled.grid.tiles.find((tile) => tile.x === 0 && tile.y === 0);
+    const boulder = compiled.grid.tiles.find((tile) => tile.x === 1 && tile.y === 1);
+    expect(hut?.blockLOS).toBe(true);
+    expect(hut?.feature).toBe("hut");
+    expect(boulder?.blockLOS).toBe(true);
+    expect(boulder?.feature).toBeUndefined();
+    expect(compiled.markers.H).toEqual([
+      { x: 0, y: 0 },
+      { x: 1, y: 0 },
+    ]);
     const match = createLayoutMatch({ rows: [".M.", ".F."] }, [
       { config: DEFAULT_TRAINING_UNITS.bogatyr!, owner: 1, marker: "M" },
     ]);

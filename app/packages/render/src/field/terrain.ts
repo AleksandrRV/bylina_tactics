@@ -13,6 +13,113 @@ import { biomeLookOf } from "../palette.js";
 import { FRINGE_CELLS, fringeDecor } from "../fringe.js";
 import type { FieldView } from "./types.js";
 
+function isHutTile(tile: Tile | undefined): boolean {
+  return Boolean(tile?.blockLOS && tile.feature === "hut");
+}
+
+function hutAt(tiles: readonly Tile[], x: number, y: number): boolean {
+  return isHutTile(tiles.find((candidate) => candidate.x === x && candidate.y === y));
+}
+
+function hutComponent(tiles: readonly Tile[], startX: number, startY: number): { x: number; y: number }[] {
+  const cells: { x: number; y: number }[] = [];
+  const seen = new Set<string>();
+  const stack = [{ x: startX, y: startY }];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    const key = `${current.x},${current.y}`;
+    if (seen.has(key) || !hutAt(tiles, current.x, current.y)) continue;
+    seen.add(key);
+    cells.push(current);
+    stack.push(
+      { x: current.x + 1, y: current.y },
+      { x: current.x - 1, y: current.y },
+      { x: current.x, y: current.y + 1 },
+      { x: current.x, y: current.y - 1 },
+    );
+  }
+  return cells;
+}
+
+/**
+ * Изба сверху с лёгкой изометрией: соседние клетки `H` сливаются в один
+ * дом — общие стены не рисуются, соломенная крыша стыкуется по рёбрам.
+ */
+function drawHutCell(g: Graphics, tile: Tile, tiles: readonly Tile[], C: number): void {
+  const n = hutAt(tiles, tile.x, tile.y - 1);
+  const e = hutAt(tiles, tile.x + 1, tile.y);
+  const s = hutAt(tiles, tile.x, tile.y + 1);
+  const w = hutAt(tiles, tile.x - 1, tile.y);
+  const group = hutComponent(tiles, tile.x, tile.y);
+  const southFront = group.reduce((best, cell) =>
+    cell.y > best.y || (cell.y === best.y && cell.x < best.x) ? cell : best,
+  );
+  const chimney = group.reduce((best, cell) =>
+    cell.y < best.y || (cell.y === best.y && cell.x > best.x) ? cell : best,
+  );
+  const isDoor = southFront.x === tile.x && southFront.y === tile.y && !s;
+  const isChimney = chimney.x === tile.x && chimney.y === tile.y && group.length >= 2;
+
+  g.ellipse(C / 2, C - 4, C / 2 - 4, 5).fill({ color: 0x000000, alpha: 0.22 });
+  g.rect(2, 2, C - 4, C - 4).fill(0x5c4634);
+
+  if (!w) g.rect(2, 4, 5, C - (s ? 8 : 18)).fill(0x7a5c44);
+  if (!e) g.rect(C - 7, 4, 5, C - (s ? 8 : 18)).fill(0x4a3428);
+
+  if (!s) {
+    g.rect(3, C - 14, C - 6, 12).fill(0x6a4e38);
+    for (let i = 0; i < 3; i += 1) {
+      g.rect(4, C - 13 + i * 4, C - 8, 1.2).fill({ color: 0x3d2a1c, alpha: 0.45 });
+    }
+    if (isDoor) {
+      g.roundRect(C / 2 - 7, C - 13, 14, 11, 1).fill(0x2c1c12);
+      g.roundRect(C / 2 - 6, C - 12, 12, 9, 1).fill(0x4a3220);
+      g.circle(C / 2 + 3, C - 7, 0.9).fill(0xc4a056);
+    } else {
+      g.roundRect(C / 2 - 6, C - 11, 10, 5, 1).fill(0x1a1410);
+      g.roundRect(C / 2 - 5, C - 10, 8, 3, 1).fill(0xc4a45a);
+    }
+  }
+
+  const left = w ? 0 : 6;
+  const right = e ? C : C - 6;
+  const top = n ? 0 : 4;
+  const bottom = s ? C - 8 : C - 16;
+  g.poly([left + 1, top + 10, (left + right) / 2, top, right - 1, top + 10, right - 2, bottom, left + 2, bottom]).fill(
+    0xc4a056,
+  );
+  g.poly([left + 1, top + 10, (left + right) / 2, top, right - 1, top + 10, (left + right) / 2, top + 12]).fill(
+    0xd8bc78,
+  );
+  g.poly([
+    left + 1,
+    top + 10,
+    (left + right) / 2,
+    top,
+    right - 1,
+    top + 10,
+    right - 2,
+    bottom,
+    left + 2,
+    bottom,
+  ]).stroke({ width: 1, color: 0x6a4e20, alpha: 0.7 });
+  const rows = 3;
+  for (let i = 0; i < rows; i += 1) {
+    const y = top + 12 + ((bottom - top - 14) * (i + 1)) / (rows + 1);
+    g.moveTo(left + 6, y)
+      .lineTo(right - 6, y)
+      .stroke({ width: 1, color: 0x8a6a30, alpha: 0.35 });
+  }
+
+  if (isChimney) {
+    const cx = w && e ? C / 2 + 6 : e ? C / 2 - 4 : C / 2 + 8;
+    g.rect(cx, top + 2, 7, 11).fill(0x6a5344);
+    g.rect(cx - 1, top, 9, 4).fill(0x4a3a32);
+    g.ellipse(cx + 3.5, top - 1, 3.2, 1.6).fill({ color: 0x2a2420, alpha: 0.45 });
+    g.ellipse(cx + 4.5, top - 4, 2.4, 1.4).fill({ color: 0x3a3430, alpha: 0.28 });
+  }
+}
+
 /** Нарисовать один тайл рельефа. */
 export function drawTile(tile: Tile, view: FieldView | null): Graphics {
   const snapshot = view?.snapshot;
@@ -51,11 +158,14 @@ export function drawTile(tile: Tile, view: FieldView | null): Graphics {
   // Этап 3.2: два-три оттенка базовой плитки на ярус — выбор детерминированным
   // хешем координат, поле не «пестрит», но и не выглядит монолитным.
   const shadeVariant = [-11, 0, 11][Math.floor(hashCell(tile.x, tile.y, 2) * 3)] ?? 0;
+  const hut = isHutTile(tile);
   const base = tile.pit
     ? shade(look.face[0] ?? 0x141a12, -14)
-    : tile.blockLOS
-      ? 0x3c332a
-      : shade(look.face[z] ?? look.face[1], shadeVariant);
+    : hut
+      ? 0x5a4030
+      : tile.blockLOS
+        ? 0x3c332a
+        : shade(look.face[z] ?? look.face[1], shadeVariant);
   const fill = tile.pit || tile.blockLOS ? base : shade(base, jitter);
   g.rect(0, 0, C, C).fill(fill);
   if (!tile.pit && !tile.blockLOS) {

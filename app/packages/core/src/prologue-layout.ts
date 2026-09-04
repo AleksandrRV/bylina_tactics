@@ -6,8 +6,9 @@ import { PLAYER_OWNER, ENEMY_OWNER } from "./debug-map.js";
 
 /**
  * Авторская раскладка пролога (ASCII-строки). Семантика символов:
- * `.` пусто, `t` декорация (не блокирует), `P` яма, `W` стена (blockLOS),
- * `c` полуукрытие, `E` эвакуация, `M`/`A`/`V` игроки, `F`/`S`/`U`/`K`/`H` метки.
+ * `.` пусто, `t` декорация (не блокирует), `P` яма, `W` валун (blockLOS),
+ * `H` изба (blockLOS + feature hut, и маркер), `c` полуукрытие, `E` эвакуация,
+ * `M`/`A`/`V` игроки, `F`/`S`/`U`/`K`/`z` метки.
  * Трясина (`V` с флагом bog) — immobile, не pit.
  */
 
@@ -107,6 +108,10 @@ export function compilePrologueLayout(layout: PrologueLayout, options: { default
       if (!tile) continue;
       if (ch === "P") tile.pit = true;
       if (ch === "W") tile.blockLOS = true;
+      if (ch === "H") {
+        tile.blockLOS = true;
+        tile.feature = "hut";
+      }
       if (ch === "E") {
         tile.extract = true;
         extractCells.push({ x, y });

@@ -415,16 +415,30 @@
         halfCoverChance: 0.0,
         heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
         layout: {
+          // Выселки: улица запад–восток, избы на несколько клеток
+          // (каждая `H` — стена: непроходима и закрывает обзор). Знахарка
+          // выходит из западной избы рядом с отрядом, а не с дальнего востока.
           rows: [
-            "WWW..WWW..WWWW",
-            "W.W..W.W..W.HW",
-            "........c....z",
-            "M...U..K.....z",
-            "A.....U...K..W",
-            "...t..c......W",
-            "W............W",
-            "WW..t..WW..WWW",
-            "..............",
+            "t.HH.tHHH..HHt",
+            "..HH..HHH..HH.",
+            "...z.........t",
+            "M...U..K.t..t.",
+            "A.....U...Kc..",
+            ".t.c....c....t",
+            "HH..t...t.HH..",
+            "HH.t..W..tHHtt",
+            "ttt.t...tttttt",
+          ],
+          heights: [
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "11111111111121",
+            "11111111111221",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
           ],
           legend: {
             ".": { kind: "ground" },
@@ -438,7 +452,9 @@
             "U": { kind: "spawn", side: "enemy", unitId: "upyr" },
             "K": { kind: "spawn", side: "enemy", unitId: "kikimora" },
             "H": { kind: "decor", decor: "hut" },
-            "z": { kind: "spawn", side: "player", unitId: "znaharka", scripted: true },
+            // Праща — экипировка, не запись класса; spawnScripted всё равно
+            // надевает её при появлении (как лук Федота в М3).
+            "z": { kind: "spawn", side: "player", unitId: "znaharka", weapons: ["sling"], scripted: true },
           },
         },
       },

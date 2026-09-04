@@ -14,6 +14,11 @@ export interface Tile {
   extract?: boolean;
   /** Клетка домашнего края стороны (переносимый предмет, math §17): 1 или 2. */
   homeOwner?: number;
+  /**
+   * Наземная постройка на клетке. `hut` — изба: непроходима и закрывает
+   * обзор, как стена (`blockLOS`), но рисуется домом, а не валуном.
+   */
+  feature?: "hut";
 }
 
 export interface Grid {

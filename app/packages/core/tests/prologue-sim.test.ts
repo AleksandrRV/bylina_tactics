@@ -578,30 +578,61 @@ describe("prologue M3 wave", () => {
 });
 
 describe("prologue M4 vasilisa", () => {
-  it("joins on poison or crossing x>=8, not twice", () => {
-    const layout = {
-      rows: [
-        "..............",
-        "..............",
-        "............z.",
-        "M.............",
-        "A.............",
-        "..............",
-        "..............",
-        "..............",
-        "..............",
-      ],
-      legend: {
-        M: { kind: "spawn", side: "player", unitId: "bogatyr" },
-        A: { kind: "spawn", side: "player", unitId: "strelets" },
-        z: { kind: "spawn", side: "player", unitId: "znaharka", scripted: true },
-      },
-    };
+  const SLING = weaponStatsFromRecord({
+    id: "sling",
+    category: "ranged",
+    apCost: 1,
+    endsTurn: true,
+    range: 5,
+    requiresLOS: true,
+    aimMod: 0,
+    minDmg: 2,
+    maxDmg: 4,
+    crit: 10,
+    critBonus: 1,
+    envDmg: 0,
+  });
+  const layout = {
+    rows: [
+      "t.HH.tHHH..HHt",
+      "..HH..HHH..HH.",
+      "...z.........t",
+      "M...U..K.t..t.",
+      "A.....U...Kc..",
+      ".t.c....c....t",
+      "HH..t...t.HH..",
+      "HH.t..W..tHHtt",
+      "ttt.t...tttttt",
+    ],
+    legend: {
+      M: { kind: "spawn", side: "player", unitId: "bogatyr" },
+      A: { kind: "spawn", side: "player", unitId: "strelets" },
+      z: { kind: "spawn", side: "player", unitId: "znaharka", scripted: true },
+    },
+  };
+
+  it("compiles multi-cell huts as walls next to the squad", () => {
+    const compiled = compilePrologueLayout(layout);
+    const hut = compiled.grid.tiles.find((tile) => tile.x === 2 && tile.y === 0)!;
+    const boulder = compiled.grid.tiles.find((tile) => tile.x === 6 && tile.y === 7)!;
+    const door = compiled.markers.z?.[0];
+    expect(hut.blockLOS).toBe(true);
+    expect(hut.feature).toBe("hut");
+    expect(boulder.blockLOS).toBe(true);
+    expect(boulder.feature).toBeUndefined();
+    expect(door).toEqual({ x: 3, y: 2 });
+    expect(compiled.grid.tiles.filter((tile) => tile.feature === "hut")).toHaveLength(22);
+    const bogatyr = compiled.markers.M?.[0] ?? { x: 0, y: 3 };
+    expect(Math.abs((door?.x ?? 99) - bogatyr.x) + Math.abs((door?.y ?? 99) - bogatyr.y)).toBeLessThanOrEqual(4);
+  });
+
+  it("joins on poison or crossing x>=8, not twice, with a sling from the hut", () => {
     const match = createPrologueMatch({ layout, units: [BOGATYR, STRELETS, ZNAHARKA], seed: 704 });
     expect(match.entities.some((entity) => entity.configId === "znaharka")).toBe(false);
     const kernel = createTacticsKernel({
       initial: match,
       units: [BOGATYR, STRELETS, ZNAHARKA],
+      weapons: { club: CLUB, sling: SLING },
       seed: 704,
     });
     const compiled = compilePrologueLayout(layout);
@@ -626,7 +657,12 @@ describe("prologue M4 vasilisa", () => {
       { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
     );
     expect(state.vasilisaJoined).toBe(true);
-    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
+    const healers = kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka");
+    expect(healers).toHaveLength(1);
+    expect(healers[0]?.weaponIds).toContain("sling");
+    expect(healers[0]?.weaponId).toBe("sling");
+    expect(healers[0]?.x).toBe(3);
+    expect(healers[0]?.y).toBe(2);
     state = afterPrologueApply(
       kernel,
       { type: "USE_SKILL", actorId: 2, skillId: "poison_needles", targetId: bogatyr.id },

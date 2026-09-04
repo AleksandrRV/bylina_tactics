@@ -398,6 +398,24 @@ function armStreletsBow(entity: { configId: string; weaponId?: string; weaponIds
   entity.weaponId = "bow";
 }
 
+/** Надеть пращу знахарке: класс без оружия, а кулак сцене не нужен. */
+function armZnaharkaSling(entity: { configId: string; weaponId?: string; weaponIds?: string[] }): void {
+  if (entity.configId !== "znaharka") return;
+  entity.weaponIds = ["sling"];
+  entity.weaponId = "sling";
+}
+
+function dressPrologueSpawn(entity: {
+  configId: string;
+  weaponId?: string;
+  weaponIds?: string[];
+  skillIds?: string[];
+}): void {
+  stripPrologueSkills(entity);
+  armStreletsBow(entity);
+  armZnaharkaSling(entity);
+}
+
 /**
  * События появлений, накопленные за один вызов `afterPrologueApply`
  * (0.20.37). Модульный накопитель, а не поле состояния: `spawnUnits`
@@ -431,7 +449,7 @@ function spawnUnits(
     restorePatch(kernel, (match) => {
       const entity = match.entities.find((candidate) => candidate.id === spawned.id);
       if (!entity) return;
-      stripPrologueSkills(entity);
+      dressPrologueSpawn(entity);
     });
   }
 }
@@ -460,7 +478,7 @@ function livingPlayers(match: MatchState) {
 
 function joinVasilisa(kernel: TacticsKernel, ctx: PrologueRunContext): void {
   if (living(kernel.getSnapshot(), "znaharka")) return;
-  spawnUnits(kernel, "znaharka", PLAYER_OWNER, [ctx.healerCell ?? { x: 12, y: 2 }], true);
+  spawnUnits(kernel, "znaharka", PLAYER_OWNER, [ctx.healerCell ?? { x: 3, y: 2 }], true);
 }
 
 export function afterPrologueApply(
@@ -745,13 +763,15 @@ function applyScriptDecision(
   const next = { ...state, script: decision.state };
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
   if (decision.spawn) {
-    spawnUnits(
-      kernel,
-      decision.spawn.unitId,
-      decision.spawn.owner,
-      [decision.spawn.at],
-      decision.spawn.owner === ENEMY_OWNER,
-    );
+    if (!(decision.spawn.unitId === "znaharka" && living(kernel.getSnapshot(), "znaharka"))) {
+      spawnUnits(
+        kernel,
+        decision.spawn.unitId,
+        decision.spawn.owner,
+        [decision.spawn.at],
+        decision.spawn.owner === ENEMY_OWNER,
+      );
+    }
   }
   return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
 }
