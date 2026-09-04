@@ -11,7 +11,7 @@ import {
   matchOutcome,
   noteEnemyKill,
   pickScriptedCommand,
-  shouldRestoreCheckpoint,
+  shouldRestartPrologueMission,
   tickPrologueEnemyTurn,
   tickProloguePlayerTurn,
   weaponStatsFromRecord,
@@ -538,8 +538,8 @@ describe("prologue M4 vasilisa", () => {
   });
 });
 
-describe("prologue checkpoint restore", () => {
-  it("restores after firstWave, not only fedotFreed", () => {
+describe("prologue death restarts the mission", () => {
+  it("restarts on any player combatant death, even before a scene beat", () => {
     const match = {
       turnNumber: 2,
       activeOwner: 1,
@@ -575,12 +575,12 @@ describe("prologue checkpoint restore", () => {
     const wave = createPrologueRunState("prologue_glade");
     wave.firstWave = true;
     expect(
-      shouldRestoreCheckpoint(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+      shouldRestartPrologueMission(wave, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
     ).toBe(true);
     const start = createPrologueRunState("prologue_glade");
     expect(
-      shouldRestoreCheckpoint(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
-    ).toBe(false);
+      shouldRestartPrologueMission(start, [{ type: "ENTITY_DIED", entityId: 1, causeOfDeath: "DAMAGE" }], match as never),
+    ).toBe(true);
   });
 });
 
@@ -873,7 +873,7 @@ describe("prologue M1 relief (0.20.37)", () => {
   });
 });
 
-describe("prologue M1 checkpoint (0.20.37)", () => {
+describe("prologue M1 death restart (0.20.37)", () => {
   function deadMikulaSnapshot(kernel: ReturnType<typeof createTacticsKernel>) {
     const snap = kernel.getSnapshot();
     const mikula = snap.entities.find((entity) => entity.configId === "mikula_peasant")!;
@@ -887,7 +887,7 @@ describe("prologue M1 checkpoint (0.20.37)", () => {
     };
   }
 
-  it("arms the checkpoint when the rat runs onto the field", () => {
+  it("marks the rat as spawned once so a later pickup does not add another", () => {
     const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
     const kernel = createTacticsKernel({
       initial: match,
@@ -902,7 +902,7 @@ describe("prologue M1 checkpoint (0.20.37)", () => {
     expect(state.ratSpawned).toBe(true);
   });
 
-  it("replays the scene instead of losing once the checkpoint is armed", () => {
+  it("restarts the mission from the beginning when Mikula dies", () => {
     const match = createPrologueMatch({ layout: M1_LAYOUT as never, units: [MIKULA, RAT], seed: 701 });
     const kernel = createTacticsKernel({
       initial: match,
@@ -914,10 +914,10 @@ describe("prologue M1 checkpoint (0.20.37)", () => {
     const { state } = armMikula(kernel);
     const { events, match: dead } = deadMikulaSnapshot(kernel);
     // РљРѕРЅС‚СЂРѕР»СЊРЅР°СЏ С‚РѕС‡РєР° Р°РєС‚РёРІРЅР° вЂ” РіРёР±РµР»СЊ РњРёРєСѓР»С‹ РѕС‚РєР°С‚С‹РІР°РµС‚ СЃС†РµРЅСѓ.
-    expect(shouldRestoreCheckpoint(state, events, dead)).toBe(true);
+    expect(shouldRestartPrologueMission(state, events, dead)).toBe(true);
     // Р”Рѕ РїРѕСЏРІР»РµРЅРёСЏ РєСЂС‹СЃС‹ РєРѕРЅС‚СЂРѕР»СЊРЅРѕР№ С‚РѕС‡РєРё РЅРµС‚: СЌС‚Рѕ С‡РµСЃС‚РЅРѕРµ РїРѕСЂР°Р¶РµРЅРёРµ.
     const before = createPrologueRunState("prologue_brushwood");
-    expect(shouldRestoreCheckpoint(before, events, dead)).toBe(false);
+    expect(shouldRestartPrologueMission(before, events, dead)).toBe(true);
   });
 
   it("keeps the outcome ongoing on death so the defeat card cannot flash first", () => {
@@ -985,3 +985,4 @@ describe("prologue scripted spawns reach the screen (0.20.37)", () => {
     expect(spawned.map((event) => event.entity.configId)).toEqual(["forest_rat"]);
   });
 });
+

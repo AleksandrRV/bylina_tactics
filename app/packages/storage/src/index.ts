@@ -1,5 +1,5 @@
 import type { CampaignState } from "@bylina/campaign";
-import type { FogState, MatchState } from "@bylina/core";
+import { isPrologueProgress, type FogState, type MatchState, type PrologueProgress } from "@bylina/core";
 
 /**
  * Хранилище прогресса (module-storage, architecture §3.4).
@@ -49,6 +49,12 @@ export interface SaveData {
   /** Активная партия кампании (только для экрана сражения). */
   match?: MatchState;
   fog?: FogSave;
+  /**
+   * Прогресс сюжетной сцены пролога (сценарий, сыгранные катсцены,
+   * видел ли игрок вступление). Поле необязательное и аддитивное:
+   * записи без него читаются как прежде, битое значение отбрасывается.
+   */
+  prologueProgress?: PrologueProgress;
 }
 
 interface SaveStorage {
@@ -219,6 +225,9 @@ export function isSaveData(value: unknown): value is SaveData {
   // Снимок партии, если он есть, обязан быть структурно целым (Major-5):
   // иначе ядро получает мусор как initial и падает внутри.
   if (candidate.match !== undefined && !isMatchSnapshot(candidate.match)) return false;
+  // Прогресс пролога — необязателен; битое значение отклоняет запись,
+  // migrateSave снимает его раньше, чтобы не ронять всю былину.
+  if (candidate.prologueProgress !== undefined && !isPrologueProgress(candidate.prologueProgress)) return false;
   return true;
 }
 
@@ -233,6 +242,18 @@ export function migrateSave(value: unknown): SaveData | null {
   const sourceVersion = candidate.formatVersion === undefined ? 1 : candidate.formatVersion;
   if (sourceVersion !== 1 && sourceVersion !== SAVE_FORMAT_VERSION) return null;
   const migrated = sourceVersion === 1 ? { ...candidate, formatVersion: SAVE_FORMAT_VERSION } : candidate;
+  // Битое поле прогресса пролога не должно ронять всю запись: снимаем его.
+  if (
+    typeof migrated === "object" &&
+    migrated !== null &&
+    "prologueProgress" in migrated &&
+    migrated.prologueProgress !== undefined &&
+    !isPrologueProgress(migrated.prologueProgress)
+  ) {
+    const { prologueProgress: _dropped, ...rest } = migrated as SaveData & { prologueProgress?: unknown };
+    void _dropped;
+    return isSaveData(rest) ? rest : null;
+  }
   return isSaveData(migrated) ? migrated : null;
 }
 

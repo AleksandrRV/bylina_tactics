@@ -10,7 +10,7 @@
  */
 
 import type { Command, GameEvent, MatchState } from "@bylina/core";
-import { shouldRestoreCheckpoint, takePrologueSpawnEvents, type PrologueRunState } from "./prologue-battle.js";
+import { shouldRestartPrologueMission, takePrologueSpawnEvents, type PrologueRunState } from "./prologue-battle.js";
 import type { TrainingActionKind } from "./training-scenario.js";
 
 /** Куда ведёт команда: сеть, своё ядро или отказ. */
@@ -75,10 +75,8 @@ export function routeCommand(command: Command, ctx: CommandRoutingContext): Comm
 
 /** Что сцена пролога делает с итогами уже исполненной команды. */
 export type PrologueAftermath =
-  /** Откат к контрольной точке: бой переигрывается с неё. */
-  | { kind: "restore"; state: PrologueRunState }
-  /** Контрольной точки нет — честное поражение, а не «живой» труп на поле. */
-  | { kind: "defeat"; state: PrologueRunState }
+  /** Гибель героя: миссия начинается заново с начала. */
+  | { kind: "restart"; state: PrologueRunState }
   /** Сущности созданы ядром, но выходят на поле сценой (0.20.39). */
   | { kind: "spawnBeats"; state: PrologueRunState; events: GameEvent[] }
   | { kind: "none"; state: PrologueRunState };
@@ -87,21 +85,18 @@ export interface PrologueAftermathInput {
   /** Состояние сцены, пересчитанное после команды. */
   next: PrologueRunState;
   events: readonly GameEvent[];
-  /** Снимок боя после команды: по нему решается откат. */
+  /** Снимок боя после команды: по нему решается повтор миссии. */
   snapshot: MatchState;
-  hasCheckpoint: boolean;
 }
 
 /**
  * Разобрать итог команды в прологе. Каждый вариант несёт новое состояние
  * сцены: вызывающий записывает его в ссылку, а затем исполняет ветвь —
- * откат, поражение или выход стаи.
+ * повтор миссии с начала или выход стаи.
  */
 export function prologueAftermath(input: PrologueAftermathInput): PrologueAftermath {
-  if (shouldRestoreCheckpoint(input.next, input.events, input.snapshot)) {
-    return input.hasCheckpoint
-      ? { kind: "restore", state: input.next }
-      : { kind: "defeat", state: { ...input.next, outcome: "defeat" } };
+  if (shouldRestartPrologueMission(input.next, input.events, input.snapshot)) {
+    return { kind: "restart", state: input.next };
   }
   const taken = takePrologueSpawnEvents(input.next);
   return taken.events.length > 0

@@ -62,11 +62,13 @@ export function useBattleScreenBase() {
   const [storyNote, setStoryNote] = useState<string | null>(null);
   /**
    * Ключ подсказки пролога, которую показывает открытое окно `storyNote`
-   * (0.21.21). `null`, если окно открыто обычной репликой сцены («Соберись
-   * с силами»). Закрытие окна, показывающего подсказку, снимает одноразовую
+   * (0.21.21). `null`, если окно открыто обычной репликой сцены (Летописец
+   * после гибели). Закрытие окна, показывающего подсказку, снимает одноразовую
    * реплику с очереди — но сохранение принудительной подсказки.
    */
   const [storyNoteHintKey, setStoryNoteHintKey] = useState<string | null>(null);
+  /** Персонаж сюжетного окна (портрет Летописца при повторе миссии). */
+  const [storyNotePersona, setStoryNotePersona] = useState<string | null>(null);
   /**
    * Принудительная стойка М2 (0.20.45): после первого потраченного ОД хода
    * героя принадлежит защитной стойке. Кнопка стойки пульсирует, остальные
@@ -79,7 +81,9 @@ export function useBattleScreenBase() {
    * выбирается: триггер `onSpawn` срабатывает на каждое появление, и
    * первая пара крыс М2 играется один раз, а волны — общей сценой стаи.
    */
-  const firedCutscenesRef = useRef<Set<string>>(new Set());
+  const firedCutscenesRef = useRef<Set<string>>(
+    new Set(session.get().restoredPrologueProgress?.firedCutscenes ?? []),
+  );
 
   /**
    * Позиция в очереди сценария Нави (0.20.13): живёт на время боя, очередь
@@ -145,6 +149,8 @@ export function useBattleScreenBase() {
     setStoryNote,
     storyNoteHintKey,
     setStoryNoteHintKey,
+    storyNotePersona,
+    setStoryNotePersona,
 
     prologueStanceLock,
     setPrologueStanceLock,

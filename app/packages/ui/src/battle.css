@@ -896,6 +896,18 @@
   text-wrap: balance;
 }
 
+.story-note-card.has-persona {
+  text-align: left;
+}
+
+.story-note-card.has-persona .campaign-hint-body {
+  margin-bottom: 4px;
+}
+
+.story-note-card.has-persona .story-note-text {
+  margin: 4px 0 0;
+}
+
 @keyframes story-note-in {
   from {
     opacity: 0;

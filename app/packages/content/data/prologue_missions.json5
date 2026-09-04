@@ -123,10 +123,6 @@
       // показывает, что делать дальше, не объясняя словами (0.20.40).
       actionAccent: { weaponId: "club", whileAlive: "forest_rat" },
       onboarding: [],
-      checkpoints: [
-        { id: "start", description: "Вход в миссию" },
-        { id: "rat_spawn", onKey: "stick", description: "Появление крысы" },
-      ],
     },
     {
       id: "prologue_cry",
@@ -280,10 +276,6 @@
         },
       ],
       onboarding: [],
-      checkpoints: [
-        { id: "start", description: "Вход в миссию" },
-        { id: "fedot_freed", onKey: "fedotFreed", description: "После освобождения Федота" },
-      ],
       reinforcements: "m2_cry_wave",
     },
     {
@@ -345,10 +337,6 @@
       },
       hints: ["m3.gear", "m3.blow", "m3.pit", "m3.more", "m3.shot"],
       onboarding: [],
-      checkpoints: [
-        { id: "start", description: "Вход в миссию" },
-        { id: "after_first_wave", onKey: "firstWave", description: "После второй волны упырей" },
-      ],
     },
     {
       id: "prologue_village",
@@ -416,10 +404,6 @@
       },
       hints: ["m4.poison", "m4.join", "m4.raise", "m4.source"],
       onboarding: [],
-      checkpoints: [
-        { id: "start", description: "Вход в миссию" },
-        { id: "vasilisa", onKey: "vasilisa_joined", description: "После прихода Василисы" },
-      ],
     },
   ],
 }

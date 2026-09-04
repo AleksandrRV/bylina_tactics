@@ -2,8 +2,8 @@
  * Режиссёр сцен пролога (0.20.67).
  *
  * Восемь постановщиков — проигрывание кинематографической сцены, скрытие и
- * выход сущностей появления, открытие зоны эвакуации, откат к контрольной
- * точке, пропуск сцены, сценарий хода героя — жили в экране боя: сто
+ * выход сущностей появления, открытие зоны эвакуации, повтор миссии с начала
+ * после гибели, пропуск сцены, сценарий хода героя — жили в экране боя: сто
  * восемьдесят строк, которые делят общие ссылки состояния и вызывают друг
  * друга. Экран от них не зависит ничем, кроме вызовов, поэтому они собраны
  * здесь, а экран получил обратно один объект.
@@ -63,7 +63,7 @@ export interface PrologueDirectorDeps {
   /** Точки расстановки сцен: выходы, засады, точки интереса. */
   markers: LayoutMarkers | null;
   kernel: TacticsKernel | null;
-  /** Состояние сцены миссии: сценарий, подсказки, контрольные точки. */
+  /** Состояние сцены миссии: сценарий, подсказки, вехи. */
   runRef: { current: PrologueRunState | null };
   /** Журнал телеметрии обучения миссии. */
   telemetryRef: { current: TelemetryLog };
@@ -73,8 +73,8 @@ export interface PrologueDirectorDeps {
   renderer: () => FieldRenderer | null;
   /** Передать ход противнику посреди сцены (шаг `handOff`, 0.20.40). */
   handOffTurn: () => Promise<void>;
-  /** Показать сюжетное сообщение окном (0.20.52). */
-  showStoryNote: (text: string) => void;
+  /** Показать сюжетное сообщение окном (0.20.52). Promise ждёт нажатия «ОК». */
+  showStoryNote: (text: string, options?: { persona?: string }) => Promise<void>;
   translate: (key: string) => string;
   setCutscenePlaying: (value: boolean) => void;
   setBusy: (value: boolean) => void;
@@ -100,8 +100,8 @@ export interface PrologueDirector {
   runSpawnBeats: (events: readonly GameEvent[]) => Promise<void>;
   /** Открыть зону эвакуации после сцены стаи (0.20.45). */
   revealExtractBeat: () => Promise<void>;
-  /** Откат к контрольной точке: затемнение, восстановление, кадр на герое. */
-  restoreScene: () => Promise<void>;
+  /** Повтор миссии с начала: портрет Летописца, затемнение, новый запуск. */
+  restartMission: () => Promise<void>;
   /** Пропустить текущую сцену (§1.8). */
   skip: () => void;
   /** Доиграть сценарий хода героя (после хода Нави). */
@@ -213,49 +213,20 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
     };
 
     /**
-     * Откат сцены к контрольной точке (§1.5): затемнение, восстановление
-     * снимка, кадр на герое, проявление. Затемнение и проезд идут через
-     * проигрыватель поля, поэтому уважают настройку «уменьшить движение»
-     * и множитель скорости боя.
+     * Повтор миссии с начала (§1.5): портрет Летописца, затемнение,
+     * новый запуск той же миссии. Затемнение идёт через проигрыватель
+     * поля, поэтому уважает настройку «уменьшить движение».
      */
-    const restoreScene = async (): Promise<void> => {
+    const restartMission = async (): Promise<void> => {
       const deps = now();
       const renderer = deps.renderer();
-      // Откат снимает с героя принудительную стойку (0.20.45): сцена
-      // разыгрывается заново, и держать кнопки закрытыми было бы нечем.
+      const missionId = deps.mission?.id;
       deps.setPrologueStanceLock(false);
       deps.setBusy(true);
-      deps.showStoryNote(deps.translate("prologue.scene.revive"));
       try {
+        await deps.showStoryNote(deps.translate("prologue.scene.revive"), { persona: "chronicler" });
         await (renderer?.fadeScreen?.("out", 600) ?? Promise.resolve());
-        // Полный откат к контрольной точке (0.21.24): восстанавливается и
-        // снимок ядра, и состояние сцены. Только снимка мало — иначе сценарий
-        // живёт «поверх» восстановленного поля: игрок оказывается не на своей
-        // клетке, счётчик врагов и подсказки не сбрасываются.
-        const restored = deps.session.restoreBattleCheckpoint();
-        if (restored) {
-          deps.runRef.current = restored;
-          deps.setPrologueStanceLock(restored.forceDefend);
-          deps.setPrologueHintKey(restored.hints.forcedKey ?? restored.hints.queue[0] ?? null);
-          deps.setPrologueObjectiveKey(restored.objectiveKey);
-        }
-        deps.resetSelection();
-        // Клетку героя берём из свежего снимка: состояние `view` обновится
-        // только после перерисовки, и опора на него дала бы гонку.
-        const heroId = deps.mission?.playerSlots[0];
-        const hero = heroId
-          ? deps.session.getBattleFullSnapshot()?.entities.find((entity) => entity.configId === heroId && !entity.dead)
-          : undefined;
-        if (hero) {
-          await (renderer?.playCinematic?.({
-            id: "checkpoint_focus",
-            lockInput: false,
-            // Кадр возврата: приближение не нужно — сцена играет под затемнением.
-            zoom: 1,
-            steps: [{ kind: "focus", target: { cell: { x: hero.x, y: hero.y } } }],
-          }) ?? Promise.resolve());
-        }
-        await (renderer?.fadeScreen?.("in", 500) ?? Promise.resolve());
+        if (missionId) deps.session.startPrologue(missionId, true);
       } finally {
         deps.setBusy(false);
       }
@@ -297,6 +268,6 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
       }
     };
 
-    return { runCutscene, hideSpawns, runSpawnBeats, revealExtractBeat, restoreScene, skip, runPlayerScript };
+    return { runCutscene, hideSpawns, runSpawnBeats, revealExtractBeat, restartMission, skip, runPlayerScript };
   }, [latest]);
 }

@@ -563,57 +563,68 @@ describe("createSession training hints (0.19.0)", () => {
   });
 });
 
-describe("createSession battle checkpoint (0.20.32)", () => {
-  it("restores the snapshot without recording replay commands", () => {
+describe("createSession prologue progress bind and resume", () => {
+  it("reads bound prologue progress as a deep copy", () => {
     const session = createSession("menu");
-    session.openQuickMatch();
-    session.selectDifficulty("easy");
+    session.startPrologue("prologue_brushwood", true);
     const host = createTacticsKernel({ initial: createDebugMatch(), seed: 2 });
     session.bindTacticsHost(host);
-    expect(session.saveBattleCheckpoint()).toBe(true);
-    const before = host.getSnapshot();
-    session.applyBattleCommand({ type: "END_TURN", playerId: "1" });
-    expect(host.getSnapshot().activeOwner).not.toBe(before.activeOwner);
-    const draftBefore = session.getReplayDraft();
-    // Быстрый матч — не пролог: сохранённого состояния сцены нет, вернётся null.
-    expect(session.restoreBattleCheckpoint()).toBeNull();
-    expect(host.getSnapshot().activeOwner).toBe(before.activeOwner);
-    expect(session.getReplayDraft()).toEqual(draftBefore);
+    const run = createPrologueRunState("prologue_brushwood");
+    run.pickupDone = true;
+    run.objectiveKey = "prologue.objective.destroyAll";
+    const progress = { run, firedCutscenes: ["m1_intro"], introSeen: true };
+    session.bindPrologueProgress(() => progress);
+    const first = session.getPrologueProgress();
+    expect(first).not.toBeNull();
+    expect(first!.introSeen).toBe(true);
+    expect(first!.firedCutscenes).toEqual(["m1_intro"]);
+    expect(first!.run.pickupDone).toBe(true);
+    first!.run.pickupDone = false;
+    first!.firedCutscenes.push("extra");
+    const second = session.getPrologueProgress();
+    expect(second!.run.pickupDone).toBe(true);
+    expect(second!.firedCutscenes).toEqual(["m1_intro"]);
   });
 
-  it("stores and restores the prologue run state as a deep copy (0.21.24)", () => {
+  it("continues a prologue battle with restored progress", () => {
     const session = createSession("menu");
-    session.openQuickMatch();
-    session.selectDifficulty("easy");
+    session.bindCampaign(campaign());
+    const match = createDebugMatch();
+    const run = createPrologueRunState("prologue_brushwood");
+    run.pickupDone = true;
+    session.continueCampaign({
+      screen: "battle",
+      prologueMissionId: "prologue_brushwood",
+      restoredMatch: match,
+      restoredPrologueProgress: { run, firedCutscenes: ["m1_intro"], introSeen: true },
+      matchSeed: 701,
+    });
+    const state = session.get();
+    expect(state.battleKind).toBe("prologue");
+    expect(state.restoredPrologueProgress?.introSeen).toBe(true);
+    expect(state.restoredPrologueProgress?.run.pickupDone).toBe(true);
+    expect(state.restoredPrologueProgress?.firedCutscenes).toEqual(["m1_intro"]);
+  });
+
+  it("resumes a suspended prologue battle with the stored progress", () => {
+    const session = createSession("menu");
+    session.bindCampaign(campaign());
+    session.startPrologue("prologue_brushwood", true);
     const host = createTacticsKernel({ initial: createDebugMatch(), seed: 2 });
     session.bindTacticsHost(host);
-
-    // Состояние сцены пролога в момент контрольной точки: ключевые вехи М2.
-    const runState = createPrologueRunState("prologue_cry");
-    runState.fedotFreed = true;
-    runState.waveArmed = true;
-    runState.extractPending = true;
-    runState.objectiveKey = "prologue.objective.evacuate";
-
-    expect(session.saveBattleCheckpoint(runState)).toBe(true);
-    // Мутация исходника после сохранения не трогает зафиксированный откат.
-    runState.fedotFreed = false;
-    runState.waveArmed = false;
-
-    const restored = session.restoreBattleCheckpoint();
-    expect(restored).not.toBeNull();
-    expect(restored!.fedotFreed).toBe(true);
-    expect(restored!.waveArmed).toBe(true);
-    expect(restored!.extractPending).toBe(true);
-    expect(restored!.objectiveKey).toBe("prologue.objective.evacuate");
-
-    // Возвращённое состояние — независимая копия: следующие ходы мутируют её,
-    // не задевая сохранённый откат.
-    restored!.fedotFreed = false;
-    restored!.objectiveKey = "changed";
-    const second = session.restoreBattleCheckpoint();
-    expect(second!.fedotFreed).toBe(true);
-    expect(second!.objectiveKey).toBe("prologue.objective.evacuate");
+    const run = createPrologueRunState("prologue_brushwood");
+    run.pickupDone = true;
+    session.bindPrologueProgress(() => ({
+      run,
+      firedCutscenes: ["m1_intro"],
+      introSeen: true,
+    }));
+    session.suspendCampaignBattle();
+    expect(session.get().suspendedCampaign?.prologueProgress?.introSeen).toBe(true);
+    session.resumeCampaign();
+    expect(session.get().battleKind).toBe("prologue");
+    expect(session.get().restoredPrologueProgress?.introSeen).toBe(true);
+    expect(session.get().restoredPrologueProgress?.run.pickupDone).toBe(true);
   });
 });
 

@@ -70,9 +70,9 @@ export interface PrologueRunState {
   fedotJoined: boolean;
   vasilisaJoined: boolean;
   /**
-   * М1: крыса вышла на поле (0.20.37). С этого момента миссия имеет
-   * контрольную точку — гибель Микулы откатывает сцену к появлению крысы,
-   * а не завершает миссию поражением (campaign.md §1.5, §13.8).
+   * М1: крыса вышла на поле (0.20.37). Флаг однократного появления: повторный
+   * подбор палки крысу не досыпает. Гибель героя больше не откатывает сцену
+   * к этой вехе — миссия начинается заново с начала (campaign.md §1.5).
    */
   ratSpawned: boolean;
   pendingCommand: Command | null;
@@ -133,15 +133,52 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
 /**
  * Полная копия состояния сцены пролога (0.21.24).
  *
- * Контрольная точка хранит не только снимок ядра, но и состояние сценария:
- * счётчик подкреплений, очередь подсказок, флаги вех, цель миссии. При откате
- * после гибели героя миссия обязана вернуться и к нему — иначе сценарий
- * продолжает жить «поверх» восстановленного поля: игрок оказывается не там,
- * счётчик врагов не сбрасывается, подсказки и цель разъезжаются. Копия
- * глубокая: состояние живёт в ссылке экрана и мутируется следующими ходами.
+ * Сохранение былины хранит не только снимок ядра, но и состояние сценария:
+ * счётчик подкреплений, очередь подсказок, флаги вех, цель миссии, индекс
+ * скрипта. Без него «Продолжить» поднимает поле, а вступление и цели
+ * проигрываются заново поверх уже подобранных предметов. Копия глубокая:
+ * состояние живёт в ссылке экрана и мутируется следующими ходами.
  */
 export function clonePrologueRunState(state: PrologueRunState): PrologueRunState {
   return structuredClone(state);
+}
+
+/**
+ * Прогресс сюжетной миссии, который переживает выход в меню и перезапуск
+ * приложения. Снимок ядра сам по себе не знает, какие сцены уже сыграны
+ * и видел ли игрок вступление — без этого блока «Продолжить» повторял
+ * интро и цели поверх уже сделанных ходов.
+ */
+export interface PrologueProgress {
+  run: PrologueRunState;
+  firedCutscenes: string[];
+  introSeen: boolean;
+}
+
+export function clonePrologueProgress(progress: PrologueProgress): PrologueProgress {
+  return {
+    run: clonePrologueRunState(progress.run),
+    firedCutscenes: [...progress.firedCutscenes],
+    introSeen: progress.introSeen,
+  };
+}
+
+/** Структурная проверка прогресса пролога: битое поле не должно ронять сохранение. */
+export function isPrologueProgress(value: unknown): value is PrologueProgress {
+  if (typeof value !== "object" || value === null) return false;
+  const candidate = value as Partial<PrologueProgress>;
+  if (!Array.isArray(candidate.firedCutscenes)) return false;
+  if (candidate.firedCutscenes.some((key) => typeof key !== "string")) return false;
+  if (typeof candidate.introSeen !== "boolean") return false;
+  if (typeof candidate.run !== "object" || candidate.run === null) return false;
+  const run = candidate.run as Partial<PrologueRunState>;
+  return (
+    typeof run.objectiveKey === "string" &&
+    (run.outcome === "ongoing" || run.outcome === "victory" || run.outcome === "defeat") &&
+    typeof run.pickupDone === "boolean" &&
+    typeof run.script === "object" &&
+    run.script !== null
+  );
 }
 
 const M1_TRIGGERS: MissionTrigger[] = [
@@ -431,10 +468,9 @@ export function afterPrologueApply(
     }
     const mikula = living(kernel.getSnapshot(), "mikula_peasant");
     if (!mikula) {
-      // Контрольная точка уже поставлена: провал — это повтор сцены, а не
-      // поражение (§1.5). Исход остаётся «ongoing» — иначе экран боя показал
-      // бы карточку поражения до отката.
-      next.outcome = next.ratSpawned ? "ongoing" : "defeat";
+      // Гибель героя — повтор миссии с начала (§1.5), не карточка поражения.
+      // Исход остаётся «ongoing», пока экран боя не покажет Летописца.
+      next.outcome = "ongoing";
       return harvest(next);
     }
     if (
@@ -526,16 +562,6 @@ export function afterPrologueApply(
     }
     // ENTITY_REMOVED already dropped the unit — detect by absence.
     const after = kernel.getSnapshot();
-    if (!living(after, "mikula_peasant") && !next.extracted.includes("mikula_peasant")) {
-      if (next.fedotFreed) {
-        next.outcome = "ongoing";
-      } else {
-        next.outcome = "defeat";
-      }
-    }
-    if (!living(after, "mikula_peasant") && next.extracted.includes("mikula_peasant") === false && next.fedotFreed) {
-      // death after checkpoint is handled by caller via restoreBattleCheckpoint
-    }
     const mikulaGone = !living(after, "mikula_peasant");
     const fedotGone = !living(after, "fedot_stranded");
     if (events.some((event) => event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED")) {
@@ -547,13 +573,8 @@ export function afterPrologueApply(
     if (next.extracted.includes("mikula_peasant") && next.extracted.includes("fedot_stranded")) {
       next.outcome = "victory";
     }
-    if (!living(after, "mikula_peasant") && !next.extracted.includes("mikula_peasant") && !next.fedotFreed) {
-      next.outcome = "defeat";
-    }
-    if (!living(after, "fedot_stranded") && !next.extracted.includes("fedot_stranded") && next.fedotFreed) {
-      const fedot = after.entities.find((entity) => entity.configId === "fedot_stranded");
-      if (fedot?.dead) next.outcome = "defeat";
-    }
+    // Гибель героя или Федота — повтор миссии с начала (§1.5), не поражение.
+    // Исход остаётся «ongoing», пока экран боя не покажет Летописца.
   }
 
   if (ctx.missionId === "prologue_glade") {
@@ -580,8 +601,7 @@ export function afterPrologueApply(
       enqueue(next, ctx, "m3.blow");
     }
     const after = kernel.getSnapshot();
-    if (!livingPlayers(after).length) next.outcome = "defeat";
-    else if (next.firstWave && !livingEnemies(after).length) next.outcome = "victory";
+    if (livingPlayers(after).length && next.firstWave && !livingEnemies(after).length) next.outcome = "victory";
   }
 
   if (ctx.missionId === "prologue_village") {
@@ -592,8 +612,7 @@ export function afterPrologueApply(
       enqueue(next, ctx, "m4.join");
     }
     const after = kernel.getSnapshot();
-    if (!livingPlayers(after).length) next.outcome = "defeat";
-    else if (!livingEnemies(after).length) next.outcome = "victory";
+    if (livingPlayers(after).length && !livingEnemies(after).length) next.outcome = "victory";
   }
 
   return harvest(next);
@@ -665,16 +684,15 @@ export function tickProloguePlayerTurn(
   return applyScriptDecision(kernel, state, ctx, PLAYER_OWNER);
 }
 
-function checkpointArmed(state: PrologueRunState): boolean {
-  return state.fedotFreed || state.firstWave || state.vasilisaJoined || state.ratSpawned;
-}
-
-export function shouldRestoreCheckpoint(
+/**
+ * Гибель управляемого бойца в прологе — повтор миссии с начала (§1.5).
+ * Эвакуированные в счёт не идут: они уже ушли с поля живыми.
+ */
+export function shouldRestartPrologueMission(
   state: PrologueRunState,
   events: readonly GameEvent[],
   match: MatchState,
 ): boolean {
-  if (!checkpointArmed(state)) return false;
   const died = events.some((event) => event.type === "ENTITY_DIED" || event.type === "MATCH_ENDED");
   if (!died) return false;
   const fallen = match.entities.filter(

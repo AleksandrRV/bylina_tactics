@@ -69,6 +69,8 @@ export { createPrologueMatch } from "./prologue-match.js";
 export {
   createPrologueRunState,
   clonePrologueRunState,
+  clonePrologueProgress,
+  isPrologueProgress,
   afterPrologueApply,
   gatePrologueCommand,
   clampPrologueCommand,
@@ -77,10 +79,10 @@ export {
   tickProloguePlayerTurn,
   prologueHintView,
   dismissPrologueHint,
-  shouldRestoreCheckpoint,
+  shouldRestartPrologueMission,
   takePrologueSpawnEvents,
 } from "./prologue-run.js";
-export type { PrologueRunState, PrologueRunContext } from "./prologue-run.js";
+export type { PrologueRunState, PrologueRunContext, PrologueProgress } from "./prologue-run.js";
 export {
   createReinforcementsState,
   tickReinforcements,

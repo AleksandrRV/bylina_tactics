@@ -4,6 +4,7 @@ import type { TacticsKernel } from "@bylina/core";
 import {
   afterPrologueApply,
   buildPrologueContext,
+  clonePrologueRunState,
   createPrologueRunState,
   createTelemetryLog,
   recordTelemetry,
@@ -36,6 +37,7 @@ export function useBattlePrologueState(
     setPrologueStanceLock,
     setStoryNote,
     setStoryNoteHintKey,
+    setStoryNotePersona,
     storyNoteHintKey,
     setCutscenePlaying,
     setBusy,
@@ -43,9 +45,16 @@ export function useBattlePrologueState(
 
   const { isPrologue, prologueMission } = kinds;
 
+  const restoredProgress = session.get().restoredPrologueProgress;
   const prologueRunRef = useRef<PrologueRunState | null>(
-    isPrologue && prologueMission ? createPrologueRunState(prologueMission.id) : null,
+    isPrologue && prologueMission
+      ? restoredProgress?.run
+        ? clonePrologueRunState(restoredProgress.run)
+        : createPrologueRunState(prologueMission.id)
+      : null,
   );
+  const introSeenRef = useRef(Boolean(restoredProgress?.introSeen));
+  const storyNoteClosedRef = useRef<(() => void) | null>(null);
 
   /**
    * Исход, которым распоряжается сцена (0.20.45).
@@ -73,13 +82,17 @@ export function useBattlePrologueState(
    * кинематическую сцену миссии. Закрытие итоговой переводит к следующей
    * миссии или к карте.
    */
-  const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(isPrologue ? "intro" : null);
+  const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(
+    isPrologue && !restoredProgress?.introSeen ? "intro" : null,
+  );
 
   /**
    * Ключ текущей подсказки пролога, которую показывает окно `storyNote`
    * (0.21.21). Назначается сценой, закрытие окна снимает реплику с очереди.
    */
-  const [prologueHintKey, setPrologueHintKey] = useState<string | null>(null);
+  const [prologueHintKey, setPrologueHintKey] = useState<string | null>(
+    restoredProgress?.run.hints?.forcedKey ?? restoredProgress?.run.hints?.queue[0] ?? null,
+  );
 
   /**
    * Маркеры авторской раскладки миссии: сцена ссылается на палку или точку
@@ -91,14 +104,20 @@ export function useBattlePrologueState(
   })();
 
   // Показать сюжетное сообщение окном (0.20.52): строка журнала гасится,
-  // чтобы короткая реплика боя не соседствовала с карточкой.
+  // чтобы короткая реплика боя не соседствовала с карточкой. Promise
+  // разрешается по «ОК» или щелчку по фону — повтор миссии ждёт его.
   const showStoryNote = useCallback(
-    (text: string): void => {
+    (text: string, options?: { persona?: string }): Promise<void> => {
       setLog(null);
       setStoryNoteHintKey(null);
+      setStoryNotePersona(options?.persona ?? null);
       setStoryNote(text);
+      return new Promise((resolve) => {
+        storyNoteClosedRef.current?.();
+        storyNoteClosedRef.current = resolve;
+      });
     },
-    [setLog, setStoryNote, setStoryNoteHintKey],
+    [setLog, setStoryNote, setStoryNoteHintKey, setStoryNotePersona],
   );
 
   /** Ключ текущей подсказки пролога: принудённая либо первая в очереди. */
@@ -121,9 +140,10 @@ export function useBattlePrologueState(
       const textKey = content.prologueHints.hints.find((hint) => hint.key === key)?.textKey ?? key;
       setLog(null);
       setStoryNoteHintKey(key);
+      setStoryNotePersona(null);
       setStoryNote(t(textKey));
     },
-    [content, setLog, setStoryNote, setStoryNoteHintKey, t],
+    [content, setLog, setStoryNote, setStoryNoteHintKey, setStoryNotePersona, t],
   );
 
   /**
@@ -135,8 +155,11 @@ export function useBattlePrologueState(
    */
   const closeStoryNote = useCallback((): void => {
     const key = storyNoteHintKey;
+    storyNoteClosedRef.current?.();
+    storyNoteClosedRef.current = null;
     setStoryNote(null);
     setStoryNoteHintKey(null);
+    setStoryNotePersona(null);
     if (!key || !isPrologue || !prologueRunRef.current) return;
     // Принуждённая подсказка живёт, пока сцена не отпустит ход: её закрытие
     // не снимает замок действий.
@@ -145,7 +168,7 @@ export function useBattlePrologueState(
     prologueRunRef.current = next;
     const nextKey = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
     if (nextKey !== prologueHintKey) setPrologueHintKey(nextKey);
-  }, [isPrologue, prologueHintKey, storyNoteHintKey, setStoryNote, setStoryNoteHintKey]);
+  }, [isPrologue, prologueHintKey, storyNoteHintKey, setStoryNote, setStoryNoteHintKey, setStoryNotePersona]);
 
   /**
    * Показ подсказки пролога отдельным окном (0.21.21): как только сцена
@@ -153,6 +176,35 @@ export function useBattlePrologueState(
    * что вступление и итог миссии. Принудённая стойка закрывается, когда
    * ход отпущен, — текст больше не висит над кнопкой.
    */
+  useEffect(() => {
+    if (prologueCard !== "intro") introSeenRef.current = true;
+  }, [prologueCard]);
+
+  useEffect(() => {
+    if (prologueRunRef.current?.forceDefend) setPrologueStanceLock(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (!isPrologue) return;
+    session.bindPrologueProgress(() => {
+      if (!prologueRunRef.current) return null;
+      return {
+        run: prologueRunRef.current,
+        firedCutscenes: [...firedCutscenesRef.current],
+        introSeen: introSeenRef.current,
+      };
+    });
+  }, [isPrologue, session, firedCutscenesRef]);
+
+  useEffect(
+    () => () => {
+      storyNoteClosedRef.current?.();
+      storyNoteClosedRef.current = null;
+    },
+    [],
+  );
+
   const seenPrologueHintRef = useRef<string | null>(null);
   useEffect(() => {
     if (!isPrologue || prologueCard) {

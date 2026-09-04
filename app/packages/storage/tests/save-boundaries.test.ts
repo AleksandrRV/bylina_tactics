@@ -168,6 +168,55 @@ describe("валидация SaveData.match (Major-5)", () => {
   });
 });
 
+describe("валидация SaveData.prologueProgress", () => {
+  const progress = {
+    run: {
+      objectiveKey: "prologue.objective.gather",
+      outcome: "ongoing" as const,
+      pickupDone: true,
+      script: { index: 0 },
+    },
+    firedCutscenes: ["m1_intro"],
+    introSeen: true,
+  };
+
+  it("принимает запись с целым прогрессом сюжетной сцены", () => {
+    const save = { ...baseSave(), prologueProgress: progress } as SaveData;
+    expect(isSaveData(save)).toBe(true);
+  });
+
+  it("отклоняет запись с битым прогрессом без миграции", () => {
+    expect(isSaveData({ ...baseSave(), prologueProgress: { introSeen: "yes" } })).toBe(false);
+  });
+
+  it("migrateSave снимает битый прогресс и оставляет остальную запись", () => {
+    const migrated = migrateSave({ ...baseSave(), prologueProgress: { introSeen: true } });
+    expect(migrated).not.toBeNull();
+    expect(migrated?.prologueProgress).toBeUndefined();
+    expect(migrated?.campaign.darkness).toBe(4);
+  });
+
+  it("загрузка с битым прогрессом возвращает запись без поля, а не null", () => {
+    const corrupted = { ...baseSave(), prologueProgress: { firedCutscenes: "m1_intro" } };
+    const backend = memoryBackend({ "bylina.save.prologue.bad": JSON.stringify(corrupted) });
+    const storage = createSaveStorage("bylina.save.prologue.bad", backend);
+    const loaded = storage.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded?.prologueProgress).toBeUndefined();
+    expect(loaded?.campaign.fighters).toEqual([]);
+  });
+
+  it("загрузка с целым прогрессом возвращает поле целиком", () => {
+    const save = { ...baseSave(), prologueProgress: progress } as SaveData;
+    const backend = memoryBackend({ "bylina.save.prologue.ok": JSON.stringify(save) });
+    const storage = createSaveStorage("bylina.save.prologue.ok", backend);
+    const loaded = storage.load();
+    expect(loaded?.prologueProgress?.introSeen).toBe(true);
+    expect(loaded?.prologueProgress?.firedCutscenes).toEqual(["m1_intro"]);
+    expect(loaded?.prologueProgress?.run.pickupDone).toBe(true);
+  });
+});
+
 describe("переполнение хранилища не прерывает игру", () => {
   it("save() при QuotaExceededError возвращает false и сообщает колбэку", () => {
     const quotaError = Object.assign(new Error("full"), { name: "QuotaExceededError" });

@@ -1,4 +1,4 @@
-import { APP_VERSION, clonePrologueRunState, matchOutcome } from "@bylina/core";
+import { APP_VERSION, clonePrologueProgress, matchOutcome, PLAYER_OWNER } from "@bylina/core";
 import type {
   ApplyResult,
   CellPos,
@@ -7,7 +7,7 @@ import type {
   GameEvent,
   HitPreview,
   MatchState,
-  PrologueRunState,
+  PrologueProgress,
   ReachableCell,
   SkillPreview,
   TacticsKernel,
@@ -88,6 +88,12 @@ export interface SessionState {
    */
   restoredMatch?: MatchState;
   restoredFog?: FogState;
+  /**
+   * Прогресс сюжетной сцены пролога (сценарий, сыгранные катсцены,
+   * видел ли игрок вступление). Экран боя читает его при создании,
+   * как и restoredMatch: повторный вызов инициализатора не теряет прогресс.
+   */
+  restoredPrologueProgress?: PrologueProgress;
   /** Составы сторон поочерёдной игры (0.14.0). */
   pvp?: { side1: string[]; side2: string[] } | null;
   /** Победившая сторона поочерёдной игры (экран итога). */
@@ -118,6 +124,7 @@ export interface SessionState {
     matchSeed: number;
     restoredMatch?: MatchState;
     restoredFog?: FogState;
+    prologueProgress?: PrologueProgress;
   } | null;
   /** Активная миссия обучения (0.19.0). */
   trainingMissionId?: string | null;
@@ -324,17 +331,13 @@ export interface SessionApi {
   continuePrologue(): boolean;
 
   /**
-   * Снимок чекпоинта боя (не пишется в журнал повтора). Для пролога вместе со
-   * снимком ядра сохраняется и состояние сцены (`PrologueRunState`): откат к
-   * контрольной точке обязан вернуть миссию целиком, а не только поле.
+   * Привязать чтение прогресса сюжетной сцены (как `bindTacticsHost`):
+   * экран боя ещё смонтирован, пока сессия приостанавливает миссию, и
+   * автосохранение читает свежее состояние после ходов.
    */
-  saveBattleCheckpoint(runState?: PrologueRunState): boolean;
-  /**
-   * Откат к контрольной точке: восстанавливает снимок ядра и возвращает
-   * сохранённое состояние сцены пролога (или `null`, если чекпоинт не пролог).
-   */
-  restoreBattleCheckpoint(): PrologueRunState | null;
-  hasBattleCheckpoint(): boolean;
+  bindPrologueProgress(get: (() => PrologueProgress | null) | null): void;
+  /** Свежий прогресс пролога для сохранения былины. */
+  getPrologueProgress(): PrologueProgress | null;
   subscribeBattle(listener: () => void): () => void;
   subscribe(listener: (state: SessionState) => void): () => void;
 }
@@ -389,6 +392,8 @@ interface CampaignContinuation {
   /** Восстановленная партия (для экрана сражения). */
   restoredMatch?: MatchState;
   restoredFog?: FogState;
+  /** Прогресс сюжетной сцены пролога (сценарий, катсцены, вступление). */
+  restoredPrologueProgress?: PrologueProgress;
 }
 
 /** Экран активного тактического боя: обычное сражение и сражение обучения. */
@@ -401,13 +406,7 @@ export function createSession(
   restored?: Partial<Omit<SessionState, "screen">>,
 ): SessionApi {
   let state: SessionState = { screen: initial, trainingDone: [], campaignHintsDone: [], ...idle, ...(restored ?? {}) };
-  interface BattleCheckpoint {
-    match: MatchState;
-    fog: FogState;
-    /** Состояние сцены пролога в момент контрольной точки (0.21.24). */
-    prologue?: PrologueRunState;
-  }
-  let battleCheckpoint: BattleCheckpoint | null = null;
+  let prologueProgressGetter: (() => PrologueProgress | null) | null = null;
   let tacticsHost: TacticsKernel | null = null;
   let campaign: CampaignApi | null = null;
   /** Локальный транспорт поочерёдной игры: команды сторон → ведущий → события (0.14.0). */
@@ -487,8 +486,23 @@ export function createSession(
     prologue_village: 704,
   };
 
+  /** Есть ли на поле живой управляемый боец — иначе сохранение мёртвой сцены не поднимаем. */
+  const hasLivingPlayerCombatant = (match?: MatchState): boolean => {
+    if (!match) return false;
+    return match.entities.some(
+      (entity) => entity.owner === PLAYER_OWNER && entity.coverType === 0 && !entity.dead && entity.maxAp > 0,
+    );
+  };
+
+  const readPrologueProgress = (): PrologueProgress | null => {
+    const live = prologueProgressGetter?.();
+    if (live) return clonePrologueProgress(live);
+    return state.restoredPrologueProgress ? clonePrologueProgress(state.restoredPrologueProgress) : null;
+  };
+
   /** Запустить миссию пролога с постоянным посевом. */
   const openPrologueBattle = (missionId: string): void => {
+    prologueProgressGetter = null;
     openBattle({
       ...idle,
       screen: "battle",
@@ -689,6 +703,12 @@ export function createSession(
       // Сюжетная миссия (0.20.51): бой пролога восстанавливается как пролог,
       // иначе экран боя искал бы миссию среди точек карты и падал.
       const story = screen === "battle" ? (entry.prologueMissionId ?? null) : null;
+      // Гибель героя в сохранённой сцене: миссия начинается заново, а не
+      // поднимается с трупом на поле.
+      if (story && entry.restoredMatch && !hasLivingPlayerCombatant(entry.restoredMatch)) {
+        openPrologueBattle(story);
+        return;
+      }
       const open = screen === "battle" ? openBattle : emit;
       open({
         ...idle,
@@ -704,6 +724,10 @@ export function createSession(
         campaignHintsDone: state.campaignHintsDone ?? [],
         restoredMatch: screen === "battle" ? entry.restoredMatch : undefined,
         restoredFog: screen === "battle" ? entry.restoredFog : undefined,
+        restoredPrologueProgress:
+          screen === "battle" && story && entry.restoredPrologueProgress
+            ? clonePrologueProgress(entry.restoredPrologueProgress)
+            : undefined,
       });
     },
     startCampaignMission: (missionId) => {
@@ -756,6 +780,7 @@ export function createSession(
       if (state.battleKind === "prologue" && state.prologueMissionId) {
         const snapshot = tacticsHost ? tacticsHost.getSnapshot() : state.restoredMatch;
         const fog = tacticsHost ? tacticsHost.getFog() : state.restoredFog;
+        const progress = readPrologueProgress();
         emit({
           screen: "menu",
           ...idle,
@@ -766,6 +791,7 @@ export function createSession(
             matchSeed: state.matchSeed,
             restoredMatch: snapshot ?? state.restoredMatch,
             restoredFog: fog ?? state.restoredFog,
+            prologueProgress: progress ?? undefined,
           },
         });
         return;
@@ -796,6 +822,10 @@ export function createSession(
     resumeCampaign: () => {
       const slot = state.suspendedCampaign ?? null;
       if (slot && slot.activeMissionId.startsWith("prologue_")) {
+        if (!hasLivingPlayerCombatant(slot.restoredMatch)) {
+          openPrologueBattle(slot.activeMissionId);
+          return;
+        }
         openBattle({
           ...idle,
           screen: "battle",
@@ -804,6 +834,7 @@ export function createSession(
           matchSeed: slot.matchSeed,
           restoredMatch: slot.restoredMatch,
           restoredFog: slot.restoredFog,
+          restoredPrologueProgress: slot.prologueProgress ? clonePrologueProgress(slot.prologueProgress) : undefined,
           suspendedCampaign: null,
         });
         return;
@@ -1267,26 +1298,10 @@ export function createSession(
       emit({ ...state, screen: "result", paused: false, outcome, prologueNextMissionId: nextMissionId });
     },
     continuePrologue: () => routeNextPrologue(state.prologueNextMissionId ?? null),
-    saveBattleCheckpoint: (runState) => {
-      if (!tacticsHost) return false;
-      battleCheckpoint = {
-        match: tacticsHost.getSnapshot(),
-        fog: tacticsHost.getFog(),
-        prologue: runState ? clonePrologueRunState(runState) : undefined,
-      };
-      return true;
+    bindPrologueProgress: (get) => {
+      prologueProgressGetter = get;
     },
-    restoreBattleCheckpoint: () => {
-      if (!tacticsHost || !battleCheckpoint) return null;
-      tacticsHost.restoreMatch(battleCheckpoint.match, battleCheckpoint.fog);
-      // Восстановление чекпоинта меняет ядро: ревизию отдаёт само ядро
-      // (restoreMatch → emit), локальный счётчик не двигаем.
-      notifyBattle(false);
-      // Состояние сцены возвращаем свежей копией: экран кладёт его в ссылку,
-      // и следующие ходы мутируют её, не задевая сохранённый откат.
-      return battleCheckpoint.prologue ? clonePrologueRunState(battleCheckpoint.prologue) : null;
-    },
-    hasBattleCheckpoint: () => battleCheckpoint !== null,
+    getPrologueProgress: () => readPrologueProgress(),
     bindTacticsHost: (host) => {
       tacticsHost = host;
       // Сетевой ведущий: ядро создано (BattleScreen смонтирован) — ведомый

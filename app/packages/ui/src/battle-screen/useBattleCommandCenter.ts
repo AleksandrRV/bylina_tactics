@@ -219,36 +219,21 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         // Принудительная стойка (0.20.45): пульсация кнопки и закрытые
         // прочие действия живут ровно до команды «DEFEND».
         setPrologueStanceLock(next.forceDefend);
-        // Что делать с итогами команды — решает battle-command: откат к
-        // контрольной точке, честное поражение или выход стаи сценой.
+        // Что делать с итогами команды — решает battle-command: повтор
+        // миссии с начала или выход стаи сценой.
         const aftermath = prologueAftermath({
           next,
           events: result.events,
           snapshot: kernel.getSnapshot(),
-          hasCheckpoint: session.hasBattleCheckpoint(),
         });
         prologueRunRef.current = aftermath.state;
-        // Контрольная точка миссии: вход в миссию уже её обеспечен, дальше —
-        // ключевые сюжетные вехи, включая выход крысы М1. Вместе со снимком
-        // ядра сохраняется и состояние сцены — откат возвращает миссию целиком.
-        const armed = next.fedotFreed || next.firstWave || next.vasilisaJoined || next.ratSpawned;
-        if (armed && !session.hasBattleCheckpoint()) {
-          session.saveBattleCheckpoint(aftermath.state);
-        }
         switch (aftermath.kind) {
-          case "restore":
+          case "restart":
             prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
               type: "death_by",
-              cause: "checkpoint",
+              cause: "restart",
             });
-            prologueAfter = () => void director.restoreScene();
-            break;
-          case "defeat":
-            prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
-              type: "death_by",
-              cause: "checkpoint",
-            });
-            prologueFinished = true;
+            prologueAfter = () => void director.restartMission();
             break;
           case "spawnBeats":
             // Сущность уже создана ядром, но на поле её не показываем до
@@ -674,9 +659,10 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
    */
   const runEnemyPhase = useCallback(async (): Promise<void> => {
     base.setEnemyPhase(true);
-    // Отложенные постановочные действия: откат к контрольной точке или выход
+    // Отложенные постановочные действия: повтор миссии или выход
     // противника — исполняются после проигрывания событий хода.
     let enemyAfter: (() => void) | null = null;
+    let restarting = false;
     // Весь ход Нави — проигрывание: итог показывается после него (0.20.39).
     outcomeGate.playbackStart();
     try {
@@ -735,30 +721,22 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         if (isPrologue && prologueMission && prologueRunRef.current && command) {
           const ctx = buildContext(prologueMission, content, hintSettings.showHints);
           const next = applyPrologueAfter(kernel, command, applied.events, prologueRunRef.current, ctx);
-          // Тот же разбор итога, что и в канале команд: откат к контрольной
-          // точке, честное поражение или выход стаи сценой.
+          // Тот же разбор итога, что и в канале команд: повтор миссии
+          // с начала или выход стаи сценой.
           const aftermath = prologueAftermath({
             next,
             events: applied.events,
             snapshot: kernel.getSnapshot(),
-            hasCheckpoint: session.hasBattleCheckpoint(),
           });
           prologueRunRef.current = aftermath.state;
           switch (aftermath.kind) {
-            case "restore":
+            case "restart":
               prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
                 type: "death_by",
-                cause: "checkpoint",
+                cause: "restart",
               });
-              // Затемнение и откат — после того, как ход Нави доигран.
-              enemyAfter = () => void director.restoreScene();
-              break;
-            case "defeat":
-              prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
-                type: "death_by",
-                cause: "checkpoint",
-              });
-              outcomeGate.report(() => setPrologueCard("outro"));
+              restarting = true;
+              enemyAfter = () => void director.restartMission();
               break;
             case "spawnBeats":
               // Появление по сцене: на поле сущности нет до вбегания (0.20.39).
@@ -772,11 +750,12 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
           if (next.outcome !== "ongoing") outcomeGate.report(() => setPrologueCard("outro"));
         }
         finishFromEvents(applied.events);
+        if (restarting) break;
         // Пустая команда — сценарий противника исчерпан: цикл завершён.
         if (!enemyPhaseContinues({ ...phase(), commandIssued: command !== null })) break;
         await sleep(190);
       }
-      if (isPrologue && kernel && prologueMission && prologueRunRef.current) {
+      if (!restarting && isPrologue && kernel && prologueMission && prologueRunRef.current) {
         await director.runPlayerScript();
       }
       if (enemyAfter) await enemyAfter();

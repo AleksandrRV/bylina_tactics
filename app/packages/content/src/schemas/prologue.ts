@@ -1,4 +1,4 @@
-/** Пролог: раскладка, сценарий, контрольные точки, бестиарий (0.20.56). */
+/** Пролог: раскладка, сценарий, бестиарий (0.20.56). */
 
 import { z } from "zod";
 import { id } from "./common.js";
@@ -91,14 +91,6 @@ export const prologueObjectiveSchema = z
   })
   .strict();
 
-export const prologueCheckpointSchema = z
-  .object({
-    id: z.string().min(1),
-    onKey: z.string().min(1).optional(),
-    description: z.string().optional(),
-  })
-  .strict();
-
 /* ---------- катсцены миссии (0.20.37, doc/campaign.md §13.4) ----------
  *
  * Режиссура камеры описывается данными миссии, а не кодом экрана: один и тот
@@ -136,7 +128,6 @@ export const prologueMissionConfigSchema = z
       })
       .strict()
       .optional(),
-    checkpoints: z.array(prologueCheckpointSchema).optional(),
     reinforcements: z.string().optional(),
     onboarding: z.array(z.string()),
   })

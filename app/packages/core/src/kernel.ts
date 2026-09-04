@@ -94,7 +94,7 @@ export interface TacticsKernel {
    * (consume-once). После применения кости снова честные.
    */
   setForcedOutcome(outcome: ForceOutcome | null): void;
-  /** Откат к снимку чекпоинта без записи в журнал повтора. */
+  /** Восстановление снимка партии без записи в журнал повтора. */
   restoreMatch(match: MatchState, restoredFog?: FogState): void;
   /** Появление подкрепления/скриптового союзника через публичный канал ядра. */
   /**

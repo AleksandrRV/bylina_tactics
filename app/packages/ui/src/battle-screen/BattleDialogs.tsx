@@ -1,5 +1,6 @@
 import { ActionInfoDialog } from "../action-panel.js";
 import { UnitInfoDialog } from "../unit-card.js";
+import { personaPortrait } from "../portraits.js";
 import { useBattleScreen } from "./context.js";
 
 export function BattleDialogs() {
@@ -32,7 +33,7 @@ export function BattleDialogs() {
     trainingMission,
     storyNote,
     closeStoryNote,
-    storyNoteHintKey,
+    storyNotePersona,
     cutscenePlaying,
     actionInfo,
     setActionInfo,
@@ -181,19 +182,41 @@ export function BattleDialogs() {
         // кнопкой либо щелчком по фону; кнопки панели оно не задевает.
         // С 0.21.21 здесь же читаются сюжетные подсказки пролога — плашка
         // `.training-note` под ними убрана, чтобы не лежаться на кнопку
-        // защитной стойки.
+        // защитной стойки. Портрет персонажа (Летописец после гибели)
+        // приходит с репликой, а не из ключа подсказки.
         <div className="pause-root story-note-root" role="presentation" onClick={closeStoryNote}>
           <div
-            className="pause-card story-note-card"
+            className={`pause-card story-note-card${storyNotePersona ? " has-persona" : ""}`}
             role="dialog"
             aria-modal="true"
             aria-labelledby="story-note-text"
             onClick={(event) => event.stopPropagation()}
           >
-            {isPrologue && prologueMission ? <p className="eyebrow">{t(prologueMission.titleKey)}</p> : null}
-            <p id="story-note-text" className="story-note-text">
-              {storyNote}
-            </p>
+            {storyNotePersona ? (
+              <div className="campaign-hint-body">
+                {personaPortrait(storyNotePersona) ? (
+                  <img
+                    className="campaign-hint-face"
+                    src={personaPortrait(storyNotePersona)}
+                    alt=""
+                    draggable={false}
+                  />
+                ) : null}
+                <div className="campaign-hint-meta">
+                  <p className="eyebrow">{t(`campaign.persona.${storyNotePersona}`)}</p>
+                  <p id="story-note-text" className="story-note-text">
+                    {storyNote}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {isPrologue && prologueMission ? <p className="eyebrow">{t(prologueMission.titleKey)}</p> : null}
+                <p id="story-note-text" className="story-note-text">
+                  {storyNote}
+                </p>
+              </>
+            )}
             <button type="button" className="hud-btn hud-btn-primary" onClick={closeStoryNote}>
               {t("common.ok")}
             </button>

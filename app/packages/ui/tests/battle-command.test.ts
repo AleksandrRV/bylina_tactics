@@ -54,12 +54,11 @@ function makeAftermath(overrides: Partial<PrologueAftermathInput> = {}): Prologu
       grid: { width: 8, height: 6, tiles: [] },
       entities: [],
     } as unknown as MatchState,
-    hasCheckpoint: false,
     ...overrides,
   };
 }
 
-/** Смерть бойца — повод проверить контрольную точку (core/prologue-run). */
+/** Смерть бойца — повод начать миссию заново (core/prologue-run). */
 const death = [{ type: "ENTITY_DIED", id: 1 }] as unknown as GameEvent[];
 const spawn = [{ type: "ENTITY_SPAWNED", id: 7 }] as unknown as GameEvent[];
 
@@ -117,10 +116,8 @@ describe("prologue aftermath (0.20.64)", () => {
     expect(prologueAftermath(makeAftermath({ next }))).toEqual({ kind: "none", state: next });
   });
 
-  it("restores the checkpoint when it exists, and loses honestly without it", () => {
-    // Контрольная точка вооружена вехой сцены (выход крысы), герой погиб и
-    // дружина не поднимает его: бой откатывается к точке.
-    const next = run({ ratSpawned: true });
+  it("restarts the mission from the beginning when a player combatant dies", () => {
+    const next = run();
     const fallen = makeAftermath({
       next,
       events: death,
@@ -129,13 +126,7 @@ describe("prologue aftermath (0.20.64)", () => {
         entities: [{ id: 1, owner: 1, coverType: 0, dead: true, configId: "hero" }],
       } as unknown as MatchState,
     });
-    expect(prologueAftermath({ ...fallen, hasCheckpoint: true }), "точка есть — откат").toEqual({
-      kind: "restore",
-      state: next,
-    });
-    const lost = prologueAftermath({ ...fallen, hasCheckpoint: false });
-    expect(lost.kind, "точки нет — честное поражение").toBe("defeat");
-    expect(lost.state.outcome).toBe("defeat");
+    expect(prologueAftermath(fallen)).toEqual({ kind: "restart", state: next });
   });
 
   it("hands the staged spawns to the scene and empties the queue", () => {

@@ -201,4 +201,31 @@ describe("save format migrations", () => {
   it("rejects unknown future save formats", () => {
     expect(migrateSave({ ...sampleSave(), formatVersion: 99 })).toBeNull();
   });
+  it("strips invalid prologueProgress without dropping the rest of the save", () => {
+    const migrated = migrateSave({ ...sampleSave(), prologueProgress: { introSeen: "yes" } });
+    expect(migrated).not.toBeNull();
+    expect(migrated?.prologueProgress).toBeUndefined();
+    expect(migrated?.campaign.fighters[0]?.name).toBe("Ратибор");
+  });
+  it("round-trips valid prologueProgress", () => {
+    const save = {
+      ...sampleSave(),
+      prologueProgress: {
+        run: {
+          objectiveKey: "prologue.objective.gather",
+          outcome: "ongoing",
+          pickupDone: true,
+          script: { index: 0 },
+        },
+        firedCutscenes: ["m1_intro"],
+        introSeen: true,
+      },
+    } as SaveData;
+    expect(isSaveData(save)).toBe(true);
+    const backend = memoryBackend();
+    const storage = createSaveStorage("bylina.prologue.progress", backend);
+    expect(storage.save(save)).toBe(true);
+    expect(storage.load()?.prologueProgress?.introSeen).toBe(true);
+    expect(storage.load()?.prologueProgress?.firedCutscenes).toEqual(["m1_intro"]);
+  });
 });

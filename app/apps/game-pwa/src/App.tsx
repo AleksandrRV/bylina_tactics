@@ -12,7 +12,7 @@ import {
 } from "@bylina/storage";
 import { createReplayRecorder, isReplayJournal } from "@bylina/replay";
 import type { CampaignState } from "@bylina/campaign";
-import type { FogState, MatchState } from "@bylina/core";
+import type { FogState, MatchState, PrologueProgress } from "@bylina/core";
 import { ServicesProvider, Shell, applyDocumentLocale } from "@bylina/ui";
 import { applyPaletteCssVariables } from "@bylina/render";
 import { loadAppContent } from "./content-files.js";
@@ -150,6 +150,7 @@ export function App() {
     if (inCampaignBattle && saved.match) {
       lastMatchRef.current = { match: saved.match, fog: deserializeFog(saved.fog) };
     }
+    if (storyId && saved.prologueProgress) lastPrologueProgressRef.current = saved.prologueProgress;
     setCampaignRestore(saved.campaign);
     session.continueCampaign({
       screen: inCampaignBattle
@@ -164,6 +165,7 @@ export function App() {
       outcome: entry.outcome ?? null,
       restoredMatch: inCampaignBattle && saved.match ? saved.match : undefined,
       restoredFog: inCampaignBattle ? deserializeFog(saved.fog) : undefined,
+      restoredPrologueProgress: inCampaignBattle && storyId ? saved.prologueProgress : undefined,
     });
   };
 
@@ -214,6 +216,7 @@ export function App() {
     match: saved?.match,
     fog: saved?.match ? deserializeFog(saved.fog) : undefined,
   });
+  const lastPrologueProgressRef = useRef<PrologueProgress | undefined>(saved?.prologueProgress);
   const persistRef = useRef<() => void>(() => undefined);
   /**
    * Отложенная запись (0.20.51): изменения автомата кампании (экипировка,
@@ -280,6 +283,7 @@ export function App() {
           },
           match: saved.match,
           fog: saved.fog ? deserializeFog(saved.fog) : undefined,
+          prologueProgress: saved.prologueProgress,
         })
         .then((serialized) => {
           if (pendingRequest === saveRequestRef.current) saveStorage.saveSerialized(serialized);
@@ -319,6 +323,17 @@ export function App() {
       fog = lastMatchRef.current.fog;
     }
     if (match) lastMatchRef.current = { match, fog };
+    let prologueProgress: PrologueProgress | undefined;
+    if (inPrologueBattle) {
+      prologueProgress = session.getPrologueProgress() ?? lastPrologueProgressRef.current;
+    } else if (suspendedStory) {
+      prologueProgress = slot!.prologueProgress ?? lastPrologueProgressRef.current;
+    }
+    if (inPrologueBattle || suspendedStory) {
+      if (prologueProgress) lastPrologueProgressRef.current = prologueProgress;
+    } else {
+      lastPrologueProgressRef.current = undefined;
+    }
     const screen = inCampaignBattle
       ? "battle"
       : suspendedCampaign
@@ -386,6 +401,7 @@ export function App() {
         },
         match,
         fog,
+        prologueProgress,
       })
       .then((serialized) => {
         if (request === saveRequestRef.current) saveStorage.saveSerialized(serialized);
