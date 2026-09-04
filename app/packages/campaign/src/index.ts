@@ -458,8 +458,8 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     const PARTICIPANTS: Record<string, readonly string[]> = {
       prologue_brushwood: ["mikula_peasant"],
       prologue_cry: ["mikula_peasant"],
-      prologue_glade: ["bogatyr", "strelets", "mikula_peasant"],
-      prologue_village: ["bogatyr", "strelets", "znaharka", "mikula_peasant"],
+      prologue_glade: ["bogatyr", "strelets", "mikula_peasant", "fedot_stranded"],
+      prologue_village: ["bogatyr", "strelets", "znaharka", "mikula_peasant", "fedot_stranded"],
     };
     const allowed = PARTICIPANTS[missionId];
     const xpGains: XpGain[] = [];
