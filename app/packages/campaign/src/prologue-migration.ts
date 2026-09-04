@@ -13,6 +13,7 @@ export interface MigratableFighter {
   wounded: boolean;
   alive: boolean;
   equippedItemId: string | null;
+  xp?: number;
 }
 
 export const PROLOGUE_TO_CANONICAL_UNIT: Record<string, string> = {

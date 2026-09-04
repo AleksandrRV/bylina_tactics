@@ -542,7 +542,8 @@
     "victoryHint": "Mission accomplished — the chronicle grows.",
     "defeatHint": "The druzhina fell back. Gather strength and try again.",
     "darknessGained": "Darkness: +{value}",
-    "toMap": "Back to the ship map"
+    "toMap": "Back to the ship map",
+    "xp": "Fighters XP"
   },
   "deployment": {
     "title": "Deployment",
@@ -821,7 +822,8 @@
     "levelup": {
       "title": "Mikula has grown",
       "body": "Mikula proved himself in battle. He can become a bogatyr — the defender of the druzhina. His club stays with him; he will find a sword and mace later.",
-      "confirm": "Become a bogatyr"
+      "confirm": "Become a bogatyr",
+      "bogatyrHint": "Mikula is a classless peasant — only Bogatyr is available."
     },
     "objective": {
       "gather": "Gather brushwood",
@@ -876,7 +878,8 @@
     },
     "scene": {
       "revive": "Steady yourself."
-    }
+    },
+    "xpHint": "Prologue victories grant XP to each hero"
   },
   "action": {
     "hold": "Hold the button for details",

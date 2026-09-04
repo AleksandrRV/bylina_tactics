@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 
@@ -155,6 +156,45 @@ function GemIcon() {
   );
 }
 
+function XpBar({ gain }: { gain: { name: string; xpBefore: number; xpAfter: number; levelBefore: number; levelAfter: number; leveled: boolean; gained: number } }) {
+  const XP_MAX = 100;
+  const beforePct = Math.min(100, Math.max(0, (gain.xpBefore / XP_MAX) * 100));
+  const targetPct = gain.leveled ? 100 : Math.min(100, Math.max(0, (gain.xpAfter / XP_MAX) * 100));
+  const [pct, setPct] = useState(beforePct);
+  const [flash, setFlash] = useState(false);
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      setPct(targetPct);
+      if (gain.leveled) window.setTimeout(() => setFlash(true), 900);
+    }, 120);
+    return () => window.clearTimeout(id);
+  }, [targetPct, gain.leveled]);
+  return (
+    <div className={`xp-row${gain.leveled ? " is-leveled" : ""}${flash ? " is-flash" : ""}`}>
+      <div className="xp-row-head">
+        <span className="xp-name">{gain.name}</span>
+        <span className="xp-levels">
+          Ур. {gain.levelBefore}
+          {gain.levelAfter !== gain.levelBefore ? ` → ${gain.levelAfter}` : ""}
+          {gain.leveled ? <span className="xp-badge">↗</span> : null}
+        </span>
+        <span className="xp-values">
+          {gain.leveled ? `${XP_MAX}/${XP_MAX}` : `${gain.xpAfter}/${XP_MAX}`}
+          {gain.gained > 0 ? <span className="xp-gain">+{gain.gained}</span> : null}
+        </span>
+      </div>
+      <div className="xp-bar" aria-hidden="true">
+        <div className="xp-bar-track" />
+        <div
+          className="xp-bar-fill"
+          style={{ width: `${pct}%`, transition: "width 820ms cubic-bezier(0.22,1,0.36,1)" }}
+        />
+        {gain.leveled ? <span className="xp-bar-shine" /> : null}
+      </div>
+    </div>
+  );
+}
+
 export function MissionResultScreen() {
   useI18nTick();
   const t = useT();
@@ -168,6 +208,7 @@ export function MissionResultScreen() {
   const gainedPercent = last ? Math.min(100, ((state.darkness - previous) / state.darknessMax) * 100) : 0;
   const previousPercent = Math.min(100, (previous / state.darknessMax) * 100);
   const lostByRoster = state.phase === "lost" && last && state.fighters.every((fighter) => !fighter.alive);
+  const isPrologue = last?.missionId?.startsWith("prologue_") ?? state.chapter === "prologue";
 
   return (
     <div className="screen menu-screen mission-result-screen">
@@ -231,7 +272,16 @@ export function MissionResultScreen() {
         </div>
       ) : null}
 
-      {last && (last.rewards.gold > 0 || last.rewards.herbs > 0 || last.rewards.artifacts > 0) ? (
+      {last?.xpGains && last.xpGains.length > 0 ? (
+        <div className="xp-section" aria-label={t("missionResult.xp") ?? "Опыт"}>
+          <p className="xp-section-title">{t("missionResult.xp") ?? "Опыт бойцов"}</p>
+          {last.xpGains.map((gain) => (
+            <XpBar key={gain.fighterId} gain={gain} />
+          ))}
+        </div>
+      ) : null}
+
+      {!isPrologue && last && (last.rewards.gold > 0 || last.rewards.herbs > 0 || last.rewards.artifacts > 0) ? (
         <div className="rewards-strip" aria-label={t("missionResult.rewards")}>
           <span className="rewards-title">{t("missionResult.rewards")}</span>
           {last.rewards.gold > 0 ? (
@@ -252,7 +302,7 @@ export function MissionResultScreen() {
         </div>
       ) : null}
 
-      {last && state.phase !== "lost" ? (
+      {!isPrologue && last && state.phase !== "lost" ? (
         <div className="darkness-summary" aria-label={t("campaign.darknessLabel")}>
           <div className="summary-line">
             <span>{t("missionResult.darknessGained", { value: last.darknessGained })}</span>

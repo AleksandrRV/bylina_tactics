@@ -689,6 +689,7 @@ describe("createCampaign: sandbox after prologue (0.20.35)", () => {
             wounded: false,
             alive: true,
             equippedItemId: null,
+          xp: 0,
           },
           {
             id: 2,
@@ -700,6 +701,7 @@ describe("createCampaign: sandbox after prologue (0.20.35)", () => {
             wounded: false,
             alive: true,
             equippedItemId: null,
+          xp: 0,
           },
           {
             id: 3,
@@ -711,6 +713,7 @@ describe("createCampaign: sandbox after prologue (0.20.35)", () => {
             wounded: false,
             alive: true,
             equippedItemId: null,
+          xp: 0,
           },
         ],
         deadGenerals: [],

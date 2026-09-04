@@ -1253,6 +1253,20 @@ export function createSession(
     },
     advancePrologue: (nextMissionId) => routeNextPrologue(nextMissionId),
     finishPrologueMission: (outcome, nextMissionId) => {
+      // Опыт пролога (0.21.27): победа даёт +50 XP каждому живому герою — полоса на экране победы
+      // анимируется частично (М1) и до уровня (М2). Тьма и ресурсы в прологе не копятся.
+      if (campaign && outcome === "victory" && state.prologueMissionId) {
+        const cur = state.prologueMissionId;
+        // М1 brushwood 50, М2 cry 50 (+50=100→уровень), М3/М4 тоже по 50 — М1-М4 без ресурсов но с опытом.
+        const bonusPerMission: Record<string, number> = {
+          prologue_brushwood: 50,
+          prologue_cry: 50,
+          prologue_glade: 50,
+          prologue_village: 50,
+        };
+        const gained = bonusPerMission[cur] ?? 50;
+        campaign.grantPrologueXp(cur, gained);
+      }
       // Стандартный экран победы после финального текстового сообщения
       // миссии (0.21.25). Следующая миссия запоминается, чтобы кнопка
       // «Дальше» вела именно в неё.
@@ -1263,9 +1277,17 @@ export function createSession(
       if (state.screen !== "levelup") return;
       const nextMissionId = state.prologueMissionId;
       if (!nextMissionId) return;
-      // Прокачка применяется в автомате кампании: Микула становится
-      // богатырём и получает уровень 2; дубина остаётся при нём (0.21.25).
-      if (campaign) campaign.promotePrologueHero();
+      // Стандартное окно повышения (0.21.27): крестьянин Микула выбирает класс через assignClass
+      // (единственный вариант — Богатырь), без кастомного UI. Уровень уже получен опытом (100 XP).
+      if (campaign) {
+        const hero = campaign.getState().fighters.find((f) => f.unitId === "mikula_peasant" && f.alive);
+        if (hero) {
+          campaign.assignClass(hero.id, "bogatyr");
+        } else {
+          // Совместимость: если боец уже прокачан другим путём
+          campaign.promotePrologueHero();
+        }
+      }
       openPrologueBattle(nextMissionId);
     },
     saveBattleCheckpoint: (runState) => {

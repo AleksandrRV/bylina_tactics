@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import type { ItemConfig, MissionConfig } from "@bylina/content";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
@@ -113,6 +113,8 @@ export function CampaignScreen() {
   const selected = selectedId ? byId.get(selectedId) : undefined;
   const selectedPoint = selectedId ? state.missions.find((point) => point.id === selectedId) : undefined;
   const isRecruitUnit = (unitId: string): boolean => unitId === content.campaign.recruitUnitId;
+  const isTrainable = (unitId: string): boolean => unitId === content.campaign.recruitUnitId || unitId === "mikula_peasant";
+  const trainClassesFor = (unitId: string): readonly string[] => (unitId === "mikula_peasant" ? ["bogatyr"] : CLASS_IDS);
 
   const resources = state.resources;
   const scanCost = content.campaign.scan.cost;
@@ -628,7 +630,7 @@ export function CampaignScreen() {
             {state.fighters.map((fighter) => {
               const face = unitPortrait(fighter.unitId);
               const recruit = isRecruitUnit(fighter.unitId);
-              const canTrain = fighter.alive && recruit && fighter.level >= content.campaign.classUnlockLevel;
+              const canTrain = fighter.alive && (fighter.unitId === content.campaign.recruitUnitId || fighter.unitId === "mikula_peasant") && fighter.level >= content.campaign.classUnlockLevel;
               const penalty = content.campaign.woundPenalty;
               const equipped = fighter.equippedItemId ? itemById.get(fighter.equippedItemId) : undefined;
               return (
@@ -888,7 +890,7 @@ export function CampaignScreen() {
             <h2 id="train-title">{t("roster.trainTitle", { name: training.name })}</h2>
             <p className="muted">{t("roster.trainHint")}</p>
             <div className="class-grid">
-              {CLASS_IDS.map((classId) => {
+              {trainClassesFor(training.unitId).map((classId) => {
                 const face = unitPortrait(classId);
                 return (
                   <button

@@ -254,8 +254,18 @@ function armClubAndRemoveStick(kernel: TacticsKernel): void {
     match.entities = match.entities.filter((entity) => entity.configId !== "stick");
     const mikula = match.entities.find((entity) => entity.configId === "mikula_peasant" && !entity.dead);
     if (mikula) {
-      mikula.weaponId = "club";
-      mikula.weaponIds = ["club"];
+      // Слот оружия — один: если свободен, дубина сразу в руки; иначе — на базу (campaign inventory).
+      // В ядре база недоступна, поэтому помечаем фолбэк меткой, которую сессия переложит в запасы.
+      const hasSlot = !mikula.weaponIds || mikula.weaponIds.length === 0;
+      if (hasSlot) {
+        mikula.weaponId = "club";
+        mikula.weaponIds = ["club"];
+      } else {
+        // Не теряем дубину: кладём как запасной ствол, сессия после победы переложит в инвентарь корабля.
+        (match as unknown as { pendingClubToBase?: boolean }).pendingClubToBase = true;
+        // На всякий случай сохраняем в списке, чтобы не потерялась при сериализации.
+        if (!(mikula.weaponIds ?? []).includes("club")) mikula.weaponIds = [...(mikula.weaponIds ?? []), "club"];
+      }
     }
   });
 }

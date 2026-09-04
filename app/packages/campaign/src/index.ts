@@ -44,6 +44,19 @@ interface FighterState {
   alive: boolean;
   /** Предмет из запасов корабля, надетый на бойца. */
   equippedItemId: string | null;
+  /** Опыт внутри уровня: 0..XP_MAX-1 (порог 100, 0.21.27). */
+  xp: number;
+}
+
+export interface XpGain {
+  fighterId: number;
+  name: string;
+  levelBefore: number;
+  levelAfter: number;
+  xpBefore: number;
+  xpAfter: number;
+  gained: number;
+  leveled: boolean;
 }
 
 export interface MissionParticipant {
@@ -70,6 +83,8 @@ interface MissionFinishResult {
   leveledUp: string[];
   /** Имя нового рекрута, вступившего в дружину. */
   newRecruit: string | null;
+  /** Прирост опыта по бойцам (0.21.27). */
+  xpGains: XpGain[];
 }
 
 interface ScanResult {
@@ -78,6 +93,8 @@ interface ScanResult {
   /** Открытые сканированием точки. */
   opened: string[];
 }
+
+export const XP_MAX = 100;
 
 export interface CampaignState {
   /** Глава: пролог (линейная цепочка) либо открытая карта (0.20.31). */
@@ -108,6 +125,8 @@ export interface CampaignState {
     wounded: string[];
     leveledUp: string[];
     newRecruit: string | null;
+    /** Прирост опыта по бойцам (0.21.27): для анимированной полосы на экране победы. */
+    xpGains: XpGain[];
   } | null;
 }
 
@@ -156,8 +175,11 @@ export interface CampaignApi {
    * Прокачка героя пролога после М2 (0.21.25): Микула становится богатырём
    * и получает уровень 2. Оружие не переназначается — оно берётся из
    * экипировки (дубина сохраняется). Действует только в главе «prologue».
+   * @deprecated Используйте assignClass с фильтром [bogatyr] (0.21.27).
    */
   promotePrologueHero(): boolean;
+  /** Начисление опыта за сюжетную миссию пролога (0.21.27): без Тьмы/ресурсов, с анимацией полосы. */
+  grantPrologueXp(missionId: string, gained?: number): XpGain[];
   subscribe(listener: () => void): () => void;
 }
 
@@ -232,7 +254,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     return `Рекрут ${nextFighterId}`;
   };
 
-  const makeFighter = (unitId: string, level: number, hp?: number): FighterState => {
+  const makeFighter = (unitId: string, level: number, hp?: number, xp = 0): FighterState => {
     const maxHp = hpOf(unitId);
     const fighter: FighterState = {
       id: nextFighterId,
@@ -244,6 +266,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       wounded: false,
       alive: true,
       equippedItemId: null,
+      xp,
     };
     nextFighterId += 1;
     return fighter;
@@ -276,9 +299,18 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         inventory: [...options.initialState.inventory],
         shipPosition: { ...options.initialState.shipPosition },
         missions: options.initialState.missions.map((mission) => ({ ...mission })),
-        fighters: options.initialState.fighters.map((fighter) => ({ ...fighter })),
+        fighters: options.initialState.fighters.map((fighter) => ({ ...fighter, xp: (fighter as FighterState).xp ?? 0 })),
         deadGenerals: [...(options.initialState.deadGenerals ?? [])],
-        lastResult: options.initialState.lastResult ? { ...options.initialState.lastResult } : null,
+        lastResult: options.initialState.lastResult
+          ? {
+              ...options.initialState.lastResult,
+              rewards: { ...options.initialState.lastResult.rewards },
+              fallen: [...options.initialState.lastResult.fallen],
+              wounded: [...options.initialState.lastResult.wounded],
+              leveledUp: [...options.initialState.lastResult.leveledUp],
+              xpGains: [...((options.initialState.lastResult as CampaignState["lastResult"])?.xpGains ?? [])],
+            }
+          : null,
       }
     : freshState;
   const listeners = new Set<() => void>();
@@ -294,6 +326,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
           fallen: [...result.fallen],
           wounded: [...result.wounded],
           leveledUp: [...result.leveledUp],
+          xpGains: result.xpGains ? result.xpGains.map((gain) => ({ ...gain })) : [],
         }
       : null;
 
@@ -323,6 +356,31 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     state.resources.artifacts += reward.artifacts;
   };
 
+  const applyXp = (fighter: FighterState, gained: number): XpGain => {
+    const xpBefore = fighter.xp ?? 0;
+    const levelBefore = fighter.level;
+    let xp = xpBefore + gained;
+    let level = levelBefore;
+    let leveled = false;
+    while (xp >= XP_MAX) {
+      xp -= XP_MAX;
+      level += 1;
+      leveled = true;
+    }
+    fighter.xp = xp;
+    fighter.level = level;
+    return {
+      fighterId: fighter.id,
+      name: fighter.name,
+      levelBefore,
+      levelAfter: level,
+      xpBefore,
+      xpAfter: xp,
+      gained,
+      leveled,
+    };
+  };
+
   const SANDBOX_ROSTER = ["bogatyr", "strelets", "znaharka"] as const;
 
   const openSandboxFromPrologue = (): boolean => {
@@ -331,6 +389,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     state.fighters = migratePrologueFighters(state.fighters);
     for (const fighter of state.fighters) {
       if (fighter.unitId === "bogatyr" && fighter.level < 2) fighter.level = 2;
+      fighter.xp = fighter.xp ?? 0;
       const maxHp = hpOf(fighter.unitId);
       if (maxHp !== fighter.maxHp) {
         const ratio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 1;
@@ -356,6 +415,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
    * Прокачка героя пролога после М2 (0.21.25): Микула становится богатырём
    * и получает уровень 2. Оружие при смене класса НЕ переназначается — оно
    * берётся из экипировки (дубина из М1 остаётся у бойца). Идемпотентна.
+   * @deprecated
    */
   const promotePrologueHero = (): boolean => {
     if (state.chapter !== "prologue") return false;
@@ -372,6 +432,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       hero.level = 2;
       changed = true;
     }
+    hero.xp = hero.xp ?? 0;
     // Смена записи влечёт пересчёт запаса здоровья (крестьянин → богатырь):
     // соотношение текущего и максимального здоровья сохраняется, как и при
     // переходе в песочницу (openSandboxFromPrologue).
@@ -384,6 +445,33 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     }
     if (changed) emit();
     return true;
+  };
+
+  const grantPrologueXp = (missionId: string, gained = 50): XpGain[] => {
+    if (state.chapter !== "prologue") return [];
+    const xpGains: XpGain[] = [];
+    const leveledUp: string[] = [];
+    for (const fighter of state.fighters) {
+      if (!fighter.alive) continue;
+      // Опыт получают все живые герои пролога (М1 — Микула, с М2 — и Вася/Дед).
+      const gainRec = applyXp(fighter, gained);
+      xpGains.push(gainRec);
+      if (gainRec.leveled) leveledUp.push(fighter.name);
+    }
+    // Фиксируем результат для экрана победы (prologue ResultScreen читает campaign.lastResult).
+    state.lastResult = {
+      missionId,
+      outcome: "victory",
+      darknessGained: 0,
+      rewards: { ...ZERO_RESOURCES },
+      fallen: [],
+      wounded: [],
+      leveledUp,
+      newRecruit: null,
+      xpGains,
+    };
+    emit();
+    return xpGains;
   };
 
   return {
@@ -435,6 +523,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       const fallen: string[] = [];
       const wounded: string[] = [];
       const leveledUp: string[] = [];
+      const xpGains: XpGain[] = [];
 
       for (const participant of participants) {
         const fighter = state.fighters.find((candidate) => candidate.id === participant.fighterId);
@@ -455,10 +544,31 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
           const woundedNow = fighter.hp <= fighter.maxHp * config.woundHpRatio;
           if (woundedNow && !fighter.wounded) wounded.push(fighter.name);
           fighter.wounded = fighter.wounded || woundedNow;
-          if (outcome === "victory") {
-            fighter.level += 1;
-            leveledUp.push(fighter.name);
+        }
+        if (outcome === "victory") {
+          if (sandbox) {
+            // Песочница: опыт 100 за победу → уровень каждый раз (совместимость с тестами).
+            const gainRec = applyXp(fighter, 100);
+            xpGains.push(gainRec);
+            if (gainRec.leveled) leveledUp.push(fighter.name);
+          } else {
+            // Пролог через finishMission (резерв): 50 за победу → М1 50% , М2 100% → уровень.
+            const gainRec = applyXp(fighter, 50);
+            xpGains.push(gainRec);
+            if (gainRec.leveled) leveledUp.push(fighter.name);
           }
+        } else {
+          // Поражение — опыта нет, но полоса должна отобразиться нулевой прибавкой для анимации.
+          xpGains.push({
+            fighterId: fighter.id,
+            name: fighter.name,
+            levelBefore: fighter.level,
+            levelAfter: fighter.level,
+            xpBefore: fighter.xp ?? 0,
+            xpAfter: fighter.xp ?? 0,
+            gained: 0,
+            leveled: false,
+          });
         }
       }
 
@@ -484,7 +594,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
             ? "roster"
             : undefined
         : undefined;
-      state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit };
+      state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit, xpGains };
       if (campaignLost) {
         state.phase = "lost";
       }
@@ -493,7 +603,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         openSandboxFromPrologue();
       }
       emit();
-      return { darknessGained, rewards, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit };
+      return { darknessGained, rewards, campaignLost, lostReason, fallen, wounded, leveledUp, newRecruit, xpGains };
     },
     abandonMission: () => {
       if (state.activeMissionId === null) return;
@@ -562,10 +672,13 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     },
     openSandboxFromPrologue,
     promotePrologueHero,
+    grantPrologueXp,
     assignClass: (fighterId, unitId) => {
       const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
       if (!fighter || !fighter.alive) return false;
-      if (fighter.unitId !== config.recruitUnitId) return false;
+      // Пролог: крестьянин Микула считается рекрутом для стандартного окна выбора класса (0.21.27).
+      const isRecruit = fighter.unitId === config.recruitUnitId || fighter.unitId === "mikula_peasant";
+      if (!isRecruit) return false;
       if (fighter.level < config.classUnlockLevel) return false;
       // При заданном перечне классов (0.19.2) назначение чужой либо
       // несуществующей записи отклоняется.

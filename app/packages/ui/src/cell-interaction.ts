@@ -9,6 +9,8 @@ export function cellKey(x: number, y: number): string {
  * Возвращает сущность, с которой должен взаимодействовать щелчок по клетке.
  * Живой юнит всегда приоритетнее среды. Проходимая клетка не выбирает
  * граневое укрытие: такой щелчок зарезервирован за перемещением.
+ * Предмет на поле (палка М1, owner 0, maxAp 0) не считается целью атаки:
+ * клик по клетке с предметом трактуется как перемещение (0.21.27).
  */
 export function interactiveEntityAt(
   entities: readonly EntityState[],
@@ -16,7 +18,15 @@ export function interactiveEntityAt(
   y: number,
   reachable: boolean,
 ): EntityState | undefined {
-  const unit = entities.find((entity) => !entity.dead && entity.coverType === 0 && entity.x === x && entity.y === y);
+  const unit = entities.find(
+    (entity) =>
+      !entity.dead &&
+      entity.coverType === 0 &&
+      entity.x === x &&
+      entity.y === y &&
+      // Нейтральный предмет пролога (палка) не перехватывает клик.
+      !(entity.owner === 0 && entity.maxAp === 0),
+  );
   if (unit) return unit;
   if (reachable) return undefined;
   return entities.find((entity) => !entity.dead && entity.coverType > 0 && entity.x === x && entity.y === y);
@@ -42,6 +52,8 @@ export function primaryAttackForEnemy(
     target.owner === playerOwner
   )
     return null;
+  // Предмет на поле (палка М1) не считается целью атаки.
+  if (target.owner === 0 && target.maxAp === 0) return null;
   // Владелец 0 — нейтральный объект миссии (идол): клик по нему включает
   // основное оружие, как по противнику.
   const weaponId = selected.weaponId || selected.weaponIds?.[0];

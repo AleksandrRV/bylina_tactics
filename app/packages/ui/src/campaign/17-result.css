@@ -179,3 +179,117 @@
 .tab-alert.forge-alert {
   background: #6b5d24;
 }
+
+/* ---- Опыт на экране победы (0.21.27) -------------------------- */
+.xp-section {
+  width: 100%;
+  margin-top: 16px;
+  padding: 12px 12px 14px;
+  border: 1px solid rgba(224, 179, 74, 0.24);
+  background: linear-gradient(180deg, rgba(44, 38, 22, 0.5), rgba(30, 26, 14, 0.4));
+  text-align: left;
+  animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
+}
+
+.xp-section-title {
+  margin: 0 0 10px;
+  font-size: 0.74rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #e0b34a;
+}
+
+.xp-row {
+  margin-top: 10px;
+}
+
+.xp-row:first-of-type {
+  margin-top: 0;
+}
+
+.xp-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.84rem;
+}
+
+.xp-name {
+  font-weight: 600;
+  color: var(--mist);
+}
+
+.xp-levels {
+  color: var(--mist-dim);
+  font-size: 0.78rem;
+}
+
+.xp-badge {
+  margin-left: 6px;
+  color: #7fa857;
+  font-weight: 700;
+}
+
+.xp-values {
+  margin-left: auto;
+  font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  font-size: 0.78rem;
+  color: var(--mist-dim);
+}
+
+.xp-gain {
+  margin-left: 6px;
+  color: #a9c88a;
+}
+
+.xp-bar {
+  position: relative;
+  height: 10px;
+  margin-top: 6px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.xp-bar-track {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, rgba(0,0,0,0.2), rgba(0,0,0,0.08));
+}
+
+.xp-bar-fill {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #7fa857, #e0b34a);
+  box-shadow: 0 0 10px rgba(224, 179, 74, 0.35);
+}
+
+.xp-row.is-leveled .xp-bar-fill {
+  background: linear-gradient(90deg, #e0b34a, #f0d27a);
+  box-shadow: 0 0 14px rgba(224, 179, 74, 0.5);
+}
+
+.xp-bar-shine {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+  transform: translateX(-100%);
+  animation: xp-shine 900ms ease 900ms both;
+}
+
+@keyframes xp-shine {
+  to { transform: translateX(100%); }
+}
+
+.xp-row.is-flash .xp-name {
+  animation: xp-flash 600ms ease both;
+}
+
+@keyframes xp-flash {
+  0% { color: #f0d27a; }
+  100% { color: var(--mist); }
+}

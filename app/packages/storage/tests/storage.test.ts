@@ -49,6 +49,7 @@ function sampleSave(): SaveData {
           wounded: false,
           alive: true,
           equippedItemId: null,
+          xp: 0,
         },
       ],
       deadGenerals: [],
