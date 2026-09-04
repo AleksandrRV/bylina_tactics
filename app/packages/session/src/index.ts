@@ -46,8 +46,7 @@ export type AppScreen =
   | "pvpRoom"
   | "replays"
   | "training"
-  | "trainingBattle"
-  | "levelup"; // Окно прокачки героя пролога после Миссии 2 (0.21.25).
+  | "trainingBattle";
 
 type GameMode = "quickMatch" | "campaign" | "pvp";
 
@@ -321,8 +320,7 @@ export interface SessionApi {
   finishPrologueMission(outcome: MatchOutcome, nextMissionId: string | null): void;
   /** Кнопка «Дальше» на экране победы пролога: переход к следующей миссии. */
   continuePrologue(): boolean;
-  /** Подтвердить прокачку героя после М2 и начать Миссию 3 (0.21.25). */
-  confirmLevelUp(): void;
+
   /**
    * Снимок чекпоинта боя (не пишется в журнал повтора). Для пролога вместе со
    * снимком ядра сохраняется и состояние сцены (`PrologueRunState`): откат к
@@ -508,12 +506,6 @@ export function createSession(
     if (!nextMissionId) {
       campaign?.openSandboxFromPrologue();
       emit({ ...idle, screen: "campaign", prologueMissionId: null });
-      return true;
-    }
-    // После Миссии 2 герой повышает уровень и выбирает класс (единственная
-    // опция — Богатырь): вместо боя открывается окно прокачки.
-    if (state.prologueMissionId === "prologue_cry" && nextMissionId === "prologue_glade") {
-      emit({ ...idle, screen: "levelup", prologueMissionId: nextMissionId });
       return true;
     }
     openPrologueBattle(nextMissionId);
@@ -1273,23 +1265,6 @@ export function createSession(
       emit({ ...state, screen: "result", paused: false, outcome, prologueNextMissionId: nextMissionId });
     },
     continuePrologue: () => routeNextPrologue(state.prologueNextMissionId ?? null),
-    confirmLevelUp: () => {
-      if (state.screen !== "levelup") return;
-      const nextMissionId = state.prologueMissionId;
-      if (!nextMissionId) return;
-      // Стандартное окно повышения (0.21.27): крестьянин Микула выбирает класс через assignClass
-      // (единственный вариант — Богатырь), без кастомного UI. Уровень уже получен опытом (100 XP).
-      if (campaign) {
-        const hero = campaign.getState().fighters.find((f) => f.unitId === "mikula_peasant" && f.alive);
-        if (hero) {
-          campaign.assignClass(hero.id, "bogatyr");
-        } else {
-          // Совместимость: если боец уже прокачан другим путём
-          campaign.promotePrologueHero();
-        }
-      }
-      openPrologueBattle(nextMissionId);
-    },
     saveBattleCheckpoint: (runState) => {
       if (!tacticsHost) return false;
       battleCheckpoint = {

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
+import { unitPortrait } from "./portraits.js";
 
 function XpBar({
   gain,
@@ -63,24 +64,26 @@ export function ResultScreen() {
   // Итог сюжетной миссии пролога (0.21.25): стандартный экран победы после
   // финального текстового сообщения миссии; «Дальше» ведёт в следующую миссию.
   const isPrologue = battleKind === "prologue";
-  let last: {
-    xpGains: Array<{
-      fighterId: number;
-      name: string;
-      xpBefore: number;
-      xpAfter: number;
-      levelBefore: number;
-      levelAfter: number;
-      leveled: boolean;
-      gained: number;
-    }>;
-  } | null = null;
+  let last: any = null;
+  let campaignState: any = null;
   try {
-    last = session.getCampaign().getState().lastResult;
+    campaignState = session.getCampaign().getState() as any;
+    last = (campaignState?.lastResult ?? null) as any;
   } catch {
     last = null;
   }
   const showXp = isPrologue && last?.xpGains && last.xpGains.length > 0 && victory;
+  // Стандартное окно повышения для Микулы после М2 (0.21.28): единственный вариант — Богатырь
+  const heroForTrain =
+    (campaignState?.fighters as any[] | undefined)?.find((f: any) => f.alive && f.unitId === "mikula_peasant") ?? null;
+  const needsPrologueTrain =
+    isPrologue && victory && last?.missionId === "prologue_cry" && heroForTrain && heroForTrain.level >= 2;
+  const [trainDone, setTrainDone] = useState(false);
+  const handlePrologueTrain = (): void => {
+    if (!heroForTrain) return;
+    session.getCampaign().assignClass(heroForTrain.id, "bogatyr");
+    setTrainDone(true);
+  };
 
   return (
     <div className="screen menu-screen">
@@ -111,7 +114,7 @@ export function ResultScreen() {
       {showXp ? (
         <div className="xp-section" aria-label={t("missionResult.xp") ?? "Опыт"}>
           <p className="xp-section-title">{t("missionResult.xp") ?? "Опыт бойцов"}</p>
-          {last!.xpGains.map((gain) => (
+          {last!.xpGains.map((gain: any) => (
             <XpBar key={gain.fighterId} gain={gain} />
           ))}
           <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
@@ -120,9 +123,46 @@ export function ResultScreen() {
         </div>
       ) : null}
 
+      {needsPrologueTrain && !trainDone ? (
+        <div className="pause-root" role="presentation" style={{ position: "static", background: "transparent" }}>
+          <div
+            className="pause-card train-card"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="train-title"
+            style={{ boxShadow: "none" }}
+          >
+            <h2 id="train-title" style={{ display: "none" }}>
+              {t("roster.trainTitle", { name: heroForTrain?.name ?? "Микула" })}
+            </h2>
+            <p className="muted">{t("roster.trainHint")}</p>
+            <div className="class-grid">
+              {(["bogatyr"] as const).map((classId) => {
+                const face = unitPortrait(classId);
+                return (
+                  <button key={classId} type="button" className="class-card" onClick={handlePrologueTrain}>
+                    {face ? (
+                      <img src={face} alt="" draggable={false} />
+                    ) : (
+                      <span className="deploy-face-empty" aria-hidden="true" />
+                    )}
+                    <span>{t(`unit.${classId}.name`)}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       <nav className="menu-nav">
         {isPrologue ? (
-          <button type="button" className="btn btn-primary" onClick={() => session.continuePrologue()}>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={Boolean(needsPrologueTrain && !trainDone)}
+            onClick={() => session.continuePrologue()}
+          >
             {t("prologue.victory.continue")}
           </button>
         ) : !isPvp ? (

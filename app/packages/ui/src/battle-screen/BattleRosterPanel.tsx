@@ -8,6 +8,7 @@ export function BattleRosterPanel() {
     t,
     roster,
     selectedId,
+    selected,
     isTraining,
     trainingActorId,
     setLog,
@@ -19,6 +20,12 @@ export function BattleRosterPanel() {
     unitNameKey,
   } = model;
 
+  // Подсветка следующего бойца с ОД, если у выбранного 0 ОД (0.21.28)
+  const highlightId =
+    selected && selected.ap === 0 && !selected.dead
+      ? (roster.find((e) => !e.dead && e.id !== selectedId && e.ap > 0)?.id ?? null)
+      : null;
+
   return (
     <div className="roster" aria-label={t("field.sidePlayer")}>
       {roster.map((entity) => (
@@ -26,6 +33,7 @@ export function BattleRosterPanel() {
           key={entity.id}
           entity={entity}
           selected={entity.id === selectedId}
+          highlight={entity.id === highlightId}
           name={t(unitNameKey(entity.configId))}
           onSelect={() => {
             if (entity.dead) return;

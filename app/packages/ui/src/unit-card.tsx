@@ -22,6 +22,8 @@ import { useLongPress } from "./use-long-press.js";
 interface RosterCardProps {
   entity: EntityState;
   selected: boolean;
+  /** Подсветка следующего бойца с ОД, если у выбранного 0 ОД (0.21.28). */
+  highlight?: boolean;
   /** Имя из словаря: экран знает язык, карточка — нет. */
   name: string;
   onSelect: () => void;
@@ -29,11 +31,13 @@ interface RosterCardProps {
   onInspect?: () => void;
 }
 
-export function RosterCard({ entity, selected, name, onSelect, onInspect }: RosterCardProps) {
+export function RosterCard({ entity, selected, highlight, name, onSelect, onInspect }: RosterCardProps) {
   const t = useT();
   const press = useLongPress({ onLongPress: onInspect, onClick: onSelect });
   const face = unitPortrait(entity.configId);
-  const classes = ["roster-card", selected ? "is-on" : "", entity.dead ? "is-dead" : ""].filter(Boolean).join(" ");
+  const classes = ["roster-card", selected ? "is-on" : "", entity.dead ? "is-dead" : "", highlight ? "hint-pulse" : ""]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <button

@@ -8,7 +8,6 @@ import { DifficultyScreen } from "./DifficultyScreen.js";
 import { MenuScreen } from "./MenuScreen.js";
 import { MissionResultScreen } from "./MissionResultScreen.js";
 import { PvpRoomScreen } from "./PvpRoomScreen.js";
-import { LevelUpScreen } from "./LevelUpScreen.js";
 import { ReplayScreen } from "./ReplayScreen.js";
 import { TrainingScreen } from "./TrainingScreen.js";
 import { ResultScreen } from "./ResultScreen.js";
@@ -40,8 +39,6 @@ export function screenComponent(screen: AppScreen): ComponentType {
       return PvpRoomScreen;
     case "replays":
       return ReplayScreen;
-    case "levelup":
-      return LevelUpScreen;
     case "training":
       return TrainingScreen;
     // Экран сражения обучения обрабатывается тем же компонентом, что и бой.
