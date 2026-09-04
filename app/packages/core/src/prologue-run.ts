@@ -468,7 +468,15 @@ export function afterPrologueApply(
       const f = ctx.ratMarker ?? { x: 9, y: 4 };
       spawnRats(kernel, [f, { x: f.x, y: Math.min(f.y + 1, kernel.getSnapshot().grid.height - 1) }], false);
     }
-    if (events.some((event) => event.type === "COMBAT_RESOLVED" && event.result !== "MISS")) {
+    // М2: "Стойка приняла удар" — сразу после сценарной атаки двух крыс
+    // (промах+попадание) с небольшой паузой после цифры урона второй (0.21.28):
+    // показывается после хода Нави, не после действия игрока.
+    const enemyHitAfterAmbush = events.some((event) => {
+      if (event.type !== "COMBAT_RESOLVED" || event.result === "MISS") return false;
+      const source = match.entities.find((e) => e.id === event.sourceId);
+      return source?.owner === ENEMY_OWNER;
+    });
+    if (enemyHitAfterAmbush && !next.ambushPending && !next.fedotFreed) {
       enqueue(next, ctx, "m2.stanceWorks");
     }
     // Освобождение Федота — само действие INTERACT (0.21.23): ядро уже сняло
@@ -504,7 +512,6 @@ export function afterPrologueApply(
       spawnRats(kernel, wave, false);
       next.waveArmed = true;
       enqueue(next, ctx, "m2.wave");
-      enqueue(next, ctx, "m2.gear");
     }
     for (const event of events) {
       if (event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED") {
@@ -550,6 +557,16 @@ export function afterPrologueApply(
   }
 
   if (ctx.missionId === "prologue_glade") {
+    // М3: фраза Федота "Лук я бросил в трясине..." перенесена из М2 (0.21.28)
+    // и показывается в начале миссии, до первой волны.
+    if (!next.firstWave && !next.hints.queue.includes("m3.gear") && !next.hints.forcedKey) {
+      const hasGear = ctx.hints.some((h) => h.key === "m3.gear" || h.key === "m2.gear");
+      if (hasGear) {
+        // Предпочитаем m3.gear, fallback к m2.gear для совместимости
+        const gearKey = ctx.hints.some((h) => h.key === "m3.gear") ? "m3.gear" : "m2.gear";
+        enqueue(next, ctx, gearKey);
+      }
+    }
     if (evaluated.fired.some((item) => item.flag === "firstWave") && !next.firstWave) {
       next.firstWave = true;
       spawnUnits(kernel, "upyr", ENEMY_OWNER, ctx.waveCells ?? [], true);

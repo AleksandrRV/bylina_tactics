@@ -34,7 +34,16 @@ export function BattleBottomPanel() {
     allOwnApSpent,
     liberatable,
     unitNameKey,
-  } = model;
+    roster,
+  } = model as typeof model & { roster?: readonly any[] };
+
+  // Подсветка кнопки завершения хода, если у выбранного 0 ОД и ни у кого больше нет ОД (0.21.28)
+  const endTurnApHint = (() => {
+    if (!selected || selected.dead || selected.ap !== 0) return false;
+    const fighters: readonly any[] =
+      roster ?? snapshot.entities.filter((e) => e.owner === viewOwner && e.coverType === 0 && !e.dead && e.maxAp > 0);
+    return !fighters.some((e) => e.id !== selectedId && !e.dead && e.ap > 0);
+  })();
 
   if (isSpectator) {
     return (
@@ -262,7 +271,7 @@ export function BattleBottomPanel() {
       </div>
       <button
         type="button"
-        className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" ? " hint-pulse" : ""}`}
+        className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" || endTurnApHint ? " hint-pulse" : ""}`}
         // Принудительная стойка закрывает и «Конец хода» (0.20.45):
         // иначе игрок ушёл бы от засады ценой пропущенного урока.
         disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn") || prologueStanceLock}

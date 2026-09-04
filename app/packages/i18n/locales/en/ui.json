@@ -860,10 +860,10 @@
       "m2": {
         "noise": "You hear a suspicious rustle in the bushes — you should get ready.",
         "stanceWorks": "The stance took the blow.",
-        "wave": "There will be more of them than sticks. The light is to the west.",
-        "gear": "I dropped my bow in the mire when I ran. I will find it — and come back."
+        "wave": "There will be more of them than sticks. The light is to the west."
       },
       "m3": {
+        "gear": "I dropped my bow in the mire when I ran. I will find it — and come back.",
         "blow": "A heavy blow knocks back. The pit beyond it forgives no step.",
         "pit": "You do not walk into a pit. You push into it.",
         "more": "More.",

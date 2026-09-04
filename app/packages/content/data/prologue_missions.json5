@@ -214,7 +214,7 @@
           { kind: "endTurn" },
         ],
       },
-      hints: ["m2.noise", "m2.stanceWorks", "m2.wave", "m2.gear"],
+      hints: ["m2.noise", "m2.stanceWorks", "m2.wave"],
       // Режиссура камеры М2 (0.20.45, campaign.md §7.2 и §13.4). Четыре
       // сцены ведут миссию: вступление называет цель, засада показывает
       // первую пару крыс и передаёт им ход, стая — до четырёх крыс разом
@@ -343,7 +343,7 @@
           { kind: "endTurn" },
         ],
       },
-      hints: ["m3.blow", "m3.pit", "m3.more", "m3.shot"],
+      hints: ["m3.gear", "m3.blow", "m3.pit", "m3.more", "m3.shot"],
       onboarding: [],
       checkpoints: [
         { id: "start", description: "Вход в миссию" },

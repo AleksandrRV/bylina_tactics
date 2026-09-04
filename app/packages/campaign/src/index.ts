@@ -452,11 +452,21 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
   const grantPrologueXp = (missionId: string, gained = 50): XpGain[] => {
     if (state.chapter !== "prologue") return [];
+    // Опыт только участникам миссии на всём протяжении (0.21.28): М1 только
+    // Микула, М2 освобождённый Федот без опыта, М3 исключение — стрелец
+    // получает опыт (скрыт в начале, активно участвует), М4 опыт всем троим.
+    const PARTICIPANTS: Record<string, readonly string[]> = {
+      prologue_brushwood: ["mikula_peasant"],
+      prologue_cry: ["mikula_peasant"],
+      prologue_glade: ["bogatyr", "strelets", "mikula_peasant"],
+      prologue_village: ["bogatyr", "strelets", "znaharka", "mikula_peasant"],
+    };
+    const allowed = PARTICIPANTS[missionId];
     const xpGains: XpGain[] = [];
     const leveledUp: string[] = [];
     for (const fighter of state.fighters) {
       if (!fighter.alive) continue;
-      // Опыт получают все живые герои пролога (М1 — Микула, с М2 — и Вася/Дед).
+      if (allowed && !allowed.includes(fighter.unitId)) continue;
       const gainRec = applyXp(fighter, gained);
       xpGains.push(gainRec);
       if (gainRec.leveled) leveledUp.push(fighter.name);
