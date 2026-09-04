@@ -94,6 +94,10 @@ export type RosterMods = {
   maxHpMod?: number;
   /** Дополнительное оружие из снаряжения. */
   extraWeaponIds?: readonly string[];
+  /** Дополнительные умения из талантов класса (0.21.30). */
+  extraSkillIds?: readonly string[];
+  /** Талант «Стойка на ходу» (0.21.30): защитная стойка после хода без действий. */
+  autoDefend?: boolean;
   /** Начальный запас здоровья высадки (сохранённый после прошлой миссии). */
   hp?: number;
 };
@@ -221,6 +225,15 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
       spawned.weaponIds = [...(spawned.weaponIds ?? []), ...extra];
       if (spawned.weaponId === "" && extra.length > 0) spawned.weaponId = extra[0]!;
     }
+    if (entry.mods.extraSkillIds) {
+      const owned = new Set(spawned.skillIds ?? []);
+      for (const skillId of entry.mods.extraSkillIds) {
+        if (owned.has(skillId)) continue;
+        owned.add(skillId);
+        spawned.skillIds = [...(spawned.skillIds ?? []), skillId];
+      }
+    }
+    if (entry.mods.autoDefend) spawned.autoDefend = true;
     if (entry.mods.hp !== undefined) spawned.hp = Math.max(1, Math.min(spawned.maxHp, entry.mods.hp));
     state.entities.push(spawned);
   });

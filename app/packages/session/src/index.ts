@@ -12,7 +12,7 @@ import type {
   SkillPreview,
   TacticsKernel,
 } from "@bylina/core";
-import type { CampaignApi, MissionOutcome, MissionParticipant } from "@bylina/campaign";
+import type { CampaignApi, MissionOutcome, MissionParticipant, TalentChoice } from "@bylina/campaign";
 import {
   createLocalTransport,
   isCommandPayload,
@@ -32,6 +32,8 @@ import type { ReplayJournal } from "@bylina/replay";
  * получали её из сессии.
  */
 export { APP_VERSION };
+/** Выбор таланта класса (0.21.30): интерфейс читает его через сессию, не завися от модуля кампании. */
+export type { TalentChoice };
 
 export type AppScreen =
   | "boot"

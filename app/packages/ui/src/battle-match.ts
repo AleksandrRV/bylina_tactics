@@ -206,6 +206,18 @@ function deploymentSlots(deps: BattleMatchDeps): ({ unitId: string; hp: number }
       if (item.maxHpMod) mods.maxHpMod = (mods.maxHpMod ?? 0) + item.maxHpMod;
       if (item.weaponId) mods.extraWeaponIds = [item.weaponId];
     }
+    // Таланты класса (0.21.30): активные добавляют умение, пассивные —
+    // модификаторы характеристик и признак «стойки на ходу».
+    for (const talent of deps.session.getCampaign().getFighterTalents(fighter.id)) {
+      if (talent.skillId) mods.extraSkillIds = [...(mods.extraSkillIds ?? []), talent.skillId];
+      const passive = talent.passive;
+      if (!passive) continue;
+      if (passive.aimMod) mods.aimMod = (mods.aimMod ?? 0) + passive.aimMod;
+      if (passive.defenseMod) mods.defenseMod = (mods.defenseMod ?? 0) + passive.defenseMod;
+      if (passive.mobilityMod) mods.mobilityMod = (mods.mobilityMod ?? 0) + passive.mobilityMod;
+      if (passive.maxHpMod) mods.maxHpMod = (mods.maxHpMod ?? 0) + passive.maxHpMod;
+      if (passive.autoDefend) mods.autoDefend = true;
+    }
     return { unitId: fighter.unitId, hp: fighter.hp, ...mods };
   });
 }

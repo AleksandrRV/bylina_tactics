@@ -62,6 +62,13 @@ function bestSkill(
         return { type: "USE_SKILL", actorId: actor.id, skillId, targetPos: { x: corpse.x, y: corpse.y, z: corpse.z } };
       continue;
     }
+    // Автовыбор целей (0.21.30): цели назначает ядро, команда идёт без цели.
+    if (skill.autoTarget) {
+      if (kernel.getSkillPreview(actor.id, skillId).available) {
+        return { type: "USE_SKILL", actorId: actor.id, skillId };
+      }
+      continue;
+    }
     if (skill.filter === "enemies") {
       const target = foes.find(
         (foe) =>

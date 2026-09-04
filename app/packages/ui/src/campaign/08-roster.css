@@ -254,6 +254,63 @@
   background: radial-gradient(circle at 32% 28%, var(--ink-3), #161c22);
 }
 
+/* ---- Таланты (0.21.30): метки в реестре и окно выбора ---------- */
+
+.fighter-talents {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px;
+  max-width: 140px;
+}
+
+.talent-chip {
+  font-size: 0.68rem;
+  line-height: 1.2;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mist);
+  background: var(--ink-3);
+  white-space: nowrap;
+}
+
+.talent-card {
+  width: min(100%, 560px);
+}
+
+.talent-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.talent-option {
+  text-align: center;
+}
+
+.talent-option img {
+  border-radius: 8px;
+  width: 72px;
+  height: 72px;
+}
+
+.talent-name {
+  font-weight: 600;
+}
+
+.talent-kind {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--amber);
+}
+
+.talent-desc {
+  font-size: 0.78rem;
+  line-height: 1.3;
+  color: var(--mist);
+  opacity: 0.85;
+}
+
 /* ---- Вкладки: активное состояние и счётчик Горницы ------------- */
 
 .campaign-tab {

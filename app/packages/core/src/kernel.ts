@@ -212,14 +212,17 @@ function canWeaponReach(
 function skillWeapon(skill: SkillStats): WeaponStats | null {
   const damage = skill.effects.find((effect) => effect.type === "damage");
   if (!damage || damage.type !== "damage") return null;
+  // Автовыбор целей (0.21.30): стрельба ведётся на дальность записи с
+  // вычетом меткости — умение «на себя» лишь по способу применения.
+  const auto = skill.autoTarget;
   return {
     id: skill.id,
-    category: skill.category === "ranged" ? "ranged" : "melee",
+    category: skill.category === "ranged" || auto ? "ranged" : "melee",
     apCost: skill.apCost,
     endsTurn: false,
-    range: skill.category === "self" ? Math.max(1, skill.radius ?? 1) : skill.range,
+    range: skill.category === "self" && !auto ? Math.max(1, skill.radius ?? 1) : skill.range,
     requiresLOS: skill.requiresLOS,
-    aimMod: 0,
+    aimMod: auto ? -auto.aimPenalty : 0,
     minDmg: damage.minDmg,
     maxDmg: damage.maxDmg,
     crit: damage.crit ?? 0,
@@ -364,6 +367,9 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
   };
 
   const spendAction = (actor: EntityState, apCost: number, endsTurn: boolean, events: GameEvent[]): void => {
+    // Талант «Стойка на ходу» (0.21.30): любое действие, кроме перемещения,
+    // отменяет самопроизвольную стойку в конце хода.
+    actor.actedThisTurn = true;
     const previous = actor.ap;
     const spent = endsTurn ? previous : apCost;
     actor.ap = Math.max(0, previous - spent);
@@ -1099,6 +1105,33 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       })
       .sort((a, b) => a.id - b.id);
 
+  /**
+   * Цели умения с автовыбором (0.21.30, §10.6 game-rules): живые видимые
+   * враги в дальности и на линии наблюдения, ближайшие первыми (при равном
+   * расстоянии — меньший идентификатор), не более `count`.
+   */
+  const autoTargets = (actor: EntityState, skill: SkillStats): EntityState[] => {
+    const auto = skill.autoTarget;
+    if (!auto) return [];
+    return state.entities
+      .filter(
+        (entity) =>
+          !entity.dead &&
+          entity.coverType === 0 &&
+          entity.owner > 0 &&
+          entity.owner !== actor.owner &&
+          visibleTo(actor.owner, entity) &&
+          inRangedReach(actor.x, actor.y, actor.z, entity.x, entity.y, entity.z, skill.range) &&
+          (!skill.requiresLOS || hasLineOfSight(state.grid, actor.x, actor.y, actor.z, entity.x, entity.y, entity.z)),
+      )
+      .sort((a, b) => {
+        const da = distH(actor.x, actor.y, a.x, a.y);
+        const db = distH(actor.x, actor.y, b.x, b.y);
+        return da !== db ? da - db : a.id - b.id;
+      })
+      .slice(0, auto.count);
+  };
+
   const skillPreview = (
     actor: EntityState,
     skill: SkillStats,
@@ -1137,6 +1170,23 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
       const tile = tileAt(state.grid, actor.x, actor.y);
       if (!tile?.extract) return { available: false, reason: "ILLEGAL" };
       return { available: true, targetPos: cellPos(actor), areaCells: [cellPos(actor)] };
+    }
+    if (skill.autoTarget) {
+      // Автовыбор целей: умение доступно, пока есть хотя бы один враг в
+      // досягаемости; клетки области — выбранные цели, шанс — по первой.
+      const chosen = autoTargets(actor, skill);
+      if (chosen.length === 0) return { available: false, reason: "NOT_FOUND" };
+      const weapon = skillWeapon(skill);
+      const first = chosen[0]!;
+      const combat = weapon ? previewAttack(state.grid, state.entities, actor, first, weapon) : undefined;
+      return {
+        available: true,
+        targetPos: cellPos(first),
+        chance: combat?.chance,
+        dmgMin: combat?.dmgMin,
+        dmgMax: combat?.dmgMax,
+        areaCells: chosen.map((entity) => cellPos(entity)),
+      };
     }
     if (skill.category === "self")
       return { available: true, targetPos: cellPos(actor), areaCells: previewAreaCells(cellPos(actor)) };
@@ -1493,6 +1543,13 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const endingOwner = state.activeOwner;
         for (const entity of [...state.entities].sort((a, b) => a.id - b.id)) {
           if (entity.dead || entity.owner !== endingOwner) continue;
+          // Талант «Стойка на ходу» (0.21.30, §15.8): боец, который за ход
+          // только перемещался, сам встаёт в защитную стойку до своего
+          // следующего хода.
+          if (entity.autoDefend && !entity.actedThisTurn && (entity.movementSpent ?? 0) > 0 && !entity.defending) {
+            entity.defending = true;
+            events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "DEFENDING", applied: true });
+          }
           if (entity.ap > 0) {
             const previous = entity.ap;
             entity.ap = 0;
@@ -1571,6 +1628,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
             events.push({ type: "STATUS_CHANGED", entityId: entity.id, status: "DEFENDING", applied: false });
           }
           entity.movementSpent = 0;
+          entity.actedThisTurn = undefined;
           if (entity.dead || entity.maxAp <= 0) continue;
           const delta = entity.maxAp - entity.ap;
           entity.ap = entity.maxAp;
@@ -1603,6 +1661,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const previous = actor.ap;
         actor.ap = 0;
         actor.overwatch = true;
+        actor.actedThisTurn = true;
         const events: GameEvent[] = [
           { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -previous },
           { type: "STATUS_CHANGED", entityId: actor.id, status: "OVERWATCH", applied: true },
@@ -1616,6 +1675,7 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
         const previous = actor.ap;
         actor.ap = 0;
         actor.defending = true;
+        actor.actedThisTurn = true;
         const events: GameEvent[] = [
           { type: "STAT_CHANGED", entityId: actor.id, stat: "AP", newValue: 0, delta: -previous },
           { type: "STATUS_CHANGED", entityId: actor.id, status: "DEFENDING", applied: true },
@@ -1725,6 +1785,18 @@ export function createTacticsKernel(options: KernelOptions = {}): TacticsKernel 
           const chance = clampChance((skill.willPower ?? 0) - (target.will ?? 0));
           success = rng.nextInt(1, 100) <= chance;
           if (success) applySkillEffects(actor, skill, target, command.targetPos, events);
+        } else if (skill.autoTarget && weapon) {
+          // Двойной выстрел (0.21.30, §10.6): по одной атаке на каждую из
+          // выбранных ядром целей, в порядке близости; каждая — отдельный
+          // бросок с вычетом меткости записи.
+          for (const chosen of autoTargets(actor, skill)) {
+            const hit = resolveCombatAgainst(actor, chosen, weapon, events);
+            if (!hit) continue;
+            success = true;
+            applySkillEffects(actor, skill, chosen, undefined, events);
+            if (!chosen.dead && skill.effects.some((effect) => effect.type === "knockback"))
+              displace(actor, chosen, events);
+          }
         } else if (skill.resolution === "attack" && skill.category === "self" && (skill.radius ?? 0) > 0 && weapon) {
           // §9.5/§12.1: правила граневых укрытий действуют и для атак по области —
           // полная грань запрещает обычную ближнюю атаку, неполная сохраняет свой

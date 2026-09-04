@@ -50,6 +50,8 @@ function sampleSave(): SaveData {
           alive: true,
           equippedItemId: null,
           xp: 0,
+          talents: ["iron_hide"],
+          pendingTalentLevels: [],
         },
       ],
       deadGenerals: [],
@@ -79,6 +81,8 @@ describe("createSaveStorage", () => {
     const loaded = storage.load();
     expect(loaded).not.toBeNull();
     expect(loaded?.campaign.fighters[0]?.name).toBe("Ратибор");
+    // Таланты бойца (0.21.30) переживают сохранение как есть.
+    expect(loaded?.campaign.fighters[0]?.talents).toEqual(["iron_hide"]);
     expect(loaded?.session.screen).toBe("campaign");
     expect(loaded?.session.trainingDone).toEqual(["movement"]);
     expect(loaded?.session.campaignHintsDone).toEqual(["darkness", "scan"]);

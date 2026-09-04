@@ -133,14 +133,21 @@ export function skillActionInfo(id: string, skill: SkillStats, t: Translate): Ac
       value: t(
         skill.category === "melee"
           ? "action.info.kindMelee"
-          : skill.category === "ranged"
+          : skill.category === "ranged" || skill.autoTarget
             ? "action.info.kindRanged"
             : "action.info.kindSelf",
       ),
     },
   ];
-  if (skill.category !== "self") {
+  if (skill.category !== "self" || skill.autoTarget) {
     rows.push({ label: t("action.info.range"), value: cells(skill.range, t) });
+  }
+  if (skill.autoTarget) {
+    // Автовыбор целей (0.21.30): игрок не целится — строка объясняет, кого и как бьёт умение.
+    rows.push({
+      label: t("action.info.autoTarget"),
+      value: t("action.info.autoTargetValue", { count: skill.autoTarget.count, penalty: skill.autoTarget.aimPenalty }),
+    });
   }
   if ((skill.radius ?? 0) > 0) {
     rows.push({ label: t("action.info.radius"), value: cells(skill.radius!, t) });

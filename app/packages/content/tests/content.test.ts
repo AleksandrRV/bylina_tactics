@@ -97,6 +97,7 @@ describe("parseContent", () => {
       "circular_sweep",
       "cleanse",
       "create_illusion",
+      "double_shot",
       "evacuate",
       "heal",
       "panic",
@@ -175,6 +176,41 @@ describe("parseContent", () => {
     if (!summonKey) return;
     summonFiles[summonKey] = summonFiles[summonKey]!.replace("maxUsesPerBattle: 1", "maxUsesPerBattle: 2");
     expect(parseContent(summonFiles).ok).toBe(false);
+  });
+
+  it("parses class talent trees and their references (0.21.30)", () => {
+    const result = parseContent(readDataTree());
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    const talents = result.data.campaign.talents ?? {};
+    expect(Object.keys(talents).sort()).toEqual(["bogatyr", "strelets", "volkhv", "znaharka"]);
+    for (const tree of Object.values(talents)) {
+      for (const pair of Object.values(tree)) expect(pair).toHaveLength(2);
+    }
+    expect(talents.strelets?.["3"]?.[0]).toEqual({ id: "double_shot", skillId: "double_shot" });
+    const doubleShot = result.data.skills.find((skill) => skill.id === "double_shot");
+    expect(doubleShot?.autoTarget).toEqual({ count: 2, aimPenalty: 15 });
+  });
+
+  it("rejects talents that refer to unknown skills or classes", () => {
+    const files = readDataTree();
+    const campaignKey = Object.keys(files).find((key) => key.endsWith("campaign.json5"));
+    expect(campaignKey).toBeDefined();
+    if (!campaignKey) return;
+    const brokenSkill = { ...files };
+    brokenSkill[campaignKey] = files[campaignKey]!.replace(
+      '{ id: "double_shot", skillId: "double_shot" }',
+      '{ id: "double_shot", skillId: "no_such_skill" }',
+    );
+    expect(parseContent(brokenSkill).ok).toBe(false);
+
+    const brokenClass = { ...files };
+    brokenClass[campaignKey] = files[campaignKey]!.replace("    volkhv: {\n", "    upyr: {\n");
+    expect(parseContent(brokenClass).ok).toBe(false);
+
+    const brokenPair = { ...files };
+    brokenPair[campaignKey] = files[campaignKey]!.replace('        { id: "keen_eye", passive: { aimMod: 5 } },\n', "");
+    expect(parseContent(brokenPair).ok).toBe(false);
   });
 
   it("rejects a broken campaign file", () => {

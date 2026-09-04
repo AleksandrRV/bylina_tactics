@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
+import { TalentChoiceDialog } from "./TalentChoiceDialog.js";
 
 function XpBar({
   gain,
@@ -54,35 +55,55 @@ function XpBar({
   );
 }
 
+/** Классы, доступные герою пролога при повышении (campaign.md §6.1): только богатырь. */
+const PROLOGUE_CLASS_IDS: readonly string[] = ["bogatyr"];
+
 export function ResultScreen() {
   useI18nTick();
   const t = useT();
-  const { session } = useServices();
+  const { session, content } = useServices();
+  const classUnlockLevel = content.campaign.classUnlockLevel;
   const { outcome, pvpWinner, battleKind } = useSessionState();
   const victory = outcome === "victory";
   const isPvp = pvpWinner !== undefined && pvpWinner !== null;
   // Итог сюжетной миссии пролога (0.21.25): стандартный экран победы после
   // финального текстового сообщения миссии; «Дальше» ведёт в следующую миссию.
   const isPrologue = battleKind === "prologue";
-  let last: any = null;
-  let campaignState: any = null;
-  try {
-    campaignState = session.getCampaign().getState() as any;
-    last = (campaignState?.lastResult ?? null) as any;
-  } catch {
-    last = null;
-  }
-  const showXp = isPrologue && last?.xpGains && last.xpGains.length > 0 && victory;
-  // Стандартное окно повышения для Микулы после М2 (0.21.28): единственный вариант — Богатырь
+  // Автомат кампании привязан только в былине: быстрый матч и состязание
+  // приходят сюда без него, а маршрутизация оболочки может смонтировать
+  // экран пролога до привязки — тогда опыт и повышение просто не показываются.
+  const campaign = useMemo(() => {
+    if (!isPrologue) return null;
+    try {
+      return session.getCampaign();
+    } catch {
+      return null;
+    }
+  }, [isPrologue, session]);
+  const [, setTick] = useState(0);
+  useEffect(() => campaign?.subscribe(() => setTick((value) => value + 1)), [campaign]);
+  const campaignState = campaign?.getState() ?? null;
+  const last = campaignState?.lastResult ?? null;
+  const showXp = isPrologue && victory && Boolean(last?.xpGains.length);
+  // Стандартное окно повышения (0.21.30): Микула, достигший порога класса,
+  // выбирает класс тем же окном, что рекрут на карте, — но единственный
+  // вариант пролога — Богатырь (campaign.md §6.1). Пока выбор не сделан,
+  // «Дальше» закрыта: в М3 герой выходит уже богатырём.
   const heroForTrain =
-    (campaignState?.fighters as any[] | undefined)?.find((f: any) => f.alive && f.unitId === "mikula_peasant") ?? null;
-  const needsPrologueTrain =
-    isPrologue && victory && last?.missionId === "prologue_cry" && heroForTrain && heroForTrain.level >= 2;
-  const [trainDone, setTrainDone] = useState(false);
+    campaignState?.fighters.find(
+      (fighter) => fighter.alive && fighter.unitId === "mikula_peasant" && fighter.level >= classUnlockLevel,
+    ) ?? null;
+  const needsPrologueTrain = isPrologue && victory && heroForTrain !== null;
+  // Талант (0.21.30): уровни выше порога класса — выбор одного из двух, тем
+  // же окном, что в песочнице.
+  const talentChoice =
+    isPrologue && victory && !needsPrologueTrain ? (campaign?.getPendingTalentChoice() ?? null) : null;
+  const talentFighter = talentChoice
+    ? campaignState?.fighters.find((fighter) => fighter.id === talentChoice.fighterId)
+    : undefined;
   const handlePrologueTrain = (): void => {
     if (!heroForTrain) return;
     session.getCampaign().assignClass(heroForTrain.id, "bogatyr");
-    setTrainDone(true);
   };
 
   return (
@@ -111,19 +132,17 @@ export function ResultScreen() {
         </p>
       </header>
 
-      {showXp ? (
-        <div className="xp-section" aria-label={t("missionResult.xp") ?? "Опыт"}>
-          <p className="xp-section-title">{t("missionResult.xp") ?? "Опыт бойцов"}</p>
-          {last!.xpGains.map((gain: any) => (
+      {showXp && last ? (
+        <div className="xp-section" aria-label={t("missionResult.xp")}>
+          <p className="xp-section-title">{t("missionResult.xp")}</p>
+          {last.xpGains.map((gain) => (
             <XpBar key={gain.fighterId} gain={gain} />
           ))}
-          <p className="muted" style={{ fontSize: 12, marginTop: 8 }}>
-            {t("prologue.xpHint") ?? ""}
-          </p>
+          <p className="muted xp-section-hint">{t("prologue.xpHint")}</p>
         </div>
       ) : null}
 
-      {needsPrologueTrain && !trainDone ? (
+      {needsPrologueTrain && heroForTrain ? (
         <div className="pause-root" role="presentation" style={{ position: "static", background: "transparent" }}>
           <div
             className="pause-card train-card"
@@ -132,12 +151,10 @@ export function ResultScreen() {
             aria-labelledby="train-title"
             style={{ boxShadow: "none" }}
           >
-            <h2 id="train-title" style={{ display: "none" }}>
-              {t("roster.trainTitle", { name: heroForTrain?.name ?? "Микула" })}
-            </h2>
+            <h2 id="train-title">{t("roster.trainTitle", { name: heroForTrain.name })}</h2>
             <p className="muted">{t("roster.trainHint")}</p>
             <div className="class-grid">
-              {(["bogatyr"] as const).map((classId) => {
+              {PROLOGUE_CLASS_IDS.map((classId) => {
                 const face = unitPortrait(classId);
                 return (
                   <button key={classId} type="button" className="class-card" onClick={handlePrologueTrain}>
@@ -155,12 +172,16 @@ export function ResultScreen() {
         </div>
       ) : null}
 
+      {talentChoice && talentFighter ? (
+        <TalentChoiceDialog choice={talentChoice} fighterName={talentFighter.name} inline />
+      ) : null}
+
       <nav className="menu-nav">
         {isPrologue ? (
           <button
             type="button"
             className="btn btn-primary"
-            disabled={Boolean(needsPrologueTrain && !trainDone)}
+            disabled={needsPrologueTrain || talentChoice !== null}
             onClick={() => session.continuePrologue()}
           >
             {t("prologue.victory.continue")}

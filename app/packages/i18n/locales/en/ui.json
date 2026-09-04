@@ -415,6 +415,10 @@
     "whistle": {
       "name": "Whistle",
       "flavor": "The robber's whistle: wind in the ears and heels over head."
+    },
+    "double_shot": {
+      "name": "Double shot",
+      "flavor": "Two arrows, one after another, at the two nearest foes. The strelets picks the targets himself; each arrow flies a little less true."
     }
   },
   "status": {
@@ -918,7 +922,9 @@
       "targetCover": "Cover",
       "targetEnemies": "Enemies",
       "uses": "Uses per battle",
-      "yes": "yes"
+      "yes": "yes",
+      "autoTarget": "Targets",
+      "autoTargetValue": "{count} nearest foes, aim −{penalty}"
     },
     "status": {
       "flying": "Flight",
@@ -927,6 +933,31 @@
       "panic": "Fear",
       "poison": "Poison",
       "timed": "Timer"
+    }
+  },
+  "talent": {
+    "title": "Talent: {name}, level {level}",
+    "hint": "The fighter has grown. Pick one of two talents — the choice is final.",
+    "kindActive": "Skill",
+    "kindPassive": "Passive",
+    "autoDefend": "defensive stance if the fighter only moved this turn",
+    "iron_hide": {
+      "name": "Iron hide"
+    },
+    "road_stance": {
+      "name": "Road stance"
+    },
+    "swift_step": {
+      "name": "Swift step"
+    },
+    "steady_hand": {
+      "name": "Steady hand"
+    },
+    "thick_skin": {
+      "name": "Thick skin"
+    },
+    "keen_eye": {
+      "name": "Keen eye"
     }
   }
 }

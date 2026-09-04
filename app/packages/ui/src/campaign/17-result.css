@@ -191,6 +191,11 @@
   animation: rise var(--pop-duration, 240ms) var(--pop-ease, ease) both;
 }
 
+.xp-section-hint {
+  font-size: 12px;
+  margin: 8px 0 0;
+}
+
 .xp-section-title {
   margin: 0 0 10px;
   font-size: 0.74rem;

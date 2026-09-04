@@ -4,6 +4,7 @@ import { useServices, useT } from "./context.js";
 import { useI18nTick, useSessionState, useSettingsState } from "./hooks.js";
 import { unitPortrait } from "./portraits.js";
 import { CampaignHint } from "./CampaignHint.js";
+import { TalentChoiceDialog, talentName } from "./TalentChoiceDialog.js";
 import { pendingCampaignHints, type CampaignHintId } from "./campaign-hints.js";
 import {
   AnvilIcon,
@@ -143,6 +144,13 @@ export function CampaignScreen() {
   }, [shipPosition]);
   const woundedFighters = state.fighters.filter((fighter) => fighter.alive && fighter.wounded);
   const training = trainingId !== null ? state.fighters.find((fighter) => fighter.id === trainingId) : undefined;
+  // Выбор таланта (0.21.30): очередь ожидающих уровней разбирается по одному
+  // окну; пока выбор не сделан, боец не готов к высадке. Окно класса
+  // приоритетнее — рекрут без класса талантов не получает.
+  const talentChoice = training ? null : campaign.getPendingTalentChoice();
+  const talentFighter = talentChoice
+    ? state.fighters.find((fighter) => fighter.id === talentChoice.fighterId)
+    : undefined;
 
   // РўСѓС‚РѕСЂРёР°Р»С‹ В«РїРµСЂРІРѕРіРѕ СЂР°Р·Р°В» (0.20.0): Р¶РµР»Р°РµРјС‹Рµ РїРѕ СѓСЃР»РѕРІРёСЏРј СЌРєСЂР°РЅР°, РµС‰С‘ РЅРµ
   // РїРѕРєР°Р·Р°РЅРЅС‹Рµ Рё РїСЂРё РІРєР»СЋС‡С‘РЅРЅРѕР№ РЅР°СЃС‚СЂРѕР№РєРµ РїРѕРґСЃРєР°Р·РѕРє вЂ” РґРѕР±Р°РІР»СЏСЋС‚СЃСЏ РІ РѕС‡РµСЂРµРґСЊ.
@@ -685,6 +693,15 @@ export function CampaignScreen() {
                   <span className="fighter-level">
                     <LevelPips level={fighter.level} />
                     <span className="level-label">{t("roster.level", { level: fighter.level })}</span>
+                    {fighter.talents.length > 0 ? (
+                      <span className="fighter-talents">
+                        {campaign.getFighterTalents(fighter.id).map((talent) => (
+                          <span key={talent.id} className="talent-chip">
+                            {talentName(talent, t)}
+                          </span>
+                        ))}
+                      </span>
+                    ) : null}
                   </span>
                   {canTrain ? (
                     <button
@@ -921,6 +938,10 @@ export function CampaignScreen() {
             </button>
           </div>
         </div>
+      ) : null}
+
+      {talentChoice && talentFighter ? (
+        <TalentChoiceDialog choice={talentChoice} fighterName={talentFighter.name} />
       ) : null}
 
       {state.phase === "lost" ? (

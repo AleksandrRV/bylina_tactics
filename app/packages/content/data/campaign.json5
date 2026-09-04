@@ -27,6 +27,69 @@
     radius: 45,
     cost: { gold: 0, herbs: 1, artifacts: 0 },
   },
+  // Древа талантов (0.21.30, campaign.md §4.1): начиная с 3-го уровня боец
+  // выбирает один талант из двух. Талант — либо активное умение (skillId из
+  // records `skills`), либо пассивная способность (passive). Класс, у
+  // которого для уровня записи нет, растёт без выбора. Уровень 2 —
+  // всегда выбор класса рекрутом (classUnlockLevel), а не талант.
+  talents: {
+    bogatyr: {
+      "3": [
+        { id: "circular_sweep", skillId: "circular_sweep" },
+        { id: "iron_hide", passive: { maxHpMod: 2 } },
+      ],
+      "4": [
+        { id: "road_stance", passive: { autoDefend: true } },
+        { id: "swift_step", passive: { mobilityMod: 1 } },
+      ],
+      "5": [
+        { id: "steady_hand", passive: { aimMod: 5 } },
+        { id: "thick_skin", passive: { defenseMod: 5 } },
+      ],
+    },
+    strelets: {
+      "3": [
+        { id: "double_shot", skillId: "double_shot" },
+        { id: "keen_eye", passive: { aimMod: 5 } },
+      ],
+      "4": [
+        { id: "swift_step", passive: { mobilityMod: 1 } },
+        { id: "road_stance", passive: { autoDefend: true } },
+      ],
+      "5": [
+        { id: "iron_hide", passive: { maxHpMod: 2 } },
+        { id: "thick_skin", passive: { defenseMod: 5 } },
+      ],
+    },
+    znaharka: {
+      "3": [
+        { id: "roots", skillId: "roots" },
+        { id: "iron_hide", passive: { maxHpMod: 2 } },
+      ],
+      "4": [
+        { id: "swift_step", passive: { mobilityMod: 1 } },
+        { id: "road_stance", passive: { autoDefend: true } },
+      ],
+      "5": [
+        { id: "steady_hand", passive: { aimMod: 5 } },
+        { id: "thick_skin", passive: { defenseMod: 5 } },
+      ],
+    },
+    volkhv: {
+      "3": [
+        { id: "roots", skillId: "roots" },
+        { id: "iron_hide", passive: { maxHpMod: 2 } },
+      ],
+      "4": [
+        { id: "road_stance", passive: { autoDefend: true } },
+        { id: "swift_step", passive: { mobilityMod: 1 } },
+      ],
+      "5": [
+        { id: "steady_hand", passive: { aimMod: 5 } },
+        { id: "thick_skin", passive: { defenseMod: 5 } },
+      ],
+    },
+  },
   missions: [
     {
       // Первая миссия: только ближний бой (упырь) — базовые правила.

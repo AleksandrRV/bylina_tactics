@@ -41,6 +41,8 @@ const ACTION_FILES: Record<string, string> = {
   circular_sweep: "circular_sweep.jpg",
   cleanse: "cleanse.jpg",
   create_illusion: "create_illusion.jpg",
+  // Двойной выстрел (0.21.30): образ лука — умение стреляет им же.
+  double_shot: "bow.jpg",
   evacuate: "evacuate.jpg",
   heal: "heal.jpg",
   panic: "panic.jpg",

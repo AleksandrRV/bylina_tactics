@@ -609,6 +609,49 @@ describe("createCampaign: chapter prologue (0.20.31)", () => {
     expect(campaign().getState().chapter).toBe("open");
   });
 
+  it("starts the prologue with the story heroes instead of the sandbox roster (0.21.30)", () => {
+    const automaton = campaign(CONFIG, { chapter: "prologue" });
+    const fighters = automaton.getState().fighters;
+    expect(fighters.map((fighter) => [fighter.name, fighter.unitId, fighter.level, fighter.xp])).toEqual([
+      ["Микула", "mikula_peasant", 1, 0],
+      ["Федот", "fedot_stranded", 1, 0],
+    ]);
+  });
+
+  it("seeds the story heroes when a fresh sandbox automaton enters the prologue (0.21.30)", () => {
+    // App создаёт автомат главой «open», а session.startPrologue переводит
+    // его в пролог: состав обязан смениться на героев сюжета.
+    const automaton = campaign();
+    expect(automaton.getState().fighters.map((fighter) => fighter.unitId)).toEqual(["bogatyr", "strelets", "znaharka"]);
+    automaton.setChapter("prologue");
+    expect(automaton.getState().fighters.map((fighter) => fighter.unitId)).toEqual([
+      "mikula_peasant",
+      "fedot_stranded",
+    ]);
+    // Повторный вход не дублирует героев.
+    automaton.setChapter("open");
+    automaton.setChapter("prologue");
+    expect(automaton.getState().fighters).toHaveLength(2);
+  });
+
+  it("grants prologue XP to Mikula on M1 and levels him up after M2 (0.21.30)", () => {
+    const automaton = campaign(CONFIG, { chapter: "prologue" });
+    const first = automaton.grantPrologueXp("prologue_brushwood", 50);
+    expect(first.map((gain) => [gain.name, gain.gained, gain.xpAfter, gain.leveled])).toEqual([
+      ["Микула", 50, 50, false],
+    ]);
+    expect(automaton.getState().lastResult?.xpGains).toHaveLength(1);
+    const second = automaton.grantPrologueXp("prologue_cry", 50);
+    expect(second[0]?.leveled).toBe(true);
+    const mikula = automaton.getState().fighters.find((fighter) => fighter.unitId === "mikula_peasant");
+    expect(mikula?.level).toBe(2);
+    expect(mikula?.xp).toBe(0);
+    // Уровень 2 — выбор класса, а не таланта: очередь талантов пуста.
+    expect(mikula?.pendingTalentLevels).toEqual([]);
+    expect(automaton.assignClass(mikula!.id, "bogatyr")).toBe(true);
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === mikula!.id)?.unitId).toBe("bogatyr");
+  });
+
   it("disables darkness, rewards, wounds, permanent death and recruit in prologue", () => {
     const automaton = campaign(CONFIG, { chapter: "prologue" });
     expect(automaton.getState().chapter).toBe("prologue");
@@ -624,7 +667,8 @@ describe("createCampaign: chapter prologue (0.20.31)", () => {
     expect(automaton.getState().resources).toEqual(CONFIG.startingResources);
     for (const fighter of automaton.getState().fighters) {
       expect(fighter.wounded).toBe(false);
-      expect(fighter.level).toBe(CONFIG.classUnlockLevel);
+      expect(fighter.level).toBe(1);
+      expect(fighter.xp).toBe(50);
     }
     expect(automaton.getState().fighters.length).toBe(fighters.length);
   });
@@ -635,8 +679,7 @@ describe("createCampaign: chapter prologue (0.20.31)", () => {
     automaton.startMission("clearing_1");
     automaton.finishMission("clearing_1", "defeat", [
       { fighterId: fighters[0]!.id, survived: false, hp: 0 },
-      { fighterId: fighters[1]!.id, survived: true, hp: 6 },
-      { fighterId: fighters[2]!.id, survived: true, hp: 7 },
+      { fighterId: fighters[1]!.id, survived: true, hp: 5 },
     ]);
     expect(automaton.getState().fighters.find((fighter) => fighter.id === fighters[0]!.id)?.alive).toBe(true);
     expect(automaton.getState().phase).toBe("active");
@@ -792,5 +835,134 @@ describe("createCampaign: sandbox after prologue (0.20.35)", () => {
     const automaton = prologueCampaign();
     expect(automaton.scan()).toBeNull();
     expect(automaton.craftItem("aim_charm")).toBe(false);
+  });
+});
+
+describe("createCampaign: class talents (0.21.30)", () => {
+  const TALENTS: NonNullable<CampaignConfig["talents"]> = {
+    bogatyr: {
+      "3": [
+        { id: "circular_sweep", skillId: "circular_sweep" },
+        { id: "iron_hide", passive: { maxHpMod: 2 } },
+      ],
+      "4": [
+        { id: "road_stance", passive: { autoDefend: true } },
+        { id: "swift_step", passive: { mobilityMod: 1 } },
+      ],
+    },
+    strelets: {
+      "3": [
+        { id: "double_shot", skillId: "double_shot" },
+        { id: "keen_eye", passive: { aimMod: 5 } },
+      ],
+    },
+  };
+  const WITH_TALENTS: CampaignConfig = { ...CONFIG, talents: TALENTS };
+
+  function winMission(automaton: ReturnType<typeof createCampaign>, id: string): void {
+    automaton.startMission(id);
+    const fighters = automaton.getState().fighters.filter((fighter) => fighter.alive);
+    automaton.finishMission(
+      id,
+      "victory",
+      fighters.map((fighter) => ({ fighterId: fighter.id, survived: true, hp: fighter.maxHp })),
+    );
+  }
+
+  it("queues a talent choice for every level above the class threshold", () => {
+    const automaton = campaign(WITH_TALENTS);
+    const bogatyr = automaton.getState().fighters.find((fighter) => fighter.unitId === "bogatyr")!;
+    expect(automaton.getPendingTalentChoice()).toBeNull();
+    winMission(automaton, "clearing_1");
+    // Уровень 2 → 3: у богатыря появляется выбор из двух талантов.
+    const choice = automaton.getPendingTalentChoice();
+    expect(choice).not.toBeNull();
+    expect(choice!.fighterId).toBe(bogatyr.id);
+    expect(choice!.level).toBe(3);
+    expect(choice!.options.map((talent) => talent.id)).toEqual(["circular_sweep", "iron_hide"]);
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === bogatyr.id)?.pendingTalentLevels).toEqual([
+      3,
+    ]);
+  });
+
+  it("applies the chosen talent once and rejects talents outside the pair", () => {
+    const automaton = campaign(WITH_TALENTS);
+    winMission(automaton, "clearing_1");
+    const choice = automaton.getPendingTalentChoice()!;
+    expect(automaton.chooseTalent(choice.fighterId, choice.level, "double_shot")).toBe(false);
+    expect(automaton.chooseTalent(choice.fighterId, 4, "circular_sweep")).toBe(false);
+    expect(automaton.chooseTalent(choice.fighterId, choice.level, "iron_hide")).toBe(true);
+    const fighter = automaton.getState().fighters.find((entry) => entry.id === choice.fighterId)!;
+    expect(fighter.talents).toEqual(["iron_hide"]);
+    expect(fighter.pendingTalentLevels).toEqual([]);
+    // Пассивный запас здоровья действует сразу: 12 + 2.
+    expect(fighter.maxHp).toBe(14);
+    expect(automaton.getFighterTalents(fighter.id)).toEqual([{ id: "iron_hide", passive: { maxHpMod: 2 } }]);
+    expect(automaton.chooseTalent(choice.fighterId, choice.level, "iron_hide")).toBe(false);
+  });
+
+  it("skips levels without talent records and offers the next fighter", () => {
+    const automaton = campaign(WITH_TALENTS);
+    winMission(automaton, "clearing_1");
+    // Богатырь, стрелец и знахарка — все повысились до 3; у знахарки древа нет.
+    const choices: string[] = [];
+    let choice = automaton.getPendingTalentChoice();
+    while (choice) {
+      choices.push(`${choice.fighterId}:${choice.level}`);
+      expect(automaton.chooseTalent(choice.fighterId, choice.level, choice.options[0]!.id)).toBe(true);
+      choice = automaton.getPendingTalentChoice();
+    }
+    const [bogatyr, strelets, znaharka] = automaton.getState().fighters;
+    expect(choices).toEqual([`${bogatyr!.id}:3`, `${strelets!.id}:3`]);
+    expect(znaharka!.pendingTalentLevels).toEqual([]);
+    expect(znaharka!.talents).toEqual([]);
+  });
+
+  it("waits for a recruit to pick a class before offering talents", () => {
+    const automaton = campaign(WITH_TALENTS);
+    winMission(automaton, "clearing_1");
+    // Разбираем таланты ветеранов, чтобы очередь опустела.
+    for (let choice = automaton.getPendingTalentChoice(); choice; choice = automaton.getPendingTalentChoice()) {
+      automaton.chooseTalent(choice.fighterId, choice.level, choice.options[0]!.id);
+    }
+    const recruit = automaton.getState().fighters.find((fighter) => fighter.unitId === "recruit")!;
+    expect(recruit.level).toBe(1);
+    expect(automaton.scan()).not.toBeNull();
+    winMission(automaton, "clearing_2"); // рекрут → 2: выбор класса
+    for (let choice = automaton.getPendingTalentChoice(); choice; choice = automaton.getPendingTalentChoice()) {
+      automaton.chooseTalent(choice.fighterId, choice.level, choice.options[0]!.id);
+    }
+    expect(automaton.scan()).not.toBeNull();
+    winMission(automaton, "clearing_3"); // рекрут → 3: талант ждёт класса
+    for (let choice = automaton.getPendingTalentChoice(); choice; choice = automaton.getPendingTalentChoice()) {
+      if (choice.fighterId === recruit.id) throw new Error("recruit got a talent before a class");
+      automaton.chooseTalent(choice.fighterId, choice.level, choice.options[0]!.id);
+    }
+    expect(automaton.getState().fighters.find((fighter) => fighter.id === recruit.id)?.pendingTalentLevels).toEqual([
+      3,
+    ]);
+    expect(automaton.assignClass(recruit.id, "strelets")).toBe(true);
+    const choice = automaton.getPendingTalentChoice();
+    expect(choice?.fighterId).toBe(recruit.id);
+    expect(choice?.options.map((talent) => talent.id)).toEqual(["double_shot", "keen_eye"]);
+  });
+
+  it("restores talents from a saved state and tolerates records without them", () => {
+    const automaton = campaign(WITH_TALENTS);
+    winMission(automaton, "clearing_1");
+    const choice = automaton.getPendingTalentChoice()!;
+    automaton.chooseTalent(choice.fighterId, choice.level, "circular_sweep");
+    const saved = automaton.getState();
+    const restored = createCampaign(WITH_TALENTS, { unitStats: UNIT_STATS, initialState: saved });
+    expect(restored.getFighterTalents(choice.fighterId).map((talent) => talent.id)).toEqual(["circular_sweep"]);
+    const legacy = {
+      ...saved,
+      fighters: saved.fighters.map(({ talents: _talents, pendingTalentLevels: _pending, ...rest }) => rest),
+    };
+    const fromLegacy = createCampaign(WITH_TALENTS, { unitStats: UNIT_STATS, initialState: legacy as never });
+    for (const fighter of fromLegacy.getState().fighters) {
+      expect(fighter.talents).toEqual([]);
+      expect(fighter.pendingTalentLevels).toEqual([]);
+    }
   });
 });

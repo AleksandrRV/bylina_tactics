@@ -283,6 +283,24 @@ export function parseContent(files: Record<string, string>): ContentLoadResult {
         issues.push({ file: "campaign.json5", message: `unknown initial roster unit: ${unitId}` });
       }
     }
+    // Древа талантов (0.21.30): класс обязан быть записью дружины, активный
+    // талант — существующим умением.
+    for (const [classId, tree] of Object.entries(campaignConfig.talents ?? {})) {
+      const classUnit = units.find((unit) => unit.id === classId);
+      if (!classUnit || classUnit.side !== "druzhina") {
+        issues.push({ file: "campaign.json5", message: `talents: unknown druzhina class: ${classId}` });
+      }
+      for (const pair of Object.values(tree)) {
+        for (const talent of pair) {
+          if (talent.skillId !== undefined && !skillIds.has(talent.skillId)) {
+            issues.push({
+              file: "campaign.json5",
+              message: `talents ${classId}: talent ${talent.id} refers to unknown skill: ${talent.skillId}`,
+            });
+          }
+        }
+      }
+    }
     // Согласованность финальной миссии: если в конфигурации есть миссия типа
     // «needle», её идентификатор обязан совпадать с needleMissionId, и наоборот —
     // точка, на которую ссылается needleMissionId, не может быть иного типа.

@@ -141,6 +141,35 @@ describe("i18n catalogs cover every static key used by the UI (0.20.2)", () => {
     }
   });
 
+  it("covers every skill and class talent of the content (0.21.30)", () => {
+    // Кнопка умения и окно таланта строят ключи динамически:
+    // `skill.<id>.name/flavor` и `talent.<id>.name` для пассивных талантов.
+    const dataRoot = join(root, "../content/data");
+    const files: Record<string, string> = {};
+    const walk = (dir: string): void => {
+      for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        const full = join(dir, entry.name);
+        if (entry.isDirectory()) walk(full);
+        else if (entry.name.endsWith(".json5")) files[full] = readFileSync(full, "utf8");
+      }
+    };
+    walk(dataRoot);
+    const parsed = parseContent(files);
+    if (!parsed.ok) throw new Error("content parse failed");
+    for (const locale of ["ru", "en"]) {
+      for (const skill of parsed.data.skills) {
+        expect(catalogs[locale]!.has(`skill.${skill.id}.name`), `${locale}: skill.${skill.id}.name`).toBe(true);
+        expect(catalogs[locale]!.has(`skill.${skill.id}.flavor`), `${locale}: skill.${skill.id}.flavor`).toBe(true);
+      }
+      for (const tree of Object.values(parsed.data.campaign.talents ?? {})) {
+        for (const talent of Object.values(tree).flat()) {
+          if (talent.skillId) continue;
+          expect(catalogs[locale]!.has(`talent.${talent.id}.name`), `${locale}: talent.${talent.id}.name`).toBe(true);
+        }
+      }
+    }
+  });
+
   it("covers every campaign mission type label derived from the schema", () => {
     // Ключ строится динамически: `campaign.type.${mission.type}` на экране
     // высадки — каждый тип миссии из схемы контента обязан быть в словарях.

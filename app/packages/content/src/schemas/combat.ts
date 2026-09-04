@@ -117,12 +117,42 @@ export const skillConfigSchema = z
     affectsFlying: z.boolean().optional(),
     cooldownTurns: z.number().int().min(1).max(5).optional(),
     maxUsesPerBattle: z.number().int().min(1).optional(),
+    /**
+     * Автоматический выбор целей (0.21.30, «двойной выстрел»): умение
+     * применяется без прицеливания, ядро само берёт `count` ближайших
+     * видимых врагов в дальности `range`; каждая атака идёт с вычетом
+     * `aimPenalty` из меткости. Только для category «self», resolution
+     * «attack» и filter «enemies».
+     */
+    autoTarget: z
+      .object({
+        count: z.number().int().min(1).max(3),
+        aimPenalty: z.number().int().min(0).max(100),
+      })
+      .strict()
+      .optional(),
     effects: z.array(skillEffectSchema),
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.category === "self" && value.range !== 0) {
+    if (value.category === "self" && value.range !== 0 && value.autoTarget === undefined) {
       context.addIssue({ code: z.ZodIssueCode.custom, path: ["range"], message: "self skill range must be 0" });
+    }
+    if (value.autoTarget !== undefined) {
+      const wellFormed =
+        value.category === "self" &&
+        value.resolution === "attack" &&
+        value.filter === "enemies" &&
+        value.range >= 1 &&
+        value.radius === undefined &&
+        value.effects.some((effect) => effect.type === "damage");
+      if (!wellFormed) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ["autoTarget"],
+          message: "autoTarget skills must be self/attack/enemies with range >= 1, no radius and a damage effect",
+        });
+      }
     }
     if (value.resolution === "will" && value.willPower === undefined) {
       context.addIssue({

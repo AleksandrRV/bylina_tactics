@@ -669,6 +669,31 @@ describe("createSession prologue route (0.20.31)", () => {
     expect(session.get().battleEpoch ?? 0).toBe(epoch);
   });
 
+  it("grants Mikula XP on prologue victories and levels him up after M2 (0.21.30)", () => {
+    // App создаёт автомат главой «open»; startPrologue переводит его в пролог
+    // и подменяет состав героями сюжета — иначе опыт начислять некому.
+    const session = createSession("menu");
+    session.bindCampaign(campaign());
+    session.startPrologue("prologue_brushwood", true);
+    const automaton = session.getCampaign();
+    expect(automaton.getState().fighters.map((fighter) => fighter.unitId)).toEqual([
+      "mikula_peasant",
+      "fedot_stranded",
+    ]);
+    session.finishPrologueMission("victory", "prologue_cry");
+    expect(session.get().screen).toBe("result");
+    let last = automaton.getState().lastResult;
+    expect(last?.xpGains.map((gain) => [gain.name, gain.gained, gain.leveled])).toEqual([["Микула", 50, false]]);
+    session.continuePrologue();
+    expect(session.get().prologueMissionId).toBe("prologue_cry");
+    session.finishPrologueMission("victory", "prologue_glade");
+    last = automaton.getState().lastResult;
+    expect(last?.xpGains.map((gain) => [gain.name, gain.levelAfter, gain.leveled])).toEqual([["Микула", 2, true]]);
+    const mikula = automaton.getState().fighters.find((fighter) => fighter.unitId === "mikula_peasant")!;
+    expect(mikula.level).toBe(2);
+    expect(automaton.assignClass(mikula.id, "bogatyr")).toBe(true);
+  });
+
   it("opens the campaign sandbox when the prologue chain ends (0.20.35)", () => {
     const session = createSession("menu");
     const automaton = createCampaign(CAMPAIGN_CONFIG, { chapter: "prologue", unitStats: UNIT_STATS });

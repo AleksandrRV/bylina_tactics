@@ -1,4 +1,4 @@
-import type { CampaignConfig, ItemConfig, MissionConfig } from "@bylina/content";
+import type { CampaignConfig, ItemConfig, MissionConfig, TalentConfig } from "@bylina/content";
 import { migratePrologueFighters } from "./prologue-migration.js";
 
 /**
@@ -46,6 +46,20 @@ interface FighterState {
   equippedItemId: string | null;
   /** Опыт внутри уровня: 0..XP_MAX-1 (порог 100, 0.21.27). */
   xp: number;
+  /** Выбранные таланты класса по идентификаторам (0.21.30). */
+  talents: string[];
+  /**
+   * Уровни, за которые выбор таланта ещё не сделан (0.21.30): очередь
+   * растёт при повышении, экран кампании предлагает по одному окну.
+   */
+  pendingTalentLevels: number[];
+}
+
+/** Вариант выбора таланта: запись контента, дополненная уровнем (0.21.30). */
+export interface TalentChoice {
+  fighterId: number;
+  level: number;
+  options: TalentConfig[];
 }
 
 export interface XpGain {
@@ -167,6 +181,18 @@ export interface CampaignApi {
   /** Назначить класс рекруту, достигшему `classUnlockLevel`. */
   assignClass(fighterId: number, unitId: string): boolean;
   /**
+   * Первый ожидающий выбор таланта (0.21.30): боец с непустой очередью
+   * `pendingTalentLevels`, у класса которого есть записи для этого уровня.
+   * Уровни без записей списываются молча. `null` — выбирать нечего.
+   */
+  getPendingTalentChoice(): TalentChoice | null;
+  /** Выбрать талант из предложенной пары для указанного уровня бойца (0.21.30). */
+  chooseTalent(fighterId: number, level: number, talentId: string): boolean;
+  /** Записи выбранных талантов бойца (0.21.30): для высадки и карточки. */
+  getFighterTalents(fighterId: number): TalentConfig[];
+  /** Пара талантов класса для уровня (0.21.30); пустой массив — уровень без выбора. */
+  getTalentOptions(unitId: string, level: number): TalentConfig[];
+  /**
    * Переход пролог → открытая кампания (0.20.35). Идемпотентно, если глава уже `open`.
    * Точка перехода задаётся `prologueFinalMissionId` (конфиг этапа 1).
    */
@@ -204,8 +230,16 @@ interface CampaignOptions {
   unitStats?: Record<string, { maxHealth: number }>;
   /** Записи предметов Кузни (из модуля содержания). */
   items?: ItemConfig[];
-  /** Восстановленное состояние кампании (сохранение, версия 0.13.0). */
-  initialState?: Omit<CampaignState, "chapter"> & { chapter?: CampaignChapter };
+  /**
+   * Восстановленное состояние кампании (сохранение, версия 0.13.0).
+   * Поля талантов (0.21.30) в записях прежних версий отсутствуют — они
+   * восстанавливаются пустыми.
+   */
+  initialState?: Omit<CampaignState, "chapter" | "fighters"> & {
+    chapter?: CampaignChapter;
+    fighters: (Omit<FighterState, "talents" | "pendingTalentLevels"> &
+      Partial<Pick<FighterState, "talents" | "pendingTalentLevels">>)[];
+  };
   /** Начальная глава (0.20.31). По умолчанию «open». */
   chapter?: CampaignChapter;
   /**
@@ -213,6 +247,13 @@ interface CampaignOptions {
    * в открытую песочницу кампании (`openSandboxFromPrologue`).
    */
   prologueFinalMissionId?: string;
+  /**
+   * Герои пролога (0.21.30): при старте главы «prologue» дружина состоит
+   * из них, а не из стартового состава песочницы — иначе опыт сюжетных
+   * миссий некому начислять. Имена — данные сюжета; запись юнита — из
+   * бестиария пролога. По умолчанию — Микула и Федот.
+   */
+  prologueRoster?: readonly { name: string; unitId: string }[];
   /**
    * Допустимые записи классов для назначения рекруту (0.19.2): при заданном
    * списке `assignClass` отклоняет записи вне его — защита от назначения
@@ -254,11 +295,11 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     return `Рекрут ${nextFighterId}`;
   };
 
-  const makeFighter = (unitId: string, level: number, hp?: number, xp = 0): FighterState => {
+  const makeFighter = (unitId: string, level: number, hp?: number, xp = 0, name?: string): FighterState => {
     const maxHp = hpOf(unitId);
     const fighter: FighterState = {
       id: nextFighterId,
-      name: nextRecruitName(),
+      name: name ?? nextRecruitName(),
       unitId,
       level,
       hp: hp ?? maxHp,
@@ -267,14 +308,28 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       alive: true,
       equippedItemId: null,
       xp,
+      talents: [],
+      pendingTalentLevels: [],
     };
     nextFighterId += 1;
     return fighter;
   };
 
+  /** Герои пролога (0.21.30): Микула — уровень 1 без класса, опыт 0. */
+  const PROLOGUE_ROSTER: readonly { name: string; unitId: string }[] = options.prologueRoster ?? [
+    { name: "Микула", unitId: "mikula_peasant" },
+    { name: "Федот", unitId: "fedot_stranded" },
+  ];
+  const prologueFighters = (): FighterState[] =>
+    PROLOGUE_ROSTER.map((hero) => {
+      usedNames.add(hero.name);
+      return makeFighter(hero.unitId, 1, undefined, 0, hero.name);
+    });
+
   const firstMission = missions[0];
+  const startChapter: CampaignChapter = options.chapter ?? "open";
   const freshState: CampaignState = {
-    chapter: options.chapter ?? "open",
+    chapter: startChapter,
     darkness: 0,
     darknessMax: config.darknessMax,
     phase: "active",
@@ -285,7 +340,12 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       id: mission.id,
       status: index === 0 ? "open" : "locked",
     })),
-    fighters: initialRoster.map((unitId) => makeFighter(unitId, config.classUnlockLevel)),
+    // Пролог (0.21.30): дружина — герои сюжета; стартовый состав
+    // песочницы приходит при переходе (openSandboxFromPrologue).
+    fighters:
+      startChapter === "prologue"
+        ? prologueFighters()
+        : initialRoster.map((unitId) => makeFighter(unitId, config.classUnlockLevel)),
     deadGenerals: [],
     activeMissionId: null,
     lastResult: null,
@@ -301,7 +361,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         missions: options.initialState.missions.map((mission) => ({ ...mission })),
         fighters: options.initialState.fighters.map((fighter) => ({
           ...fighter,
-          xp: (fighter as FighterState).xp ?? 0,
+          xp: fighter.xp ?? 0,
+          talents: [...(fighter.talents ?? [])],
+          pendingTalentLevels: [...(fighter.pendingTalentLevels ?? [])],
         })),
         deadGenerals: [...(options.initialState.deadGenerals ?? [])],
         lastResult: options.initialState.lastResult
@@ -369,6 +431,9 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       xp -= XP_MAX;
       level += 1;
       leveled = true;
+      // Талант за каждый уровень выше порога класса (0.21.30): уровень
+      // `classUnlockLevel` — выбор класса, выше — выбор одного из двух.
+      if (level > config.classUnlockLevel) fighter.pendingTalentLevels.push(level);
     }
     fighter.xp = xp;
     fighter.level = level;
@@ -386,6 +451,23 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
 
   const SANDBOX_ROSTER = ["bogatyr", "strelets", "znaharka"] as const;
 
+  /** Записи пролога без класса (0.21.30): таланты ждут назначения класса. */
+  const PROLOGUE_CLASSLESS: Record<string, true> = { mikula_peasant: true, fedot_stranded: true };
+
+  const talentOptions = (unitId: string, level: number): TalentConfig[] => {
+    const pair = config.talents?.[unitId]?.[String(level)];
+    return pair ? pair.map((talent) => ({ ...talent })) : [];
+  };
+
+  /** Сумма постоянных прибавок здоровья от выбранных талантов (0.21.30). */
+  const talentHpBonus = (fighter: FighterState): number => {
+    const all = Object.values(config.talents?.[fighter.unitId] ?? {}).flat();
+    return fighter.talents.reduce((sum, talentId) => {
+      const talent = all.find((entry) => entry.id === talentId);
+      return sum + (talent?.passive?.maxHpMod ?? 0);
+    }, 0);
+  };
+
   const openSandboxFromPrologue = (): boolean => {
     if (state.chapter !== "prologue") return false;
     state.chapter = "open";
@@ -393,7 +475,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
     for (const fighter of state.fighters) {
       if (fighter.unitId === "bogatyr" && fighter.level < 2) fighter.level = 2;
       fighter.xp = fighter.xp ?? 0;
-      const maxHp = hpOf(fighter.unitId);
+      const maxHp = hpOf(fighter.unitId) + talentHpBonus(fighter);
       if (maxHp !== fighter.maxHp) {
         const ratio = fighter.maxHp > 0 ? fighter.hp / fighter.maxHp : 1;
         fighter.maxHp = maxHp;
@@ -494,10 +576,25 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       inventory: [...state.inventory],
       shipPosition: { ...state.shipPosition },
       missions: state.missions.map((mission) => ({ ...mission })),
-      fighters: state.fighters.map((fighter) => ({ ...fighter })),
+      fighters: state.fighters.map((fighter) => ({
+        ...fighter,
+        talents: [...fighter.talents],
+        pendingTalentLevels: [...fighter.pendingTalentLevels],
+      })),
       lastResult: cloneLastResult(state.lastResult),
     }),
     setChapter: (chapter) => {
+      if (chapter === "prologue" && state.chapter !== "prologue") {
+        // Вход в пролог из свежего автомата (0.21.30): состав песочницы
+        // заменяется героями сюжета, чтобы опыт М1–М2 начислялся Микуле.
+        // Уже начатая былина (пройденные точки, живой прогресс) не трогается.
+        const untouched =
+          state.darkness === 0 &&
+          state.activeMissionId === null &&
+          state.missions.every((mission) => mission.status !== "done") &&
+          !state.fighters.some((fighter) => PROLOGUE_ROSTER.some((hero) => hero.unitId === fighter.unitId));
+        if (untouched) state.fighters = prologueFighters();
+      }
       state.chapter = chapter;
       emit();
     },
@@ -709,6 +806,50 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       fighter.unitId = unitId;
       fighter.maxHp = hpOf(unitId);
       fighter.hp = fighter.maxHp;
+      emit();
+      return true;
+    },
+    getTalentOptions: talentOptions,
+    getFighterTalents: (fighterId) => {
+      const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
+      if (!fighter) return [];
+      const tree = config.talents?.[fighter.unitId] ?? {};
+      const all = Object.values(tree).flat();
+      return fighter.talents
+        .map((talentId) => all.find((talent) => talent.id === talentId))
+        .filter((talent): talent is TalentConfig => talent !== undefined);
+    },
+    getPendingTalentChoice: () => {
+      for (const fighter of state.fighters) {
+        if (!fighter.alive || fighter.pendingTalentLevels.length === 0) continue;
+        // Рекрут без класса сначала выбирает класс: древо зависит от него.
+        if (fighter.unitId === config.recruitUnitId || fighter.unitId in PROLOGUE_CLASSLESS) continue;
+        while (fighter.pendingTalentLevels.length > 0) {
+          const level = fighter.pendingTalentLevels[0]!;
+          const options = talentOptions(fighter.unitId, level);
+          if (options.length === 2) return { fighterId: fighter.id, level, options };
+          // Уровень без записей в древе — списывается без выбора.
+          fighter.pendingTalentLevels.shift();
+        }
+      }
+      return null;
+    },
+    chooseTalent: (fighterId, level, talentId) => {
+      const fighter = state.fighters.find((candidate) => candidate.id === fighterId);
+      if (!fighter || !fighter.alive) return false;
+      if (!fighter.pendingTalentLevels.includes(level)) return false;
+      const options = talentOptions(fighter.unitId, level);
+      if (!options.some((talent) => talent.id === talentId)) return false;
+      if (fighter.talents.includes(talentId)) return false;
+      fighter.talents.push(talentId);
+      fighter.pendingTalentLevels = fighter.pendingTalentLevels.filter((pending) => pending !== level);
+      // Пассивный запас здоровья действует и вне боя: максимум растёт сразу.
+      const chosen = options.find((talent) => talent.id === talentId);
+      const hpBonus = chosen?.passive?.maxHpMod ?? 0;
+      if (hpBonus !== 0) {
+        fighter.maxHp = Math.max(1, fighter.maxHp + hpBonus);
+        fighter.hp = Math.max(1, Math.min(fighter.maxHp, fighter.hp + Math.max(0, hpBonus)));
+      }
       emit();
       return true;
     },

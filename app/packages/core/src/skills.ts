@@ -41,6 +41,12 @@ export interface SkillStats {
   cooldownTurns?: number;
   /** Жёсткий предел применений одной сущностью за бой. */
   maxUsesPerBattle?: number;
+  /**
+   * Автовыбор целей (0.21.30, §10.6 game-rules): ядро само берёт `count`
+   * ближайших видимых врагов в дальности `range` и стреляет по каждому с
+   * вычетом `aimPenalty` из меткости. Прицеливание игроком не требуется.
+   */
+  autoTarget?: { count: number; aimPenalty: number };
   effects: SkillEffect[];
 }
 

@@ -1,0 +1,19 @@
+{
+  // Двойной выстрел стрельца (0.21.30): талант 3-го уровня. Две стрелы по
+  // двум разным врагам, цели ядро выбирает само — ближайшие видимые в
+  // дальности лука (по расстоянию, затем по идентификатору). Каждая стрела
+  // бьёт с −15 к меткости (§10.6 game-rules). Один враг в досягаемости —
+  // одна стрела, второй выстрел пропадает.
+  id: "double_shot",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  category: "self",
+  resolution: "attack",
+  envDmg: 0,
+  filter: "enemies",
+  autoTarget: { count: 2, aimPenalty: 15 },
+  cooldownTurns: 2,
+  effects: [{ type: "damage", minDmg: 3, maxDmg: 5, crit: 15, critBonus: 2 }],
+}
