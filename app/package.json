@@ -13,6 +13,7 @@
     "screens:compare": "node scripts/capture-screens.mjs compare",
     "audit:visual": "node scripts/visual-audit.mjs",
     "resize:action-art": "node scripts/resize-action-art.mjs",
+    "audit:deps": "node scripts/audit-deps.mjs --audit-level=high",
     "check:versions": "node scripts/check-version-consistency.mjs && node scripts/visual-audit.mjs",
     "version:set": "node scripts/set-version.mjs",
     "lint": "eslint . && pnpm check:boundaries",

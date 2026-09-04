@@ -103,8 +103,11 @@ jobs:
       # Проверка зависимостей на известные уязвимости (0.21.0): high и
       # critical роняют сборку, moderate — нет. Dev-серверные находки
       # (vitest UI / vite / esbuild в этом проекте) в аудит попадают.
+      # Скрипт отделяет находки от недоступности реестра npm: обрыв связи
+      # повторяется и не роняет ветку, иначе ERR_SOCKET_TIMEOUT выглядел
+      # бы как уязвимость (коды выхода у pnpm audit совпадают).
       - name: Audit dependencies
-        run: pnpm audit --audit-level=high
+        run: pnpm audit:deps
 
       - name: Build
         run: pnpm build
