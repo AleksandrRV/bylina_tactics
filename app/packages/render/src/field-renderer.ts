@@ -831,6 +831,28 @@ export function createFieldRenderer(): FieldRenderer {
 
   // ── Ввод ────────────────────────────────────────────────────────────────────
 
+  /**
+   * Прижать камеру к полю после ручного жеста (§5.1 ui-design: «камера не
+   * показывает пустоту за краями карты»). Сдвиг и щипок правили `world.x/y`
+   * напрямую, без ограничения: пролистывание уводило поле за край экрана,
+   * и карта пропадала — вернуть её можно было только перезапуском боя.
+   * Прежде до этого не доходило, потому что жест сдвига был недостижим
+   * (наведение мыши занимало слот пальца, и всё уходило в ветку щипка).
+   */
+  const clampCameraToField = (): void => {
+    const w = app.renderer.width;
+    const h = app.renderer.height;
+    if (w <= 0 || h <= 0) return;
+    const offset = clampCameraOffset(
+      { x: world.x, y: world.y },
+      { scale: world.scale.x, offset: { x: world.x, y: world.y } },
+      { width: w, height: h },
+      mapPlane(),
+    );
+    world.x = offset.x;
+    world.y = offset.y;
+  };
+
   const zoomAt = (screenX: number, screenY: number, factor: number): void => {
     const next = Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, world.scale.x * factor));
     if (next === world.scale.x) return;
@@ -840,6 +862,7 @@ export function createFieldRenderer(): FieldRenderer {
     world.x = screenX - wx * next;
     world.y = screenY - wy * next;
     userMoved = true;
+    clampCameraToField();
   };
 
   const centerOnEntityCell = (x: number, y: number, durationMs = 260): void => {
@@ -893,6 +916,7 @@ export function createFieldRenderer(): FieldRenderer {
         world.x += action.dx;
         world.y += action.dy;
         userMoved = true;
+        clampCameraToField();
         reportHover(action.point);
         return;
       case "zoom":
@@ -940,6 +964,7 @@ export function createFieldRenderer(): FieldRenderer {
     if (event.deltaX !== 0 && event.deltaY === 0) {
       world.x -= event.deltaX;
       userMoved = true;
+      clampCameraToField();
       return;
     }
     const rect = app.canvas.getBoundingClientRect();
@@ -1093,6 +1118,7 @@ export function createFieldRenderer(): FieldRenderer {
       world.x += dx;
       world.y += dy;
       userMoved = true;
+      clampCameraToField();
     },
     destroy() {
       destroyed = true;
