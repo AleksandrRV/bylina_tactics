@@ -13,5 +13,7 @@
     { key: "m4.join",                             textKey: "prologue.hint.m4.join",        once: true },
     { key: "m4.raise",                            textKey: "prologue.hint.m4.raise",       once: true },
     { key: "m4.source",                           textKey: "prologue.hint.m4.source",      once: true },
+    { key: "m5.slug",                             textKey: "prologue.hint.m5.slug",        once: true },
+    { key: "m5.breach",                           textKey: "prologue.hint.m5.breach",      once: true },
   ],
 }

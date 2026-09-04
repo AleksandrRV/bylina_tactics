@@ -484,6 +484,7 @@ export function createSession(
     prologue_cry: 702,
     prologue_glade: 703,
     prologue_village: 704,
+    prologue_road: 705,
   };
 
   /** Есть ли на поле живой управляемый боец — иначе сохранение мёртвой сцены не поднимаем. */
@@ -1288,6 +1289,7 @@ export function createSession(
           prologue_cry: 50,
           prologue_glade: 50,
           prologue_village: 50,
+          prologue_road: 50,
         };
         const gained = bonusPerMission[cur] ?? 50;
         campaign.grantPrologueXp(cur, gained);

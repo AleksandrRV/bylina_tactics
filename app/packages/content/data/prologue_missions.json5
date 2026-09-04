@@ -1,8 +1,8 @@
-// Цепочка М1–М4. Этап 1: данные закрыты флагом enabled.
+// Цепочка М1–М5. Этап 1: данные закрыты флагом enabled.
 {
   enabled: true,
   roster: ["mikula_peasant", "fedot_stranded", "bogatyr", "strelets", "znaharka"],
-  prologueFinalMissionId: "prologue_village",
+  prologueFinalMissionId: "prologue_road",
   missions: [
     {
       id: "prologue_brushwood",
@@ -401,7 +401,7 @@
       titleKey: "prologue.m4.title",
       introKey: "prologue.m4.intro",
       outroKey: "prologue.m4.outro",
-      nextMissionId: null,
+      nextMissionId: "prologue_road",
       playerSlots: ["bogatyr", "strelets"],
       fog: true,
       map: {
@@ -477,6 +477,108 @@
         ],
       },
       hints: ["m4.poison", "m4.join", "m4.raise", "m4.source"],
+      onboarding: [],
+    },
+    {
+      id: "prologue_road",
+      titleKey: "prologue.m5.title",
+      introKey: "prologue.m5.intro",
+      outroKey: "prologue.m5.outro",
+      nextMissionId: null,
+      playerSlots: ["bogatyr", "strelets", "znaharka"],
+      fog: true,
+      map: {
+        biome: "meadow",
+        width: 14,
+        height: 16,
+        pitChance: 0.0,
+        coverDensity: 0.0,
+        wallDensity: 0.0,
+        edgeCoverChance: 0.0,
+        halfCoverChance: 0.0,
+        heightMix: { z0: 0.3, z1: 0.4, z2: 0.3 },
+        layout: {
+          // Тракт к могильнику (шире и короче канона 12×28): юг — ложбина,
+          // каменная полка с просветами делит поле, север — гряда слизней.
+          // Центр за полкой — стрелковая галерея; фланги — карманы укрытий.
+          // Укрытие — тактика, не замок: открытый проход всегда есть.
+          rows: [
+            "t.G..G..G..G.t",
+            "t..W...W...W.t",
+            "..C...C...C...",
+            "tW..c....W.c.t",
+            "...W..e...W...",
+            "t.C..W..c..C.t",
+            ".W..c..W..c...",
+            "WW.WW..WW.WWW.",
+            "t..e....e..W.t",
+            "..W..C...W....",
+            "tc...W..c...ct",
+            "..e....W..e...",
+            "tW..c...C..W.t",
+            "..c..W....c...",
+            "...M.......P.t",
+            "t..AV.ttttttt.",
+          ],
+          // Ярусы: гряда z=2, склон и полка z=1, ложбина z=0. Скачков в два
+          // яруса между соседями нет — с ложбины на склон ведёт ступень.
+          heights: [
+            "22222222222222",
+            "22222222222222",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "11111111111111",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+            "00000000000000",
+          ],
+          legend: {
+            ".": { kind: "ground" },
+            "t": { kind: "decor", decor: "bush" },
+            "W": { kind: "wall" },
+            "c": { kind: "cover", coverType: 1 },
+            "C": { kind: "cover", coverType: 2 },
+            "e": { kind: "cover", coverType: 1, edge: 0 },
+            "P": { kind: "pit" },
+            "M": { kind: "spawn", side: "player", unitId: "bogatyr", weapons: ["club"] },
+            "A": { kind: "spawn", side: "player", unitId: "strelets", weapons: ["bow"] },
+            "V": { kind: "spawn", side: "player", unitId: "znaharka", weapons: ["sling"] },
+            "G": { kind: "spawn", side: "enemy", unitId: "slug" },
+          },
+        },
+      },
+      enemies: [{ unitId: "slug", count: 4 }],
+      objective: {
+        initialTextKey: "prologue.objective.clearRoad",
+      },
+      script: {
+        priority: [],
+        actions: [],
+      },
+      hints: ["m5.slug", "m5.breach"],
+      cutscenes: [
+        {
+          id: "m5_intro",
+          trigger: { kind: "missionStart" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.5,
+          steps: [
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 420, holdMs: 500 },
+            // Полка впереди, гряда в тумане: камера не выдаёт слизней.
+            { kind: "pan", target: { cell: { x: 5, y: 7 } }, durationMs: 1100, holdMs: 700 },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 800 },
+          ],
+        },
+      ],
       onboarding: [],
     },
   ],

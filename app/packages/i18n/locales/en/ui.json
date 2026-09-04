@@ -815,6 +815,7 @@
       "toCry": "To the cry",
       "toGlade": "To the glade",
       "toVillage": "To the village",
+      "toRoad": "To the barrow-road",
       "onward": "Onward",
       "toMap": "To the map"
     },
@@ -835,7 +836,8 @@
       "rescueFedot": "Find Fedot and lead him to the light",
       "evacuate": "Lead both of you to the west",
       "clearGlade": "Clear the glade",
-      "clearStreet": "Clear the street"
+      "clearStreet": "Clear the street",
+      "clearRoad": "Cross the tract"
     },
     "m1": {
       "title": "Brushwood",
@@ -856,6 +858,11 @@
       "title": "Vyselki",
       "intro": "Vyselki. The shutters are closed, the huts intact. The people left for the river. There is little smoke.",
       "outro": "These are not hungry beasts. They came from the barrow-field. If we do not stop it — Vyselki will not see the morning."
+    },
+    "m5": {
+      "title": "The Road to the Barrow",
+      "intro": "The tract to the barrow-field. Slime hangs from above.",
+      "outro": "The slugs have fallen. Beyond the ridge the barrow-field lies dark."
     },
     "hint": {
       "m1": {
@@ -878,6 +885,10 @@
         "join": "I am here. I will lift the blight — click, if your hands reach.",
         "raise": "She raised the skeleton. Once for this fight. Kill it again.",
         "source": "They came from the barrow-field. The earth there has been swelling since last autumn."
+      },
+      "m5": {
+        "slug": "They strike true and from afar. It hurts by drops. A screen is not armour, but from it they miss.",
+        "breach": "A fence is no longer a wall. Breach strikes the target and cripples what it hides behind."
       }
     },
     "scene": {

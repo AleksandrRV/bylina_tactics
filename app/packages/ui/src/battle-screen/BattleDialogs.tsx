@@ -168,9 +168,15 @@ export function BattleDialogs() {
               {t(
                 prologueCard === "intro"
                   ? "common.ok"
-                  : prologueMission.nextMissionId && prologueMission.id === "prologue_brushwood"
+                  : prologueMission.id === "prologue_brushwood" && prologueMission.nextMissionId
                     ? "prologue.next.toCry"
-                    : "prologue.next.toMap",
+                    : prologueMission.id === "prologue_cry" && prologueMission.nextMissionId
+                      ? "prologue.next.toGlade"
+                      : prologueMission.id === "prologue_glade" && prologueMission.nextMissionId
+                        ? "prologue.next.toVillage"
+                        : prologueMission.id === "prologue_village" && prologueMission.nextMissionId
+                          ? "prologue.next.toRoad"
+                          : "prologue.next.toMap",
               )}
             </button>
           </div>

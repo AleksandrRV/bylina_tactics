@@ -136,7 +136,9 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
           ? "prologue.objective.clearGlade"
           : missionId === "prologue_village"
             ? "prologue.objective.clearStreet"
-            : "prologue.objective.gather",
+            : missionId === "prologue_road"
+              ? "prologue.objective.clearRoad"
+              : "prologue.objective.gather",
     outcome: "ongoing",
     waveArmed: false,
     firstWave: false,
@@ -508,7 +510,9 @@ export function afterPrologueApply(
         ? M3_TRIGGERS
         : ctx.missionId === "prologue_village"
           ? M4_TRIGGERS
-          : M1_TRIGGERS;
+          : ctx.missionId === "prologue_road"
+            ? []
+            : M1_TRIGGERS;
   const evaluated = evaluateMissionTriggers(match, events, triggers, next.mission);
   next.mission = evaluated.state;
 
@@ -707,6 +711,20 @@ export function afterPrologueApply(
     if (livingPlayers(after).length && !livingEnemies(after).length) next.outcome = "victory";
   }
 
+  if (ctx.missionId === "prologue_road") {
+    const spit = events.some((event) => {
+      if (event.type !== "COMBAT_RESOLVED") return false;
+      const source = match.entities.find((entity) => entity.id === event.sourceId);
+      return source?.configId === "slug";
+    });
+    if (spit) enqueue(next, ctx, "m5.slug");
+    const after = kernel.getSnapshot();
+    if (livingPlayers(after).length && !livingEnemies(after).length) {
+      enqueue(next, ctx, "m5.breach");
+      next.outcome = "victory";
+    }
+  }
+
   return harvest(next);
 }
 
@@ -793,6 +811,32 @@ export function tickPrologueEnemyTurn(
       tick.spawns.map((spawn) => spawn.at),
       false,
     );
+  }
+  // М5: слизни стоят на гряде и плюют по линии наблюдения. Не ползут и
+  // не встают в дозор — иначе учебный подход превращался бы в погоню.
+  if (ctx.missionId === "prologue_road") {
+    const snap = kernel.getSnapshot();
+    const slugs = snap.entities
+      .filter((entity) => entity.configId === "slug" && !entity.dead && entity.ap > 0 && entity.owner === ENEMY_OWNER)
+      .sort((a, b) => a.id - b.id);
+    const foes = livingPlayers(snap);
+    for (const slug of slugs) {
+      const target = foes
+        .filter((foe) => kernel.getHitPreview(slug.id, foe.id, slug.weaponId || "spit").available)
+        .sort((a, b) => a.id - b.id)[0];
+      if (target) {
+        // Первый плевок обязан попасть и бить минимумом: урок «болит по капле»,
+        // не случайный промах и не разовый удар на смерть.
+        const firstSpit = !next.hints.shown.includes("m5.slug") && !next.hints.queue.includes("m5.slug");
+        if (firstSpit) kernel.setForcedOutcome("min");
+        return {
+          command: { type: "ATTACK", actorId: slug.id, targetId: target.id, weaponId: slug.weaponId || "spit" },
+          state: next,
+          forceOutcome: firstSpit ? "min" : undefined,
+        };
+      }
+    }
+    return { command: null, state: next };
   }
   // М3, бросок раненого: пока Федот не выстрелил, ходит только этот упырь.
   // Остальные стоят — иначе обычный алгоритм бросил бы всю тройку разом.

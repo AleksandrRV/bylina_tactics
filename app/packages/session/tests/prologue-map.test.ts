@@ -153,3 +153,59 @@ describe("prologue M2 markers (0.20.45)", () => {
     ]);
   });
 });
+
+/**
+ * Раскладка М5 «Дорога к могильнику». Тракт учит укрытию: полка с просветами
+ * режет рывок, слизни стоят на гряде вне стартового зрения, одна яма на краю.
+ */
+describe("prologue M5 map", () => {
+  const { mission, match } = missionMatch("prologue_road", 705);
+  const grid = match.grid;
+  const bogatyr = match.entities.find((entity) => entity.configId === "bogatyr")!;
+  const slugs = match.entities.filter((entity) => entity.configId === "slug" && !entity.dead);
+  const others = match.entities.filter((entity) => entity.id !== bogatyr.id);
+  const walker: EntityState = { ...bogatyr, mobility: 4, ap: 2 };
+
+  it("lays the tract on three tiers with a single pit and four slugs", () => {
+    expect(mission.map.biome).toBe("meadow");
+    expect(mission.fog).toBe(true);
+    expect(mission.nextMissionId ?? null).toBeNull();
+    const tiers = new Set(grid.tiles.map((tile) => tile.z));
+    expect([...tiers].sort()).toEqual([0, 1, 2]);
+    for (const tile of grid.tiles) {
+      for (const [dx, dy] of [
+        [1, 0],
+        [0, 1],
+      ] as const) {
+        const other = tileAt(grid, tile.x + dx, tile.y + dy);
+        if (!other) continue;
+        expect(Math.abs(other.z - tile.z), `скачок у (${tile.x},${tile.y})`).toBeLessThanOrEqual(1);
+      }
+    }
+    expect(slugs).toHaveLength(4);
+    expect(slugs.every((slug) => slug.y === 0 && slug.z === 2)).toBe(true);
+    expect(grid.tiles.filter((tile) => tile.pit)).toHaveLength(1);
+    expect(bogatyr.z).toBe(0);
+  });
+
+  it("keeps a walkable gap in the shelf and a path to the ridge", () => {
+    const gap = tileAt(grid, 2, 7);
+    expect(gap?.blockLOS).toBe(false);
+    expect(gap?.pit).toBe(false);
+    const ridge = slugs[0]!;
+    const approach = [
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1],
+    ] as const;
+    let cheapest = Number.POSITIVE_INFINITY;
+    for (const [dx, dy] of approach) {
+      const path = findPath(grid, others, walker, ridge.x + dx, ridge.y + dy);
+      if (path) cheapest = Math.min(cheapest, path.mpCost);
+    }
+    expect(Number.isFinite(cheapest), "гряда недостижима").toBe(true);
+    // Первый рывок (8 ОД) не дотягивает до гряды: полка учит подходу.
+    expect(cheapest).toBeGreaterThan(8);
+  });
+});

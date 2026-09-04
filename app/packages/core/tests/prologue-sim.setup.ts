@@ -109,6 +109,17 @@ export const ZNAHARKA: SpawnUnitConfig = {
   vision: 10,
   weapons: [],
 };
+export const SLUG: SpawnUnitConfig = {
+  id: "slug",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 2,
+  aim: 90,
+  defense: 0,
+  vision: 10,
+  preferredRange: 8,
+  weapons: ["spit"],
+};
 
 /* ---------- Общие виды оружия ---------- */
 
@@ -138,6 +149,20 @@ export const TEETH = weaponStatsFromRecord({
   maxDmg: 3,
   crit: 10,
   critBonus: 1,
+  envDmg: 0,
+});
+export const SPIT = weaponStatsFromRecord({
+  id: "spit",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 8,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 1,
+  maxDmg: 2,
+  crit: 0,
+  critBonus: 0,
   envDmg: 0,
 });
 

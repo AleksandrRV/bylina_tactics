@@ -7,8 +7,9 @@ import { PLAYER_OWNER, ENEMY_OWNER } from "./debug-map.js";
 /**
  * Авторская раскладка пролога (ASCII-строки). Семантика символов:
  * `.` пусто, `t` декорация (не блокирует), `P` яма, `W` валун (blockLOS),
- * `H` изба (blockLOS + feature hut, и маркер), `c` полуукрытие, `E` эвакуация,
- * `M`/`A`/`V` игроки, `F`/`S`/`U`/`K`/`z` метки.
+ * `H` изба (blockLOS + feature hut, и маркер), `c` полуукрытие, `C` полное
+ * укрытие, `e` гранёвое полуукрытие на северной границе (не занимает клетку),
+ * `E` эвакуация, `M`/`A`/`V` игроки, `F`/`S`/`U`/`K`/`G`/`z` метки.
  * Трясина (`V` с флагом bog) — immobile, не pit.
  */
 
@@ -19,9 +20,9 @@ export interface PrologueLayout {
    * `0`/`1`/`2` — ярус, любой другой символ (обычно `-`) — ярус по умолчанию.
    *
    * Отдельный параллельный массив, а не цифры внутри `rows`: любой символ
-   * строки, не входящий в служебный набор `. P W E c`, становится маркером и
-   * попадает в `markers` — цифры в `rows` засорили бы раскладку ложными
-   * маркерами.
+   * строки, не входящий в служебный набор `. P W E c C e`, становится
+   * маркером и попадает в `markers` — цифры в `rows` засорили бы раскладку
+   * ложными маркерами.
    */
   heights?: string[];
   legend?: Record<string, unknown>;
@@ -55,7 +56,15 @@ function applyHeights(grid: Grid, heights: readonly string[] | undefined): void 
   }
 }
 
-function coverEntity(id: number, x: number, y: number, z: number, coverType: 1 | 2, obstacle: boolean): EntityState {
+function coverEntity(
+  id: number,
+  x: number,
+  y: number,
+  z: number,
+  coverType: 1 | 2,
+  obstacle: boolean,
+  edge?: 0 | 1 | 2 | 3,
+): EntityState {
   return {
     id,
     configId: "cover",
@@ -77,6 +86,7 @@ function coverEntity(id: number, x: number, y: number, z: number, coverType: 1 |
     dead: false,
     flying: false,
     coverType,
+    edge,
     overwatch: false,
     defending: false,
     movementSpent: 0,
@@ -119,7 +129,14 @@ export function compilePrologueLayout(layout: PrologueLayout, options: { default
       if (ch === "c") {
         covers.push(coverEntity(coverId++, x, y, tile.z, 1, true));
       }
-      if (ch !== "." && ch !== "P" && ch !== "W" && ch !== "E" && ch !== "c") {
+      if (ch === "C") {
+        covers.push(coverEntity(coverId++, x, y, tile.z, 2, true));
+      }
+      if (ch === "e") {
+        // Северная грань: защищает от выстрела с гряды, клетку не занимает.
+        covers.push(coverEntity(coverId++, x, y, tile.z, 1, false, 0));
+      }
+      if (ch !== "." && ch !== "P" && ch !== "W" && ch !== "E" && ch !== "c" && ch !== "C" && ch !== "e") {
         pushMarker(ch, x, y);
       }
     }

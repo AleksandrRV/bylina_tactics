@@ -494,11 +494,13 @@ describe("prologue content (0.20.31)", () => {
       "prologue_cry",
       "prologue_glade",
       "prologue_village",
+      "prologue_road",
     ]);
-    expect(result.data.prologue.prologueFinalMissionId).toBe("prologue_village");
+    expect(result.data.prologue.prologueFinalMissionId).toBe("prologue_road");
     expect(result.data.prologue.missions.map((mission: { fog: boolean }) => mission.fog)).toEqual([
       false,
       false,
+      true,
       true,
       true,
     ]);
@@ -506,6 +508,7 @@ describe("prologue content (0.20.31)", () => {
       "meadow",
       "swamp",
       "thicket",
+      "meadow",
       "meadow",
     ]);
     const prologueUnitIds = result.data.prologueBestiary.units.map((unit: { id: string }) => unit.id).sort();
@@ -519,6 +522,9 @@ describe("prologue content (0.20.31)", () => {
     const hintKeys = result.data.prologueHints.hints.map((hint: { key: string }) => hint.key);
     expect(hintKeys).toContain("m1.endTurn");
     expect(hintKeys).toContain("m4.source");
+    expect(hintKeys).toContain("m5.slug");
+    expect(hintKeys).toContain("m5.breach");
+    expect(result.data.prologueBestiary.units.find((unit) => unit.id === "slug")?.preferredRange).toBe(8);
     expect(result.data.reinforcements.profiles?.m2_cry_wave?.mode).toBe("onKill");
     expect(
       result.data.prologueBestiary.units.find((unit: { id: string }) => unit.id === "mikula_peasant")?.weapons,
