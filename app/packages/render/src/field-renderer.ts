@@ -20,6 +20,7 @@ import {
   type Point,
 } from "./camera.js";
 import { FADE_COLOR } from "./palette.js";
+import { createGestureTracker } from "./field/gestures.js";
 
 // ── Подсистемы ────────────────────────────────────────────────────────────────
 export {
@@ -149,15 +150,12 @@ export function createFieldRenderer(): FieldRenderer {
   let pendingTrainingFocus: Point | null = null;
   let trainingGlide = false;
 
-  let drag = false;
-  let dragged = false;
-  let lastX = 0;
-  let lastY = 0;
   let lastTapKey: string | null = null;
   let lastTapTime = 0;
-  const pointers = new Map<number, { x: number; y: number }>();
-  let pinch = 0;
-  let pinchCenter: Point | null = null;
+  // Жесты поля (сдвиг/щипок/нажатие) считает отдельный автомат: он учитывает
+  // только реально нажатые указатели, поэтому наведение мыши больше не
+  // выглядит для него вторым пальцем.
+  const gestures = createGestureTracker();
 
   // Кинематика
   let cinematicSkip = false;
@@ -863,91 +861,77 @@ export function createFieldRenderer(): FieldRenderer {
     });
   };
 
-  const onDown = (event: FederatedPointerEvent): void => {
-    if (inputLocked) return;
-    pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
-    if (pointers.size === 2) {
-      const pts = [...pointers.values()];
-      const a = pts[0];
-      const b = pts[1];
-      if (a && b) {
-        pinch = Math.hypot(a.x - b.x, a.y - b.y);
-        pinchCenter = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      }
-      drag = false;
-      return;
-    }
-    drag = true;
-    dragged = false;
-    lastX = event.global.x;
-    lastY = event.global.y;
-  };
-
-  const onMove = (event: FederatedPointerEvent): void => {
-    if (inputLocked) return;
-    pointers.set(event.pointerId, { x: event.global.x, y: event.global.y });
-    if (pointers.size >= 2) {
-      const pts = [...pointers.values()];
-      const a = pts[0];
-      const b = pts[1];
-      if (a && b && pinch > 0 && pinchCenter) {
-        const dist = Math.hypot(a.x - b.x, a.y - b.y);
-        const factor = dist / pinch;
-        zoomAt(pinchCenter.x, pinchCenter.y, factor);
-        pinch = dist;
-      }
-      return;
-    }
-    if (!drag) return;
-    const dx = event.global.x - lastX;
-    const dy = event.global.y - lastY;
-    if (Math.abs(dx) + Math.abs(dy) > 2) dragged = true;
-    world.x += dx;
-    world.y += dy;
-    lastX = event.global.x;
-    lastY = event.global.y;
-    userMoved = true;
-
-    const local = world.toLocal({ x: event.global.x, y: event.global.y });
+  /** Наведение сообщается экрану по мировой точке указателя. */
+  const reportHover = (point: { x: number; y: number }): void => {
+    if (!onHover) return;
+    const local = world.toLocal(point);
     const cell = cellFromLocal(local.x, local.y);
-    if (cell && onHover) onHover(cell.x, cell.y);
+    if (cell) onHover(cell.x, cell.y);
   };
 
-  const onUp = (event: FederatedPointerEvent): void => {
-    if (inputLocked) return;
-    pointers.delete(event.pointerId);
-    if (pointers.size < 2) {
-      pinch = 0;
-      pinchCenter = null;
-    }
-    if (!drag) return;
-    drag = false;
-    if (dragged) return;
-    const local = world.toLocal({ x: event.global.x, y: event.global.y });
+  /** Короткое нажатие: первое — действие, второе подряд по той же клетке — камера. */
+  const handleTap = (point: { x: number; y: number }): void => {
+    const local = world.toLocal(point);
     const cell = cellFromLocal(local.x, local.y);
     if (!cell) return;
-    // Двойное касание: центрировать камеру.
     const now = Date.now();
     const tapKey = `${cell.x},${cell.y}`;
     if (tapKey === lastTapKey && now - lastTapTime < 400) {
       centerOnEntityCell(cell.x, cell.y);
       lastTapKey = null;
       lastTapTime = 0;
-    } else {
-      lastTapKey = tapKey;
-      lastTapTime = now;
-      if (onActivate) onActivate(cell.x, cell.y);
+      return;
+    }
+    lastTapKey = tapKey;
+    lastTapTime = now;
+    if (onActivate) onActivate(cell.x, cell.y);
+  };
+
+  const runGesture = (action: ReturnType<typeof gestures.down>): void => {
+    switch (action.type) {
+      case "pan":
+        world.x += action.dx;
+        world.y += action.dy;
+        userMoved = true;
+        reportHover(action.point);
+        return;
+      case "zoom":
+        zoomAt(action.center.x, action.center.y, action.factor);
+        return;
+      case "hover":
+        reportHover(action.point);
+        return;
+      case "tap":
+        handleTap(action.point);
+        return;
+      case "none":
+        return;
     }
   };
 
-  const onCancel = (event: FederatedPointerEvent): void => {
+  const onDown = (event: FederatedPointerEvent): void => {
     if (inputLocked) return;
-    pointers.delete(event.pointerId);
-    if (pointers.size < 2) {
-      pinch = 0;
-      pinchCenter = null;
-    }
-    drag = false;
+    runGesture(gestures.down(event.pointerId, { x: event.global.x, y: event.global.y }));
+  };
+
+  const onMove = (event: FederatedPointerEvent): void => {
+    const action = gestures.move(event.pointerId, { x: event.global.x, y: event.global.y });
+    if (inputLocked) return;
+    runGesture(action);
+  };
+
+  // Учёт отпускания идёт всегда, даже при закрытом вводе: иначе замок,
+  // взведённый пока палец на экране (сцена, показ исхода), съедал бы
+  // отпускание — указатель навсегда оставался «нажатым», и следующее
+  // касание считалось вторым пальцем: щипок вместо нажатия и сдвига.
+  const onUp = (event: FederatedPointerEvent): void => {
+    const action = gestures.up(event.pointerId, { x: event.global.x, y: event.global.y });
+    if (inputLocked) return;
+    runGesture(action);
+  };
+
+  const onCancel = (event: FederatedPointerEvent): void => {
+    gestures.cancel(event.pointerId);
   };
 
   const onWheel = (event: WheelEvent): void => {
@@ -1112,6 +1096,7 @@ export function createFieldRenderer(): FieldRenderer {
     },
     destroy() {
       destroyed = true;
+      gestures.clear();
       cancelAnimationFrame(animFrame);
       jobs.length = 0;
       if (mounted) {
@@ -1153,6 +1138,9 @@ export function createFieldRenderer(): FieldRenderer {
     fadeScreen,
     setInputLocked(locked) {
       inputLocked = locked;
+      // Замок ввода съедает отпускание указателя: без сброса палец остался
+      // бы «прижатым», и следующее касание считалось бы вторым — щипком.
+      if (locked) gestures.clear();
     },
     setHiddenEntities,
     setOnActivate(handler) {
