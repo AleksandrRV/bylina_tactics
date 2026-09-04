@@ -5,7 +5,15 @@ import { useI18nTick, useSessionState } from "./hooks.js";
 function XpBar({
   gain,
 }: {
-  gain: { name: string; xpBefore: number; xpAfter: number; levelBefore: number; levelAfter: number; leveled: boolean; gained: number };
+  gain: {
+    name: string;
+    xpBefore: number;
+    xpAfter: number;
+    levelBefore: number;
+    levelAfter: number;
+    leveled: boolean;
+    gained: number;
+  };
 }) {
   const XP_MAX = 100;
   const beforePct = Math.min(100, Math.max(0, (gain.xpBefore / XP_MAX) * 100));
@@ -35,7 +43,10 @@ function XpBar({
       </div>
       <div className="xp-bar" aria-hidden="true">
         <div className="xp-bar-track" />
-        <div className="xp-bar-fill" style={{ width: `${pct}%`, transition: "width 820ms cubic-bezier(0.22,1,0.36,1)" }} />
+        <div
+          className="xp-bar-fill"
+          style={{ width: `${pct}%`, transition: "width 820ms cubic-bezier(0.22,1,0.36,1)" }}
+        />
         {gain.leveled ? <span className="xp-bar-shine" /> : null}
       </div>
     </div>
@@ -52,7 +63,18 @@ export function ResultScreen() {
   // Итог сюжетной миссии пролога (0.21.25): стандартный экран победы после
   // финального текстового сообщения миссии; «Дальше» ведёт в следующую миссию.
   const isPrologue = battleKind === "prologue";
-  let last: { xpGains: Array<{ fighterId:number; name:string; xpBefore:number; xpAfter:number; levelBefore:number; levelAfter:number; leveled:boolean; gained:number }> } | null = null;
+  let last: {
+    xpGains: Array<{
+      fighterId: number;
+      name: string;
+      xpBefore: number;
+      xpAfter: number;
+      levelBefore: number;
+      levelAfter: number;
+      leveled: boolean;
+      gained: number;
+    }>;
+  } | null = null;
   try {
     last = session.getCampaign().getState().lastResult;
   } catch {

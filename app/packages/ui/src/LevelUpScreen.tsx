@@ -16,9 +16,12 @@ export function LevelUpScreen() {
   const t = useT();
   const { session } = useServices();
   const campaign = session.getCampaign();
-  const hero = useMemo(() => campaign.getState().fighters.find((f) => f.alive && f.unitId === "mikula_peasant"), [campaign]);
+  const hero = useMemo(
+    () => campaign.getState().fighters.find((f) => f.alive && f.unitId === "mikula_peasant"),
+    [campaign],
+  );
   // Для крестьянина доступен только Богатырь — стандартный список фильтруется до одного варианта.
-  const availableClasses = hero ? ["bogatyr"] as const : ([] as readonly string[]);
+  const availableClasses = hero ? (["bogatyr"] as const) : ([] as readonly string[]);
   const unitName = (id: string) => `unit.${id}.name`;
 
   return (
@@ -29,20 +32,27 @@ export function LevelUpScreen() {
         <p className="muted">{t("prologue.levelup.body")}</p>
       </header>
       <div className="pause-root" role="presentation" style={{ position: "static", background: "transparent" }}>
-        <div className="pause-card train-card" role="dialog" aria-modal="true" aria-labelledby="train-title" style={{ boxShadow: "none" }}>
-          <h2 id="train-title" style={{ display: "none" }}>{t("roster.trainTitle", { name: hero?.name ?? "Микула" })}</h2>
+        <div
+          className="pause-card train-card"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="train-title"
+          style={{ boxShadow: "none" }}
+        >
+          <h2 id="train-title" style={{ display: "none" }}>
+            {t("roster.trainTitle", { name: hero?.name ?? "Микула" })}
+          </h2>
           <p className="muted">{t("roster.trainHint")}</p>
           <div className="class-grid">
             {availableClasses.map((classId) => {
               const face = unitPortrait(classId);
               return (
-                <button
-                  key={classId}
-                  type="button"
-                  className="class-card"
-                  onClick={() => session.confirmLevelUp()}
-                >
-                  {face ? <img src={face} alt="" draggable={false} /> : <span className="deploy-face-empty" aria-hidden="true" />}
+                <button key={classId} type="button" className="class-card" onClick={() => session.confirmLevelUp()}>
+                  {face ? (
+                    <img src={face} alt="" draggable={false} />
+                  ) : (
+                    <span className="deploy-face-empty" aria-hidden="true" />
+                  )}
                   <span>{t(unitName(classId))}</span>
                 </button>
               );

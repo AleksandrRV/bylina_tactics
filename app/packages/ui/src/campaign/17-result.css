@@ -250,13 +250,13 @@
   border-radius: 999px;
   overflow: hidden;
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255,255,255,0.08);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .xp-bar-track {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(0,0,0,0.2), rgba(0,0,0,0.08));
+  background: linear-gradient(90deg, rgba(0, 0, 0, 0.2), rgba(0, 0, 0, 0.08));
 }
 
 .xp-bar-fill {
@@ -276,13 +276,15 @@
 .xp-bar-shine {
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.28) 50%, transparent 100%);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.28) 50%, transparent 100%);
   transform: translateX(-100%);
   animation: xp-shine 900ms ease 900ms both;
 }
 
 @keyframes xp-shine {
-  to { transform: translateX(100%); }
+  to {
+    transform: translateX(100%);
+  }
 }
 
 .xp-row.is-flash .xp-name {
@@ -290,6 +292,10 @@
 }
 
 @keyframes xp-flash {
-  0% { color: #f0d27a; }
-  100% { color: var(--mist); }
+  0% {
+    color: #f0d27a;
+  }
+  100% {
+    color: var(--mist);
+  }
 }

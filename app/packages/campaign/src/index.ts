@@ -299,7 +299,10 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
         inventory: [...options.initialState.inventory],
         shipPosition: { ...options.initialState.shipPosition },
         missions: options.initialState.missions.map((mission) => ({ ...mission })),
-        fighters: options.initialState.fighters.map((fighter) => ({ ...fighter, xp: (fighter as FighterState).xp ?? 0 })),
+        fighters: options.initialState.fighters.map((fighter) => ({
+          ...fighter,
+          xp: (fighter as FighterState).xp ?? 0,
+        })),
         deadGenerals: [...(options.initialState.deadGenerals ?? [])],
         lastResult: options.initialState.lastResult
           ? {
@@ -594,7 +597,17 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
             ? "roster"
             : undefined
         : undefined;
-      state.lastResult = { missionId: id, outcome, darknessGained, rewards, fallen, wounded, leveledUp, newRecruit, xpGains };
+      state.lastResult = {
+        missionId: id,
+        outcome,
+        darknessGained,
+        rewards,
+        fallen,
+        wounded,
+        leveledUp,
+        newRecruit,
+        xpGains,
+      };
       if (campaignLost) {
         state.phase = "lost";
       }

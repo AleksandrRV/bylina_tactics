@@ -113,8 +113,10 @@ export function CampaignScreen() {
   const selected = selectedId ? byId.get(selectedId) : undefined;
   const selectedPoint = selectedId ? state.missions.find((point) => point.id === selectedId) : undefined;
   const isRecruitUnit = (unitId: string): boolean => unitId === content.campaign.recruitUnitId;
-  const isTrainable = (unitId: string): boolean => unitId === content.campaign.recruitUnitId || unitId === "mikula_peasant";
-  const trainClassesFor = (unitId: string): readonly string[] => (unitId === "mikula_peasant" ? ["bogatyr"] : CLASS_IDS);
+  const isTrainable = (unitId: string): boolean =>
+    unitId === content.campaign.recruitUnitId || unitId === "mikula_peasant";
+  const trainClassesFor = (unitId: string): readonly string[] =>
+    unitId === "mikula_peasant" ? ["bogatyr"] : CLASS_IDS;
 
   const resources = state.resources;
   const scanCost = content.campaign.scan.cost;
@@ -630,7 +632,10 @@ export function CampaignScreen() {
             {state.fighters.map((fighter) => {
               const face = unitPortrait(fighter.unitId);
               const recruit = isRecruitUnit(fighter.unitId);
-              const canTrain = fighter.alive && (fighter.unitId === content.campaign.recruitUnitId || fighter.unitId === "mikula_peasant") && fighter.level >= content.campaign.classUnlockLevel;
+              const canTrain =
+                fighter.alive &&
+                (fighter.unitId === content.campaign.recruitUnitId || fighter.unitId === "mikula_peasant") &&
+                fighter.level >= content.campaign.classUnlockLevel;
               const penalty = content.campaign.woundPenalty;
               const equipped = fighter.equippedItemId ? itemById.get(fighter.equippedItemId) : undefined;
               return (

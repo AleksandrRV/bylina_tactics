@@ -156,7 +156,19 @@ function GemIcon() {
   );
 }
 
-function XpBar({ gain }: { gain: { name: string; xpBefore: number; xpAfter: number; levelBefore: number; levelAfter: number; leveled: boolean; gained: number } }) {
+function XpBar({
+  gain,
+}: {
+  gain: {
+    name: string;
+    xpBefore: number;
+    xpAfter: number;
+    levelBefore: number;
+    levelAfter: number;
+    leveled: boolean;
+    gained: number;
+  };
+}) {
   const XP_MAX = 100;
   const beforePct = Math.min(100, Math.max(0, (gain.xpBefore / XP_MAX) * 100));
   const targetPct = gain.leveled ? 100 : Math.min(100, Math.max(0, (gain.xpAfter / XP_MAX) * 100));
