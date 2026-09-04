@@ -63,8 +63,9 @@ export interface PrologueRunState {
   reinforcements: ReinforcementsState;
   forceDefend: boolean;
   /**
-   * М3: с начала миссии доступно только умение «Пролом» (0.21.32).
-   * Снимается после применения. Второе принуждение пролога — канон §1.2.
+   * М3: с начала миссии доступно только умение «Пролом» (0.21.33).
+   * Подход к цели (MOVE в смежную клетку) разрешён — рывок. Снимается
+   * после применения. Второе принуждение пролога — канон §1.2.
    */
   forceSkillId: string | null;
   /**
@@ -246,10 +247,24 @@ function enqueue(state: PrologueRunState, ctx: PrologueRunContext, key: string, 
   state.hints = enqueueHint(state.hints, { ...hint, forced: forced || hint.forced }, { showHints: ctx.showHints });
 }
 
-export function gatePrologueCommand(state: PrologueRunState, command: Command): boolean {
+export function gatePrologueCommand(state: PrologueRunState, command: Command, snapshot?: MatchState): boolean {
   if (state.forceDefend) return command.type === "DEFEND";
   if (state.forceSkillId) {
-    return command.type === "USE_SKILL" && command.skillId === state.forceSkillId;
+    if (command.type === "USE_SKILL" && command.skillId === state.forceSkillId) return true;
+    // М3: умение бьёт вблизи, а упырь стоит через четыре клетки. Рывок —
+    // подход (MOVE) и «Пролом» одним замыслом; без MOVE замок оставлял
+    // героя на месте. Подход принимается только в смежную с учебным
+    // упырём клетку: иначе шаг в сторону съел бы ОД, и удара бы нечем
+    // было оплатить.
+    if (command.type === "MOVE") {
+      if (!snapshot) return true;
+      const upyr = snapshot.entities.find(
+        (entity) => entity.configId === "upyr" && !entity.dead && entity.owner === ENEMY_OWNER,
+      );
+      if (!upyr) return false;
+      return distH(command.to.x, command.to.y, upyr.x, upyr.y) <= 1;
+    }
+    return false;
   }
   return true;
 }
@@ -374,6 +389,13 @@ export function revealPrologueExtract(
 function stripPrologueSkills(entity: { configId: string; skillIds?: string[] }): void {
   if (entity.configId !== "strelets") return;
   entity.skillIds = (entity.skillIds ?? []).filter((id) => id !== "aimed_eye");
+}
+
+/** Надеть лук стрельцу пролога: `spawnScripted` читает запись класса, а у неё оружия нет. */
+function armStreletsBow(entity: { configId: string; weaponId?: string; weaponIds?: string[] }): void {
+  if (entity.configId !== "strelets") return;
+  entity.weaponIds = ["bow"];
+  entity.weaponId = "bow";
 }
 
 /**
@@ -781,10 +803,18 @@ export function tickProloguePlayerTurn(
     }
     const strelets = living(kernel.getSnapshot(), "strelets");
     if (strelets && strelets.owner === PLAYER_OWNER && strelets.ap > 0) {
-      const weaponId = strelets.weaponId ?? strelets.weaponIds?.[0] ?? "bow";
+      // spawnScripted выдаёт дружине кулак, если в записи класса пустой
+      // список оружия. Выстрел с гряды тогда уходит «ударом» и ядро его
+      // отвергает. Лук надеваем здесь же, если появление его пропустило.
+      if (!(strelets.weaponIds ?? []).includes("bow")) {
+        restorePatch(kernel, (match) => {
+          const entity = match.entities.find((candidate) => candidate.id === strelets.id);
+          if (entity) armStreletsBow(entity);
+        });
+      }
       kernel.setForcedOutcome("max");
       return {
-        command: { type: "ATTACK", actorId: strelets.id, targetId: rusher.id, weaponId },
+        command: { type: "ATTACK", actorId: strelets.id, targetId: rusher.id, weaponId: "bow" },
         state,
         forceOutcome: "max",
       };

@@ -411,7 +411,7 @@ describe("prologue M2 reinforcements (0.21.19)", () => {
 
 describe("prologue M3 wave", () => {
   const M3_LAYOUT = {
-    rows: [".MUP....", "....R...", "...SS...", ".......A"],
+    rows: [".M...UP.", ".......R", "...SS...", ".A......"],
     legend: {
       M: { kind: "spawn", side: "player", unitId: "bogatyr" },
       U: { kind: "spawn", side: "enemy", unitId: "upyr" },
@@ -473,6 +473,9 @@ describe("prologue M3 wave", () => {
     expect(gatePrologueCommand(state, { type: "END_TURN", playerId: "1" })).toBe(false);
     expect(gatePrologueCommand(state, { type: "ATTACK", actorId: 1, targetId: 2, weaponId: "club" })).toBe(false);
     expect(gatePrologueCommand(state, { type: "USE_SKILL", actorId: 1, skillId: "breach", targetId: 2 })).toBe(true);
+    // Рывок: подход к упырю разрешён — иначе замок умения оставлял героя
+    // на четырёх клетках от цели.
+    expect(gatePrologueCommand(state, { type: "MOVE", actorId: 1, to: { x: 4, y: 0, z: 1 } })).toBe(true);
   });
 
   it("knocks the first upyr into the pit and spawns a wounded rusher without Fedot", () => {
@@ -481,7 +484,14 @@ describe("prologue M3 wave", () => {
     expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "strelets")).toBe(false);
     const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
     const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
-    expect(Math.abs(bogatyr.x - upyr.x) + Math.abs(bogatyr.y - upyr.y)).toBe(1);
+    expect(upyr.x - bogatyr.x).toBe(4);
+    expect(upyr.y).toBe(bogatyr.y);
+    const step = { x: upyr.x - 1, y: upyr.y, z: bogatyr.z };
+    expect(gatePrologueCommand(state, { type: "MOVE", actorId: bogatyr.id, to: step }, kernel.getSnapshot())).toBe(
+      true,
+    );
+    const walked = kernel.apply({ type: "MOVE", actorId: bogatyr.id, to: step });
+    expect(walked.ok).toBe(true);
     kernel.setForcedOutcome("min");
     const applied = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id });
     expect(applied.ok).toBe(true);
@@ -511,6 +521,9 @@ describe("prologue M3 wave", () => {
     const { kernel, ctx, state } = bootM3();
     const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
     const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
+    const step = { x: upyr.x - 1, y: upyr.y, z: bogatyr.z };
+    const walked = kernel.apply({ type: "MOVE", actorId: bogatyr.id, to: step });
+    if (!walked.ok) throw new Error("approach rejected");
     kernel.setForcedOutcome("min");
     const blow = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id });
     if (!blow.ok) throw new Error("breach rejected");

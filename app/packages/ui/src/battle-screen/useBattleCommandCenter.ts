@@ -176,7 +176,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
             : null,
         prologueAllows:
           isPrologue && prologueRunRef.current
-            ? (issued) => gatePrologueCommand(prologueRunRef.current!, issued)
+            ? (issued) => gatePrologueCommand(prologueRunRef.current!, issued, kernel?.getSnapshot())
             : null,
       } as Parameters<typeof routeCommand>[1]);
       switch (route.kind) {
@@ -264,13 +264,43 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
             break;
         }
         const hint = next.hints.forcedKey ?? next.hints.queue[0] ?? null;
-        if (hint && hint !== prologueHintKey) {
-          prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
-            type: "hint_shown",
-            key: hint,
-          });
+        const fellIntoPit = result.events.some(
+          (event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT",
+        );
+        if (fellIntoPit) {
+          // Падение в яму: реплика не должна закрывать анимацию. Окно
+          // «Пролома» гасим сразу; сюжетную фразу и выход волны — после
+          // проигрывания и короткой паузы, чтобы упырь успел упасть.
+          setPrologueHintKey(null);
+          const wave = prologueAfter;
+          const followUp = after;
+          prologueAfter = () => {
+            setBusy(true);
+            void sleep(800).then(() => {
+              const queued = prologueRunRef.current?.hints;
+              const key = queued?.forcedKey ?? queued?.queue[0] ?? hint;
+              if (key && key !== prologueHintKey) {
+                prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
+                  type: "hint_shown",
+                  key,
+                });
+              }
+              setPrologueHintKey(key);
+              setBusy(false);
+              wave?.();
+              followUp?.();
+            });
+          };
+          after = undefined;
+        } else {
+          if (hint && hint !== prologueHintKey) {
+            prologueTelemetryRef.current = recTelemetry(prologueTelemetryRef.current, {
+              type: "hint_shown",
+              key: hint,
+            });
+          }
+          setPrologueHintKey(hint);
         }
-        setPrologueHintKey(hint);
         setPrologueObjectiveKey(next.objectiveKey);
         if (next.outcome !== "ongoing") prologueFinished = true;
       }
