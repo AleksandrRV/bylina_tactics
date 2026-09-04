@@ -69,6 +69,7 @@ The tactical rules run only on the host. UI and rendering display snapshots/even
 
 - Explore first, state a short plan and affected files, then implement the smallest coherent change.
 - Always run targeted tests while iterating, then the full relevant checks before declaring success. For UI work, run the build and the applicable DOM tests; if visual behavior matters, use the documented screen/audit commands.
+- Before every commit, from `app/` run `pnpm format:check`. If it fails, run `pnpm format` and check again. Passing tests are not a substitute: CI runs Prettier separately and fails on wrap/trailing-newline drift that the editor does not apply.
 - Update the owning `doc/*.md` contract in the same change when behavior, data, protocol, or operations changes. Keep one source of truth; link rather than duplicate.
 - Keep commits small and conventional (for example, `fix(core): ...`, `feat(ui): ...`, `docs: ...`). Never force-push. Do not commit unrelated user changes.
 
