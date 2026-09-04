@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createQrDataUrl,
   createWebRtcChannel,
@@ -387,6 +387,7 @@ function NetworkSetup({
   const [connected, setConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [qr, setQr] = useState<string | null>(null);
+  const mountedRef = useRef(true);
   // Описание сессии готовится не мгновенно: пока собираются адреса, кнопка
   // показывает подготовку, а не молчит (0.21.18 — «Создать партию» не
   // отвечала на нажатие, когда сбор кандидатов не завершался).
@@ -396,6 +397,12 @@ function NetworkSetup({
     [],
   );
   const qrInputRef = useMemo(() => ({ current: null as HTMLInputElement | null }), []);
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      transportRef.current?.close?.();
+    };
+  }, [transportRef]);
 
   /** Смена роли рвёт начатое соединение: канал и коды принадлежат паре. */
   const switchRole = (next: "host" | "guest"): void => {
@@ -421,8 +428,12 @@ function NetworkSetup({
           setCode(next);
           setPending(false);
           void createQrDataUrl(next)
-            .then(setQr)
-            .catch(() => setQr(null));
+            .then((value) => {
+              if (mountedRef.current) setQr(value);
+            })
+            .catch(() => {
+              if (mountedRef.current) setQr(null);
+            });
         },
         receiveSignal: () => undefined,
         onConnect: () => setConnected(true),
