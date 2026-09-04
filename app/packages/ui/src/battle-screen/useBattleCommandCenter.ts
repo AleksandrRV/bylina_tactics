@@ -988,7 +988,8 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     const [xs, ys] = intentModel.preview.split(",");
     const x = Number(xs);
     const y = Number(ys);
-    return session.getBattlePath(selectedId, { x, y, z: 0 });
+    const result = session.getBattlePath(selectedId, { x, y, z: 0 });
+    return result?.path ?? [];
   })();
 
   const onCell = useCallback(
