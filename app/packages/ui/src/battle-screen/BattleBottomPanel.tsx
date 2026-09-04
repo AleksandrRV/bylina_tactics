@@ -24,6 +24,7 @@ export function BattleBottomPanel() {
     trainingSkillAllowed,
     trainingAllows,
     prologueStanceLock,
+    prologueSkillLock,
     accentWeaponId,
     applyCommand,
     applySelfSkill,
@@ -274,7 +275,13 @@ export function BattleBottomPanel() {
         className={`hud-btn hud-btn-primary end-turn${allOwnApSpent(snapshot.entities, viewOwner) ? " is-ready" : ""}${hintPanelKey === "end_turn" || endTurnApHint ? " hint-pulse" : ""}`}
         // Принудительная стойка закрывает и «Конец хода» (0.20.45):
         // иначе игрок ушёл бы от засады ценой пропущенного урока.
-        disabled={busy || snapshot.activeOwner !== viewOwner || !trainingAllows("endTurn") || prologueStanceLock}
+        disabled={
+          busy ||
+          snapshot.activeOwner !== viewOwner ||
+          !trainingAllows("endTurn") ||
+          prologueStanceLock ||
+          Boolean(prologueSkillLock)
+        }
         onClick={() => endTurn()}
       >
         {t("field.endTurn")}

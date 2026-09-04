@@ -23,7 +23,7 @@ export function useBattleTrainingState(
   intentModel: BattleIntentModel,
   kernelSkills: Record<string, import("@bylina/core").SkillStats>,
 ) {
-  const { session, t, setLog, outcomeGate, hintSettings, prologueStanceLock } = base;
+  const { session, t, setLog, outcomeGate, hintSettings, prologueStanceLock, prologueSkillLock } = base;
   const { isTraining, isPrologue, trainingMission } = kinds;
   const { battleRevision, snapshot } = snapshotModel;
   const { selectedId } = intentModel;
@@ -180,9 +180,10 @@ export function useBattleTrainingState(
   const trainingAllows = useCallback(
     (action: TrainingActionKind): boolean => {
       if (isPrologue && prologueStanceLock) return action === "defend";
+      if (isPrologue && prologueSkillLock) return action === "skill";
       return directiveAllowsAction(directiveView, action);
     },
-    [isPrologue, prologueStanceLock, directiveView],
+    [isPrologue, prologueStanceLock, prologueSkillLock, directiveView],
   );
 
   const trainingDeny = useCallback(
@@ -205,9 +206,10 @@ export function useBattleTrainingState(
   const trainingSkillAllowed = useCallback(
     (skillId: string): boolean => {
       if (isPrologue && prologueStanceLock) return false;
+      if (isPrologue && prologueSkillLock) return skillId === prologueSkillLock;
       return !isTraining || (trainingDirective?.kind === "skill" && trainingDirective.skillId === skillId);
     },
-    [isPrologue, prologueStanceLock, isTraining, trainingDirective],
+    [isPrologue, prologueStanceLock, prologueSkillLock, isTraining, trainingDirective],
   );
 
   // Конец хода стороны наступает сам, когда ни один боец стороны не имеет
@@ -227,6 +229,7 @@ export function useBattleTrainingState(
     hintSettings,
     activeHint,
     prologueStanceLock,
+    prologueSkillLock,
     isPrologue,
   };
 

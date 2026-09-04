@@ -77,6 +77,11 @@ export function useBattleScreenBase() {
    */
   const [prologueStanceLock, setPrologueStanceLock] = useState(false);
   /**
+   * Принудительное умение М3 (0.21.32): с начала миссии доступен только
+   * «Пролом». Кнопка умения пульсирует, остальные действия закрыты.
+   */
+  const [prologueSkillLock, setPrologueSkillLock] = useState<string | null>(null);
+  /**
    * Сцены, уже сыгранные в этом бою (0.20.45). Сцена с `once` повторно не
    * выбирается: триггер `onSpawn` срабатывает на каждое появление, и
    * первая пара крыс М2 играется один раз, а волны — общей сценой стаи.
@@ -152,6 +157,8 @@ export function useBattleScreenBase() {
 
     prologueStanceLock,
     setPrologueStanceLock,
+    prologueSkillLock,
+    setPrologueSkillLock,
 
     firedCutscenesRef,
     enemyScriptRef,

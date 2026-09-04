@@ -1,5 +1,5 @@
 import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
-import { tileAt } from "./grid.js";
+import { distH, tileAt } from "./grid.js";
 import {
   allowedPanel,
   createHintsManagerState,
@@ -50,6 +50,8 @@ export interface PrologueRunContext {
   extractCells?: { x: number; y: number }[];
   fedotWaveSpawns?: { x: number; y: number }[];
   waveCells?: { x: number; y: number }[];
+  /** М3: клетка раненого упыря, который кидается на богатыря. */
+  rusherCell?: { x: number; y: number };
   allyCell?: { x: number; y: number };
   healerCell?: { x: number; y: number };
 }
@@ -60,6 +62,21 @@ export interface PrologueRunState {
   hints: HintsManagerState;
   reinforcements: ReinforcementsState;
   forceDefend: boolean;
+  /**
+   * М3: с начала миссии доступно только умение «Пролом» (0.21.32).
+   * Снимается после применения. Второе принуждение пролога — канон §1.2.
+   */
+  forceSkillId: string | null;
+  /**
+   * М3: идентификатор раненого упыря волны. Пока Федот не выстрелил,
+   * ходит только он — остальные стоят.
+   */
+  rusherId: number | null;
+  /**
+   * М3: после выхода волны экран сам передаёт ход Нави (без handOff
+   * внутри сцены: иначе выстрел Федота вложился бы в чужой кадр).
+   */
+  handOffPending: boolean;
   pickupDone: boolean;
   fedotFreed: boolean;
   extracted: string[];
@@ -102,9 +119,12 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
   return {
     script: { index: 0 },
     mission: createMissionScriptState(),
-    hints: createHintsManagerState(),
+    hints: missionId === "prologue_glade" ? { shown: [], queue: [], forcedKey: "m3.blow" } : createHintsManagerState(),
     reinforcements: createReinforcementsState(),
     forceDefend: false,
+    forceSkillId: missionId === "prologue_glade" ? "breach" : null,
+    rusherId: null,
+    handOffPending: false,
     pickupDone: false,
     fedotFreed: false,
     extracted: [],
@@ -177,7 +197,10 @@ export function isPrologueProgress(value: unknown): value is PrologueProgress {
     (run.outcome === "ongoing" || run.outcome === "victory" || run.outcome === "defeat") &&
     typeof run.pickupDone === "boolean" &&
     typeof run.script === "object" &&
-    run.script !== null
+    run.script !== null &&
+    (run.forceSkillId === undefined || run.forceSkillId === null || typeof run.forceSkillId === "string") &&
+    (run.rusherId === undefined || run.rusherId === null || typeof run.rusherId === "number") &&
+    (run.handOffPending === undefined || typeof run.handOffPending === "boolean")
   );
 }
 
@@ -192,7 +215,6 @@ const M2_TRIGGERS: MissionTrigger[] = [];
 
 const M3_TRIGGERS: MissionTrigger[] = [
   { id: "first_upyr_dead", kind: "OnUnitDied", unitId: "upyr", once: true, flag: "firstWave" },
-  { id: "shield", kind: "OnSkillUsed", skillId: "shield_bash", once: true, flag: "blow" },
 ];
 
 const M4_TRIGGERS: MissionTrigger[] = [
@@ -225,8 +247,11 @@ function enqueue(state: PrologueRunState, ctx: PrologueRunContext, key: string, 
 }
 
 export function gatePrologueCommand(state: PrologueRunState, command: Command): boolean {
-  if (!state.forceDefend) return true;
-  return command.type === "DEFEND";
+  if (state.forceDefend) return command.type === "DEFEND";
+  if (state.forceSkillId) {
+    return command.type === "USE_SKILL" && command.skillId === state.forceSkillId;
+  }
+  return true;
 }
 
 /**
@@ -385,9 +410,6 @@ function spawnUnits(
       const entity = match.entities.find((candidate) => candidate.id === spawned.id);
       if (!entity) return;
       stripPrologueSkills(entity);
-      if (unitId === "strelets" && owner === PLAYER_OWNER) {
-        entity.ap = 0;
-      }
     });
   }
 }
@@ -491,8 +513,8 @@ export function afterPrologueApply(
     }
     // Первое потраченное ОД героя — «шум в кустах» (0.20.45). Раньше
     // сигнал ставило только перемещение: удар или умение оставляли засаду
-    // за кадром. Стойка — единственное принуждение пролога (§1.1), поэтому
-    // перекрывается всё, кроме неё, и «Конец хода» тоже.
+    // за кадром. Стойка — первое принуждение пролога (§1.2); второе — «Пролом»
+    // в М3. Поэтому перекрывается всё, кроме неё, и «Конец хода» тоже.
     if (next.ambushPending && !next.forceDefend && !next.fedotFreed && apSpendingCommand(command)) {
       next.forceDefend = true;
       enqueue(next, ctx, "m2.noise", true);
@@ -578,27 +600,57 @@ export function afterPrologueApply(
   }
 
   if (ctx.missionId === "prologue_glade") {
-    // М3: фраза Федота "Лук я бросил в трясине..." перенесена из М2 (0.21.28)
-    // и показывается в начале миссии, до первой волны.
-    if (!next.firstWave && !next.hints.queue.includes("m3.gear") && !next.hints.forcedKey) {
-      const hasGear = ctx.hints.some((h) => h.key === "m3.gear" || h.key === "m2.gear");
-      if (hasGear) {
-        // Предпочитаем m3.gear, fallback к m2.gear для совместимости
-        const gearKey = ctx.hints.some((h) => h.key === "m3.gear") ? "m3.gear" : "m2.gear";
-        enqueue(next, ctx, gearKey);
-      }
+    if (command.type === "USE_SKILL" && next.forceSkillId && command.skillId === next.forceSkillId) {
+      next.forceSkillId = null;
+      next.hints = dismissHint(next.hints, "m3.blow");
+    }
+    if (events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")) {
+      enqueue(next, ctx, "m3.pit");
     }
     if (evaluated.fired.some((item) => item.flag === "firstWave") && !next.firstWave) {
       next.firstWave = true;
-      spawnUnits(kernel, "upyr", ENEMY_OWNER, ctx.waveCells ?? [], true);
-      if (ctx.allyCell && !living(kernel.getSnapshot(), "strelets")) {
-        spawnUnits(kernel, "strelets", PLAYER_OWNER, [ctx.allyCell], true);
+      next.handOffPending = true;
+      const rusherAt = ctx.rusherCell ?? ctx.waveCells?.[0];
+      const others = (ctx.waveCells ?? []).filter(
+        (cell) => !rusherAt || cell.x !== rusherAt.x || cell.y !== rusherAt.y,
+      );
+      const beforeIds = new Set(kernel.getSnapshot().entities.map((entity) => entity.id));
+      if (rusherAt) spawnUnits(kernel, "upyr", ENEMY_OWNER, [rusherAt], true);
+      const spawned = kernel
+        .getSnapshot()
+        .entities.filter((entity) => entity.configId === "upyr" && !entity.dead && !beforeIds.has(entity.id));
+      const rusherSpawn = spawned[0];
+      if (rusherSpawn) {
+        next.rusherId = rusherSpawn.id;
+        restorePatch(kernel, (matchState) => {
+          const entity = matchState.entities.find((candidate) => candidate.id === rusherSpawn.id);
+          if (!entity) return;
+          entity.hp = Math.max(1, Math.floor(entity.maxHp / 2));
+        });
       }
+      spawnUnits(kernel, "upyr", ENEMY_OWNER, others, true);
       enqueue(next, ctx, "m3.more");
+    }
+    const bogatyr = living(kernel.getSnapshot(), "bogatyr");
+    const rusher =
+      next.rusherId !== null
+        ? kernel.getSnapshot().entities.find((entity) => entity.id === next.rusherId && !entity.dead)
+        : undefined;
+    if (
+      next.firstWave &&
+      !next.fedotJoined &&
+      bogatyr &&
+      rusher &&
+      distH(bogatyr.x, bogatyr.y, rusher.x, rusher.y) <= 1 &&
+      ctx.allyCell &&
+      !living(kernel.getSnapshot(), "strelets")
+    ) {
+      spawnUnits(kernel, "strelets", PLAYER_OWNER, [ctx.allyCell], true);
       enqueue(next, ctx, "m3.shot");
     }
-    if (evaluated.fired.some((item) => item.flag === "blow")) {
-      enqueue(next, ctx, "m3.blow");
+    if (command.type === "ATTACK") {
+      const actor = match.entities.find((entity) => entity.id === command.actorId);
+      if (actor?.configId === "strelets") next.fedotJoined = true;
     }
     const after = kernel.getSnapshot();
     if (livingPlayers(after).length && next.firstWave && !livingEnemies(after).length) next.outcome = "victory";
@@ -633,12 +685,40 @@ export function takePrologueSpawnEvents(state: PrologueRunState): {
   return { events: state.pendingEvents, state: { ...state, pendingEvents: [] } };
 }
 
+function approachBogatyr(kernel: TacticsKernel, actor: { id: number; x: number; y: number }): Command | null {
+  const bogatyr = living(kernel.getSnapshot(), "bogatyr");
+  if (!bogatyr) return null;
+  const now = distH(actor.x, actor.y, bogatyr.x, bogatyr.y);
+  if (now <= 1) return null;
+  const reachable = kernel.getReachable(actor.id);
+  const closer = reachable
+    .filter((cell) => distH(cell.x, cell.y, bogatyr.x, bogatyr.y) < now)
+    .sort((a, b) => {
+      const da = distH(a.x, a.y, bogatyr.x, bogatyr.y);
+      const db = distH(b.x, b.y, bogatyr.x, bogatyr.y);
+      if (da !== db) return da - db;
+      if (a.apCost !== b.apCost) return a.apCost - b.apCost;
+      return a.y !== b.y ? a.y - b.y : a.x - b.x;
+    });
+  const best = closer[0];
+  return best ? { type: "MOVE", actorId: actor.id, to: best } : null;
+}
+
+function rusherOf(kernel: TacticsKernel, state: PrologueRunState) {
+  if (state.rusherId !== null) {
+    return kernel.getSnapshot().entities.find((entity) => entity.id === state.rusherId && !entity.dead);
+  }
+  return kernel
+    .getSnapshot()
+    .entities.find((entity) => entity.configId === "upyr" && !entity.dead && entity.hp < entity.maxHp);
+}
+
 function applyScriptDecision(
   kernel: TacticsKernel,
   state: PrologueRunState,
   ctx: PrologueRunContext,
   owner: number,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" | "max" } {
   const decision = pickScriptedCommand(kernel, ctx.script, state.script, { activeOwner: owner });
   const next = { ...state, script: decision.state };
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
@@ -658,7 +738,7 @@ export function tickPrologueEnemyTurn(
   kernel: TacticsKernel,
   state: PrologueRunState,
   ctx: PrologueRunContext,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" | "max" } {
   const next = { ...state, reinforcements: { ...state.reinforcements } };
   // Тик вызывается перед каждой командой Нави, но прибавляет подкрепление
   // один раз за ход: сервис сам помнит ход, в котором уже отработал
@@ -672,6 +752,16 @@ export function tickPrologueEnemyTurn(
       false,
     );
   }
+  // М3, бросок раненого: пока Федот не выстрелил, ходит только этот упырь.
+  // Остальные стоят — иначе обычный алгоритм бросил бы всю тройку разом.
+  if (ctx.missionId === "prologue_glade" && next.firstWave && !next.fedotJoined) {
+    const rusher = rusherOf(kernel, next);
+    if (rusher && rusher.owner === ENEMY_OWNER && rusher.ap > 0) {
+      const step = approachBogatyr(kernel, rusher);
+      if (step) return { command: step, state: next };
+    }
+    return { command: null, state: next };
+  }
   return applyScriptDecision(kernel, next, ctx, ENEMY_OWNER);
 }
 
@@ -680,7 +770,26 @@ export function tickProloguePlayerTurn(
   kernel: TacticsKernel,
   state: PrologueRunState,
   ctx: PrologueRunContext,
-): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" } {
+): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" | "max" } {
+  // М3: Федот стреляет только в раненого упыря и только вплотную к богатырю.
+  // Обычный скрипт берёт первого живого упыря с ОД — после броска это не он.
+  if (ctx.missionId === "prologue_glade" && !state.fedotJoined) {
+    const rusher = rusherOf(kernel, state);
+    const bogatyr = living(kernel.getSnapshot(), "bogatyr");
+    if (!rusher || !bogatyr || distH(rusher.x, rusher.y, bogatyr.x, bogatyr.y) > 1) {
+      return { command: null, state };
+    }
+    const strelets = living(kernel.getSnapshot(), "strelets");
+    if (strelets && strelets.owner === PLAYER_OWNER && strelets.ap > 0) {
+      const weaponId = strelets.weaponId ?? strelets.weaponIds?.[0] ?? "bow";
+      kernel.setForcedOutcome("max");
+      return {
+        command: { type: "ATTACK", actorId: strelets.id, targetId: rusher.id, weaponId },
+        state,
+        forceOutcome: "max",
+      };
+    }
+  }
   return applyScriptDecision(kernel, state, ctx, PLAYER_OWNER);
 }
 

@@ -22,7 +22,7 @@ export interface PrologueScriptAction {
   skillId?: string;
   corpseUnitId?: string;
   onlyIf?: TrainingEnemyCondition;
-  forceOutcome?: "hit" | "miss" | "min";
+  forceOutcome?: "hit" | "miss" | "min" | "max";
   at?: { x: number; y: number };
 }
 
@@ -38,7 +38,7 @@ export interface PrologueScriptState {
 export interface ScriptedDecision {
   command: Command | null;
   state: PrologueScriptState;
-  forceOutcome?: "hit" | "miss" | "min";
+  forceOutcome?: "hit" | "miss" | "min" | "max";
   spawn?: { unitId: string; at: { x: number; y: number }; owner: number };
 }
 
@@ -103,7 +103,7 @@ function approachStep(
 type ActionResolution = {
   command: Command | null;
   done: boolean;
-  forceOutcome?: "hit" | "miss" | "min";
+  forceOutcome?: "hit" | "miss" | "min" | "max";
   spawn?: ScriptedDecision["spawn"];
 };
 

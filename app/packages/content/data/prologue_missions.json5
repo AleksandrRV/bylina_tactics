@@ -289,7 +289,7 @@
       map: {
         biome: "thicket",
         width: 12,
-        height: 9,
+        height: 10,
         pitChance: 0.0,
         coverDensity: 0.0,
         wallDensity: 0.0,
@@ -297,27 +297,48 @@
         halfCoverChance: 0.0,
         heightMix: { z0: 0.1, z1: 0.8, z2: 0.1 },
         layout: {
+          // Опушка за топью (0.21.32): запад — сухой берег, где Микула
+          // встречает первого упыря у ямы; восток — всхолмление, на которое
+          // вбегает Федот; юг — чаща, откуда выходит волна. Укрытий нет
+          // (первое знакомство с ними — М5); валуны и кусты — ориентиры.
           rows: [
-            "tt...t...ttt",
-            "t.........t.",
-            "...P........",
-            ".M...U......",
-            "......P.....",
-            "..........A.",
-            "t......SS..t",
-            "tt..t...t.tt",
+            "ttW.t..t.Wtt",
+            "t....t.....t",
+            "..tP..P.t...",
+            ".MUP........",
+            "....tR....A.",
+            "t.P....t....",
+            ".W.t.SS..t.t",
+            "t...P...W.tt",
+            "ttt.tt.ttttt",
             "tttttttttttt",
+          ],
+          // Ярусы: западный берег ровный, восточная гряда z=2 без скачка
+          // в два яруса, южная низина у валуна.
+          heights: [
+            "111111111111",
+            "111111111112",
+            "111111111122",
+            "111111111122",
+            "111111111222",
+            "011111111121",
+            "011111111111",
+            "111011111111",
+            "111111111111",
+            "111111111111",
           ],
           legend: {
             ".": { kind: "ground" },
             "t": { kind: "decor", decor: "bush" },
+            "W": { kind: "wall" },
             "P": { kind: "pit" },
             // Микула-богатырь сохраняет дубину из М1: оружие выдаётся
             // экипировкой (маркером раскладки), а не записью класса (0.21.25).
             "M": { kind: "spawn", side: "player", unitId: "bogatyr", weapons: ["club"] },
             "U": { kind: "spawn", side: "enemy", unitId: "upyr" },
+            "R": { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
             "S": { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
-            // Федот-стрелец бьёт из лука по сценарию: оружие выдаётся маркером
+            // Федот-стрелец бьёт с гряды: оружие выдаётся маркером
             // раскладки, а не записью класса (0.21.25).
             "A": { kind: "spawn", side: "player", unitId: "strelets", weapons: ["bow"], scripted: true },
           },
@@ -327,15 +348,51 @@
       objective: {
         initialTextKey: "prologue.objective.clearGlade",
       },
+      // Выстрел Федота и появление на гряде ведёт контроллер сцены
+      // (rusherId / allyCell), а не очередь: иначе скрипт взял бы первого
+      // живого упыря с ОД — после броска это уже не раненый.
       script: {
         priority: [],
-        actions: [
-          { unitId: "strelets", side: "player", kind: "appear", at: { x: 10, y: 5 } },
-          { unitId: "strelets", side: "player", kind: "attack", targetUnitId: "upyr", weaponId: "bow", forceOutcome: "hit" },
-          { kind: "endTurn" },
-        ],
+        actions: [],
       },
       hints: ["m3.gear", "m3.blow", "m3.pit", "m3.more", "m3.shot"],
+      cutscenes: [
+        {
+          id: "m3_intro",
+          trigger: { kind: "missionStart" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.7,
+          steps: [
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 420, holdMs: 500 },
+            { kind: "pan", target: { marker: "U" }, durationMs: 900, holdMs: 800, accent: true },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 700 },
+          ],
+        },
+        {
+          id: "m3_wave",
+          trigger: { kind: "onSpawn", configId: "upyr" },
+          once: true,
+          lockInput: true,
+          skippable: true,
+          zoom: 1.5,
+          steps: [
+            { kind: "pan", target: { configId: "upyr" }, durationMs: 420, runInMs: 720, follow: true, holdMs: 500 },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 600 },
+          ],
+        },
+        {
+          id: "m3_fedot",
+          trigger: { kind: "onSpawn", configId: "strelets" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.6,
+          steps: [
+            { kind: "pan", target: { configId: "strelets" }, durationMs: 420, runInMs: 800, follow: true, holdMs: 400 },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 500 },
+          ],
+        },
+      ],
       onboarding: [],
     },
     {

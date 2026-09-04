@@ -9,9 +9,9 @@ import type { WeaponStats } from "./weapons.js";
 /**
  * Исход атаки, заданный сценой миссии: `hit` — попадание со случайным
  * уроном, `miss` — промах, `min` — попадание минимальным уроном оружия
- * (0.20.40).
+ * (0.20.40), `max` — попадание максимальным уроном (постановочный выстрел).
  */
-export type ForceOutcome = "hit" | "miss" | "min";
+export type ForceOutcome = "hit" | "miss" | "min" | "max";
 
 export interface AttackOptions {
   ignoreAp?: boolean;
@@ -212,11 +212,12 @@ export function resolveAttack(
   if (options.forceOutcome === "miss") {
     return { result: "MISS", damage: 0, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
   }
-  if (options.forceOutcome === "min") {
-    // Постановочный удар (0.20.40): попадание строго минимальным уроном
-    // оружия — сцена обещает игроку укус, а не случайное увечье. Бросок
-    // не делается вовсе: исход и урон определены данными миссии.
-    const damage = Math.max(0, weapon.minDmg - (target.defending ? 2 : 0) - (options.damageReduction ?? 0));
+  if (options.forceOutcome === "min" || options.forceOutcome === "max") {
+    // Постановочный удар: бросок не делается. `min` (0.20.40) — укус М1,
+    // опасность без случайного увечья; `max` — выстрел Федота в М3, сцена
+    // обещает, что раненый упырь падает от одной стрелы.
+    const raw = options.forceOutcome === "min" ? weapon.minDmg : weapon.maxDmg;
+    const damage = Math.max(0, raw - (target.defending ? 2 : 0) - (options.damageReduction ?? 0));
     return { result: "HIT", damage, chance: preview.chance, critChance, flanked, heightMod, cover, actionType };
   }
   if (options.forceOutcome === "hit") {

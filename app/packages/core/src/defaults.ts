@@ -87,8 +87,8 @@ export const CLAWS: WeaponStats = {
   range: 1,
   requiresLOS: false,
   aimMod: 0,
-  minDmg: 3,
-  maxDmg: 4,
+  minDmg: 2,
+  maxDmg: 3,
   crit: 10,
   critBonus: 1,
 };

@@ -19,6 +19,7 @@ import {
 } from "../src/index.js";
 import {
   BOGATYR,
+  BREACH,
   CLUB,
   FEDOT,
   M1_LAYOUT,
@@ -409,61 +410,157 @@ describe("prologue M2 reinforcements (0.21.19)", () => {
 });
 
 describe("prologue M3 wave", () => {
-  it("spawns the second wave and strelets after the first upyr dies", () => {
-    const layout = {
-      rows: [
-        "............",
-        "............",
-        "............",
-        ".M...U......",
-        "............",
-        "..........A.",
-        ".......SS...",
-        "............",
-        "............",
-      ],
-      legend: {
-        M: { kind: "spawn", side: "player", unitId: "bogatyr" },
-        U: { kind: "spawn", side: "enemy", unitId: "upyr" },
-        S: { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
-        A: { kind: "spawn", side: "player", unitId: "strelets", scripted: true },
-      },
-    };
-    const match = createPrologueMatch({ layout, units: [BOGATYR, UPYR, STRELETS], seed: 703 });
-    expect(match.entities.filter((entity) => entity.configId === "upyr")).toHaveLength(1);
-    expect(match.entities.some((entity) => entity.configId === "strelets")).toBe(false);
+  const M3_LAYOUT = {
+    rows: [".MUP....", "....R...", "...SS...", ".......A"],
+    legend: {
+      M: { kind: "spawn", side: "player", unitId: "bogatyr" },
+      U: { kind: "spawn", side: "enemy", unitId: "upyr" },
+      P: { kind: "pit" },
+      R: { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
+      S: { kind: "spawn", side: "enemy", unitId: "upyr", scripted: true },
+      A: { kind: "spawn", side: "player", unitId: "strelets", scripted: true },
+    },
+  };
+
+  function bootM3() {
+    const match = createPrologueMatch({ layout: M3_LAYOUT, units: [BOGATYR, UPYR, STRELETS], seed: 703 });
     const kernel = createTacticsKernel({
       initial: match,
       units: [BOGATYR, UPYR, STRELETS],
-      weapons: { club: CLUB, teeth: TEETH },
-      seed: 703,
-      fogDisabled: false,
-    });
-    expect(kernel.getVisibleCells(1).size).toBeGreaterThan(0);
-    const compiled = compilePrologueLayout(layout);
-    let state = createPrologueRunState("prologue_glade");
-    const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
-    state = afterPrologueApply(
-      kernel,
-      { type: "ATTACK", actorId: 1, targetId: upyr.id, weaponId: "sword" },
-      [{ type: "ENTITY_DIED", entityId: upyr.id, causeOfDeath: "DAMAGE" }],
-      state,
-      {
-        missionId: "prologue_glade",
-        hints: [],
-        showHints: true,
-        waveCells: compiled.markers.S,
-        allyCell: compiled.markers.A?.[0],
+      weapons: {
+        club: CLUB,
+        teeth: TEETH,
+        bow: weaponStatsFromRecord({
+          id: "bow",
+          category: "ranged",
+          apCost: 1,
+          endsTurn: true,
+          range: 8,
+          requiresLOS: true,
+          aimMod: 0,
+          minDmg: 3,
+          maxDmg: 5,
+          crit: 15,
+          critBonus: 2,
+          envDmg: 0,
+        }),
       },
+      skills: { breach: BREACH },
+      seed: 703,
+      fogDisabled: true,
+    });
+    const compiled = compilePrologueLayout(M3_LAYOUT);
+    const ctx = {
+      missionId: "prologue_glade" as const,
+      hints: [
+        { key: "m3.blow", textKey: "prologue.hint.m3.blow", once: true, forced: true, panelKey: "skill" },
+        { key: "m3.pit", textKey: "prologue.hint.m3.pit", once: true },
+        { key: "m3.more", textKey: "prologue.hint.m3.more", once: true },
+        { key: "m3.shot", textKey: "prologue.hint.m3.shot", once: true },
+      ],
+      showHints: true,
+      waveCells: compiled.markers.S,
+      rusherCell: compiled.markers.R?.[0],
+      allyCell: compiled.markers.A?.[0],
+    };
+    return { kernel, ctx, state: createPrologueRunState("prologue_glade"), compiled };
+  }
+
+  it("locks the hero to breach at the start", () => {
+    const state = createPrologueRunState("prologue_glade");
+    expect(state.forceSkillId).toBe("breach");
+    expect(gatePrologueCommand(state, { type: "DEFEND", actorId: 1 })).toBe(false);
+    expect(gatePrologueCommand(state, { type: "END_TURN", playerId: "1" })).toBe(false);
+    expect(gatePrologueCommand(state, { type: "ATTACK", actorId: 1, targetId: 2, weaponId: "club" })).toBe(false);
+    expect(gatePrologueCommand(state, { type: "USE_SKILL", actorId: 1, skillId: "breach", targetId: 2 })).toBe(true);
+  });
+
+  it("knocks the first upyr into the pit and spawns a wounded rusher without Fedot", () => {
+    const { kernel, ctx, state } = bootM3();
+    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "upyr")).toHaveLength(1);
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "strelets")).toBe(false);
+    const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
+    expect(Math.abs(bogatyr.x - upyr.x) + Math.abs(bogatyr.y - upyr.y)).toBe(1);
+    kernel.setForcedOutcome("min");
+    const applied = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id });
+    expect(applied.ok).toBe(true);
+    if (!applied.ok) return;
+    expect(applied.events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")).toBe(
+      true,
     );
-    expect(state.firstWave).toBe(true);
+    const next = afterPrologueApply(
+      kernel,
+      { type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id },
+      applied.events,
+      state,
+      ctx,
+    );
+    expect(next.forceSkillId).toBeNull();
+    expect(next.firstWave).toBe(true);
+    expect(next.handOffPending).toBe(true);
+    expect(next.fedotJoined).toBe(false);
     const after = kernel.getSnapshot();
-    expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead).length).toBeGreaterThanOrEqual(
-      2,
+    expect(after.entities.filter((entity) => entity.configId === "upyr" && !entity.dead)).toHaveLength(3);
+    expect(after.entities.some((entity) => entity.configId === "strelets")).toBe(false);
+    const rusher = after.entities.find((entity) => entity.id === next.rusherId && !entity.dead)!;
+    expect(rusher.hp).toBe(Math.floor(rusher.maxHp / 2));
+  });
+
+  it("lets only the wounded upyr approach, then Fedot one-shots him from the ridge", () => {
+    const { kernel, ctx, state } = bootM3();
+    const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
+    kernel.setForcedOutcome("min");
+    const blow = kernel.apply({ type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id });
+    if (!blow.ok) throw new Error("breach rejected");
+    let run = afterPrologueApply(
+      kernel,
+      { type: "USE_SKILL", actorId: bogatyr.id, skillId: "breach", targetId: upyr.id },
+      blow.events,
+      state,
+      ctx,
     );
-    const fedot = after.entities.find((entity) => entity.configId === "strelets" && !entity.dead);
-    expect(fedot).toBeTruthy();
-    expect(fedot?.skillIds ?? []).not.toContain("aimed_eye");
+    kernel.apply({ type: "END_TURN", playerId: "1" });
+    const healthyBefore = kernel
+      .getSnapshot()
+      .entities.filter((entity) => entity.configId === "upyr" && !entity.dead && entity.id !== run.rusherId)
+      .map((entity) => `${entity.x},${entity.y}`);
+    for (let guard = 0; guard < 8; guard += 1) {
+      const decision = tickPrologueEnemyTurn(kernel, run, ctx);
+      run = decision.state;
+      if (!decision.command) {
+        kernel.apply({ type: "END_TURN", playerId: "2" });
+        break;
+      }
+      expect(decision.command.type).toBe("MOVE");
+      if (decision.command.type === "MOVE") {
+        expect(decision.command.actorId).toBe(run.rusherId);
+      }
+      const applied = kernel.apply(decision.command);
+      if (!applied.ok) throw new Error("rusher move rejected");
+      run = afterPrologueApply(kernel, decision.command, applied.events, run, ctx);
+    }
+    const healthyAfter = kernel
+      .getSnapshot()
+      .entities.filter((entity) => entity.configId === "upyr" && !entity.dead && entity.id !== run.rusherId)
+      .map((entity) => `${entity.x},${entity.y}`);
+    expect(healthyAfter).toEqual(healthyBefore);
+    const rusher = kernel.getSnapshot().entities.find((entity) => entity.id === run.rusherId && !entity.dead)!;
+    const hero = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    expect(Math.abs(rusher.x - hero.x) + Math.abs(rusher.y - hero.y)).toBeLessThanOrEqual(1);
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "strelets" && !entity.dead)).toBe(true);
+    const shot = tickProloguePlayerTurn(kernel, run, ctx);
+    expect(shot.forceOutcome).toBe("max");
+    expect(shot.command?.type).toBe("ATTACK");
+    if (shot.command?.type === "ATTACK") expect(shot.command.targetId).toBe(rusher.id);
+    if (!shot.command) throw new Error("Fedot did not shoot");
+    const fired = kernel.apply(shot.command);
+    expect(fired.ok).toBe(true);
+    if (!fired.ok) return;
+    const afterShot = afterPrologueApply(kernel, shot.command, fired.events, shot.state, ctx);
+    expect(afterShot.fedotJoined).toBe(true);
+    expect(kernel.getSnapshot().entities.find((entity) => entity.id === run.rusherId)?.dead).toBe(true);
   });
 });
 
@@ -593,9 +690,9 @@ describe("prologue death restarts the mission", () => {
 });
 
 describe("prologue player script", () => {
-  it("issues a forceHit attack for strelets on the player turn", () => {
+  it("holds Fedot's shot until the wounded rusher is adjacent", () => {
     const layout = {
-      rows: [".M..", "U...", "..A."],
+      rows: [".M...", ".....", "U....", "....A"],
       legend: {
         M: { kind: "spawn", side: "player", unitId: "bogatyr" },
         U: { kind: "spawn", side: "enemy", unitId: "upyr" },
@@ -628,28 +725,32 @@ describe("prologue player script", () => {
       fogDisabled: true,
     });
     kernel.spawnScripted("strelets", 1, { x: 2, y: 2, z: 1 });
+    const upyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "upyr")!;
     const state = createPrologueRunState("prologue_glade");
+    state.forceSkillId = null;
     state.firstWave = true;
+    state.rusherId = upyr.id;
+    const idle = tickProloguePlayerTurn(kernel, state, {
+      missionId: "prologue_glade",
+      hints: [],
+      showHints: true,
+    });
+    expect(idle.command).toBeNull();
+    const placed = kernel.getSnapshot();
+    const bogatyr = placed.entities.find((entity) => entity.configId === "bogatyr")!;
+    const rusher = placed.entities.find((entity) => entity.id === upyr.id)!;
+    rusher.x = bogatyr.x + 1;
+    rusher.y = bogatyr.y;
+    rusher.hp = Math.floor(rusher.maxHp / 2);
+    kernel.restoreMatch(placed, kernel.getFog());
     const decision = tickProloguePlayerTurn(kernel, state, {
       missionId: "prologue_glade",
       hints: [],
       showHints: true,
-      script: {
-        actions: [
-          { unitId: "strelets", side: "player", kind: "appear", at: { x: 2, y: 2 } },
-          {
-            unitId: "strelets",
-            side: "player",
-            kind: "attack",
-            targetUnitId: "upyr",
-            weaponId: "bow",
-            forceOutcome: "hit",
-          },
-        ],
-      },
     });
-    expect(decision.forceOutcome).toBe("hit");
+    expect(decision.forceOutcome).toBe("max");
     expect(decision.command?.type).toBe("ATTACK");
+    if (decision.command?.type === "ATTACK") expect(decision.command.targetId).toBe(upyr.id);
   });
 });
 

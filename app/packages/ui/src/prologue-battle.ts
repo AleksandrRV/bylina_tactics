@@ -49,6 +49,7 @@ export function buildPrologueContext(
     // первого» — порядок маркеров в раскладке больше ни на что не влияет.
     fedotWaveSpawns: layout?.markers.S ?? layout?.markers.F?.slice(1),
     waveCells: layout?.markers.S,
+    rusherCell: layout?.markers.R?.[0],
     // Зона эвакуации открывается по клеткам раскладки, а не всей колонкой:
     // `E` — служебный символ, в маркеры он не попадает, у раскладки есть
     // отдельный список extractCells.

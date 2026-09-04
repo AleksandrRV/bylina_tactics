@@ -62,7 +62,7 @@ export const prologueScriptActionSchema = z
      * для постановочного первого удара: крыса М1 обязана укусить, но не
      * вправе искалечить героя случайным максимумом.
      */
-    forceOutcome: z.enum(["hit", "miss", "min"]).optional(),
+    forceOutcome: z.enum(["hit", "miss", "min", "max"]).optional(),
     at: z.object({ x: z.number().int(), y: z.number().int() }).strict().optional(),
     onlyIf: z.enum(["targetAlive", "targetNotPoisoned", "targetWounded", "corpseExists"]).optional(),
   })

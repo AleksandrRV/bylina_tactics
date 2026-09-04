@@ -147,7 +147,10 @@ export function useBattleScreenModel() {
   // Пульсация панели: указание обучения либо принудительная стойка М2
   // (0.20.45) — единственное место пролога, где интерфейс сам называет
   // единственно возможное действие.
-  const hintPanelKey = training.directiveView?.panelKey ?? (base.prologueStanceLock ? "defend" : null);
+  const hintPanelKey =
+    training.directiveView?.panelKey ??
+    (base.prologueStanceLock ? "defend" : null) ??
+    (base.prologueSkillLock ? "skill" : null);
 
   const screenClassName = useMemo(() => {
     return [

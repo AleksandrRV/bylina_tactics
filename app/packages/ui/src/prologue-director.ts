@@ -79,6 +79,7 @@ export interface PrologueDirectorDeps {
   setCutscenePlaying: (value: boolean) => void;
   setBusy: (value: boolean) => void;
   setPrologueStanceLock: (value: boolean) => void;
+  setPrologueSkillLock: (value: string | null) => void;
   setPrologueObjectiveKey: (key: string) => void;
   setPrologueHintKey: (key: string | null) => void;
   /** Снять выбор, действие и прицел: после отката они недействительны. */
@@ -106,6 +107,8 @@ export interface PrologueDirector {
   skip: () => void;
   /** Доиграть сценарий хода героя (после хода Нави). */
   runPlayerScript: () => Promise<void>;
+  /** М3: после сцены волны передать ход Нави, чтобы раненый упырь бросился. */
+  runPendingHandOff: () => Promise<void>;
 }
 
 export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirector {
@@ -222,6 +225,7 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
       const renderer = deps.renderer();
       const missionId = deps.mission?.id;
       deps.setPrologueStanceLock(false);
+      deps.setPrologueSkillLock(null);
       deps.setBusy(true);
       try {
         await deps.showStoryNote(deps.translate("prologue.scene.revive"), { persona: "chronicler" });
@@ -268,6 +272,22 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
       }
     };
 
-    return { runCutscene, hideSpawns, runSpawnBeats, revealExtractBeat, restartMission, skip, runPlayerScript };
+    const runPendingHandOff = async (): Promise<void> => {
+      const deps = now();
+      if (!deps.runRef.current?.handOffPending) return;
+      deps.runRef.current = { ...deps.runRef.current, handOffPending: false };
+      await deps.handOffTurn();
+    };
+
+    return {
+      runCutscene,
+      hideSpawns,
+      runSpawnBeats,
+      revealExtractBeat,
+      restartMission,
+      skip,
+      runPlayerScript,
+      runPendingHandOff,
+    };
   }, [latest]);
 }

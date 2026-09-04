@@ -59,6 +59,25 @@ export const BOGATYR: SpawnUnitConfig = {
   defense: 10,
   vision: 10,
   weapons: ["sword"],
+  skills: ["breach"],
+};
+export const BREACH = {
+  id: "breach",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  category: "melee" as const,
+  resolution: "attack" as const,
+  envDmg: 1,
+  affectsEnvironment: true,
+  filter: "all" as const,
+  cooldownTurns: 4,
+  effects: [
+    { type: "damage" as const, minDmg: 4, maxDmg: 6, crit: 10, critBonus: 2 },
+    { type: "destroyCover" as const },
+    { type: "knockback" as const },
+  ],
 };
 export const UPYR: SpawnUnitConfig = {
   id: "upyr",

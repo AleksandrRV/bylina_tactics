@@ -35,6 +35,7 @@ export function useBattlePrologueState(
     outcomeGate,
     firedCutscenesRef,
     setPrologueStanceLock,
+    setPrologueSkillLock,
     setStoryNote,
     setStoryNoteHintKey,
     setStoryNotePersona,
@@ -91,7 +92,10 @@ export function useBattlePrologueState(
    * (0.21.21). Назначается сценой, закрытие окна снимает реплику с очереди.
    */
   const [prologueHintKey, setPrologueHintKey] = useState<string | null>(
-    restoredProgress?.run.hints?.forcedKey ?? restoredProgress?.run.hints?.queue[0] ?? null,
+    restoredProgress?.run.hints?.forcedKey ??
+      restoredProgress?.run.hints?.queue[0] ??
+      prologueRunRef.current?.hints.forcedKey ??
+      null,
   );
 
   /**
@@ -182,6 +186,7 @@ export function useBattlePrologueState(
 
   useEffect(() => {
     if (prologueRunRef.current?.forceDefend) setPrologueStanceLock(true);
+    if (prologueRunRef.current?.forceSkillId) setPrologueSkillLock(prologueRunRef.current.forceSkillId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -261,6 +266,7 @@ export function useBattlePrologueState(
     setCutscenePlaying,
     setBusy,
     setPrologueStanceLock,
+    setPrologueSkillLock,
     setPrologueObjectiveKey,
     setPrologueHintKey,
     resetSelection: () => {

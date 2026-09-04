@@ -77,6 +77,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     debug,
     paused,
     setPrologueStanceLock,
+    setPrologueSkillLock,
   } = base;
   const { kernel, weapons, skills } = kernelModel;
   const { snapshot } = snapshotModel;
@@ -200,6 +201,17 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
           break;
       }
       const issued = route.command;
+      if (
+        isPrologue &&
+        kernel &&
+        issued.type === "USE_SKILL" &&
+        prologueRunRef.current?.forceSkillId &&
+        issued.skillId === prologueRunRef.current.forceSkillId
+      ) {
+        // Учебный «Пролом»: попадание без броска, минимальный урон — упырь
+        // живёт, чтобы толчок отправил его в яму, а не добивание на месте.
+        kernel.setForcedOutcome("min");
+      }
       const result = session.applyBattleCommand(issued);
       if (!result.ok) {
         // Отклонённая команда объясняется игроку (0.20.2): в обучении шаги
@@ -219,6 +231,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         // Принудительная стойка (0.20.45): пульсация кнопки и закрытые
         // прочие действия живут ровно до команды «DEFEND».
         setPrologueStanceLock(next.forceDefend);
+        setPrologueSkillLock(next.forceSkillId);
         // Что делать с итогами команды — решает battle-command: повтор
         // миссии с начала или выход стаи сценой.
         const aftermath = prologueAftermath({
@@ -242,7 +255,10 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
             director.hideSpawns(aftermath.events);
             // Сначала стая выбегает, потом загорается выход (0.20.45).
             prologueAfter = () =>
-              void director.runSpawnBeats(aftermath.events).then(() => director.revealExtractBeat());
+              void director
+                .runSpawnBeats(aftermath.events)
+                .then(() => director.revealExtractBeat())
+                .then(() => director.runPendingHandOff());
             break;
           case "none":
             break;
@@ -443,7 +459,15 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         isCaptive(entity, snapshot.objective) &&
         distH(selected.x, selected.y, entity.x, entity.y) <= 1,
     );
-    if (!captive || paused || base.busy || snapshot.activeOwner !== viewOwner || base.prologueStanceLock) return;
+    if (
+      !captive ||
+      paused ||
+      base.busy ||
+      snapshot.activeOwner !== viewOwner ||
+      base.prologueStanceLock ||
+      base.prologueSkillLock
+    )
+      return;
     applyCommand({ type: "INTERACT", actorId: selected.id, targetId: captive.id });
     setIntent({ type: "cancel" });
   }, [applyCommand, selected, viewOwner, snapshot, paused, base.busy, base.prologueStanceLock, setIntent]);
@@ -755,10 +779,12 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         if (!enemyPhaseContinues({ ...phase(), commandIssued: command !== null })) break;
         await sleep(190);
       }
+      // Сначала появление по сцене (Федот М3 вбегает на гряду), потом
+      // скрипт хода героя (выстрел). Иначе стрела уходила бы в скрытого.
+      if (enemyAfter) await enemyAfter();
       if (!restarting && isPrologue && kernel && prologueMission && prologueRunRef.current) {
         await director.runPlayerScript();
       }
-      if (enemyAfter) await enemyAfter();
     } finally {
       outcomeGate.playbackEnd();
       base.setEnemyPhase(false);
@@ -860,7 +886,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
   // служит триггером проверки автозавершения (0.21.11).
   const { shouldAutoEndTurn: autoEndTurnFn, autoEndTurnDeps } = training;
   useEffect(() => {
-    if (isPrologue && prologueRunRef.current?.forceDefend) return;
+    if (isPrologue && (prologueRunRef.current?.forceDefend || prologueRunRef.current?.forceSkillId)) return;
     if (!isTraining && !hintSettings.autoEndTurn) return;
     const ownUnits = snapshot.entities.filter(
       (entity) => !entity.dead && entity.coverType === 0 && entity.owner === viewOwner && entity.maxAp > 0,
