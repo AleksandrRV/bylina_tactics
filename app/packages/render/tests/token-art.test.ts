@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { M1_ART, RECRUIT_ART } from "../src/token-art.js";
+import { M1_ART, M5_ART, RECRUIT_ART } from "../src/token-art.js";
 import type { EntityState } from "@bylina/core";
 
 /**
@@ -70,7 +70,7 @@ function entity(configId: string, weaponIds?: string[]): EntityState {
 }
 
 function draw(configId: string, target: EntityState, motionNow = 0) {
-  const art = M1_ART[configId] ?? RECRUIT_ART[configId];
+  const art = M1_ART[configId] ?? RECRUIT_ART[configId] ?? M5_ART[configId];
   expect(art, `нет иллюстрации для ${configId}`).toBeTruthy();
   const { g, points } = recordingGraphics();
   art!({ g: g as never, cx: 0, cy: 0, entity: target, motionNow });
@@ -147,5 +147,19 @@ describe("образ рекрута (0.20.43)", () => {
     // даже на малом масштабе, как дубина у вооружённого Микулы.
     expect(Math.max(...points.map((point) => point.x))).toBeGreaterThan(12);
     expect(Math.min(...points.map((point) => point.y))).toBeLessThan(-10);
+  });
+});
+
+describe("образ слизня (М5)", () => {
+  it("keeps the slug inside the token footprint and lower than a fighter", () => {
+    const slug = draw("slug", entity("slug"));
+    const hero = draw("mikula_peasant", entity("mikula_peasant"));
+    expect(slug.length).toBeGreaterThan(8);
+    const extentY = (points: RecordedPoint[]): number => Math.max(...points.map((point) => Math.abs(point.y))) * 2;
+    expect(extentY(slug)).toBeLessThan(extentY(hero));
+    for (const point of slug) {
+      expect(Math.abs(point.x)).toBeLessThanOrEqual(26);
+      expect(Math.abs(point.y)).toBeLessThanOrEqual(26);
+    }
   });
 });

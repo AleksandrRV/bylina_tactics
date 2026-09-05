@@ -56,4 +56,9 @@ describe("unit portraits (0.20.43)", () => {
     expect(unitPortrait("forest_rat")?.endsWith("forest_rat.jpg")).toBe(true);
     expect(unitPortrait("forest_rat")).not.toBe(unitPortrait("upyr"));
   });
+
+  it("gives the slug its own face", () => {
+    expect(unitPortrait("slug")?.endsWith("slug.jpg")).toBe(true);
+    expect(unitPortrait("slug")).not.toBe(unitPortrait("kikimora"));
+  });
 });

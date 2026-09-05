@@ -24,6 +24,17 @@ export function faceOf(x: number, y: number, z: number): { fx: number; fy: numbe
   };
 }
 
+/**
+ * Высота пятна тумана по клетке: грань плюс южный откос. Без откоса мгла
+ * кроет только верх плитки, и ярус на севере карты читается светлой щелью.
+ */
+export function fogCoverHeight(tile: Tile, tiles: readonly Tile[]): number {
+  const z = visualLevel(tile);
+  const south = neighborLevel(tiles, tile.x, tile.y + 1);
+  const drop = south === null ? z : Math.max(0, z - south);
+  return CELL_SIZE + drop * RISE;
+}
+
 /** Координата центра клетки в мировых пикселях. */
 export function centerOf(x: number, y: number, z: number): { cx: number; cy: number } {
   const { fx, fy } = faceOf(x, y, z);

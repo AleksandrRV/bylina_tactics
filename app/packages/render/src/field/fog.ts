@@ -5,7 +5,7 @@
 
 import { Graphics } from "pixi.js";
 import { CELL_SIZE, FOG_DRIFT_INTERVAL_MS } from "./constants.js";
-import { visualLevel, faceOf, centerOf } from "./geometry.js";
+import { visualLevel, faceOf, centerOf, fogCoverHeight } from "./geometry.js";
 import type { FieldView, Fx } from "./types.js";
 
 /** Подпись набора видимых/разведанных клеток: меняется только при их изменении. */
@@ -47,15 +47,16 @@ export function paintFogBase(fogBaseLayer: Graphics, view: FieldView | null): vo
     const z = visualLevel(tile);
     const { fx, fy } = faceOf(tile.x, tile.y, z);
     const explored = v.exploredCells?.has(key) ?? false;
+    const coverH = fogCoverHeight(tile, tiles);
     if (!explored) {
       const nearKnown =
         isKnown(tile.x - 1, tile.y) ||
         isKnown(tile.x + 1, tile.y) ||
         isKnown(tile.x, tile.y - 1) ||
         isKnown(tile.x, tile.y + 1);
-      g.rect(fx, fy, C, C).fill({ color: 0x080a0c, alpha: nearKnown ? 0.55 : 0.96 });
+      g.rect(fx, fy, C, coverH).fill({ color: 0x080a0c, alpha: nearKnown ? 0.55 : 0.96 });
     } else {
-      g.rect(fx, fy, C, C).fill({ color: 0x0c1218, alpha: 0.6 });
+      g.rect(fx, fy, C, coverH).fill({ color: 0x0c1218, alpha: 0.6 });
     }
   }
 }

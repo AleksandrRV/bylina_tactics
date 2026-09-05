@@ -235,8 +235,11 @@ export function drawTile(tile: Tile, view: FieldView | null): Graphics {
     }
   }
 
-  // Камень-глыба (блокирует обзор): валун с гранями.
-  if (tile.blockLOS) {
+  // Изба и валун оба ставят blockLOS, но дом не должен перекрываться глыбой:
+  // иначе улица Выселок читается как каменный завал.
+  if (hut) {
+    drawHutCell(g, tile, tiles, C);
+  } else if (tile.blockLOS) {
     g.ellipse(C / 2, C - 9, 16, 5).fill({ color: 0x000000, alpha: 0.28 });
     g.poly([6, C - 12, 10, 16, 24, 8, 38, 10, 46, 18, 44, C - 10, 26, C - 6, 12, C - 8]).fill(0x7a6a56);
     g.poly([10, 16, 24, 8, 38, 10, 34, 22, 16, 24]).fill(0x94836b);

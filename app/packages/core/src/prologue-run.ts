@@ -89,6 +89,12 @@ export interface PrologueRunState {
   fedotJoined: boolean;
   vasilisaJoined: boolean;
   /**
+   * М4: яд или переход за x≥8 только заказывают выход знахарки. Сама она
+   * выходит на следующем конце хода игрока — иначе яд ставится и сразу
+   * лечится, и урок «болит по капле» не успевает состояться.
+   */
+  vasilisaPending: boolean;
+  /**
    * М1: крыса вышла на поле (0.20.37). Флаг однократного появления: повторный
    * подбор палки крысу не досыпает. Гибель героя больше не откатывает сцену
    * к этой вехе — миссия начинается заново с начала (campaign.md §1.5).
@@ -145,6 +151,7 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
     firstWave: false,
     fedotJoined: false,
     vasilisaJoined: false,
+    vasilisaPending: false,
     ratSpawned: false,
     pendingCommand: null,
     pendingEvents: [],
@@ -694,8 +701,17 @@ export function afterPrologueApply(
 
   if (ctx.missionId === "prologue_village") {
     const poisonOrLine = evaluated.fired.some((item) => item.flag === "vasilisa_joined");
-    if (poisonOrLine && !next.vasilisaJoined) {
+    if (poisonOrLine && !next.vasilisaJoined) next.vasilisaPending = true;
+    // Яд тикает в начале хода отравленного — это END_TURN Нави. Знахарка
+    // выходит только когда игрок сам закончит уже отравленный ход.
+    if (
+      next.vasilisaPending &&
+      !next.vasilisaJoined &&
+      command.type === "END_TURN" &&
+      command.playerId === String(PLAYER_OWNER)
+    ) {
       next.vasilisaJoined = true;
+      next.vasilisaPending = false;
       joinVasilisa(kernel, ctx);
       enqueue(next, ctx, "m4.join");
     }
@@ -772,16 +788,14 @@ function applyScriptDecision(
   const decision = pickScriptedCommand(kernel, ctx.script, state.script, { activeOwner: owner });
   const next = { ...state, script: decision.state };
   if (decision.forceOutcome) kernel.setForcedOutcome(decision.forceOutcome);
-  if (decision.spawn) {
-    if (!(decision.spawn.unitId === "znaharka" && living(kernel.getSnapshot(), "znaharka"))) {
-      spawnUnits(
-        kernel,
-        decision.spawn.unitId,
-        decision.spawn.owner,
-        [decision.spawn.at],
-        decision.spawn.owner === ENEMY_OWNER,
-      );
-    }
+  if (decision.spawn && decision.spawn.unitId !== "znaharka") {
+    spawnUnits(
+      kernel,
+      decision.spawn.unitId,
+      decision.spawn.owner,
+      [decision.spawn.at],
+      decision.spawn.owner === ENEMY_OWNER,
+    );
   }
   return { command: decision.command, state: next, forceOutcome: decision.forceOutcome };
 }

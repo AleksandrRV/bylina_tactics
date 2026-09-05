@@ -250,11 +250,56 @@ function drawRecruit({ g, cx, cy }: TokenCtx): void {
   g.rect(cx + 9.6, cy - 5.2, 6.4, 1.4).fill(RECRUIT_LOOK.shaft);
 }
 
+/** Раскладка слизня Нави — стрелок гряды М5. */
+const SLUG_ART = {
+  body: 0x6a7a38,
+  bodyLight: 0x8aaa4a,
+  belly: 0xc4d878,
+  mucus: 0x9ec85a,
+  stalk: 0x7a8a40,
+  eye: 0xc4e85a,
+  pupil: 0x1a2010,
+  drip: 0xb8e060,
+} as const;
+
+/**
+ * Слизень: приземистый блестящий ком, стебельки-глаза, слизистый след.
+ * Силуэт ниже человека и короче крысы — тварь читается лужей, не бойцом.
+ */
+function drawSlug({ g, cx, cy }: TokenCtx): void {
+  g.ellipse(cx - 3, cy + 9, 12, 3.6).fill({ color: SLUG_ART.mucus, alpha: 0.35 });
+  g.ellipse(cx + 2, cy + 8.4, 7, 2.4).fill({ color: SLUG_ART.drip, alpha: 0.28 });
+
+  g.ellipse(cx, cy + 4.2, 12.5, 7.4).fill(SLUG_ART.body);
+  g.ellipse(cx + 1.2, cy + 2.4, 9.5, 5.2).fill(SLUG_ART.bodyLight);
+  g.ellipse(cx, cy + 6.6, 8, 3).fill(SLUG_ART.belly);
+  g.ellipse(cx + 4, cy + 1.6, 3.2, 1.6).fill({ color: 0xe8ffb0, alpha: 0.45 });
+
+  g.moveTo(cx + 3.5, cy + 0.5)
+    .quadraticCurveTo(cx + 5.5, cy - 7, cx + 8, cy - 10)
+    .stroke({ width: 1.8, color: SLUG_ART.stalk, cap: "round" });
+  g.moveTo(cx + 1.2, cy + 0.2)
+    .quadraticCurveTo(cx + 1.6, cy - 6.5, cx + 3.4, cy - 9.2)
+    .stroke({ width: 1.6, color: SLUG_ART.stalk, cap: "round" });
+  g.circle(cx + 8, cy - 10, 2.2).fill(SLUG_ART.eye);
+  g.circle(cx + 8.4, cy - 10.4, 0.8).fill(SLUG_ART.pupil);
+  g.circle(cx + 3.4, cy - 9.2, 1.9).fill(SLUG_ART.eye);
+  g.circle(cx + 3.7, cy - 9.5, 0.7).fill(SLUG_ART.pupil);
+
+  g.ellipse(cx + 7.5, cy + 6.8, 1.4, 2.2).fill({ color: SLUG_ART.drip, alpha: 0.85 });
+  g.circle(cx + 7.5, cy + 9.2, 1.1).fill(SLUG_ART.drip);
+}
+
 /** Иллюстрации этой миссии: ключ — запись бестиария или предмета. */
 export const M1_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
   mikula_peasant: drawMikulaPeasant,
   forest_rat: drawForestRat,
   stick: drawStick,
+};
+
+/** Слизень тракта (М5): собственная фишка, не заглушка и не кикимора. */
+export const M5_ART: Partial<Record<string, (ctx: TokenCtx) => void>> = {
+  slug: drawSlug,
 };
 
 /**

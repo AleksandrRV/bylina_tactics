@@ -472,8 +472,8 @@
         actions: [
           { unitId: "kikimora", side: "enemy", kind: "skill", skillId: "poison_needles", targetUnitId: "bogatyr" },
           { kind: "endTurn" },
-          { unitId: "znaharka", side: "player", kind: "appear", at: { x: 12, y: 2 } },
-          { kind: "endTurn" },
+          // Знахарка выходит контроллером сцены на ход позже яда, а не
+          // очередью: иначе появление совпадало бы с уколом.
         ],
       },
       hints: ["m4.poison", "m4.join", "m4.raise", "m4.source"],

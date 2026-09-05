@@ -17,7 +17,8 @@ const PORTRAIT_FILES: Record<string, string> = {
   // Крыса Нави получила собственный портрет: прежде в полосе противников
   // вместо неё стоял упырь (0.20.43).
   forest_rat: "forest_rat.jpg",
-  slug: "kikimora.jpg",
+  // Слизень тракта больше не занимает лицо кикиморы.
+  slug: "slug.jpg",
   // Состязательные записи рядовых (0.16.0) используют образы исходных типов.
   upyr_pvp: "upyr.jpg",
   leshy_pvp: "leshy.jpg",

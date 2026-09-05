@@ -612,6 +612,7 @@ describe("prologue M4 vasilisa", () => {
     legend: {
       M: { kind: "spawn", side: "player", unitId: "bogatyr" },
       A: { kind: "spawn", side: "player", unitId: "strelets" },
+      U: { kind: "spawn", side: "enemy", unitId: "upyr" },
       z: { kind: "spawn", side: "player", unitId: "znaharka", scripted: true },
     },
   };
@@ -631,16 +632,17 @@ describe("prologue M4 vasilisa", () => {
     expect(Math.abs((door?.x ?? 99) - bogatyr.x) + Math.abs((door?.y ?? 99) - bogatyr.y)).toBeLessThanOrEqual(4);
   });
 
-  it("joins on poison or crossing x>=8, not twice, with a sling from the hut", () => {
-    const match = createPrologueMatch({ layout, units: [BOGATYR, STRELETS, ZNAHARKA], seed: 704 });
+  it("joins a turn after poison or crossing x>=8, not twice, with a sling from the hut", () => {
+    const match = createPrologueMatch({ layout, units: [BOGATYR, STRELETS, ZNAHARKA, UPYR], seed: 704 });
     expect(match.entities.some((entity) => entity.configId === "znaharka")).toBe(false);
     const kernel = createTacticsKernel({
       initial: match,
-      units: [BOGATYR, STRELETS, ZNAHARKA],
+      units: [BOGATYR, STRELETS, ZNAHARKA, UPYR],
       weapons: { club: CLUB, sling: SLING },
       seed: 704,
     });
     const compiled = compilePrologueLayout(layout);
+    const ctx = { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] };
     let state = createPrologueRunState("prologue_village");
     const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
     state = afterPrologueApply(
@@ -659,9 +661,16 @@ describe("prologue M4 vasilisa", () => {
         },
       ],
       state,
-      { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
+      ctx,
     );
+    expect(state.vasilisaPending).toBe(true);
+    expect(state.vasilisaJoined).toBe(false);
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "znaharka")).toBe(false);
+    state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "2" }, [], state, ctx);
+    expect(state.vasilisaJoined).toBe(false);
+    state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, [], state, ctx);
     expect(state.vasilisaJoined).toBe(true);
+    expect(state.vasilisaPending).toBe(false);
     const healers = kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka");
     expect(healers).toHaveLength(1);
     expect(healers[0]?.weaponIds).toContain("sling");
@@ -683,8 +692,46 @@ describe("prologue M4 vasilisa", () => {
         },
       ],
       state,
-      { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] },
+      ctx,
     );
+    expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
+  });
+
+  it("holds the healer until the player ends the poisoned turn", () => {
+    const match = createPrologueMatch({ layout, units: [BOGATYR, STRELETS, ZNAHARKA, UPYR], seed: 704 });
+    const kernel = createTacticsKernel({
+      initial: match,
+      units: [BOGATYR, STRELETS, ZNAHARKA, UPYR],
+      weapons: { club: CLUB, sling: SLING },
+      seed: 704,
+    });
+    const compiled = compilePrologueLayout(layout);
+    const ctx = { missionId: "prologue_village", hints: [], showHints: true, healerCell: compiled.markers.z?.[0] };
+    const bogatyr = kernel.getSnapshot().entities.find((entity) => entity.configId === "bogatyr")!;
+    let state = afterPrologueApply(
+      kernel,
+      { type: "USE_SKILL", actorId: 2, skillId: "poison_needles", targetId: bogatyr.id },
+      [
+        {
+          type: "STATUS_CHANGED",
+          entityId: bogatyr.id,
+          status: "POISON",
+          applied: true,
+          duration: 2,
+          magnitude: 1,
+          sourceId: 99,
+        },
+      ],
+      createPrologueRunState("prologue_village"),
+      ctx,
+    );
+    expect(state.vasilisaPending).toBe(true);
+    expect(state.vasilisaJoined).toBe(false);
+    expect(kernel.getSnapshot().entities.some((entity) => entity.configId === "znaharka")).toBe(false);
+    state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "2" }, [], state, ctx);
+    expect(state.vasilisaJoined).toBe(false);
+    state = afterPrologueApply(kernel, { type: "END_TURN", playerId: "1" }, [], state, ctx);
+    expect(state.vasilisaJoined).toBe(true);
     expect(kernel.getSnapshot().entities.filter((entity) => entity.configId === "znaharka")).toHaveLength(1);
   });
 });
