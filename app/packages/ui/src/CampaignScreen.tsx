@@ -254,68 +254,74 @@ export function CampaignScreen() {
           <p className="eyebrow">{t("campaign.kingdom")}</p>
           <h1>{t("menu.campaign")}</h1>
         </div>
-        <div className="campaign-darkness" aria-label={t("campaign.darknessLabel")}>
-          <span className="campaign-darkness-name">{t("campaign.darkness")}</span>
-          <span className="campaign-darkness-value">
-            {state.darkness} / {state.darknessMax}
-          </span>
-          <div className="darkness-bar" aria-hidden="true">
-            <i style={{ width: `${(state.darkness / state.darknessMax) * 100}%` }} />
+        {sandboxOpen ? (
+          <div className="campaign-darkness" aria-label={t("campaign.darknessLabel")}>
+            <span className="campaign-darkness-name">{t("campaign.darkness")}</span>
+            <span className="campaign-darkness-value">
+              {state.darkness} / {state.darknessMax}
+            </span>
+            <div className="darkness-bar" aria-hidden="true">
+              <i style={{ width: `${(state.darkness / state.darknessMax) * 100}%` }} />
+            </div>
           </div>
-        </div>
-        <div className="campaign-resources" aria-label={t("campaign.resourcesLabel")}>
-          <span className="resource gold" title={t("campaign.gold")}>
-            <CoinIcon />
-            {resources.gold}
-          </span>
-          <span className="resource herbs" title={t("campaign.herbs")}>
-            <HerbIcon />
-            {resources.herbs}
-          </span>
-          <span className="resource artifacts" title={t("campaign.artifacts")}>
-            <GemIcon />
-            {resources.artifacts}
-          </span>
-        </div>
+        ) : null}
+        {sandboxOpen ? (
+          <div className="campaign-resources" aria-label={t("campaign.resourcesLabel")}>
+            <span className="resource gold" title={t("campaign.gold")}>
+              <CoinIcon />
+              {resources.gold}
+            </span>
+            <span className="resource herbs" title={t("campaign.herbs")}>
+              <HerbIcon />
+              {resources.herbs}
+            </span>
+            <span className="resource artifacts" title={t("campaign.artifacts")}>
+              <GemIcon />
+              {resources.artifacts}
+            </span>
+          </div>
+        ) : null}
       </header>
 
       {tab === "map" ? (
         <>
-          <div className="map-toolbar">
-            <p className="map-toolbar-note">
-              {lockedCount > 0 ? t("scan.hint", { radius: content.campaign.scan.radius }) : t("scan.allOpen")}
-            </p>
-            <button
-              type="button"
-              className={`scan-btn${sandboxOpen && canScan && lockedCount > 0 ? "" : " is-disabled"}`}
-              disabled={!sandboxOpen || !canScan || lockedCount === 0}
-              onClick={doScan}
-              title={t("scan.cost", { gold: scanCost.gold, herbs: scanCost.herbs, artifacts: scanCost.artifacts })}
-            >
-              <RadarIcon />
-              {t("scan.action")}
-              <span className="scan-cost" aria-hidden="true">
-                {scanCost.gold > 0 ? (
-                  <span className="cost-chip gold">
-                    <CoinIcon />
-                    {scanCost.gold}
-                  </span>
-                ) : null}
-                {scanCost.herbs > 0 ? (
-                  <span className="cost-chip herbs">
-                    <HerbIcon />
-                    {scanCost.herbs}
-                  </span>
-                ) : null}
-                {scanCost.artifacts > 0 ? (
-                  <span className="cost-chip artifacts">
-                    <GemIcon />
-                    {scanCost.artifacts}
-                  </span>
-                ) : null}
-              </span>
-            </button>
-          </div>
+          {sandboxOpen ? (
+            <div className="map-toolbar">
+              <p className="map-toolbar-note">
+                {lockedCount > 0 ? t("scan.hint", { radius: content.campaign.scan.radius }) : t("scan.allOpen")}
+              </p>
+              <button
+                type="button"
+                className={`scan-btn${sandboxOpen && canScan && lockedCount > 0 ? "" : " is-disabled"}`}
+                disabled={!sandboxOpen || !canScan || lockedCount === 0}
+                onClick={doScan}
+                title={t("scan.cost", { gold: scanCost.gold, herbs: scanCost.herbs, artifacts: scanCost.artifacts })}
+              >
+                <RadarIcon />
+                {t("scan.action")}
+                <span className="scan-cost" aria-hidden="true">
+                  {scanCost.gold > 0 ? (
+                    <span className="cost-chip gold">
+                      <CoinIcon />
+                      {scanCost.gold}
+                    </span>
+                  ) : null}
+                  {scanCost.herbs > 0 ? (
+                    <span className="cost-chip herbs">
+                      <HerbIcon />
+                      {scanCost.herbs}
+                    </span>
+                  ) : null}
+                  {scanCost.artifacts > 0 ? (
+                    <span className="cost-chip artifacts">
+                      <GemIcon />
+                      {scanCost.artifacts}
+                    </span>
+                  ) : null}
+                </span>
+              </button>
+            </div>
+          ) : null}
 
           <div
             className={`campaign-map${scanKey > 0 ? " is-scanning" : ""}${flight ? " is-flying" : ""}`}
@@ -593,6 +599,8 @@ export function CampaignScreen() {
                     <button
                       type="button"
                       className="campaign-start-btn"
+                      disabled={!sandboxOpen}
+                      title={!sandboxOpen ? t("campaign.deck1.call") : undefined}
                       onClick={() => {
                         // Р­С‚Р°Рї 4.1 (РїСЂР°РІРєР° РїРѕ СЂРµРІСЊСЋ): РєРѕСЂР°Р±Р»СЊ СѓР»РµС‚Р°РµС‚ Рє С‚РѕС‡РєРµ
                         // РІС‹Р±СЂР°РЅРЅРѕР№ РјРёСЃСЃРёРё СЃСЂР°Р·Сѓ РїРѕСЃР»Рµ В«Р’ Р±РѕР№В», РґРѕ РїРµСЂРµС…РѕРґР°
@@ -618,7 +626,14 @@ export function CampaignScreen() {
             ) : (
               <div className="mission-empty">
                 <CompassIcon />
-                <p>{t("campaign.pickMission")}</p>
+                {sandboxOpen ? (
+                  <p>{t("campaign.pickMission")}</p>
+                ) : (
+                  <>
+                    <p>{t("campaign.deck1.koschei")}</p>
+                    <p className="muted">{t("campaign.deck1.call")}</p>
+                  </>
+                )}
               </div>
             )}
           </aside>
@@ -867,7 +882,8 @@ export function CampaignScreen() {
         <button
           type="button"
           className={`campaign-tab${tab === "roster" ? " is-active" : ""}`}
-          onClick={() => setTab("roster")}
+          disabled={!sandboxOpen}
+          onClick={() => sandboxOpen && setTab("roster")}
         >
           <ShieldIcon />
           {t("campaign.tabRoster")}
@@ -889,7 +905,8 @@ export function CampaignScreen() {
         <button
           type="button"
           className={`campaign-tab${tab === "forge" ? " is-active" : ""}`}
-          onClick={() => setTab("forge")}
+          disabled={!sandboxOpen}
+          onClick={() => sandboxOpen && setTab("forge")}
         >
           <HammerIcon />
           {t("campaign.tabForge")}

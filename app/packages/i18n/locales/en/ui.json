@@ -536,7 +536,11 @@
     },
     "resumeMission": "Return to the mission",
     "abandonMission": "Abandon the mission",
-    "missionActiveHint": "Finish or abandon the started mission first."
+    "missionActiveHint": "Finish or abandon the started mission first.",
+    "deck1": {
+      "koschei": "Koschei the Deathless prepares the rite of eternal night. His death is in the needle. Until we find it, night thickens with every battle. I keep that count myself.",
+      "call": "Someone is screaming. The undead hold a man. The ship will take you there."
+    }
   },
   "missionResult": {
     "rosterOutcomes": "Druzhina outcomes",
@@ -819,6 +823,8 @@
       "toGlade": "To the glade",
       "toVillage": "To the village",
       "toRoad": "To the barrow-road",
+      "toBarrow": "Into the barrow",
+      "toDeck": "To the deck",
       "onward": "Onward",
       "toMap": "To the map"
     },
@@ -840,7 +846,8 @@
       "evacuate": "Lead both of you to the west",
       "clearGlade": "Clear the glade",
       "clearStreet": "Clear the street",
-      "clearRoad": "Cross the tract"
+      "clearRoad": "Cross the tract",
+      "destroyIdol": "Destroy the idol of Nav"
     },
     "m1": {
       "title": "Brushwood",
@@ -867,6 +874,11 @@
       "intro": "The tract to the barrow-field. Slime hangs from above.",
       "outro": "The slugs have fallen. Beyond the ridge the barrow-field lies dark."
     },
+    "m6": {
+      "title": "The Barrow",
+      "intro": "The barrow-field. In the circle — not our cross.",
+      "outro": "The idol has fallen. Nav flees. A ship descends from the sky."
+    },
     "hint": {
       "m1": {
         "endTurn": "You have had enough for today. End the turn — and you will go on again."
@@ -892,6 +904,13 @@
       "m5": {
         "slug": "They strike true and from afar. It hurts by drops. A screen is not armour, but from it they miss.",
         "breach": "A fence is no longer a wall. Breach strikes the target and cripples what it hides behind."
+      },
+      "m6": {
+        "objective": "Break the stone — do not count the skulls.",
+        "wave": "The earth stirs. Someone else is coming."
+      },
+      "ship": {
+        "arrive": "Sit. I am the Chronicler. Koschei does not send rats."
       }
     },
     "scene": {

@@ -485,6 +485,7 @@ export function createSession(
     prologue_glade: 703,
     prologue_village: 704,
     prologue_road: 705,
+    prologue_barrow: 706,
   };
 
   /** Есть ли на поле живой управляемый боец — иначе сохранение мёртвой сцены не поднимаем. */
@@ -516,13 +517,12 @@ export function createSession(
 
   /**
    * Переход от миссии пролога к следующей: после Миссии 2 — окно прокачки
-   * героя (0.21.25), в остальных случаях — сразу новый бой; `null` — карта
-   * открытой песочницы кампании.
+   * героя (0.21.25), в остальных случаях — сразу новый бой; `null` — Палуба
+   * №1 (карта кампании без открытия песочницы: глава остаётся «prologue»).
    */
   const routeNextPrologue = (nextMissionId: string | null): boolean => {
     if (!nextMissionId) {
-      campaign?.openSandboxFromPrologue();
-      emit({ ...idle, screen: "campaign", prologueMissionId: null });
+      emit({ ...idle, screen: "campaign" });
       return true;
     }
     openPrologueBattle(nextMissionId);
@@ -732,6 +732,9 @@ export function createSession(
       });
     },
     startCampaignMission: (missionId) => {
+      // Палуба №1: глава ещё «prologue», точки карты открыты, но высадка
+      // в песочницу отсюда запрещена — иначе игрок начинает sandbox.
+      if (requireCampaign().getState().chapter === "prologue") return false;
       const ok = requireCampaign().startMission(missionId);
       if (!ok) return false;
       emit({
@@ -1290,6 +1293,7 @@ export function createSession(
           prologue_glade: 50,
           prologue_village: 50,
           prologue_road: 50,
+          prologue_barrow: 50,
         };
         const gained = bonusPerMission[cur] ?? 50;
         campaign.grantPrologueXp(cur, gained);

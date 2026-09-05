@@ -9,6 +9,12 @@
     countPerWave: 2,
     maxConcurrentEnemies: 8,
     spawnEdge: "north",
+    spawnCells: [
+      { x: 4, y: 0 },
+      { x: 5, y: 0 },
+      { x: 6, y: 0 },
+      { x: 7, y: 0 },
+    ],
   },
   profiles: {
     m2_cry_wave: {

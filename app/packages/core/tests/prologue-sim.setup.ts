@@ -120,6 +120,27 @@ export const SLUG: SpawnUnitConfig = {
   preferredRange: 8,
   weapons: ["spit"],
 };
+export const KIKIMORA: SpawnUnitConfig = {
+  id: "kikimora",
+  maxHealth: 5,
+  maxAP: 2,
+  mobility: 4,
+  aim: 55,
+  defense: 0,
+  vision: 8,
+  weapons: ["needle"],
+  skills: ["poison_needles", "raise_skeleton"],
+};
+export const IDOL: SpawnUnitConfig = {
+  id: "idol",
+  maxHealth: 14,
+  maxAP: 1,
+  mobility: 1,
+  aim: 0,
+  defense: 0,
+  vision: 0,
+  weapons: [],
+};
 
 /* ---------- Общие виды оружия ---------- */
 
@@ -163,6 +184,34 @@ export const SPIT = weaponStatsFromRecord({
   maxDmg: 2,
   crit: 0,
   critBonus: 0,
+  envDmg: 0,
+});
+export const CLAWS = weaponStatsFromRecord({
+  id: "claws",
+  category: "melee",
+  apCost: 1,
+  endsTurn: true,
+  range: 1,
+  requiresLOS: false,
+  aimMod: 0,
+  minDmg: 2,
+  maxDmg: 4,
+  crit: 10,
+  critBonus: 1,
+  envDmg: 0,
+});
+export const NEEDLE = weaponStatsFromRecord({
+  id: "needle",
+  category: "ranged",
+  apCost: 1,
+  endsTurn: true,
+  range: 6,
+  requiresLOS: true,
+  aimMod: 0,
+  minDmg: 1,
+  maxDmg: 2,
+  crit: 5,
+  critBonus: 1,
   envDmg: 0,
 });
 

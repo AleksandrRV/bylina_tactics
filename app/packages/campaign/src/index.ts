@@ -543,6 +543,7 @@ export function createCampaign(config: CampaignConfig, options: CampaignOptions 
       prologue_glade: ["bogatyr", "strelets", "mikula_peasant", "fedot_stranded"],
       prologue_village: ["bogatyr", "strelets", "znaharka", "mikula_peasant", "fedot_stranded"],
       prologue_road: ["bogatyr", "strelets", "znaharka", "mikula_peasant", "fedot_stranded"],
+      prologue_barrow: ["bogatyr", "strelets", "znaharka", "mikula_peasant", "fedot_stranded"],
     };
     const allowed = PARTICIPANTS[missionId];
     const xpGains: XpGain[] = [];

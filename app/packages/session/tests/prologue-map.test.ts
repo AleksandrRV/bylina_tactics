@@ -169,7 +169,7 @@ describe("prologue M5 map", () => {
   it("lays the tract on three tiers with a single pit and four slugs", () => {
     expect(mission.map.biome).toBe("meadow");
     expect(mission.fog).toBe(true);
-    expect(mission.nextMissionId ?? null).toBeNull();
+    expect(mission.nextMissionId).toBe("prologue_barrow");
     const tiers = new Set(grid.tiles.map((tile) => tile.z));
     expect([...tiers].sort()).toEqual([0, 1, 2]);
     for (const tile of grid.tiles) {

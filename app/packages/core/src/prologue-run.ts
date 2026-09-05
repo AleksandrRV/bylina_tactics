@@ -127,7 +127,12 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
   return {
     script: { index: 0 },
     mission: createMissionScriptState(),
-    hints: missionId === "prologue_glade" ? { shown: [], queue: [], forcedKey: "m3.blow" } : createHintsManagerState(),
+    hints:
+      missionId === "prologue_glade"
+        ? { shown: [], queue: [], forcedKey: "m3.blow" }
+        : missionId === "prologue_barrow"
+          ? { shown: [], queue: ["m6.objective"], forcedKey: null }
+          : createHintsManagerState(),
     reinforcements: createReinforcementsState(),
     forceDefend: false,
     forceSkillId: missionId === "prologue_glade" ? "breach" : null,
@@ -145,7 +150,9 @@ export function createPrologueRunState(missionId: string): PrologueRunState {
             ? "prologue.objective.clearStreet"
             : missionId === "prologue_road"
               ? "prologue.objective.clearRoad"
-              : "prologue.objective.gather",
+              : missionId === "prologue_barrow"
+                ? "prologue.objective.destroyIdol"
+                : "prologue.objective.gather",
     outcome: "ongoing",
     waveArmed: false,
     firstWave: false,
@@ -733,6 +740,16 @@ export function afterPrologueApply(
     }
   }
 
+  if (ctx.missionId === "prologue_barrow") {
+    const after = kernel.getSnapshot();
+    const idolAlive = after.entities.some((entity) => entity.configId === "idol" && !entity.dead);
+    if (!idolAlive && livingPlayers(after).length) {
+      next.mission.flags.idolFallen = true;
+      enqueue(next, ctx, "ship.arrive");
+      next.outcome = "victory";
+    }
+  }
+
   return harvest(next);
 }
 
@@ -805,7 +822,11 @@ export function tickPrologueEnemyTurn(
   state: PrologueRunState,
   ctx: PrologueRunContext,
 ): { command: Command | null; state: PrologueRunState; forceOutcome?: "hit" | "miss" | "min" | "max" } {
-  const next = { ...state, reinforcements: { ...state.reinforcements } };
+  const next = {
+    ...state,
+    reinforcements: { ...state.reinforcements },
+    pendingEvents: [...state.pendingEvents],
+  };
   // Тик вызывается перед каждой командой Нави, но прибавляет подкрепление
   // один раз за ход: сервис сам помнит ход, в котором уже отработал
   // (campaign.md §12.1, §7.2 п. 10; 0.21.19).
@@ -817,6 +838,21 @@ export function tickPrologueEnemyTurn(
       tick.spawns.map((spawn) => spawn.at),
       false,
     );
+  }
+  // М6: порог «меньше пяти живых Нави» (идол не в счёте) — через ход двое
+  // из пула, потолок восемь. Тип спавна берётся из `spawn.unitId`, не всегда
+  // крысы (campaign.md §7.6 / §12.1).
+  if (ctx.missionId === "prologue_barrow" && ctx.reinforcements) {
+    const tick = tickReinforcements(kernel.getSnapshot(), ctx.reinforcements, next.reinforcements);
+    next.reinforcements = tick.state;
+    if (tick.telegraph.length > 0) enqueue(next, ctx, "m6.wave");
+    for (const spawn of tick.spawns) {
+      spawnUnits(kernel, spawn.unitId, ENEMY_OWNER, [spawn.at], true);
+    }
+    if (spawnEvents.length > 0) {
+      next.pendingEvents = [...next.pendingEvents, ...spawnEvents];
+      spawnEvents = [];
+    }
   }
   // М5: слизни стоят на гряде и плюют по линии наблюдения. Не ползут и
   // не встают в дозор — иначе учебный подход превращался бы в погоню.

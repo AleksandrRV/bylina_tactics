@@ -113,6 +113,17 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
     }
     if (entry.kind === "spawn" && entry.unitId) {
       if (entry.scripted) continue;
+      // Идол Нави (М6): объект уничтожения, не боец. Владелец 0, без ОД,
+      // не в счёте истребления — живые упыри и кикиморы после его падения
+      // не мешают победе (campaign.md §7.6).
+      if (entry.unitId === "idol") {
+        spawnAt(ch, entry.unitId, 0, (entity) => {
+          entity.ap = 0;
+          entity.maxAp = 0;
+          entity.countsForElimination = false;
+        });
+        continue;
+      }
       const owner = entry.side === "enemy" ? ENEMY_OWNER : PLAYER_OWNER;
       spawnAt(ch, entry.unitId, owner, (entity) => {
         // Снаряжение из раскладки (0.20.45): М2 продолжает М1, и герой
@@ -124,9 +135,11 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
     }
   }
 
+  const hasIdol = entities.some((entity) => entity.configId === "idol");
   return {
     turnNumber: 1,
     activeOwner: PLAYER_OWNER,
+    objective: hasIdol ? { kind: "destroy", unitId: "idol" } : undefined,
     grid: compiled.grid,
     entities,
     rngSeed: String((options.seed ?? 1) >>> 0),

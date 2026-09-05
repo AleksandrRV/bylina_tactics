@@ -15,5 +15,8 @@
     { key: "m4.source",                           textKey: "prologue.hint.m4.source",      once: true },
     { key: "m5.slug",                             textKey: "prologue.hint.m5.slug",        once: true },
     { key: "m5.breach",                           textKey: "prologue.hint.m5.breach",      once: true },
+    { key: "m6.objective",                        textKey: "prologue.hint.m6.objective",   once: true },
+    { key: "m6.wave",                             textKey: "prologue.hint.m6.wave",        once: true },
+    { key: "ship.arrive",                         textKey: "prologue.hint.ship.arrive",    once: true },
   ],
 }

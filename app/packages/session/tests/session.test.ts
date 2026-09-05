@@ -705,16 +705,17 @@ describe("createSession prologue route (0.20.31)", () => {
     expect(automaton.assignClass(mikula.id, "bogatyr")).toBe(true);
   });
 
-  it("opens the campaign sandbox when the prologue chain ends (0.20.35)", () => {
+  it("opens Deck 1 without sandbox when the prologue chain ends (0.21.38)", () => {
     const session = createSession("menu");
     const automaton = createCampaign(CAMPAIGN_CONFIG, { chapter: "prologue", unitStats: UNIT_STATS });
     session.bindCampaign(automaton);
-    session.startPrologue("prologue_village", true);
+    session.startPrologue("prologue_barrow", true);
     expect(session.getCampaign().getState().chapter).toBe("prologue");
     expect(session.advancePrologue(null)).toBe(true);
     expect(session.get().screen).toBe("campaign");
     expect(session.get().prologueMissionId ?? null).toBeNull();
-    expect(session.getCampaign().getState().chapter).toBe("open");
+    expect(session.getCampaign().getState().chapter).toBe("prologue");
+    expect(session.startCampaignMission("clearing_1")).toBe(false);
   });
 });
 

@@ -179,7 +179,11 @@ export function BattleDialogs() {
                         ? "prologue.next.toVillage"
                         : prologueMission.id === "prologue_village" && prologueMission.nextMissionId
                           ? "prologue.next.toRoad"
-                          : "prologue.next.toMap",
+                          : prologueMission.id === "prologue_road" && prologueMission.nextMissionId
+                            ? "prologue.next.toBarrow"
+                            : prologueMission.id === "prologue_barrow"
+                              ? "prologue.next.toDeck"
+                              : "prologue.next.toMap",
               )}
             </button>
           </div>

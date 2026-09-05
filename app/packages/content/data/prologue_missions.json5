@@ -1,4 +1,4 @@
-// Цепочка М1–М5. Этап 1: данные закрыты флагом enabled.
+// Цепочка М1–М6. Этап 1: данные закрыты флагом enabled.
 {
   enabled: true,
   roster: ["mikula_peasant", "fedot_stranded", "bogatyr", "strelets", "znaharka"],
@@ -484,7 +484,7 @@
       titleKey: "prologue.m5.title",
       introKey: "prologue.m5.intro",
       outroKey: "prologue.m5.outro",
-      nextMissionId: null,
+      nextMissionId: "prologue_barrow",
       playerSlots: ["bogatyr", "strelets", "znaharka"],
       fog: true,
       map: {
@@ -580,6 +580,127 @@
         },
       ],
       onboarding: [],
+    },
+    {
+      id: "prologue_barrow",
+      titleKey: "prologue.m6.title",
+      introKey: "prologue.m6.intro",
+      outroKey: "prologue.m6.outro",
+      nextMissionId: null,
+      playerSlots: ["bogatyr", "strelets", "znaharka"],
+      fog: true,
+      map: {
+        biome: "meadow",
+        width: 12,
+        height: 10,
+        pitChance: 0.0,
+        coverDensity: 0.0,
+        wallDensity: 0.0,
+        edgeCoverChance: 0.0,
+        halfCoverChance: 0.0,
+        heightMix: { z0: 0.0, z1: 0.8, z2: 0.2 },
+        layout: {
+          // Могильник (campaign.md §7.6): 12×10, идол в частоколе, западный
+          // проход к истукану, север — клетки подкрепления (4,0)–(7,0).
+          // Частокол — полное укрытие `C`, не маркер `F`.
+          rows: [
+            "ttt.....tttt",
+            "t..........t",
+            "...c....CCC.",
+            "M...U....ICK",
+            "A.....U.CCC.",
+            "V..e.....K..",
+            "............",
+            "t..........t",
+            "tt..t....ttt",
+            "tttttttttttt",
+          ],
+          // Частокол и идол — ярус 2, остальное — ярус 1. Скачков в два
+          // яруса между соседями нет.
+          heights: [
+            "111111111111",
+            "111111111111",
+            "111111112221",
+            "111111112221",
+            "111111112221",
+            "111111111111",
+            "111111111111",
+            "111111111111",
+            "111111111111",
+            "111111111111",
+          ],
+          legend: {
+            ".": { kind: "ground" },
+            "t": { kind: "decor", decor: "bush" },
+            "c": { kind: "cover", coverType: 1 },
+            "C": { kind: "cover", coverType: 2 },
+            "e": { kind: "cover", coverType: 1, edge: 0 },
+            "M": { kind: "spawn", side: "player", unitId: "bogatyr", weapons: ["club"] },
+            "A": { kind: "spawn", side: "player", unitId: "strelets", weapons: ["bow"] },
+            "V": { kind: "spawn", side: "player", unitId: "znaharka", weapons: ["sling"] },
+            "U": { kind: "spawn", side: "enemy", unitId: "upyr" },
+            "K": { kind: "spawn", side: "enemy", unitId: "kikimora" },
+            "I": { kind: "spawn", side: "neutral", unitId: "idol" },
+          },
+        },
+      },
+      enemies: [
+        { unitId: "upyr", count: 2 },
+        { unitId: "kikimora", count: 2 },
+      ],
+      objective: {
+        initialTextKey: "prologue.objective.destroyIdol",
+      },
+      script: {
+        priority: [
+          { unitId: "kikimora", side: "enemy", kind: "resurrect", corpseUnitId: "upyr", skillId: "raise_skeleton", onlyIf: "corpseExists" },
+        ],
+        actions: [
+          { unitId: "kikimora", side: "enemy", kind: "skill", skillId: "poison_needles", targetUnitId: "bogatyr" },
+          { kind: "endTurn" },
+        ],
+      },
+      hints: ["m6.objective", "m6.wave", "ship.arrive"],
+      cutscenes: [
+        {
+          id: "m6_intro",
+          trigger: { kind: "missionStart" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.6,
+          steps: [
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 420, holdMs: 500 },
+            { kind: "pan", target: { configId: "idol" }, durationMs: 1100, holdMs: 800, accent: true },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 700 },
+          ],
+        },
+        {
+          id: "m6_wave",
+          trigger: { kind: "onSpawn", configId: "forest_rat" },
+          once: true,
+          lockInput: true,
+          skippable: true,
+          zoom: 1.5,
+          steps: [
+            { kind: "pan", target: { configId: "forest_rat" }, durationMs: 420, runInMs: 620, follow: true, holdMs: 400 },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 600 },
+          ],
+        },
+        {
+          id: "m6_ship",
+          trigger: { kind: "onFlag", flag: "idolFallen" },
+          lockInput: true,
+          skippable: true,
+          zoom: 1.4,
+          steps: [
+            { kind: "pan", target: { configId: "idol" }, durationMs: 500, holdMs: 400 },
+            { kind: "pan", target: { cell: { x: 6, y: 0 } }, durationMs: 900, holdMs: 700, accent: true },
+            { kind: "pan", target: { configId: "bogatyr" }, durationMs: 600 },
+          ],
+        },
+      ],
+      onboarding: [],
+      reinforcements: "default",
     },
   ],
 }

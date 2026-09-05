@@ -495,6 +495,7 @@ describe("prologue content (0.20.31)", () => {
       "prologue_glade",
       "prologue_village",
       "prologue_road",
+      "prologue_barrow",
     ]);
     expect(result.data.prologue.prologueFinalMissionId).toBe("prologue_road");
     expect(result.data.prologue.missions.map((mission: { fog: boolean }) => mission.fog)).toEqual([
@@ -503,11 +504,13 @@ describe("prologue content (0.20.31)", () => {
       true,
       true,
       true,
+      true,
     ]);
     expect(result.data.prologue.missions.map((mission: { map: { biome?: string } }) => mission.map.biome)).toEqual([
       "meadow",
       "swamp",
       "thicket",
+      "meadow",
       "meadow",
       "meadow",
     ]);
@@ -524,6 +527,15 @@ describe("prologue content (0.20.31)", () => {
     expect(hintKeys).toContain("m4.source");
     expect(hintKeys).toContain("m5.slug");
     expect(hintKeys).toContain("m5.breach");
+    expect(hintKeys).toContain("m6.objective");
+    expect(hintKeys).toContain("m6.wave");
+    expect(hintKeys).toContain("ship.arrive");
+    expect(result.data.prologue.missions.find((mission) => mission.id === "prologue_barrow")?.nextMissionId ?? null).toBe(
+      null,
+    );
+    expect(result.data.prologue.missions.find((mission) => mission.id === "prologue_road")?.nextMissionId).toBe(
+      "prologue_barrow",
+    );
     expect(result.data.prologueBestiary.units.find((unit) => unit.id === "slug")?.preferredRange).toBe(8);
     expect(result.data.reinforcements.profiles?.m2_cry_wave?.mode).toBe("onKill");
     expect(
