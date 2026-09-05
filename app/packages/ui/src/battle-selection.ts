@@ -75,6 +75,21 @@ export interface FirstFighterOptions extends BattleSide {
  * не на поле, выбор падает на первого своего — пустой выбор оставил бы
  * экран без бойца посреди урока.
  */
+/**
+ * Ближайший в списке свой боец с оставшимися очками действия (0.21.36).
+ * Если выбранный уже имеет ОД — он и есть ответ; иначе первый в порядке
+ * высадки, у кого ещё есть очки. Нужен кнопке «Нет» в подтверждении конца хода.
+ */
+export function firstFighterWithAp(
+  entities: EntityState[],
+  side: BattleSide,
+  selectedId: number | null,
+): number | null {
+  const withAp = entities.filter((entity) => isOwnFighter(entity, side) && entity.ap > 0);
+  if (withAp.some((entity) => entity.id === selectedId)) return selectedId;
+  return withAp[0]?.id ?? null;
+}
+
 export function firstFighterId(entities: EntityState[], options: FirstFighterOptions): number | null {
   if (options.isTraining && options.trainingActorId !== null) {
     const actor = entities.find((entity) => entity.id === options.trainingActorId);

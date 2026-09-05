@@ -110,7 +110,8 @@ describe("prologue M1 sim", () => {
     );
     const after = kernel.getSnapshot();
     const armed = after.entities.find((entity) => entity.configId === "mikula_peasant")!;
-    expect(armed.weaponIds).toContain("club");
+    expect(armed.weaponIds).toEqual(["club"]);
+    expect(armed.weaponId).toBe("club");
     expect(after.entities.some((entity) => entity.configId === "stick")).toBe(false);
     expect(after.entities.some((entity) => entity.configId === "forest_rat" && !entity.dead)).toBe(true);
     expect(state.pickupDone).toBe(true);
@@ -515,6 +516,9 @@ describe("prologue M3 wave", () => {
     expect(after.entities.some((entity) => entity.configId === "strelets")).toBe(false);
     const rusher = after.entities.find((entity) => entity.id === next.rusherId && !entity.dead)!;
     expect(rusher.hp).toBe(Math.floor(rusher.maxHp / 2));
+    expect(next.hints.queue).not.toContain("m3.pit");
+    expect(next.hints.queue).not.toContain("m3.more");
+    expect(next.hints.queue).not.toContain("m3.shot");
   });
 
   it("lets only the wounded upyr approach, then Fedot one-shots him from the ridge", () => {
@@ -574,6 +578,7 @@ describe("prologue M3 wave", () => {
     const afterShot = afterPrologueApply(kernel, shot.command, fired.events, shot.state, ctx);
     expect(afterShot.fedotJoined).toBe(true);
     expect(kernel.getSnapshot().entities.find((entity) => entity.id === run.rusherId)?.dead).toBe(true);
+    expect(afterShot.hints.queue).toContain("m3.shot");
   });
 });
 

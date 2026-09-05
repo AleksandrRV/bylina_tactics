@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { DEFAULT_TRAINING_UNITS, ENEMY_OWNER, PLAYER_OWNER, createMissionMatch, livingOf } from "../src/index.js";
+import {
+  DEFAULT_TRAINING_UNITS,
+  ENEMY_OWNER,
+  PLAYER_OWNER,
+  createMissionMatch,
+  livingOf,
+  setEntityWeapons,
+} from "../src/index.js";
 
 const MAP = {
   width: 12,
@@ -125,6 +132,30 @@ describe("createMissionMatch equipment", () => {
     });
     const hero = livingOf(match2, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
     expect(hero.weaponIds?.filter((id) => id === "bow")).toHaveLength(1);
+    expect(hero.weaponIds).not.toContain("strike");
+  });
+
+  it("gives the unarmed strike when a fighter has no weapon and removes it once armed", () => {
+    const empty = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: ["bogatyr", "strelets"],
+      enemies: [{ unitId: "upyr", count: 1 }],
+      seed: 63,
+    });
+    const unarmed = livingOf(empty, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
+    expect(unarmed.weaponIds).toEqual(["strike"]);
+    expect(unarmed.weaponId).toBe("strike");
+    const armed = createMissionMatch({
+      units: Object.values(DEFAULT_TRAINING_UNITS),
+      map: MAP,
+      playerSlots: [{ unitId: "bogatyr", extraWeaponIds: ["bow"] }],
+      enemies: [{ unitId: "upyr", count: 1 }],
+      seed: 64,
+    });
+    const hero = livingOf(armed, PLAYER_OWNER).find((entity) => entity.configId === "bogatyr")!;
+    expect(hero.weaponIds).toEqual(["bow"]);
+    expect(hero.weaponId).toBe("bow");
   });
 });
 

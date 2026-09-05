@@ -1,7 +1,7 @@
 import { ENEMY_OWNER, PLAYER_OWNER } from "./debug-map.js";
 import type { SpawnUnitConfig } from "./defaults.js";
 import { tileAt } from "./grid.js";
-import { spawnUnitState } from "./match.js";
+import { setEntityWeapons, spawnUnitState } from "./match.js";
 import { compilePrologueLayout, type PrologueLayout } from "./prologue-layout.js";
 import type { EntityState, MatchState } from "./types.js";
 
@@ -119,8 +119,7 @@ export function createPrologueMatch(options: PrologueMatchOptions): MatchState {
         // выходит на ночь уже с дубиной — канон §6.1 и реплика «их будет
         // больше, чем палки». В М1 того же поля нет: дубину он найдёт.
         if (!entry.weapons || entry.weapons.length === 0) return;
-        entity.weaponIds = [...entry.weapons];
-        entity.weaponId = entry.weapons[0]!;
+        setEntityWeapons(entity, entry.weapons);
       });
     }
   }

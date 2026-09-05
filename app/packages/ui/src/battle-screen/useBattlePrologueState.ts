@@ -39,9 +39,11 @@ export function useBattlePrologueState(
     setStoryNote,
     setStoryNoteHintKey,
     setStoryNotePersona,
+    storyNote,
     storyNoteHintKey,
     setCutscenePlaying,
     setBusy,
+    cutscenePlaying,
   } = base;
 
   const { isPrologue, prologueMission } = kinds;
@@ -86,6 +88,24 @@ export function useBattlePrologueState(
   const [prologueCard, setPrologueCard] = useState<"intro" | "outro" | null>(
     isPrologue && !restoredProgress?.introSeen ? "intro" : null,
   );
+
+  const overlayOpenRef = useRef(false);
+  overlayOpenRef.current = Boolean(prologueCard || storyNote);
+  const overlayWaitersRef = useRef<Array<() => void>>([]);
+
+  /** Пока открыто текстовое окно — сцены и ход Нави ждут закрытия (0.21.36). */
+  const waitForTextOverlay = useCallback((): Promise<void> => {
+    if (!overlayOpenRef.current) return Promise.resolve();
+    return new Promise((resolve) => {
+      overlayWaitersRef.current.push(resolve);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (prologueCard || storyNote) return;
+    const waiters = overlayWaitersRef.current.splice(0);
+    for (const resolve of waiters) resolve();
+  }, [prologueCard, storyNote]);
 
   /**
    * Ключ текущей подсказки пролога, которую показывает окно `storyNote`
@@ -212,10 +232,10 @@ export function useBattlePrologueState(
 
   const seenPrologueHintRef = useRef<string | null>(null);
   useEffect(() => {
-    if (!isPrologue || prologueCard) {
+    if (!isPrologue || prologueCard || cutscenePlaying) {
       seenPrologueHintRef.current = null;
-      // Вступительная карточка либо итог миссии открыты — окно реплики
-      // уступает им экран (0.21.21).
+      // Вступительная карточка, итог миссии или кинематограф: окно реплики
+      // ждёт, пока игрок закроет текст / сцена доиграет (0.21.36).
       if (storyNoteHintKey) {
         setStoryNote(null);
         setStoryNoteHintKey(null);
@@ -238,6 +258,7 @@ export function useBattlePrologueState(
   }, [
     isPrologue,
     prologueCard,
+    cutscenePlaying,
     prologueHintKey,
     storyNoteHintKey,
     showPrologueHint,
@@ -276,6 +297,7 @@ export function useBattlePrologueState(
     battleOutcome,
     outcomeGate,
     setPrologueCard,
+    waitForTextOverlay,
   });
 
   return {
@@ -294,6 +316,7 @@ export function useBattlePrologueState(
     closeStoryNote,
     currentPrologueHintKey,
     director,
+    waitForTextOverlay,
     // Экспортируем функции из prologue-battle для использования в CommandCenter и EnemyTurn
     afterPrologueApply,
     buildPrologueContext,

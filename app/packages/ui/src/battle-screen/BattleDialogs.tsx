@@ -35,6 +35,9 @@ export function BattleDialogs() {
     closeStoryNote,
     storyNotePersona,
     cutscenePlaying,
+    endTurnConfirm,
+    confirmEndTurn,
+    cancelEndTurn,
     actionInfo,
     setActionInfo,
     unitInfo,
@@ -225,6 +228,20 @@ export function BattleDialogs() {
             )}
             <button type="button" className="hud-btn hud-btn-primary" onClick={closeStoryNote}>
               {t("common.ok")}
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {endTurnConfirm ? (
+        <div className="pause-root" role="presentation">
+          <div className="pause-card" role="dialog" aria-modal="true" aria-labelledby="end-turn-confirm-title">
+            <h2 id="end-turn-confirm-title">{t("field.endTurnConfirm")}</h2>
+            <button type="button" className="hud-btn hud-btn-primary" onClick={confirmEndTurn}>
+              {t("field.endTurnYes")}
+            </button>
+            <button type="button" className="hud-btn" onClick={cancelEndTurn}>
+              {t("field.endTurnNo")}
             </button>
           </div>
         </div>

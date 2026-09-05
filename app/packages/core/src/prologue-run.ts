@@ -10,6 +10,7 @@ import {
   type HintsManagerState,
 } from "./hints-manager.js";
 import type { TacticsKernel } from "./kernel.js";
+import { setEntityWeapons } from "./match.js";
 import {
   createMissionScriptState,
   evaluateMissionTriggers,
@@ -335,16 +336,8 @@ function armClubAndRemoveStick(kernel: TacticsKernel): void {
     if (mikula) {
       // Слот оружия — один: если свободен, дубина сразу в руки; иначе — на базу (campaign inventory).
       // В ядре база недоступна, поэтому помечаем фолбэк меткой, которую сессия переложит в запасы.
-      const hasSlot = !mikula.weaponIds || mikula.weaponIds.length === 0;
-      if (hasSlot) {
-        mikula.weaponId = "club";
-        mikula.weaponIds = ["club"];
-      } else {
-        // Не теряем дубину: кладём как запасной ствол, сессия после победы переложит в инвентарь корабля.
-        (match as unknown as { pendingClubToBase?: boolean }).pendingClubToBase = true;
-        // На всякий случай сохраняем в списке, чтобы не потерялась при сериализации.
-        if (!(mikula.weaponIds ?? []).includes("club")) mikula.weaponIds = [...(mikula.weaponIds ?? []), "club"];
-      }
+      // Дубина сменяет кулак: «удар» нужен только без оружия (0.21.36).
+      setEntityWeapons(mikula, ["club"]);
     }
   });
 }
@@ -394,24 +387,36 @@ function stripPrologueSkills(entity: { configId: string; skillIds?: string[] }):
 }
 
 /** Надеть лук стрельцу пролога: `spawnScripted` читает запись класса, а у неё оружия нет. */
-function armStreletsBow(entity: { configId: string; weaponId?: string; weaponIds?: string[] }): void {
+function armStreletsBow(entity: {
+  configId: string;
+  weaponId: string;
+  weaponIds?: string[];
+  coverType: number;
+  maxAp: number;
+}): void {
   if (entity.configId !== "strelets") return;
-  entity.weaponIds = ["bow"];
-  entity.weaponId = "bow";
+  setEntityWeapons(entity, ["bow"]);
 }
 
 /** Надеть пращу знахарке: класс без оружия, а кулак сцене не нужен. */
-function armZnaharkaSling(entity: { configId: string; weaponId?: string; weaponIds?: string[] }): void {
+function armZnaharkaSling(entity: {
+  configId: string;
+  weaponId: string;
+  weaponIds?: string[];
+  coverType: number;
+  maxAp: number;
+}): void {
   if (entity.configId !== "znaharka") return;
-  entity.weaponIds = ["sling"];
-  entity.weaponId = "sling";
+  setEntityWeapons(entity, ["sling"]);
 }
 
 function dressPrologueSpawn(entity: {
   configId: string;
-  weaponId?: string;
+  weaponId: string;
   weaponIds?: string[];
   skillIds?: string[];
+  coverType: number;
+  maxAp: number;
 }): void {
   stripPrologueSkills(entity);
   armStreletsBow(entity);
@@ -570,17 +575,7 @@ export function afterPrologueApply(
       const f = ctx.ratMarker ?? { x: 9, y: 4 };
       spawnRats(kernel, [f, { x: f.x, y: Math.min(f.y + 1, kernel.getSnapshot().grid.height - 1) }], false);
     }
-    // М2: "Стойка приняла удар" — сразу после сценарной атаки двух крыс
-    // (промах+попадание) с небольшой паузой после цифры урона второй (0.21.28):
-    // показывается после хода Нави, не после действия игрока.
-    const enemyHitAfterAmbush = events.some((event) => {
-      if (event.type !== "COMBAT_RESOLVED" || event.result === "MISS") return false;
-      const source = match.entities.find((e) => e.id === event.sourceId);
-      return source?.owner === ENEMY_OWNER;
-    });
-    if (enemyHitAfterAmbush && !next.ambushPending && !next.fedotFreed) {
-      enqueue(next, ctx, "m2.stanceWorks");
-    }
+    // Реплика «Стойка приняла удар» убрана (0.21.36): удар и так виден.
     // Освобождение Федота — само действие INTERACT (0.21.23): ядро уже сняло
     // immobile и вернуло пленника в отряд, здесь — последствия сценария.
     if (
@@ -613,7 +608,6 @@ export function afterPrologueApply(
       ).slice(0, waveRoom);
       spawnRats(kernel, wave, false);
       next.waveArmed = true;
-      enqueue(next, ctx, "m2.wave");
     }
     for (const event of events) {
       if (event.type === "ENTITY_REMOVED" && event.reason === "EXTRACTED") {
@@ -648,9 +642,8 @@ export function afterPrologueApply(
       next.forceSkillId = null;
       next.hints = dismissHint(next.hints, "m3.blow");
     }
-    if (events.some((event) => event.type === "ENTITY_DIED" && event.causeOfDeath === "FALL_INTO_PIT")) {
-      enqueue(next, ctx, "m3.pit");
-    }
+    // Реплики «яма» и «ещё» после сброса упыря убраны (0.21.36): мешали
+    // увидеть падение и выход волны. Одна фраза — после выстрела Федота.
     if (evaluated.fired.some((item) => item.flag === "firstWave") && !next.firstWave) {
       next.firstWave = true;
       next.handOffPending = true;
@@ -673,7 +666,6 @@ export function afterPrologueApply(
         });
       }
       spawnUnits(kernel, "upyr", ENEMY_OWNER, others, true);
-      enqueue(next, ctx, "m3.more");
     }
     const bogatyr = living(kernel.getSnapshot(), "bogatyr");
     const rusher =

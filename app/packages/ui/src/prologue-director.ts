@@ -89,6 +89,8 @@ export interface PrologueDirectorDeps {
   battleOutcome: () => "ongoing" | "victory" | "defeat";
   outcomeGate: OutcomeGate;
   setPrologueCard: (card: "intro" | "outro" | null) => void;
+  /** Дождаться закрытия текстового окна, прежде чем крутить сцену или ход Нави. */
+  waitForTextOverlay: () => Promise<void>;
 }
 
 /** Постановщики сцен пролога. */
@@ -122,9 +124,15 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
       return (await now().renderer()?.playCinematic?.(plan)) ?? false;
     };
 
+    const sleep = (ms: number): Promise<void> =>
+      new Promise((resolve) => {
+        window.setTimeout(resolve, ms);
+      });
+
     const runCutscene = async (event: CutsceneEvent, revealIds: readonly number[] = []): Promise<void> => {
       const deps = now();
       if (!deps.mission?.cutscenes || !deps.kernel) return;
+      await deps.waitForTextOverlay();
       const fired = [...deps.firedRef.current];
       const config = pickCutscene(deps.mission.cutscenes, event, fired);
       if (!config) return;
@@ -256,6 +264,7 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
         if (!applied.ok) break;
         await (deps.renderer()?.play(applied.events) ?? Promise.resolve());
         deps.announce(applied.events);
+        if (applied.events.some((event) => event.type === "ENTITY_DIED")) await sleep(800);
         const next = afterPrologueApply(deps.kernel, decision.command, applied.events, deps.runRef.current, ctx);
         deps.runRef.current = next;
         deps.setPrologueObjectiveKey(next.objectiveKey);
@@ -275,6 +284,7 @@ export function usePrologueDirector(deps: PrologueDirectorDeps): PrologueDirecto
     const runPendingHandOff = async (): Promise<void> => {
       const deps = now();
       if (!deps.runRef.current?.handOffPending) return;
+      await deps.waitForTextOverlay();
       deps.runRef.current = { ...deps.runRef.current, handOffPending: false };
       await deps.handOffTurn();
     };

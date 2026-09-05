@@ -9,6 +9,7 @@ import type { EntityState } from "@bylina/core";
 import {
   cyclableFighters,
   firstFighterId,
+  firstFighterWithAp,
   isOwnFighter,
   nextFighterId,
   type BattleSide,
@@ -77,5 +78,14 @@ describe("battle selection (0.20.60)", () => {
     // Обычный бой: первый свой, чужие и укрытия пропускаются.
     expect(firstFighterId([fighter(3, { coverType: 2 }), fighter(4, { owner: 2 }), hero], plain)).toBe(1);
     expect(firstFighterId([fighter(1, { owner: 2 })], plain), "своих нет").toBeNull();
+  });
+
+  it("picks the nearest fighter with remaining AP when ending the turn is cancelled", () => {
+    const spent = fighter(1, { ap: 0 });
+    const ready = fighter(2, { ap: 1 });
+    const later = fighter(3, { ap: 2 });
+    expect(firstFighterWithAp([spent, ready, later], side, 1), "с отходившего — на ближайшего с ОД").toBe(2);
+    expect(firstFighterWithAp([spent, ready, later], side, 2), "выбранный уже с ОД").toBe(2);
+    expect(firstFighterWithAp([spent], side, 1), "ни у кого нет ОД").toBeNull();
   });
 });

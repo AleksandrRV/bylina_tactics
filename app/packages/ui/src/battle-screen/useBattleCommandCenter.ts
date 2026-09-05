@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   ENEMY_OWNER,
   PLAYER_OWNER,
@@ -17,7 +17,7 @@ import { gatePrologueCommand, clampPrologueCommand } from "../prologue-battle.js
 import { resolveCellClick } from "../battle-cell-click.js";
 import { meleeStrikeOf, planCharge, type ChargePlan, type MeleeStrike } from "../charge-attack.js";
 import { cellKey } from "../cell-interaction.js";
-import { firstFighterId } from "../battle-selection.js";
+import { firstFighterId, firstFighterWithAp } from "../battle-selection.js";
 import { enemyPhaseActive, enemyPhaseContinues, type EnemyPhaseState } from "../battle-enemy-phase.js";
 import { useLatest } from "../hooks.js";
 import type { BattleScreenBase } from "./useBattleScreenBase.js";
@@ -119,6 +119,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     showPrologueHint,
     currentPrologueHintKey,
     director,
+    waitForTextOverlay,
     afterPrologueApply: applyPrologueAfter,
     buildPrologueContext: buildContext,
     recordTelemetry: recTelemetry,
@@ -747,6 +748,7 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
         // ниже по телу цикла оно уже не пусто.
         if (!kernel) break;
         if (!enemyPhaseActive(phase())) break;
+        if (isPrologue) await waitForTextOverlay();
         let command: Command | null;
         if (isTraining) {
           const scriptState = enemyScriptRef.current;
@@ -850,6 +852,29 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     await runEndTurnSequence();
   }, [paused, isReplay, isSpectator, session, viewOwner, runEndTurnSequence]);
 
+  const [endTurnConfirm, setEndTurnConfirm] = useState(false);
+
+  const confirmEndTurn = useCallback((): void => {
+    setEndTurnConfirm(false);
+    setIntent({ type: "cancel" });
+    setLog(null);
+    if (battleKind === "pvp") {
+      session.sendPvpCommand({ type: "END_TURN", playerId: String(viewOwner) });
+      return;
+    }
+    if (isNetGuest) {
+      session.sendNetCommand({ type: "END_TURN", playerId: String(viewOwner) });
+      return;
+    }
+    void runEndTurnSequence();
+  }, [battleKind, isNetGuest, runEndTurnSequence, session, setIntent, setLog, viewOwner]);
+
+  const cancelEndTurn = useCallback((): void => {
+    setEndTurnConfirm(false);
+    const nextId = firstFighterWithAp(snapshot.entities, { viewOwner, isSpectator, isReplay }, selectedId);
+    if (nextId !== null) setIntent({ type: "select", actorId: nextId });
+  }, [isReplay, isSpectator, selectedId, setIntent, snapshot.entities, viewOwner]);
+
   /**
    * Конец хода: команда, проигрывание событий, ход Нави и
    * возврат управления игроку. Собственно конец хода — через кнопку.
@@ -863,16 +888,6 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       trainingDeny("endTurn");
       return;
     }
-    setIntent({ type: "cancel" });
-    setLog(null);
-    if (battleKind === "pvp") {
-      session.sendPvpCommand({ type: "END_TURN", playerId: String(viewOwner) });
-      return;
-    }
-    if (isNetGuest) {
-      session.sendNetCommand({ type: "END_TURN", playerId: String(viewOwner) });
-      return;
-    }
     if (
       isPrologue &&
       prologueRunRef.current &&
@@ -883,27 +898,27 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
       showPrologueHint(currentPrologueHintKey() ?? "m2.noise");
       return;
     }
-    void runEndTurnSequence();
+    // Обучение учит жать кнопку — подтверждение там мешает шагу.
+    if (!isTraining && !allOwnApSpent(snapshot.entities, viewOwner)) {
+      setEndTurnConfirm(true);
+      return;
+    }
+    confirmEndTurn();
   }, [
     paused,
     base.busy,
     base.outcomePending,
     snapshot.activeOwner,
+    snapshot.entities,
     viewOwner,
     isTraining,
     directiveView,
     trainingDeny,
-    setIntent,
-    setLog,
-    battleKind,
-    isNetGuest,
     isPrologue,
     prologueRunRef,
-    deps.prologue,
     showPrologueHint,
     currentPrologueHintKey,
-    runEndTurnSequence,
-    session,
+    confirmEndTurn,
   ]);
 
   // Автозавершение хода стороны наступает само, когда ни один боец стороны не имеет
@@ -1203,6 +1218,9 @@ export function useBattleCommandCenter(deps: BattleCommandCenterDeps) {
     chargeFor,
     debugAutoWin,
     endTurn,
+    endTurnConfirm,
+    confirmEndTurn,
+    cancelEndTurn,
     runEndTurnSequence,
     runEnemyPhase,
     handOffTurnToEnemy,

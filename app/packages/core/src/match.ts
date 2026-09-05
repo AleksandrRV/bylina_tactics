@@ -5,6 +5,50 @@ import { enemySpawns, generateBattlefield, playerSpawns, QUICK_MATCH_MAP, type M
 import { DEFAULT_TRAINING_UNITS, type SpawnUnitConfig } from "./defaults.js";
 import type { EntityState, Grid, MatchState, MissionObjective } from "./types.js";
 
+const UNARMED_ID = "strike";
+
+/**
+ * Кулак — запасной удар человека без оружия (0.21.36).
+ *
+ * Если в руках есть настоящее оружие, «удар» убирается. Если оружия не
+ * осталось, кулак возвращается, чтобы боец мог атаковать. Действует всегда:
+ * пролог, кампания, обучение, быстрый матч и состязание.
+ */
+export function syncUnarmedStrike(entity: {
+  weaponId: string;
+  weaponIds?: string[];
+  coverType: number;
+  maxAp: number;
+  dead?: boolean;
+}): void {
+  if (entity.dead || entity.coverType !== 0 || entity.maxAp <= 0) return;
+  const current = entity.weaponIds ?? (entity.weaponId ? [entity.weaponId] : []);
+  const real = current.filter((id) => id && id !== UNARMED_ID);
+  if (real.length > 0) {
+    entity.weaponIds = real;
+    entity.weaponId = real.includes(entity.weaponId) ? entity.weaponId : real[0]!;
+    return;
+  }
+  entity.weaponIds = [UNARMED_ID];
+  entity.weaponId = UNARMED_ID;
+}
+
+/** Надеть оружие и сразу согласовать кулак: не копить «удар» рядом с дубиной. */
+export function setEntityWeapons(
+  entity: {
+    weaponId: string;
+    weaponIds?: string[];
+    coverType: number;
+    maxAp: number;
+    dead?: boolean;
+  },
+  weaponIds: readonly string[],
+): void {
+  entity.weaponIds = [...weaponIds];
+  entity.weaponId = weaponIds[0] ?? "";
+  syncUnarmedStrike(entity);
+}
+
 function pickUnit(units: SpawnUnitConfig[] | undefined, id: string): SpawnUnitConfig {
   if (units) {
     const found = units.find((unit) => unit.id === id);
@@ -27,14 +71,7 @@ export function spawnUnitState(
   rosterIndex?: number,
 ): EntityState {
   const weaponIds = [...config.weapons];
-  // Оружие не привязано к классу (0.21.25): человек дружины без оружия из
-  // экипировки получает базовый «удар» (кулак). Звери и чудовища Нави всегда
-  // несут естественное оружие в записи, поэтому для них этот путь не
-  // срабатывает.
-  if (weaponIds.length === 0 && config.side === "druzhina") {
-    weaponIds.push("strike");
-  }
-  return {
+  const spawned: EntityState = {
     id,
     configId: config.id,
     owner,
@@ -73,6 +110,8 @@ export function spawnUnitState(
     movementSpent: 0,
     rosterIndex,
   };
+  syncUnarmedStrike(spawned);
+  return spawned;
 }
 
 export interface QuickMatchOptions {
@@ -131,9 +170,7 @@ export interface MissionMatchOptions {
  * состязание, обучение) выдают его из своей конфигурации.
  */
 function applyLoadout(entity: EntityState, weaponIds: readonly string[]): void {
-  if (weaponIds.length === 0) return;
-  entity.weaponIds = [...weaponIds];
-  entity.weaponId = weaponIds[0]!;
+  setEntityWeapons(entity, weaponIds);
 }
 
 /** Ближайшая свободная клетка к точке (x0, y0): без ямы, стены, укрытия и сущности. */
@@ -224,6 +261,7 @@ export function createMissionMatch(options: MissionMatchOptions): MatchState {
       }
       spawned.weaponIds = [...(spawned.weaponIds ?? []), ...extra];
       if (spawned.weaponId === "" && extra.length > 0) spawned.weaponId = extra[0]!;
+      syncUnarmedStrike(spawned);
     }
     if (entry.mods.extraSkillIds) {
       const owned = new Set(spawned.skillIds ?? []);

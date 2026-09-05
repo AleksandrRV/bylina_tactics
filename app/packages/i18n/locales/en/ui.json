@@ -46,6 +46,9 @@
   "field": {
     "back": "Menu",
     "endTurn": "End turn",
+    "endTurnConfirm": "Your fighters still have action points. Are you sure you want to end the turn?",
+    "endTurnYes": "Yes",
+    "endTurnNo": "No",
     "turn": "Turn {turn}",
     "ap": "AP {current} / {max}",
     "height": "Tier {z}",
