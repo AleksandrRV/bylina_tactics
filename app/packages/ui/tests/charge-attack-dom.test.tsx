@@ -125,6 +125,17 @@ describe("рывок к цели в экране боя (0.20.50)", () => {
       await act(async () => {
         endTurn.click();
       });
+      // Подтверждение конца хода при оставшихся ОД (0.21.36): без него
+      // клик только открывает диалог, ход не передаётся, и тест висит.
+      const confirm = document
+        .querySelector("#end-turn-confirm-title")
+        ?.closest(".pause-card")
+        ?.querySelector<HTMLButtonElement>(".hud-btn-primary");
+      if (confirm) {
+        await act(async () => {
+          confirm.click();
+        });
+      }
       const advanced = await waitUntil(() => {
         const current = session.getBattleSnapshot(1);
         return current.turnNumber > turn && current.activeOwner === 1;

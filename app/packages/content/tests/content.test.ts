@@ -530,9 +530,9 @@ describe("prologue content (0.20.31)", () => {
     expect(hintKeys).toContain("m6.objective");
     expect(hintKeys).toContain("m6.wave");
     expect(hintKeys).toContain("ship.arrive");
-    expect(result.data.prologue.missions.find((mission) => mission.id === "prologue_barrow")?.nextMissionId ?? null).toBe(
-      null,
-    );
+    expect(
+      result.data.prologue.missions.find((mission) => mission.id === "prologue_barrow")?.nextMissionId ?? null,
+    ).toBe(null);
     expect(result.data.prologue.missions.find((mission) => mission.id === "prologue_road")?.nextMissionId).toBe(
       "prologue_barrow",
     );
